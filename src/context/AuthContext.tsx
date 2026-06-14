@@ -1,32 +1,45 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { mockFounder, mockInvestor } from '../data/mockData';
 
 interface AuthContextValue {
   currentUser: User;
   role: UserRole;
-  switchRole: (role: UserRole) => void;
   isInvestor: boolean;
   isFounder: boolean;
+  isLoggedIn: boolean;
+  login: (role: UserRole) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User>(mockFounder);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [role, setRole] = useState<UserRole>('founder');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const switchRole = useCallback((role: UserRole) => {
-    setCurrentUser(role === 'investor' ? mockInvestor : mockFounder);
-  }, []);
+  const currentUser: User = role === 'investor' ? mockInvestor : mockFounder;
+
+  function login(selectedRole: UserRole) {
+    setRole(selectedRole);
+    setIsLoggedIn(true);
+  }
+
+  function logout() {
+    setIsLoggedIn(false);
+  }
 
   return (
     <AuthContext.Provider
       value={{
         currentUser,
-        role: currentUser.role,
-        switchRole,
-        isInvestor: currentUser.role === 'investor',
-        isFounder: currentUser.role === 'founder',
+        role,
+        isInvestor: role === 'investor',
+        isFounder: role === 'founder',
+        isLoggedIn,
+        login,
+        logout,
       }}
     >
       {children}

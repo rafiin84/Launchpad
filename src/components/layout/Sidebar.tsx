@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import type { ElementType } from 'react';
 import {
   Home,
   Inbox,
@@ -7,7 +7,6 @@ import {
   Building2,
   PieChart,
   MessageSquare,
-  Users,
   BookOpen,
   DollarSign,
   Layers,
@@ -15,6 +14,9 @@ import {
   Settings,
   Rocket,
   ArrowLeftRight,
+  LayoutDashboard,
+  LogOut,
+  Users,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Avatar } from '../ui/Avatar';
@@ -23,76 +25,80 @@ import { useAuth } from '../../context/AuthContext';
 interface NavItem {
   label: string;
   path: string;
-  icon: React.ElementType;
-  investorOnly?: boolean;
-  founderVisible?: boolean;
+  icon: ElementType;
 }
 
-const navItems: NavItem[] = [
-  { label: 'Home', path: '/', icon: Home },
-  { label: 'Applications', path: '/applications', icon: Inbox, investorOnly: true },
-  { label: 'Deal Flow', path: '/deals', icon: TrendingUp, investorOnly: true },
-  { label: 'Companies', path: '/companies', icon: Building2 },
+const investorNav: NavItem[] = [
+  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Portfolio', path: '/portfolio', icon: PieChart },
+  { label: 'Applications', path: '/applications', icon: Inbox },
+  { label: 'Deal Flow', path: '/deals', icon: TrendingUp },
+  { label: 'Discussions', path: '/discussions', icon: Users },
   { label: 'Conversations', path: '/conversations', icon: MessageSquare },
+  { label: 'Knowledge Hub', path: '/knowledge', icon: BookOpen },
   { label: 'Introductions', path: '/introductions', icon: ArrowLeftRight },
-  { label: 'Knowledge', path: '/knowledge', icon: BookOpen },
-  { label: 'Investments', path: '/investments', icon: DollarSign, investorOnly: true },
-  { label: 'Funds', path: '/funds', icon: Layers, investorOnly: true },
+  { label: 'Investments', path: '/investments', icon: DollarSign },
+  { label: 'Funds', path: '/funds', icon: Layers },
+  { label: 'Documents', path: '/documents', icon: FileText },
+  { label: 'Settings', path: '/settings', icon: Settings },
+];
+
+const founderNav: NavItem[] = [
+  { label: 'Home', path: '/', icon: Home },
+  { label: 'Companies', path: '/companies', icon: Building2 },
+  { label: 'Discussions', path: '/discussions', icon: Users },
+  { label: 'Conversations', path: '/conversations', icon: MessageSquare },
+  { label: 'Knowledge Hub', path: '/knowledge', icon: BookOpen },
+  { label: 'Introductions', path: '/introductions', icon: ArrowLeftRight },
   { label: 'Documents', path: '/documents', icon: FileText },
   { label: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
-  const { currentUser, role, switchRole, isInvestor } = useAuth();
+  const { currentUser, role, isInvestor, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const visibleItems = navItems.filter((item) => {
-    if (item.investorOnly && !isInvestor) return false;
-    return true;
-  });
+  const navItems = isInvestor ? investorNav : founderNav;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="w-64 h-screen sticky top-0 flex flex-col border-r border-gray-100 bg-white overflow-hidden">
       {/* Logo */}
-      <div className="px-6 py-5 flex items-center gap-2.5">
-        <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
-          <Rocket size={16} className="text-white" />
+      <div className="px-6 py-5 flex items-center gap-2.5 flex-shrink-0">
+        <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center">
+          <Rocket size={15} className="text-white" />
         </div>
         <span className="text-lg font-bold tracking-tight text-gray-900">Launchpad</span>
       </div>
 
-      {/* Role Switcher */}
-      <div className="px-4 pb-4">
-        <div className="flex rounded-xl bg-gray-100 p-1">
-          <button
-            onClick={() => switchRole('founder')}
-            className={cn(
-              'flex-1 py-1.5 text-xs font-medium rounded-lg transition-all',
-              role === 'founder' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            Founder
-          </button>
-          <button
-            onClick={() => switchRole('investor')}
-            className={cn(
-              'flex-1 py-1.5 text-xs font-medium rounded-lg transition-all',
-              role === 'investor' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            Investor
-          </button>
-        </div>
+      {/* Role badge */}
+      <div className="px-5 pb-4 flex-shrink-0">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold',
+            isInvestor
+              ? 'bg-black text-white'
+              : 'bg-indigo-50 text-indigo-700'
+          )}
+        >
+          {isInvestor ? <TrendingUp size={11} /> : <Rocket size={11} />}
+          {isInvestor ? 'Investor' : 'Founder'}
+        </span>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
-        {visibleItems.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.path === '/'
-            ? location.pathname === '/'
-            : location.pathname.startsWith(item.path);
+          const isActive =
+            item.path === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.path);
 
           return (
             <NavLink
@@ -112,15 +118,25 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Profile */}
-      <div className="px-4 py-4 border-t border-gray-100">
-        <NavLink to="/profile" className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+      {/* Profile + logout */}
+      <div className="px-4 py-4 border-t border-gray-100 flex-shrink-0">
+        <NavLink
+          to="/profile"
+          className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors mb-2"
+        >
           <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
             <p className="text-xs text-gray-500 capitalize truncate">{role}</p>
           </div>
         </NavLink>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+        >
+          <LogOut size={15} />
+          Sign out
+        </button>
       </div>
     </aside>
   );

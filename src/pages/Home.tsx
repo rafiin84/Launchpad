@@ -1,18 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Trophy, HelpCircle, ArrowLeftRight, Lightbulb, Sparkles, TrendingUp, Users, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Trophy, Users, TrendingUp, Filter,
+  DollarSign, Building2, Inbox, PieChart, BookOpen, Briefcase,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { postsService } from '../services/postsService';
-import type { Post, PostType } from '../types';
+import { investmentsService } from '../services/investmentsService';
+import { applicationsService } from '../services/dealsService';
+import type { Post, PostType, Investment, Application } from '../types';
 import { FeedCard } from '../components/feed/FeedCard';
 import { CreatePost } from '../components/feed/CreatePost';
 import { Avatar } from '../components/ui/Avatar';
-import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { mockUsers, mockCompanies, mockMilestones } from '../data/mockData';
+import { cn } from '../lib/cn';
 
-// ─── Sidebar widgets ──────────────────────────────────────────────────────────
+// ─── Sidebar widgets (founder) ────────────────────────────────────────────────
 
 function RecentWinsWidget() {
   const wins = mockMilestones.slice(0, 3);
@@ -28,7 +32,9 @@ function RecentWinsWidget() {
           return (
             <div key={m.id} className="flex gap-2.5">
               <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
-                {company && <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />}
+                {company && (
+                  <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-900 leading-snug">{m.title}</p>
@@ -94,96 +100,216 @@ function TrendingWidget() {
   );
 }
 
-function AIInsightsWidget() {
-  return (
-    <Card padding="md" className="bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-100">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 bg-indigo-600 rounded-lg flex items-center justify-center">
-          <Sparkles size={13} className="text-white" />
-        </div>
-        <h3 className="text-sm font-semibold text-indigo-900">AI Portfolio Digest</h3>
-      </div>
-      <p className="text-xs text-indigo-800 leading-relaxed">
-        <strong>This week:</strong> 3 portfolio companies shared revenue milestones. Enterprise pricing and PLG are the most-discussed topics. SynthFlow and HealthBridge are getting the most engagement.
-      </p>
-      <button className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-        View full digest →
-      </button>
-    </Card>
-  );
-}
-
-// ─── Hero section ─────────────────────────────────────────────────────────────
+// ─── Investor analytics dashboard ─────────────────────────────────────────────
 
 function InvestorHome() {
   const { currentUser } = useAuth();
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [filter, setFilter] = useState<PostType | 'all'>('all');
+  const [summary, setSummary] = useState({
+    totalCompanies: 0,
+    totalDeployed: 0,
+    totalCurrentValue: 0,
+    avgMoic: 0,
+  });
 
   useEffect(() => {
+    investmentsService.getAll().then(setInvestments);
+    investmentsService.getPortfolioSummary().then(setSummary);
+    applicationsService.getAll().then(setApplications);
     postsService.getFeed().then(setPosts);
   }, []);
 
-  const filtered = filter === 'all' ? posts : posts.filter((p) => p.type === filter);
+  const pendingApps = applications.filter(
+    (a) => a.stage === 'new' || a.stage === 'reviewing'
+  ).length;
+
+  const activeDeals = applications.filter((a) =>
+    ['meeting-scheduled', 'due-diligence', 'investment-committee'].includes(a.stage)
+  ).length;
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  })();
+
+  const deployedFormatted = summary.totalDeployed >= 1_000_000
+    ? `$${(summary.totalDeployed / 1_000_000).toFixed(1)}M`
+    : `$${(summary.totalDeployed / 1_000).toFixed(0)}K`;
+
+  const stats = [
+    {
+      label: 'Total Deployed',
+      value: deployedFormatted,
+      sub: 'across all funds',
+      icon: DollarSign,
+      accent: true,
+    },
+    {
+      label: 'Startups Invested',
+      value: investments.length || summary.totalCompanies,
+      sub: 'portfolio companies',
+      icon: Building2,
+      accent: false,
+    },
+    {
+      label: 'Active Deals',
+      value: activeDeals,
+      sub: 'in pipeline',
+      icon: Briefcase,
+      accent: false,
+    },
+    {
+      label: 'Portfolio ROI',
+      value: `${summary.avgMoic}x`,
+      sub: 'average MOIC',
+      icon: TrendingUp,
+      accent: false,
+    },
+    {
+      label: 'Pending Applications',
+      value: pendingApps,
+      sub: 'need review',
+      icon: Inbox,
+      accent: false,
+    },
+  ];
+
+  const pipelineStages = [
+    { label: 'New', count: applications.filter((a) => a.stage === 'new').length },
+    { label: 'Reviewing', count: applications.filter((a) => a.stage === 'reviewing').length },
+    { label: 'Meeting', count: applications.filter((a) => a.stage === 'meeting-scheduled').length },
+    { label: 'Due Diligence', count: applications.filter((a) => a.stage === 'due-diligence').length },
+    { label: 'IC Review', count: applications.filter((a) => a.stage === 'investment-committee').length },
+    { label: 'Approved', count: applications.filter((a) => a.stage === 'approved').length },
+  ];
+
+  const quickActions = [
+    { label: 'Review Applications', path: '/applications', icon: Inbox },
+    { label: 'Deal Flow', path: '/deals', icon: TrendingUp },
+    { label: 'Portfolio Overview', path: '/portfolio', icon: PieChart },
+    { label: 'Knowledge Hub', path: '/knowledge', icon: BookOpen },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-        {/* Main feed */}
-        <div className="flex-1 min-w-0">
-          {/* Welcome */}
-          <div className="mb-5">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Good morning, {currentUser.name.split(' ')[0]} 👋</h1>
-            <p className="text-gray-500 mt-1 text-sm">Here's what your portfolio is up to.</p>
-          </div>
+      {/* Welcome */}
+      <div className="mb-7">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          {greeting}, {currentUser.name.split(' ')[0]} 👋
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Here's your portfolio at a glance ·{' '}
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </p>
+      </div>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            {[
-              { label: 'Portfolio', value: '6' },
-              { label: 'Active deals', value: '3' },
-              { label: 'Applications', value: '2' },
-            ].map((s) => (
-              <div key={s.label} className="bg-white border border-gray-100 rounded-2xl px-3 sm:px-5 py-4">
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Feed filter */}
-          <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <Filter size={13} className="text-gray-400 flex-shrink-0" />
-            {(['all', 'win', 'advice', 'introduction', 'insight'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                  filter === f ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'
-                }`}
+      {/* Analytics cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        {stats.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={stat.label}
+              className={cn(
+                'rounded-2xl p-5',
+                stat.accent
+                  ? 'bg-black text-white'
+                  : 'bg-white border border-gray-100'
+              )}
+            >
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-lg flex items-center justify-center mb-3',
+                  stat.accent ? 'bg-white/15' : 'bg-gray-50'
+                )}
               >
-                {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
+                <Icon size={16} className={stat.accent ? 'text-white' : 'text-gray-500'} />
+              </div>
+              <p className={cn('text-2xl font-bold mb-0.5', stat.accent ? 'text-white' : 'text-gray-900')}>
+                {stat.value}
+              </p>
+              <p className={cn('text-xs font-semibold', stat.accent ? 'text-gray-200' : 'text-gray-700')}>
+                {stat.label}
+              </p>
+              <p className={cn('text-xs mt-0.5', stat.accent ? 'text-gray-400' : 'text-gray-400')}>
+                {stat.sub}
+              </p>
+            </div>
+          );
+        })}
+      </div>
 
+      {/* Main + sidebar */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Feed */}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Recent Portfolio Activity</h2>
           <div className="space-y-4">
-            {filtered.map((post) => (
+            {posts.slice(0, 4).map((post) => (
               <FeedCard key={post.id} post={post} />
             ))}
+            {posts.length === 0 && (
+              <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center">
+                <p className="text-sm text-gray-400">No portfolio activity yet</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right sidebar — hidden on mobile */}
-        <div className="hidden lg:block w-72 flex-shrink-0 space-y-4">
-          <AIInsightsWidget />
-          <RecentWinsWidget />
-          <TrendingWidget />
+        {/* Right sidebar */}
+        <div className="hidden lg:block w-64 flex-shrink-0 space-y-4">
+          {/* Deal pipeline */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <TrendingUp size={15} className="text-indigo-500" />
+              Deal Pipeline
+            </h3>
+            <div className="space-y-0.5">
+              {pipelineStages.map((s) => (
+                <div key={s.label} className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-gray-600">{s.label}</span>
+                  <span className="text-xs font-semibold text-gray-900 bg-gray-50 px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                    {s.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
+            <div>
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    key={action.path}
+                    to={action.path}
+                    className="flex items-center gap-2.5 py-2.5 border-b border-gray-50 last:border-0 hover:text-indigo-600 transition-colors group"
+                  >
+                    <Icon size={14} className="text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 group-hover:text-indigo-600">{action.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+// ─── Founder feed ──────────────────────────────────────────────────────────────
 
 function FounderHome() {
   const { currentUser } = useAuth();
@@ -274,6 +400,8 @@ function FounderHome() {
     </div>
   );
 }
+
+// ─── Export ────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const { isInvestor } = useAuth();

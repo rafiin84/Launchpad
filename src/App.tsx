@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 
+import Login from './pages/Login';
 import Home from './pages/Home';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -15,6 +16,7 @@ import Portfolio from './pages/Portfolio';
 import Investments from './pages/Investments';
 import Funds from './pages/Funds';
 import Documents from './pages/Documents';
+import Discussions from './pages/Discussions';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 
@@ -23,6 +25,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/companies" element={<Companies />} />
@@ -37,6 +40,7 @@ export default function App() {
             <Route path="/investments" element={<Investments />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />
+            <Route path="/discussions" element={<Discussions />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

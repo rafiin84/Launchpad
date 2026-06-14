@@ -1,0 +1,161 @@
+import { Navigate, useNavigate } from 'react-router-dom';
+import {
+  Rocket, TrendingUp, ArrowRight, Building2, Users,
+  DollarSign, PieChart, Inbox, LayoutDashboard,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import type { UserRole } from '../types';
+import { cn } from '../lib/cn';
+
+export default function Login() {
+  const { isLoggedIn, login } = useAuth();
+  const navigate = useNavigate();
+
+  if (isLoggedIn) return <Navigate to="/" replace />;
+
+  const handleLogin = (role: UserRole) => {
+    login(role);
+    navigate('/');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-100 flex flex-col">
+      {/* Nav bar */}
+      <div className="flex items-center justify-between px-8 py-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center">
+            <Rocket size={15} className="text-white" />
+          </div>
+          <span className="text-base font-bold tracking-tight text-gray-900">Launchpad</span>
+        </div>
+        <span className="text-xs text-gray-400 bg-white border border-gray-200 px-3 py-1.5 rounded-full">
+          Invite Only
+        </span>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+        {/* Hero */}
+        <div className="text-center mb-12 max-w-xl">
+          <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+            Private Founder + Investor Network
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight mb-3">
+            Welcome back.
+          </h1>
+          <p className="text-gray-500 text-base leading-relaxed">
+            Select your role to access your personalized dashboard.
+            Founders and investors have separate, dedicated experiences.
+          </p>
+        </div>
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
+
+          {/* Investor card — dark */}
+          <button
+            onClick={() => handleLogin('investor')}
+            className="group relative bg-black rounded-3xl p-8 text-left transition-all duration-200 hover:shadow-2xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+          >
+            <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-white/20 transition-colors">
+              <TrendingUp size={22} className="text-white" />
+            </div>
+
+            <div className="mb-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Investor</span>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-3">I'm an Investor</h2>
+            <p className="text-sm text-gray-400 leading-relaxed mb-6">
+              Manage your portfolio, track deals, review applications, and stay close to your founders.
+            </p>
+
+            <div className="space-y-2 mb-8">
+              {[
+                { icon: LayoutDashboard, label: 'Analytics dashboard' },
+                { icon: PieChart, label: 'Portfolio overview' },
+                { icon: Inbox, label: 'Deal pipeline & applications' },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="flex items-center gap-2.5 text-xs text-gray-400">
+                    <Icon size={13} className="flex-shrink-0" />
+                    {item.label}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-white">Continue as Investor</span>
+              <div className={cn(
+                'w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center transition-all',
+                'group-hover:bg-white group-hover:text-black'
+              )}>
+                <ArrowRight size={17} className="text-white group-hover:text-black transition-colors" />
+              </div>
+            </div>
+          </button>
+
+          {/* Founder card — light */}
+          <button
+            onClick={() => handleLogin('founder')}
+            className="group relative bg-white border-2 border-gray-100 hover:border-gray-900 rounded-3xl p-8 text-left transition-all duration-200 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+          >
+            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-5 group-hover:bg-indigo-100 transition-colors">
+              <Rocket size={22} className="text-indigo-600" />
+            </div>
+
+            <div className="mb-1">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Founder</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">I'm a Founder</h2>
+            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              Share updates, ask for advice, request intros, and connect with your investor network.
+            </p>
+
+            <div className="space-y-2 mb-8">
+              {[
+                { icon: TrendingUp, label: 'Activity feed & posts' },
+                { icon: Users, label: 'Peer founder network' },
+                { icon: Building2, label: 'Company profile & milestones' },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="flex items-center gap-2.5 text-xs text-gray-500">
+                    <Icon size={13} className="flex-shrink-0 text-gray-400" />
+                    {item.label}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-900">Continue as Founder</span>
+              <div className={cn(
+                'w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center transition-all',
+                'group-hover:bg-black'
+              )}>
+                <ArrowRight size={17} className="text-gray-600 group-hover:text-white transition-colors" />
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Social proof */}
+        <div className="mt-10 text-center">
+          <p className="text-xs text-gray-400 mb-3">Trusted by teams building at</p>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            {['SynthFlow', 'HealthBridge', 'CarbonLoop', 'DataMesh', 'Nexus Ventures'].map((name) => (
+              <span key={name} className="text-xs font-medium text-gray-400">{name}</span>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-400 mt-8 text-center max-w-sm">
+          Private & invite-only. All data shared on Launchpad is strictly confidential between founders and their investors.
+        </p>
+      </div>
+    </div>
+  );
+}
