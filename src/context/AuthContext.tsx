@@ -16,8 +16,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>('founder');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [role, setRole] = useState<UserRole>('investor');
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   const currentUser: User = role === 'investor' ? mockInvestor : mockFounder;
 

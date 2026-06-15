@@ -462,8 +462,8 @@ function InvestorHome() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-      {/* Welcome — constrained */}
-      <div className="max-w-5xl mb-6">
+      {/* Welcome */}
+      <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           {greeting}, {currentUser.name.split(' ')[0]} 👋
         </h1>
@@ -503,11 +503,8 @@ function InvestorHome() {
         })}
       </div>
 
-      {/* Everything below — constrained to max-w-5xl */}
-      <div className="max-w-5xl">
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           <PortfolioGrowthChart />
           <SectorBreakdownChart />
         </div>
@@ -565,8 +562,6 @@ function InvestorHome() {
             </div>
           </div>
         </div>
-
-      </div>
     </div>
   );
 }
