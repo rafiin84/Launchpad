@@ -19,7 +19,7 @@ export default function Profile() {
   const userPosts = mockPosts.filter((p) => p.author.id === currentUser.id);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       {/* Profile header */}
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-6">
         {/* Cover */}

@@ -96,7 +96,7 @@ export default function Investments() {
   const totalUnrealized = summary.totalCurrentValue - summary.totalDeployed;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-4xl px-4 sm:px-6 py-6 sm:py-8">
       <PageHeader
         title="Investments"
         description="Track your investment positions and portfolio performance"

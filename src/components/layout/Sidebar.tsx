@@ -6,16 +6,15 @@ import {
   TrendingUp,
   Building2,
   PieChart,
-  MessageSquare,
-  BookOpen,
-  DollarSign,
-  Layers,
   FileText,
   Settings,
   Rocket,
-  ArrowLeftRight,
   LayoutDashboard,
   LogOut,
+  Rss,
+  MessageSquare,
+  BookOpen,
+  ArrowLeftRight,
   Users,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
@@ -29,29 +28,23 @@ interface NavItem {
 }
 
 const investorNav: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Portfolio', path: '/portfolio', icon: PieChart },
-  { label: 'Applications', path: '/applications', icon: Inbox },
-  { label: 'Deal Flow', path: '/deals', icon: TrendingUp },
-  { label: 'Discussions', path: '/discussions', icon: Users },
-  { label: 'Conversations', path: '/conversations', icon: MessageSquare },
-  { label: 'Knowledge Hub', path: '/knowledge', icon: BookOpen },
-  { label: 'Introductions', path: '/introductions', icon: ArrowLeftRight },
-  { label: 'Investments', path: '/investments', icon: DollarSign },
-  { label: 'Funds', path: '/funds', icon: Layers },
-  { label: 'Documents', path: '/documents', icon: FileText },
-  { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Dashboard',    path: '/',            icon: LayoutDashboard },
+  { label: 'Activities',   path: '/activities',  icon: Rss },
+  { label: 'Portfolio',    path: '/portfolio',   icon: PieChart },
+  { label: 'Applications', path: '/applications',icon: Inbox },
+  { label: 'Documents',    path: '/documents',   icon: FileText },
+  { label: 'Settings',     path: '/settings',    icon: Settings },
 ];
 
 const founderNav: NavItem[] = [
-  { label: 'Home', path: '/', icon: Home },
-  { label: 'Companies', path: '/companies', icon: Building2 },
-  { label: 'Discussions', path: '/discussions', icon: Users },
+  { label: 'Home',          path: '/',              icon: Home },
+  { label: 'Companies',     path: '/companies',     icon: Building2 },
+  { label: 'Discussions',   path: '/discussions',   icon: Users },
   { label: 'Conversations', path: '/conversations', icon: MessageSquare },
-  { label: 'Knowledge Hub', path: '/knowledge', icon: BookOpen },
+  { label: 'Knowledge Hub', path: '/knowledge',     icon: BookOpen },
   { label: 'Introductions', path: '/introductions', icon: ArrowLeftRight },
-  { label: 'Documents', path: '/documents', icon: FileText },
-  { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Documents',     path: '/documents',     icon: FileText },
+  { label: 'Settings',      path: '/settings',      icon: Settings },
 ];
 
 export function Sidebar() {
@@ -76,23 +69,8 @@ export function Sidebar() {
         <span className="text-lg font-bold tracking-tight text-gray-900">Launchpad</span>
       </div>
 
-      {/* Role badge */}
-      <div className="px-5 pb-4 flex-shrink-0">
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold',
-            isInvestor
-              ? 'bg-black text-white'
-              : 'bg-indigo-50 text-indigo-700'
-          )}
-        >
-          {isInvestor ? <TrendingUp size={11} /> : <Rocket size={11} />}
-          {isInvestor ? 'Investor' : 'Founder'}
-        </span>
-      </div>
-
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+      <nav className="flex-1 overflow-y-auto flex flex-col gap-0.5 px-3 pb-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -105,7 +83,7 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5 text-sm font-medium transition-all',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                 isActive
                   ? 'bg-black text-white'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'

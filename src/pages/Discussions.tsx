@@ -333,7 +333,7 @@ export default function Discussions() {
   return (
     <div className="py-6 sm:py-8 px-4 sm:px-6">
       {/* Constrain feed to 550px, centered */}
-      <div className="max-w-[550px] mx-auto">
+      <div className="max-w-[550px]">
         <PageHeader
           title="Discussions"
           description="Share insights, ask questions, and learn from the network"

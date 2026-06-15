@@ -31,7 +31,7 @@ export default function CompanyDetail() {
 
   if (!company) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-100 rounded w-1/3" />
           <div className="h-32 bg-gray-100 rounded-2xl" />
@@ -41,7 +41,7 @@ export default function CompanyDetail() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       {/* Back */}
       <Link to="/companies" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
         <ArrowLeft size={16} />

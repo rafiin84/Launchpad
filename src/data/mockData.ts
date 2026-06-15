@@ -17,14 +17,14 @@ import type {
 
 export const mockInvestor: User = {
   id: 'inv-1',
-  name: 'Sarah Chen',
-  email: 'sarah@nexusventures.com',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=SarahChen',
+  name: 'Kumar Vembu',
+  email: 'kumar@nexusventures.com',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=KumarVembu',
   role: 'investor',
   bio: 'Partner at Nexus Ventures. Focused on B2B SaaS, AI infrastructure, and developer tools. Former engineer at Stripe.',
   expertise: ['B2B SaaS', 'AI/ML', 'Developer Tools', 'Enterprise Sales'],
-  linkedIn: 'https://linkedin.com/in/sarahchen',
-  twitter: '@sarahchen_vc',
+  linkedIn: 'https://linkedin.com/in/kumarvembu',
+  twitter: '@kumarvembu_vc',
   location: 'San Francisco, CA',
   joinedAt: '2022-01-15',
   followersCount: 1240,
@@ -996,7 +996,7 @@ export const mockIntroductions: Introduction[] = [
     status: 'facilitated',
     facilitatedBy: mockInvestor,
     createdAt: '2024-03-13T10:00:00Z',
-    notes: 'Sarah connected via LinkedIn intro. Call scheduled for March 22.',
+    notes: 'Kumar connected via LinkedIn intro. Call scheduled for March 22.',
     connectedAt: '2024-03-14T09:00:00Z',
   },
   {

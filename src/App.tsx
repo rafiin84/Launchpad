@@ -11,6 +11,7 @@ import ConversationDetail from './pages/ConversationDetail';
 import Knowledge from './pages/Knowledge';
 import Introductions from './pages/Introductions';
 import Applications from './pages/Applications';
+import ApplicationDetail from './pages/ApplicationDetail';
 import DealFlow from './pages/DealFlow';
 import Portfolio from './pages/Portfolio';
 import Investments from './pages/Investments';
@@ -19,6 +20,7 @@ import Documents from './pages/Documents';
 import Discussions from './pages/Discussions';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import Activities from './pages/Activities';
 
 export default function App() {
   return (
@@ -28,6 +30,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/activities" element={<Activities />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
             <Route path="/conversations" element={<Conversations />} />
@@ -35,6 +38,7 @@ export default function App() {
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/introductions" element={<Introductions />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/deals" element={<DealFlow />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/investments" element={<Investments />} />

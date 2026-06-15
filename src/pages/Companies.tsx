@@ -91,7 +91,7 @@ export default function Companies() {
   const stages = ['pre-seed', 'seed', 'series-a', 'series-b', 'series-c', 'growth'];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
       <PageHeader
         title="Portfolio Companies"
         description="The founders and companies in our network"

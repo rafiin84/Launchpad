@@ -90,7 +90,7 @@ export default function Conversations() {
   const rest = filtered.filter((c) => !c.isPinned);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       <PageHeader
         title="Conversations"
         description="Persistent discussions that become institutional knowledge"
