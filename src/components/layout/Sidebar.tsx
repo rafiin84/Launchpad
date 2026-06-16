@@ -37,15 +37,11 @@ const investorNav: NavItem[] = [
 ];
 
 const founderNav: NavItem[] = [
-  { label: 'Home',          path: '/',              icon: Home },
-  { label: 'Activities',    path: '/activities',    icon: Rss },
-  { label: 'Companies',     path: '/companies',     icon: Building2 },
-  { label: 'Discussions',   path: '/discussions',   icon: Users },
-  { label: 'Conversations', path: '/conversations', icon: MessageSquare },
-  { label: 'Knowledge Hub', path: '/knowledge',     icon: BookOpen },
-  { label: 'Introductions', path: '/introductions', icon: ArrowLeftRight },
-  { label: 'Documents',     path: '/documents',     icon: FileText },
-  { label: 'Settings',      path: '/settings',      icon: Settings },
+  { label: 'Dashboard',  path: '/',           icon: Home },
+  { label: 'Activities', path: '/activities', icon: Rss },
+  { label: 'Company',    path: '/company',    icon: Building2 },
+  { label: 'Documents',  path: '/documents',  icon: FileText },
+  { label: 'Settings',   path: '/settings',   icon: Settings },
 ];
 
 export function Sidebar() {

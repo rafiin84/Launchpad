@@ -10,6 +10,7 @@ import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import FounderDashboard from './FounderDashboard';
 
 function formatCurrency(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -27,7 +28,10 @@ const STAGE_STYLES: Record<string, string> = {
 };
 
 export default function Home() {
-  const { currentUser } = useAuth();
+  const { currentUser, isFounder } = useAuth();
+
+  // Founders get their own dedicated dashboard
+  if (isFounder) return <FounderDashboard />;
   const isConnected = !!loadToken();
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
