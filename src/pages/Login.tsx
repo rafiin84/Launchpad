@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
+import { redirectToZoho, loadToken } from '../services/oauth';
 
 
 function Logo() {
@@ -122,6 +123,35 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
             <span key={name} className="text-xs font-medium text-gray-400">{name}</span>
           ))}
         </div>
+      </div>
+
+      {/* Zoho sign-in */}
+      <div className="mt-8 w-full max-w-2xl">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400 font-medium">or sign in with</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <button
+          onClick={redirectToZoho}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:border-gray-400 rounded-2xl px-6 py-4 transition-all hover:shadow-md group"
+        >
+          {/* Zoho logo mark */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="6" fill="#E42527"/>
+            <text x="12" y="17" textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" fontFamily="sans-serif">Z</text>
+          </svg>
+          <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">
+            {loadToken() ? 'Reconnect Zoho CRM' : 'Sign in with Zoho CRM'}
+          </span>
+        </button>
+
+        {loadToken() && (
+          <p className="text-xs text-emerald-600 text-center mt-3 font-medium">
+            ✓ Zoho CRM connected
+          </p>
+        )}
       </div>
 
       <p className="text-xs text-gray-400 mt-8 text-center max-w-sm">

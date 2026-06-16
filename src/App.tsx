@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 import Login from './pages/Login';
+import Callback from './pages/Callback';
 import Home from './pages/Home';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -33,6 +34,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/callback" element={<Callback />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
