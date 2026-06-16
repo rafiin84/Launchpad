@@ -156,7 +156,7 @@ function PortfolioSnapshotGrid({ investments }: { investments: Investment[] }) {
           return (
             <Link
               key={inv.id}
-              to="/portfolio"
+              to={`/companies/${inv.company.id}`}
               className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group"
             >
               {/* Company header */}
