@@ -1,23 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
-import { getDocuments, deleteDocument, type StoredDocument } from '../services/store';
+import { fetchCRMDocuments, deleteCRMDocument, type CRMDocument } from '../services/crmDocuments';
+import { loadToken } from '../services/oauth';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  'pitch-deck':       { icon: File,          color: 'text-indigo-500 bg-indigo-50',  label: 'Pitch Deck' },
-  'financial-model':  { icon: FileSpreadsheet,color: 'text-emerald-500 bg-emerald-50',label: 'Financial Model' },
-  'legal-document':   { icon: Scale,          color: 'text-amber-500 bg-amber-50',   label: 'Legal Document' },
-  'due-diligence':    { icon: FileText,       color: 'text-sky-500 bg-sky-50',       label: 'Due Diligence' },
-  'other':            { icon: FileText,       color: 'text-gray-500 bg-gray-100',    label: 'Other' },
+  'pitch-deck':       { icon: File,           color: 'text-indigo-500 bg-indigo-50',   label: 'Pitch Deck' },
+  'financial-model':  { icon: FileSpreadsheet, color: 'text-emerald-500 bg-emerald-50', label: 'Financial Model' },
+  'legal-document':   { icon: Scale,           color: 'text-amber-500 bg-amber-50',    label: 'Legal Document' },
+  'due-diligence':    { icon: FileText,        color: 'text-sky-500 bg-sky-50',        label: 'Due Diligence' },
+  'other':            { icon: FileText,        color: 'text-gray-500 bg-gray-100',     label: 'Other' },
 };
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '';
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
 
 function visibilityLabel(v: string) {
   if (v === 'shared-investors') return 'Shared with Investors';
@@ -25,38 +19,46 @@ function visibilityLabel(v: string) {
   return 'Private';
 }
 
+function normalizeType(t: string): string {
+  if (!t) return 'other';
+  const lower = t.toLowerCase().replace(/\s+/g, '-');
+  if (lower in TYPE_META) return lower;
+  return 'other';
+}
+
 export default function Documents() {
-  const [docs, setDocs] = useState<StoredDocument[]>([]);
+  const [docs, setDocs] = useState<CRMDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const isConnected = !!loadToken();
 
-  useEffect(() => {
-    setDocs(getDocuments());
-  }, []);
-
-  const handleDelete = (id: string) => {
-    deleteDocument(id);
-    setDocs(prev => prev.filter(d => d.id !== id));
+  const load = () => {
+    if (!isConnected) { setLoading(false); return; }
+    setLoading(true);
+    setError('');
+    fetchCRMDocuments()
+      .then(setDocs)
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
   };
 
-  const handleOpen = (doc: StoredDocument) => {
-    if (!doc.fileData) return;
-    const [meta, base64] = doc.fileData.split(',');
-    const mime = meta.match(/:(.*?);/)?.[1] ?? 'application/octet-stream';
-    const bytes = atob(base64);
-    const buf = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
-    const blob = new Blob([buf], { type: mime });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCRMDocument(id);
+      setDocs(prev => prev.filter(d => d.id !== id));
+    } catch {
+      // swallow
+    }
   };
 
-  // Build category counts (stored + mock baselines)
-  const mockCounts: Record<string, number> = {
-    'pitch-deck': 3, 'financial-model': 2, 'legal-document': 5, 'due-diligence': 1, 'other': 0,
-  };
-  const storedCounts = docs.reduce<Record<string, number>>((acc, d) => {
-    acc[d.type] = (acc[d.type] ?? 0) + 1;
+  const typeCounts = docs.reduce<Record<string, number>>((acc, d) => {
+    const t = normalizeType(d.documentType);
+    acc[t] = (acc[t] ?? 0) + 1;
     return acc;
   }, {});
+
   const allTypes = Object.keys(TYPE_META);
 
   return (
@@ -66,10 +68,22 @@ export default function Documents() {
         description="Secure document repository for your portfolio"
         action={
           <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={15} /> Upload Document
+            <Plus size={15} /> Add Document
           </Link>
         }
       />
+
+      {/* Not-connected banner */}
+      {!isConnected && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
+            <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
+          </div>
+          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
+        </div>
+      )}
 
       {/* Privacy notice */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
@@ -84,9 +98,9 @@ export default function Documents() {
         {allTypes.map((type) => {
           const meta = TYPE_META[type];
           const Icon = meta.icon;
-          const count = (mockCounts[type] ?? 0) + (storedCounts[type] ?? 0);
+          const count = typeCounts[type] ?? 0;
           return (
-            <div key={type} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all cursor-pointer">
+            <div key={type} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${meta.color}`}>
                 <Icon size={20} />
               </div>
@@ -97,25 +111,61 @@ export default function Documents() {
         })}
       </div>
 
-      {/* Uploaded documents list */}
-      {docs.length > 0 ? (
+      {loading && (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+              <div className="flex gap-4">
+                <div className="w-9 h-9 bg-gray-100 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/3" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+          <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-red-600 mb-3">{error}</p>
+          <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors">
+            <RefreshCw size={12} /> Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && docs.length === 0 && isConnected && (
+        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
+          <FileText size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
+          <p className="text-xs text-gray-400 mb-4">Add pitch decks, financial models, and legal documents.</p>
+          <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus size={14} /> Add your first document
+          </Link>
+        </div>
+      )}
+
+      {!loading && !error && docs.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Uploaded Documents ({docs.length})</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Documents ({docs.length})</h2>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
             {docs.map((doc, i) => {
-              const meta = TYPE_META[doc.type] ?? TYPE_META['other'];
+              const typeKey = normalizeType(doc.documentType);
+              const meta = TYPE_META[typeKey] ?? TYPE_META['other'];
               const Icon = meta.icon;
               return (
                 <div
                   key={doc.id}
-                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < docs.length - 1 ? 'border-b border-gray-50' : ''} ${doc.fileData ? 'cursor-pointer' : ''}`}
-                  onClick={() => doc.fileData && handleOpen(doc)}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < docs.length - 1 ? 'border-b border-gray-50' : ''}`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.color}`}>
                     <Icon size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{doc.documentName}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{doc.documentName || '—'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-400">{meta.label}</span>
                       {doc.relatedCompany && (
@@ -126,30 +176,29 @@ export default function Documents() {
                           </span>
                         </>
                       )}
-                      {doc.fileName && (
+                      {doc.description && (
                         <>
                           <span className="text-gray-200">·</span>
-                          <span className="text-xs text-gray-400">{doc.fileName} {doc.fileSize ? `(${formatBytes(doc.fileSize)})` : ''}</span>
+                          <span className="text-xs text-gray-400 truncate max-w-[200px]">{doc.description}</span>
                         </>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
-                      doc.visibility === 'private' || !doc.visibility
-                        ? 'bg-gray-100 text-gray-600'
-                        : doc.visibility === 'shared-investors'
-                        ? 'bg-indigo-50 text-indigo-600'
-                        : 'bg-emerald-50 text-emerald-600'
-                    }`}>
-                      {doc.visibility === 'private' || !doc.visibility ? <EyeOff size={10} /> : <Eye size={10} />}
-                      {visibilityLabel(doc.visibility)}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
+                    {doc.visibility && (
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
+                        doc.visibility === 'private' || !doc.visibility
+                          ? 'bg-gray-100 text-gray-600'
+                          : doc.visibility === 'shared-investors'
+                          ? 'bg-indigo-50 text-indigo-600'
+                          : 'bg-emerald-50 text-emerald-600'
+                      }`}>
+                        {doc.visibility === 'private' || !doc.visibility ? <EyeOff size={10} /> : <Eye size={10} />}
+                        {visibilityLabel(doc.visibility)}
+                      </span>
+                    )}
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                      onClick={() => handleDelete(doc.id)}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       title="Delete"
                     >
@@ -160,15 +209,6 @@ export default function Documents() {
               );
             })}
           </div>
-        </div>
-      ) : (
-        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
-          <FileText size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No documents uploaded yet</p>
-          <p className="text-xs text-gray-400 mb-4">Upload pitch decks, financial models, and legal documents.</p>
-          <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={14} /> Upload your first document
-          </Link>
         </div>
       )}
     </div>

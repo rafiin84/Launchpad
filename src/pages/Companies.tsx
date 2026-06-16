@@ -1,43 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, Users, Calendar, Plus } from 'lucide-react';
+import { Search, ExternalLink, Calendar, Plus, AlertCircle, RefreshCw, Building2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { companiesService } from '../services/companiesService';
-import type { Company } from '../types';
+import { fetchCRMPortfolio, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { loadToken } from '../services/oauth';
 import { Input } from '../components/ui/Input';
-import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
 
-function CompanyCard({ company }: { company: Company }) {
+const STAGE_STYLES: Record<string, string> = {
+  'Pre-Seed': 'bg-gray-100 text-gray-600',
+  'Seed':     'bg-violet-50 text-violet-700',
+  'Series A': 'bg-blue-50 text-blue-700',
+  'Series B': 'bg-indigo-50 text-indigo-700',
+  'Series C': 'bg-sky-50 text-sky-700',
+  'Growth':   'bg-emerald-50 text-emerald-700',
+};
+
+function CompanyCard({ company, onDelete }: { company: CRMPortfolioRecord; onDelete: (id: string) => void }) {
+  const tags = company.tags ? company.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
   return (
-    <Link to={`/companies/${company.id}`}>
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 hover:border-gray-200 hover:shadow-sm transition-all group">
+    <Link to={`/portfolio/${company.id}`} className="block">
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 hover:border-gray-200 hover:shadow-sm transition-all group relative">
+        {/* Delete button */}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onDelete(company.id); }}
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+          title="Delete"
+        >
+          <Trash2 size={13} />
+        </button>
+
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-            <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
+          <div className="w-12 h-12 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
+            <Building2 size={20} className="text-gray-400" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 pr-6">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                {company.name}
+                {company.companyName || '—'}
               </h3>
-              <StageBadge stage={company.stage} />
+              {company.stage && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STAGE_STYLES[company.stage] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {company.stage}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5 mb-2">{company.industry}</p>
+            <p className="text-xs text-gray-500 mt-0.5 mb-2">{company.industry || '—'}</p>
             <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-              {company.shortDescription || company.description}
+              {company.shortDescription || company.fullDescription || '—'}
             </p>
           </div>
         </div>
 
         <div className="mt-4 flex items-center gap-4 pt-3 border-t border-gray-50">
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <Users size={13} />
-            {company.founders.length} founder{company.founders.length !== 1 ? 's' : ''}
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <Calendar size={13} />
-            Founded {company.foundedYear}
-          </div>
+          {company.location && (
+            <span className="text-xs text-gray-500">{company.location}</span>
+          )}
+          {company.foundedYear && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Calendar size={13} />
+              Founded {company.foundedYear}
+            </div>
+          )}
           {company.website && (
             <a
               href={company.website}
@@ -52,10 +76,9 @@ function CompanyCard({ company }: { company: Company }) {
           )}
         </div>
 
-        {/* Tags */}
-        {company.tags.length > 0 && (
+        {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {company.tags.slice(0, 4).map((tag) => (
+            {tags.slice(0, 4).map((tag) => (
               <span key={tag} className="text-xs bg-gray-50 text-gray-600 px-2 py-0.5 rounded-full">
                 {tag}
               </span>
@@ -67,28 +90,45 @@ function CompanyCard({ company }: { company: Company }) {
   );
 }
 
+const STAGE_FILTERS = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth'];
+
 export default function Companies() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const isConnected = !!loadToken();
 
-  useEffect(() => {
-    companiesService.getAll().then((data) => {
-      setCompanies(data);
-      setLoading(false);
-    });
-  }, []);
+  const load = () => {
+    if (!isConnected) { setLoading(false); return; }
+    setLoading(true);
+    setError('');
+    fetchCRMPortfolio()
+      .then(setCompanies)
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCRMPortfolioRecord(id);
+      setCompanies(prev => prev.filter(c => c.id !== id));
+    } catch {
+      // swallow
+    }
+  };
 
   const filtered = query
     ? companies.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c =>
+          c.companyName.toLowerCase().includes(query.toLowerCase()) ||
           c.industry.toLowerCase().includes(query.toLowerCase()) ||
-          c.tags.some((t) => t.toLowerCase().includes(query.toLowerCase()))
+          c.tags.toLowerCase().includes(query.toLowerCase()) ||
+          c.stage.toLowerCase().includes(query.toLowerCase())
       )
     : companies;
-
-  const stages = ['pre-seed', 'seed', 'series-a', 'series-b', 'series-c', 'growth'];
 
   return (
     <div className="max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
@@ -96,11 +136,23 @@ export default function Companies() {
         title="Portfolio Companies"
         description="The founders and companies in our network"
         action={
-          <Link to="/companies/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+          <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
             <Plus size={15} /> Add Company
           </Link>
         }
       />
+
+      {/* Not-connected banner */}
+      {!isConnected && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
+            <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
+          </div>
+          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-6">
@@ -120,18 +172,18 @@ export default function Companies() {
         >
           All
         </button>
-        {stages.map((stage) => (
+        {STAGE_FILTERS.map((stage) => (
           <button
             key={stage}
             onClick={() => setQuery(stage)}
-            className="px-3 py-1.5 rounded-xl text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all capitalize"
+            className="px-3 py-1.5 rounded-xl text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
           >
-            {stage.replace('-', ' ').replace('series', 'Series')}
+            {stage}
           </button>
         ))}
       </div>
 
-      {loading ? (
+      {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse">
@@ -145,12 +197,35 @@ export default function Companies() {
             </div>
           ))}
         </div>
-      ) : (
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+          <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-red-600 mb-3">{error}</p>
+          <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors">
+            <RefreshCw size={12} /> Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && isConnected && (
+        <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
+          <Building2 size={28} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500 mb-1">No companies yet</p>
+          <p className="text-xs text-gray-400 mb-4">Add your first portfolio company to get started.</p>
+          <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl">
+            <Plus size={14} /> Add Company
+          </Link>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length > 0 && (
         <>
           <p className="text-xs text-gray-500 mb-4">{filtered.length} companies</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((company) => (
-              <CompanyCard key={company.id} company={company} />
+              <CompanyCard key={company.id} company={company} onDelete={handleDelete} />
             ))}
           </div>
         </>

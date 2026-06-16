@@ -9,14 +9,18 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TimeAgo } from '../components/ui/TimeAgo';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
-import { mockFounder, mockInvestor, mockUsers } from '../data/mockData';
-import type { User } from '../types';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DiscussionAuthor {
+  id: string;
+  name: string;
+  avatar?: string;
+  subtitle: string;
+}
 
 interface DiscussionPost {
   id: string;
-  author: User;
+  author: DiscussionAuthor;
   content: string;
   image?: string;
   likes: number;
@@ -25,64 +29,12 @@ interface DiscussionPost {
   createdAt: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const INITIAL_POSTS: DiscussionPost[] = [
-  {
-    id: 'd1',
-    author: mockInvestor,
-    content: `Just wrapped up our Q1 LP update. What I'm seeing across the portfolio:\n\n→ Revenue growth is holding steady at 2–3x YoY for early-stage\n→ Burn multiples are tightening — founders who did that work in 2023 are reaping the benefits now\n→ Enterprise sales cycles are getting longer, but deal sizes are bigger\n\nIf you're a founder with a Q1 win, share it below. I'd love to see what's working.`,
-    likes: 84,
-    comments: 31,
-    shares: 12,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'd2',
-    author: mockFounder,
-    content: `We just crossed $1M ARR at SynthFlow 🎉\n\nSix months ago we were at $180K. Here's what changed:\n\n1. We fired our 3 smallest customers (yes, really)\n2. Rebuilt pricing around outcomes, not features\n3. Hired a dedicated enterprise AE at $120K base\n\nRevenue per customer went from $8K to $42K ARR. Counter-intuitive, but it works. Happy to share the pricing playbook if anyone wants it.`,
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=280&fit=crop&auto=format&q=80',
-    likes: 147,
-    comments: 52,
-    shares: 28,
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'd3',
-    author: mockUsers[1] ?? mockFounder,
-    content: `Enterprise healthcare sales truth that nobody talks about:\n\nThe decision-maker (CMO/CIO) is NOT your champion. Your champion is the director who's been trying to fix this problem for 2 years and can't get budget.\n\nFocus all your energy on making the director look good in front of leadership. That's how you close in healthcare. The director becomes your internal seller.\n\nShout out to Sarah Chen for this insight 3 months ago — it changed our entire sales motion. We went from 8-month cycles to 4-month cycles.`,
-    likes: 63,
-    comments: 18,
-    shares: 9,
-    createdAt: new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'd4',
-    author: mockInvestor,
-    content: `Q: What makes a great founder update?\n\nAfter reading 500+ updates over the past 4 years, here's what separates good from great:\n\n✓ Leads with the ONE number (MRR, ARR, DAU — just pick one and own it)\n✓ One honest "what's hard" section — not a laundry list, one real thing\n✓ One specific ask — investors aren't mind readers\n✓ Under 3 minutes to read\n\nBonus: a Loom walkthrough of a customer win. Nothing makes investors more excited than seeing real users genuinely loving your product.`,
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=280&fit=crop&auto=format&q=80',
-    likes: 203,
-    comments: 67,
-    shares: 41,
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'd5',
-    author: mockFounder,
-    content: `Founder therapy: I almost quit last Tuesday.\n\nThe Series A process is brutal in ways nobody prepares you for. You put your whole soul into every partner meeting and then wait 3 weeks for a "we're going to pass."\n\nWhat got me through it: our head of sales sent a Slack at 11pm that night — we'd just closed our biggest contract ever, $280K ARR.\n\nTiming is everything. Don't quit on a bad day. The wins come when you least expect them.`,
-    likes: 318,
-    comments: 94,
-    shares: 56,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+const INITIAL_POSTS: DiscussionPost[] = [];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-function getAuthorSubtitle(author: User): string {
-  if (author.company?.name) return author.company.name;
-  const firstSentence = author.bio?.split('.')[0];
-  return firstSentence || (author.role === 'investor' ? 'Investor' : 'Founder');
+function getAuthorSubtitle(author: DiscussionAuthor): string {
+  return author.subtitle || 'Member';
 }
 
 // ─── Composer ─────────────────────────────────────────────────────────────────
@@ -143,7 +95,7 @@ function ComposerCard({ onPost }: { onPost: (content: string, image: string | nu
         <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
         <div>
           <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
-          <p className="text-xs text-gray-500">{getAuthorSubtitle(currentUser)}</p>
+          <p className="text-xs text-gray-500">{currentUser.role === 'investor' ? 'Investor' : (currentUser.company?.name ?? 'Founder')}</p>
         </div>
       </div>
 
@@ -320,7 +272,12 @@ export default function Discussions() {
   const handlePost = (content: string, image: string | null) => {
     const newPost: DiscussionPost = {
       id: `d-${Date.now()}`,
-      author: currentUser,
+      author: {
+        id: currentUser.id,
+        name: currentUser.name,
+        avatar: currentUser.avatar,
+        subtitle: currentUser.role === 'investor' ? 'Investor' : (currentUser.company?.name ?? 'Founder'),
+      },
       content,
       image: image ?? undefined,
       likes: 0,

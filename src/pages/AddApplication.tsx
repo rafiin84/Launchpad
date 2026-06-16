@@ -5,7 +5,7 @@ import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
-import { saveApplication } from '../services/store';
+import { createCRMApplication } from '../services/crmApplications';
 
 // ---------------------------------------------------------------------------
 // LogoUpload
@@ -142,32 +142,33 @@ export default function AddApplication() {
     if (file) setForm((prev) => ({ ...prev, pitchDeckName: file.name }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    saveApplication({
-      logo: form.logo,
-      companyName: form.companyName,
-      website: form.website,
-      location: form.location,
-      industry: form.industry,
-      companyStage: form.stage,
-      foundedYear: form.foundedYear,
-      teamSize: form.teamSize,
-      shortDescription: form.shortDescription,
-      fullDescription: form.fullDescription,
-      amountRequested: form.amountRequested,
-      useOfFunds: form.useOfFunds,
-      previousFunding: form.previousFunding,
-      founderName: form.founderName,
-      founderEmail: form.founderEmail,
-      founderPhone: form.founderPhone,
-      founderLinkedin: form.founderLinkedin,
-      founderBio: form.founderBio,
-      pipelineStage: 'new',
-    });
-    navigate('/applications');
+    try {
+      await createCRMApplication({
+        companyName:        form.companyName,
+        industry:           form.industry,
+        website:            form.website,
+        fundingAsk:         form.amountRequested,
+        useOfFunds:         form.useOfFunds,
+        previousFunding:    form.previousFunding,
+        companyDescription: form.fullDescription || form.shortDescription,
+        founderName:        form.founderName,
+        founderEmail:       form.founderEmail,
+        founderPhone:       form.founderPhone,
+        founderLinkedin:    form.founderLinkedin,
+        pipelineStage:      'New',
+        location:           form.location,
+        teamSize:           form.teamSize,
+        foundedYear:        form.foundedYear,
+      });
+      navigate('/applications');
+    } catch (err) {
+      // Surface error to user if desired — for now just log
+      console.error('Failed to create application:', err);
+    }
   }
 
   return (

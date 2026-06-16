@@ -5,7 +5,6 @@ import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { Tabs } from '../components/ui/Tabs';
 import { FeedCard } from '../components/feed/FeedCard';
-import { mockPosts } from '../data/mockData';
 
 const TABS = [
   { id: 'posts', label: 'Posts' },
@@ -16,7 +15,8 @@ export default function Profile() {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('posts');
 
-  const userPosts = mockPosts.filter((p) => p.author.id === currentUser.id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userPosts: any[] = [];
 
   return (
     <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">

@@ -26,7 +26,7 @@ async function getModule(): Promise<string> {
   if (override) { resolvedModule = override; return resolvedModule; }
   // Auto-discover by searching all modules for 'portfolio' in name.
   const discovered = await findModuleApiName('portfolio').catch(() => null);
-  resolvedModule = discovered ?? 'Portfolio';
+  resolvedModule = discovered ?? 'Portfolios';
   return resolvedModule;
 }
 
@@ -41,13 +41,13 @@ const FIELD_MAP: Record<string, string> = {
   teamSize:          'Team_Size',
   shortDescription:  'Short_Description',
   fullDescription:   'Description',
-  tags:              'Tags',
+  tags:              'Company_Tags',        // Custom text field for comma-separated tags
   investmentAmount:  'Investment_Amount',
   investmentDate:    'Investment_Date',
   preMoneyValuation: 'Pre_Money_Valuation',
   ownershipPct:      'Ownership_Percentage',
   status:            'Status',
-  notes:             'Notes',
+  notes:             'Investment_Notes',    // 'Notes' is a reserved CRM keyword
   founderName:       'Founder_Name',
   founderEmail:      'Founder_Email',
   founderLinkedin:   'Founder_LinkedIn',

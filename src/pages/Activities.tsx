@@ -1,205 +1,85 @@
-import { useState } from 'react';
-import {
-  ThumbsUp, MessageCircle, Share2, Send, Globe,
-  TrendingUp, BookMarked, Hash,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, Plus, AlertCircle, RefreshCw, Trash2, Building2, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Avatar } from '../components/ui/Avatar';
-import { TimeAgo } from '../components/ui/TimeAgo';
-import { PostTypePill } from '../components/feed/PostTypeIcon';
+import { fetchCRMActivities, deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
+import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
-import {
-  mockPosts,
-  mockUsers,
-  mockInvestments,
-  mockConversations,
-} from '../data/mockData';
-import type { Post } from '../types';
-import { cn } from '../lib/cn';
 
-// ─── Images per post (2–4 each) ───────────────────────────────────────────────
-
-const POST_IMAGES: Record<string, string[]> = {
-  'p-1': [
-    'https://picsum.photos/seed/synth-a/520/260',
-    'https://picsum.photos/seed/synth-b/258/160',
-    'https://picsum.photos/seed/synth-c/258/160',
-  ],
-  'p-2': [
-    'https://picsum.photos/seed/carbon-a/258/200',
-    'https://picsum.photos/seed/carbon-b/258/200',
-  ],
-  'p-3': [
-    'https://picsum.photos/seed/stack-a/258/200',
-    'https://picsum.photos/seed/stack-b/258/200',
-    'https://picsum.photos/seed/stack-c/258/200',
-    'https://picsum.photos/seed/stack-d/258/200',
-  ],
-  'p-4': [
-    'https://picsum.photos/seed/health-a/520/260',
-    'https://picsum.photos/seed/health-b/258/160',
-    'https://picsum.photos/seed/health-c/258/160',
-  ],
-  'p-5': [
-    'https://picsum.photos/seed/supply-a/258/200',
-    'https://picsum.photos/seed/supply-b/258/200',
-  ],
-  'p-6': [
-    'https://picsum.photos/seed/legal-a/258/160',
-    'https://picsum.photos/seed/legal-b/258/160',
-    'https://picsum.photos/seed/legal-c/258/160',
-    'https://picsum.photos/seed/legal-d/258/160',
-  ],
+const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  'win':     { label: 'Win',     bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  'advice':  { label: 'Advice',  bg: 'bg-indigo-50',  text: 'text-indigo-700' },
+  'insight': { label: 'Insight', bg: 'bg-amber-50',   text: 'text-amber-700' },
+  'update':  { label: 'Update',  bg: 'bg-sky-50',     text: 'text-sky-700' },
 };
 
-// ─── Image grid layouts ────────────────────────────────────────────────────────
-
-function PostImages({ postId }: { postId: string }) {
-  const images = POST_IMAGES[postId];
-  if (!images || images.length === 0) return null;
-  const n = images.length;
-
-  if (n === 1) {
-    return (
-      <div className="mt-3 rounded-xl overflow-hidden">
-        <img src={images[0]} alt="" className="w-full h-[220px] object-cover" loading="lazy" />
-      </div>
-    );
-  }
-
-  if (n === 2) {
-    return (
-      <div className="mt-3 rounded-xl overflow-hidden" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        <img src={images[0]} alt="" className="w-full h-[180px] object-cover" loading="lazy" />
-        <img src={images[1]} alt="" className="w-full h-[180px] object-cover" loading="lazy" />
-      </div>
-    );
-  }
-
-  if (n === 3) {
-    return (
-      <div
-        className="mt-3 rounded-xl overflow-hidden"
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '110px 110px', gap: 2 }}
-      >
-        <img src={images[0]} alt="" style={{ gridRow: '1 / 3' }} className="w-full h-full object-cover" loading="lazy" />
-        <img src={images[1]} alt="" className="w-full h-full object-cover" loading="lazy" />
-        <img src={images[2]} alt="" className="w-full h-full object-cover" loading="lazy" />
-      </div>
-    );
-  }
-
-  // 4 images — 2×2
+function TypeBadge({ type }: { type: string }) {
+  const cfg = TYPE_CONFIG[type?.toLowerCase()] ?? { label: type || 'Activity', bg: 'bg-gray-100', text: 'text-gray-600' };
   return (
-    <div className="mt-3 rounded-xl overflow-hidden" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '130px 130px', gap: 2 }}>
-      {images.map((src, i) => (
-        <img key={i} src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
-      ))}
-    </div>
+    <span className={`inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
+      {cfg.label}
+    </span>
   );
 }
 
-// ─── Activity post card ────────────────────────────────────────────────────────
-
-function ActivityPost({ post }: { post: Post }) {
+function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete: (id: string) => void }) {
+  const tags = activity.tags ? activity.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const [expanded, setExpanded] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(
-    post.reactions.reduce((sum, r) => sum + r.count, 0)
-  );
-  const [shared, setShared] = useState(false);
-  const [shareCount, setShareCount] = useState(0);
-  const [commentText, setCommentText] = useState('');
-
-  const lines = post.content.split('\n');
-  const isLong = lines.length > 5 || post.content.length > 350;
-  const display = isLong && !expanded ? lines.slice(0, 4).join('\n') : post.content;
-
-  const handleLike = () => {
-    setLiked(v => {
-      setLikeCount(c => v ? c - 1 : c + 1);
-      return !v;
-    });
-  };
-
-  const handleShare = () => {
-    if (!shared) {
-      setShared(true);
-      setShareCount(c => c + 1);
-      setTimeout(() => setShared(false), 2000);
-    }
-  };
+  const isLong = activity.content.length > 320;
+  const display = isLong && !expanded ? activity.content.slice(0, 320) : activity.content;
 
   return (
     <article className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 transition-all">
-      {/* Company banner */}
-      {post.company && (
-        <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-gray-50 bg-gradient-to-r from-gray-50/70 to-white">
-          <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
-            <img src={post.company.logo} alt={post.company.name} className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-900">{post.company.name}</p>
-            <p className="text-xs text-gray-500">{post.company.industry}</p>
-          </div>
-          <PostTypePill type={post.type} />
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-50">
+        <div className="flex items-center gap-3">
+          {activity.companyName && (
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={14} className="text-gray-400" />
+              </div>
+              <p className="text-xs font-semibold text-gray-800">{activity.companyName}</p>
+            </div>
+          )}
         </div>
-      )}
+        <TypeBadge type={activity.activityType} />
+      </div>
 
       <div className="px-5 py-4">
-        {/* Author */}
-        <div className="flex items-start gap-3 mb-3">
-          <Avatar src={post.author.avatar} name={post.author.name} size="md" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 leading-tight">{post.author.name}</p>
-            <p className="text-xs text-gray-500 truncate">
-              {post.author.bio ? post.author.bio.split('.')[0] : 'Founder'}
-            </p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <TimeAgo date={post.createdAt} className="text-xs text-gray-400" />
-              <span className="text-gray-200">·</span>
-              <Globe size={10} className="text-gray-400" />
-            </div>
-          </div>
-          {!post.company && <PostTypePill type={post.type} />}
-        </div>
-
         {/* Title */}
-        {post.title && (
-          <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-snug">{post.title}</h3>
+        {activity.title && (
+          <h3 className="text-sm font-semibold text-gray-900 mb-2 leading-snug">{activity.title}</h3>
+        )}
+
+        {/* Author */}
+        {activity.authorName && (
+          <p className="text-xs text-gray-500 mb-2">{activity.authorName}</p>
         )}
 
         {/* Content */}
-        <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{display}</div>
-        {isLong && (
-          <button
-            onClick={() => setExpanded(v => !v)}
-            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium mt-1"
-          >
-            {expanded ? 'Show less' : '…see more'}
-          </button>
+        {activity.content && (
+          <div className="mb-3">
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {display}{isLong && !expanded && '...'}
+            </p>
+            {isLong && (
+              <button onClick={() => setExpanded(v => !v)} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium mt-1">
+                {expanded ? 'Show less' : 'See more'}
+              </button>
+            )}
+          </div>
         )}
 
-        {/* Images */}
-        <PostImages postId={post.id} />
-
-        {/* Metric pills */}
-        {post.metrics && post.metrics.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {post.metrics.map((m, i) => (
-              <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5">
-                <span className="text-xs text-gray-400">{m.label}</span>
-                <span className="text-xs font-bold text-gray-900">{m.value}</span>
-              </div>
-            ))}
+        {/* Image */}
+        {activity.imageUrl && (
+          <div className="mt-3 rounded-xl overflow-hidden mb-3">
+            <img src={activity.imageUrl} alt="" className="w-full h-[220px] object-cover" loading="lazy" />
           </div>
         )}
 
         {/* Tags */}
-        {post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {post.tags.map(tag => (
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {tags.map(tag => (
               <span key={tag} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                 #{tag}
               </span>
@@ -207,214 +87,112 @@ function ActivityPost({ post }: { post: Post }) {
           </div>
         )}
 
-        {/* Engagement summary */}
-        {(likeCount > 0 || post.comments.length > 0 || shareCount > 0) && (
-          <div className="flex items-center justify-between mt-3 pb-2 border-b border-gray-50 text-xs text-gray-400">
-            <span>{likeCount > 0 ? `${likeCount} likes` : ''}</span>
-            <div className="flex gap-3">
-              {post.comments.length > 0 && <span>{post.comments.length} comments</span>}
-              {shareCount > 0 && <span>{shareCount} shares</span>}
-            </div>
-          </div>
-        )}
-
-        {/* Action bar */}
-        <div className="flex items-center gap-1 pt-2">
+        {/* Footer actions */}
+        <div className="flex items-center justify-end mt-3 pt-3 border-t border-gray-50">
           <button
-            onClick={handleLike}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
-              liked ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            )}
+            onClick={() => onDelete(activity.id)}
+            className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Delete"
           >
-            <ThumbsUp size={14} className={liked ? 'fill-current' : ''} />
-            Like
-          </button>
-          <button
-            onClick={() => setShowComments(v => !v)}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
-              showComments ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            )}
-          >
-            <MessageCircle size={14} />
-            Comment
-          </button>
-          <button
-            onClick={handleShare}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
-              shared ? 'text-emerald-600 bg-emerald-50' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            )}
-          >
-            <Share2 size={14} />
-            {shared ? 'Shared!' : 'Share'}
+            <Trash2 size={13} />
           </button>
         </div>
-
-        {/* Comments */}
-        {showComments && (
-          <div className="mt-4 pt-3 border-t border-gray-50 space-y-3">
-            {post.comments.map(comment => (
-              <div key={comment.id} className="flex gap-2.5">
-                <Avatar src={comment.author.avatar} name={comment.author.name} size="sm" />
-                <div className="flex-1 bg-gray-50 rounded-2xl px-3.5 py-2.5">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-xs font-semibold text-gray-900">{comment.author.name}</p>
-                    <TimeAgo date={comment.createdAt} className="text-xs text-gray-400" />
-                  </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{comment.content}</p>
-                  {comment.reactions.length > 0 && (
-                    <div className="flex gap-1 mt-1.5">
-                      {comment.reactions.map(r => (
-                        <span key={r.emoji} className="inline-flex items-center gap-0.5 text-xs bg-white border border-gray-200 px-1.5 py-0.5 rounded-lg text-gray-600">
-                          {r.emoji} {r.count}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {/* Reply input */}
-            <div className="flex gap-2.5 pt-1">
-              <Avatar
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=KumarVembu"
-                name="Kumar Vembu"
-                size="sm"
-              />
-              <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-3.5 py-2.5 focus-within:border-indigo-200 focus-within:bg-white transition-all">
-                <input
-                  type="text"
-                  placeholder="Write a reply…"
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && commentText) setCommentText(''); }}
-                  className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400 text-gray-900"
-                />
-                <button
-                  onClick={() => setCommentText('')}
-                  className={cn(
-                    'p-1 rounded-lg transition-all flex-shrink-0',
-                    commentText ? 'text-indigo-600 hover:bg-indigo-50' : 'text-gray-300 cursor-default'
-                  )}
-                >
-                  <Send size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </article>
   );
 }
 
-// ─── Right panel (250px) ──────────────────────────────────────────────────────
-
-function HotDiscussionsCard() {
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4">
-      <h3 className="text-xs font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-        <BookMarked size={13} className="text-amber-500" />
-        Hot Discussions
-      </h3>
-      <div className="space-y-3">
-        {mockConversations.slice(0, 4).map(conv => (
-          <Link key={conv.id} to={`/conversations/${conv.id}`} className="block group">
-            <p className="text-xs font-medium text-gray-900 group-hover:text-indigo-600 transition-colors leading-snug mb-0.5 line-clamp-2">
-              {conv.title}
-            </p>
-            <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-              <span>{conv.messageCount} replies</span>
-              <span>·</span>
-              <span>{conv.topic}</span>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TrendingTagsCard() {
-  const allTags = mockPosts.flatMap(p => p.tags);
-  const tagCounts = allTags.reduce<Record<string, number>>((acc, tag) => {
-    acc[tag] = (acc[tag] ?? 0) + 1;
-    return acc;
-  }, {});
-  const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4">
-      <h3 className="text-xs font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-        <Hash size={13} className="text-indigo-500" />
-        Trending
-      </h3>
-      <div className="flex flex-wrap gap-1.5">
-        {topTags.map(([tag, count]) => (
-          <span
-            key={tag}
-            className="flex items-center gap-1 text-[10px] bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-100 transition-all cursor-pointer"
-          >
-            #{tag}
-            <span className="text-gray-400">{count}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function NetworkCard() {
-  const founders = mockUsers.filter(u => u.role === 'founder').slice(0, 4);
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4">
-      <h3 className="text-xs font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-        <TrendingUp size={13} className="text-indigo-500" />
-        People to follow
-      </h3>
-      <div className="space-y-2.5">
-        {founders.map(u => (
-          <div key={u.id} className="flex items-center gap-2">
-            <Avatar src={u.avatar} name={u.name} size="sm" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-900 truncate">{u.name}</p>
-              <p className="text-[10px] text-gray-400 truncate">{u.company?.name ?? 'Founder'}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function Activities() {
+  const [records, setRecords] = useState<CRMActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const isConnected = !!loadToken();
+
+  const load = () => {
+    if (!isConnected) { setLoading(false); return; }
+    setLoading(true);
+    setError('');
+    fetchCRMActivities()
+      .then(setRecords)
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCRMActivity(id);
+      setRecords(prev => prev.filter(r => r.id !== id));
+    } catch {
+      // swallow
+    }
+  };
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* Three-column layout */}
-      <div className="flex gap-5 items-start">
+      <div className="w-full lg:w-[650px]">
+        <PageHeader
+          title="Activities"
+          description="What's happening across your portfolio network"
+          action={
+            <Link to="/activities/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+              <Plus size={15} /> Share Activity
+            </Link>
+          }
+        />
 
-        {/* Center feed — 650px */}
-        <div className="w-full lg:w-[650px] flex-shrink-0 space-y-4">
-          <PageHeader
-            title="Activities"
-            description="What's happening across your portfolio network"
-          />
-          {mockPosts.map(post => (
-            <ActivityPost key={post.id} post={post} />
-          ))}
-        </div>
+        {/* Not-connected banner */}
+        {!isConnected && (
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
+            <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
+              <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
+            </div>
+            <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
+          </div>
+        )}
 
-        {/* Right panel — 250px */}
-        <div className="hidden lg:block w-[250px] flex-shrink-0 sticky top-6 space-y-3">
-          <HotDiscussionsCard />
-          <TrendingTagsCard />
-          <NetworkCard />
-        </div>
+        {loading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        )}
 
+        {error && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+            <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+            <p className="text-sm text-red-600 mb-3">{error}</p>
+            <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors">
+              <RefreshCw size={12} /> Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && records.length === 0 && isConnected && (
+          <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
+            <Activity size={28} className="text-gray-200 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
+            <p className="text-xs text-gray-400 mb-4">Share a win, insight, or update with the network.</p>
+            <Link to="/activities/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl">
+              <Plus size={14} /> Share Activity
+            </Link>
+          </div>
+        )}
+
+        {!loading && !error && records.length > 0 && (
+          <div className="space-y-4">
+            {records.map(activity => (
+              <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

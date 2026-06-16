@@ -20,11 +20,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { companiesService } from '../services/companiesService';
-import { investmentsService } from '../services/investmentsService';
-import { mockInvestments } from '../data/mockData';
-import type { Company, Investment } from '../types';
-import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
@@ -41,12 +36,6 @@ function formatCurrency(amount: number) {
 const MONTHS = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const GROWTH_VALUES = [7.0, 7.1, 7.35, 7.6, 7.85, 8.05, 8.25, 8.5, 8.7, 8.9, 9.1, 9.3];
 
-const COMPANY_COLORS: Record<string, string> = {
-  'c-1': '#6366f1',
-  'c-2': '#10b981',
-  'c-4': '#8b5cf6',
-  'c-6': '#0ea5e9',
-};
 
 // ─── Portfolio Value Growth (area chart) ──────────────────────────────────────
 
@@ -105,183 +94,6 @@ function PortfolioGrowthChart() {
   );
 }
 
-// ─── MOIC comparison (horizontal bars) ────────────────────────────────────────
-
-function MoicComparisonChart({ investments }: { investments: Investment[] }) {
-  const sorted = [...investments].sort((a, b) => (b.moic ?? 1) - (a.moic ?? 1));
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-gray-900">MOIC by Company</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Multiple on invested capital</p>
-      </div>
-      <div className="space-y-4">
-        {sorted.map((inv) => {
-          const moic = inv.moic ?? 1;
-          const pct = (moic / 2.0) * 100;
-          const color = COMPANY_COLORS[inv.company.id] ?? '#6366f1';
-          return (
-            <div key={inv.id}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img src={inv.company.logo} alt={inv.company.name} className="w-full h-full object-cover" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-700">{inv.company.name}</span>
-                </div>
-                <span className="text-xs font-bold" style={{ color }}>{moic.toFixed(1)}x</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
-              </div>
-            </div>
-          );
-        })}
-        <div className="flex justify-between pt-0.5">
-          {['0x', '0.5x', '1.0x', '1.5x', '2.0x'].map(v => (
-            <span key={v} className="text-xs text-gray-300">{v}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Capital by Stage (SVG donut) ─────────────────────────────────────────────
-
-function StageAllocationChart({ investments }: { investments: Investment[] }) {
-  const stages: Record<string, { count: number; amount: number; color: string }> = {};
-  investments.forEach(inv => {
-    if (!stages[inv.round]) {
-      stages[inv.round] = { count: 0, amount: 0, color: inv.round === 'Seed' ? '#6366f1' : '#10b981' };
-    }
-    stages[inv.round].count++;
-    stages[inv.round].amount += inv.amount;
-  });
-
-  const data = Object.entries(stages).map(([label, v]) => ({ label, ...v }));
-  const totalAmt = data.reduce((s, d) => s + d.amount, 0);
-
-  const R = 36, CX = 50, CY = 50;
-  const C = 2 * Math.PI * R;
-  let accumulated = 0;
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">Capital by Stage</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Deployment breakdown</p>
-      </div>
-      <div className="flex items-center gap-6">
-        <svg viewBox="0 0 100 100" className="w-[104px] h-[104px] flex-shrink-0 -rotate-90">
-          {data.map((d, i) => {
-            const pct = d.amount / totalAmt;
-            const arc = pct * C;
-            const offset = accumulated * C;
-            accumulated += pct;
-            return (
-              <circle
-                key={i}
-                cx={CX} cy={CY} r={R}
-                fill="none"
-                stroke={d.color}
-                strokeWidth="22"
-                strokeDasharray={`${arc} ${C}`}
-                strokeDashoffset={-offset}
-              />
-            );
-          })}
-          <circle cx={CX} cy={CY} r="22" fill="white" />
-        </svg>
-        <div className="flex-1 space-y-3">
-          {data.map((d) => (
-            <div key={d.label}>
-              <div className="flex items-center justify-between mb-0.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                  <span className="text-xs font-medium text-gray-700">{d.label}</span>
-                </div>
-                <span className="text-xs font-semibold text-gray-900">
-                  {((d.amount / totalAmt) * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 pl-4">{d.count} co · {formatCurrency(d.amount)}</p>
-            </div>
-          ))}
-          <div className="pt-2 border-t border-gray-50">
-            <p className="text-xs text-gray-400">Total deployed</p>
-            <p className="text-sm font-bold text-gray-900">{formatCurrency(totalAmt)}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Invested vs Current Value (paired bars) ───────────────────────────────────
-
-function InvestedVsCurrentChart({ investments }: { investments: Investment[] }) {
-  const maxVal = 4500000;
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-gray-900">Invested vs Current Value</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Capital deployed per company</p>
-      </div>
-      <div className="space-y-4">
-        {investments.map((inv) => {
-          const invested = inv.amount;
-          const current = inv.amount * (inv.moic ?? 1);
-          const investedPct = Math.min((invested / maxVal) * 100, 100);
-          const currentPct = Math.min((current / maxVal) * 100, 100);
-          const color = COMPANY_COLORS[inv.company.id] ?? '#6366f1';
-          const gain = current - invested;
-
-          return (
-            <div key={inv.id}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium text-gray-700">{inv.company.name}</span>
-                <span className={`text-xs font-semibold ${gain > 0 ? 'text-emerald-600' : gain < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                  {gain > 0 ? '+' : ''}{formatCurrency(gain)}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-10 flex-shrink-0">In</span>
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-gray-300" style={{ width: `${investedPct}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-500 w-12 text-right flex-shrink-0">{formatCurrency(invested)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-10 flex-shrink-0">Now</span>
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${currentPct}%`, backgroundColor: color }} />
-                  </div>
-                  <span className="text-xs font-semibold w-12 text-right flex-shrink-0" style={{ color }}>
-                    {formatCurrency(current)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-5 mt-4 pt-3 border-t border-gray-50">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-1.5 bg-gray-300 rounded-full" />
-          <span className="text-xs text-gray-400">Invested</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-1.5 rounded-full bg-indigo-500" />
-          <span className="text-xs text-gray-400">Current value</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── KPI Chip row ─────────────────────────────────────────────────────────────
 
 interface KpiChip {
@@ -319,95 +131,6 @@ function KpiChipRow({ chips }: { chips: KpiChip[] }) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ─── Portfolio Company Card ────────────────────────────────────────────────────
-
-function PortfolioCompanyCard({ company, investment, onDelete }: { company: Company; investment?: Investment; onDelete: () => void }) {
-  const moic = investment?.moic ?? 1;
-  const gain = investment ? investment.amount * (moic - 1) : 0;
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
-        <Link to={`/companies/${company.id}`} className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-          <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
-        </Link>
-        <Link to={`/companies/${company.id}`} className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-            {company.name}
-          </h3>
-          <p className="text-xs text-gray-500">{company.industry} · {company.location}</p>
-        </Link>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <StageBadge stage={company.stage} />
-          <button
-            onClick={onDelete}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-
-        <p className="text-xs text-gray-600 leading-relaxed line-clamp-2 mb-3">
-          {company.shortDescription}
-        </p>
-
-        {/* Tags */}
-        {company.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {company.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="text-xs bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Investment data */}
-        {investment && (
-          <div className="pt-3 border-t border-gray-50">
-            <div className="grid grid-cols-4 gap-2 mb-2.5">
-              <div>
-                <p className="text-xs text-gray-400">Invested</p>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(investment.amount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Round</p>
-                <p className="text-sm font-semibold text-gray-900">{investment.round}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Ownership</p>
-                <p className="text-sm font-semibold text-gray-900">{investment.ownership}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">MOIC</p>
-                <p className={`text-sm font-bold ${moic >= 1.5 ? 'text-emerald-600' : moic >= 1.2 ? 'text-indigo-600' : 'text-gray-600'}`}>
-                  {moic.toFixed(1)}x
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Unrealized {gain >= 0 ? 'gain' : 'loss'}</span>
-              <span className={`text-xs font-semibold ${gain > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
-                {gain > 0 ? '+' : ''}{formatCurrency(gain)}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Latest milestone */}
-        {company.publicMilestones.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-gray-50">
-            <p className="text-xs text-gray-400 mb-1">Latest milestone</p>
-            <p className="text-xs font-medium text-gray-700">{company.publicMilestones[0].title}</p>
-          </div>
-        )}
     </div>
   );
 }
@@ -481,18 +204,15 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Portfolio() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [investments, setInvestments] = useState<Investment[]>([]);
   const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [crmLoading, setCrmLoading] = useState(false);
   const [crmError, setCrmError] = useState('');
   const [availableModules, setAvailableModules] = useState<ZohoModule[]>([]);
   const [modulesLoading, setModulesLoading] = useState(false);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const isConnected = !!loadToken();
 
   const loadCRMData = () => {
-    if (!isConnected) return;
+    if (!isConnected) { setCrmLoading(false); return; }
     setCrmLoading(true);
     setCrmError('');
     fetchCRMPortfolio()
@@ -516,11 +236,7 @@ export default function Portfolio() {
     loadCRMData();
   };
 
-  useEffect(() => {
-    companiesService.getAll().then(setCompanies);
-    investmentsService.getAll().then(setInvestments);
-    loadCRMData();
-  }, []);
+  useEffect(() => { loadCRMData(); }, []);
 
   const handleDeleteCRM = async (id: string) => {
     try {
@@ -531,92 +247,50 @@ export default function Portfolio() {
     }
   };
 
-  const handleHideMockCompany = (id: string) => {
-    setHiddenIds(prev => new Set([...prev, id]));
-  };
-
-  const getInvestment = (companyId: string) => investments.find((i) => i.company.id === companyId);
-  const investedIds = new Set(mockInvestments.map(i => i.company.id));
-  const investedCompanies = companies.filter(c => investedIds.has(c.id));
-  const visibleInvested = investedCompanies.filter(c => !hiddenIds.has(c.id));
-
-  // Pre-computed from mockInvestments (synchronous, no loading flash)
-  const totalDeployed = mockInvestments.reduce((s, i) => s + i.amount, 0);
-  const totalCurrentValue = mockInvestments.reduce((s, i) => s + i.amount * (i.moic ?? 1), 0);
-  const unrealizedGain = totalCurrentValue - totalDeployed;
-  const avgMoic = mockInvestments.reduce((s, i) => s + (i.moic ?? 1), 0) / mockInvestments.length;
-  const bestInv = [...mockInvestments].sort((a, b) => (b.moic ?? 1) - (a.moic ?? 1))[0];
-  const avgOwnership = mockInvestments.reduce((s, i) => s + i.ownership, 0) / mockInvestments.length;
-  const seedCount = mockInvestments.filter(i => i.round === 'Seed').length;
-  const seriesACount = mockInvestments.filter(i => i.round === 'Series A').length;
-  const totalEntryVal = mockInvestments.reduce((s, i) => s + i.valuation, 0);
-  const returnPct = parseFloat(((unrealizedGain / totalDeployed) * 100).toFixed(1));
+  // KPIs derived from real CRM data
+  const totalDeployed = crmCompanies.reduce((s, c) => s + (parseFloat(c.investmentAmount) || 0), 0);
+  const totalPreMoney = crmCompanies.reduce((s, c) => s + (parseFloat(c.preMoneyValuation) || 0), 0);
+  const avgOwnership = crmCompanies.length
+    ? crmCompanies.reduce((s, c) => s + (parseFloat(c.ownershipPct) || 0), 0) / crmCompanies.length
+    : 0;
+  const activeCount = crmCompanies.filter(c => c.status === 'active').length;
+  const seedCount = crmCompanies.filter(c => c.stage === 'seed').length;
+  const seriesACount = crmCompanies.filter(c => c.stage === 'series-a').length;
 
   const kpiChips: KpiChip[] = [
     {
       label: 'Portfolio Companies',
-      value: String(mockInvestments.length),
-      sub: 'active investments',
+      value: String(crmCompanies.length),
+      sub: `${activeCount} active`,
       icon: <Building2 size={16} />,
     },
     {
       label: 'Total Deployed',
-      value: formatCurrency(totalDeployed),
+      value: totalDeployed > 0 ? formatCurrency(totalDeployed) : '—',
       sub: 'capital invested',
       icon: <DollarSign size={16} />,
-    },
-    {
-      label: 'Current Value',
-      value: formatCurrency(totalCurrentValue),
-      sub: `+${returnPct}% total return`,
-      icon: <TrendingUp size={16} />,
       accent: true,
     },
     {
-      label: 'Avg MOIC',
-      value: `${avgMoic.toFixed(2)}x`,
-      sub: 'avg multiple',
-      icon: <PieChart size={16} />,
-    },
-    {
-      label: 'Unrealized Gain',
-      value: `+${formatCurrency(unrealizedGain)}`,
-      sub: 'since first investment',
-      icon: <TrendingUp size={16} />,
-      color: 'text-emerald-600',
-    },
-    {
-      label: 'Portfolio Return',
-      value: `+${returnPct}%`,
-      sub: 'on invested capital',
-      icon: <BarChart2 size={16} />,
-      color: 'text-indigo-600',
-    },
-    {
-      label: 'Best MOIC',
-      value: `${(bestInv.moic ?? 1).toFixed(1)}x`,
-      sub: bestInv.company.name,
-      icon: <Award size={16} />,
-      color: 'text-amber-600',
-    },
-    {
       label: 'Avg Ownership',
-      value: `${avgOwnership.toFixed(1)}%`,
+      value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',
       sub: 'per company',
       icon: <Percent size={16} />,
     },
     {
-      label: 'Est. IRR',
-      value: '22%',
-      sub: 'per annum',
-      icon: <Target size={16} />,
-      color: 'text-emerald-600',
-    },
-    {
       label: 'Avg Deal Size',
-      value: formatCurrency(totalDeployed / mockInvestments.length),
+      value: crmCompanies.length > 0 && totalDeployed > 0
+        ? formatCurrency(totalDeployed / crmCompanies.length)
+        : '—',
       sub: 'per investment',
       icon: <DollarSign size={16} />,
+    },
+    {
+      label: 'Entry Valuations',
+      value: totalPreMoney > 0 ? formatCurrency(totalPreMoney) : '—',
+      sub: 'combined pre-money',
+      icon: <TrendingUp size={16} />,
+      color: 'text-emerald-600',
     },
     {
       label: 'Stage Mix',
@@ -625,9 +299,43 @@ export default function Portfolio() {
       icon: <Layers size={16} />,
     },
     {
-      label: 'Entry Valuations',
-      value: formatCurrency(totalEntryVal),
-      sub: 'portfolio at entry',
+      label: 'Portfolio Value',
+      value: totalDeployed > 0 ? formatCurrency(totalDeployed) : '—',
+      sub: 'at cost basis',
+      icon: <BarChart2 size={16} />,
+      color: 'text-indigo-600',
+    },
+    {
+      label: 'Active',
+      value: String(activeCount),
+      sub: 'active investments',
+      icon: <Award size={16} />,
+      color: 'text-amber-600',
+    },
+    {
+      label: 'Est. IRR',
+      value: '—',
+      sub: 'add more data',
+      icon: <Target size={16} />,
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'MOIC',
+      value: '—',
+      sub: 'mark to market',
+      icon: <PieChart size={16} />,
+    },
+    {
+      label: 'Unrealized Gain',
+      value: '—',
+      sub: 'needs current val.',
+      icon: <TrendingUp size={16} />,
+      color: 'text-emerald-600',
+    },
+    {
+      label: 'Total Companies',
+      value: String(crmCompanies.length),
+      sub: 'in portfolio',
       icon: <Building2 size={16} />,
     },
   ];
@@ -652,15 +360,15 @@ export default function Portfolio() {
 
       {/* Everything else constrained to max-w-5xl */}
       <div className="max-w-5xl">
-        {/* Analytics charts — 2-col grid */}
+        {/* Analytics charts — static growth chart only */}
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Performance Analytics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <PortfolioGrowthChart />
-          <MoicComparisonChart investments={mockInvestments} />
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <StageAllocationChart investments={mockInvestments} />
-          <InvestedVsCurrentChart investments={mockInvestments} />
+          <PortfolioGrowthChart />
+          <div className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2">
+            <BarChart2 size={28} className="text-gray-200" />
+            <p className="text-sm font-medium text-gray-500">MOIC chart</p>
+            <p className="text-xs text-gray-400">Add portfolio companies with investment data to see MOIC analytics.</p>
+          </div>
         </div>
 
         {/* Portfolio companies */}
@@ -760,18 +468,8 @@ export default function Portfolio() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* CRM records */}
           {crmCompanies.map(c => (
             <CRMCompanyCard key={c.id} c={c} onDelete={handleDeleteCRM} />
-          ))}
-          {/* Mock companies */}
-          {visibleInvested.map((company) => (
-            <PortfolioCompanyCard
-              key={company.id}
-              company={company}
-              onDelete={() => handleHideMockCompany(company.id)}
-              investment={getInvestment(company.id)}
-            />
           ))}
         </div>
 
