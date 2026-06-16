@@ -5,6 +5,7 @@ import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
+import { saveApplication } from '../services/store';
 
 // ---------------------------------------------------------------------------
 // LogoUpload
@@ -145,7 +146,27 @@ export default function AddApplication() {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    console.log('AddApplication submit:', form);
+    saveApplication({
+      logo: form.logo,
+      companyName: form.companyName,
+      website: form.website,
+      location: form.location,
+      industry: form.industry,
+      companyStage: form.stage,
+      foundedYear: form.foundedYear,
+      teamSize: form.teamSize,
+      shortDescription: form.shortDescription,
+      fullDescription: form.fullDescription,
+      amountRequested: form.amountRequested,
+      useOfFunds: form.useOfFunds,
+      previousFunding: form.previousFunding,
+      founderName: form.founderName,
+      founderEmail: form.founderEmail,
+      founderPhone: form.founderPhone,
+      founderLinkedin: form.founderLinkedin,
+      founderBio: form.founderBio,
+      pipelineStage: 'new',
+    });
     navigate('/applications');
   }
 

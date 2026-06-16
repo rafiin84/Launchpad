@@ -5,6 +5,7 @@ import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
+import { saveDocument } from '../services/store';
 
 // ---------------------------------------------------------------------------
 // Options
@@ -98,7 +99,7 @@ export default function AddDocument() {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    console.log('AddDocument submit:', form);
+    saveDocument(form);
     navigate('/documents');
   }
 

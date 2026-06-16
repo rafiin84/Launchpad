@@ -11,8 +11,11 @@ import {
   Layers,
   PieChart,
   Plus,
+  MapPin,
+  Calendar,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getPortfolioCompanies, type StoredPortfolioCompany } from '../services/store';
 import { companiesService } from '../services/companiesService';
 import { investmentsService } from '../services/investmentsService';
 import { mockInvestments } from '../data/mockData';
@@ -395,15 +398,70 @@ function PortfolioCompanyCard({ company, investment }: { company: Company; inves
   );
 }
 
+// ─── Stored Company Card ──────────────────────────────────────────────────────
+
+function StoredCompanyCard({ c }: { c: StoredPortfolioCompany }) {
+  const amount = parseFloat(c.investmentAmount) || 0;
+  const statusColors: Record<string, string> = {
+    active: 'bg-emerald-50 text-emerald-700',
+    exited: 'bg-indigo-50 text-indigo-700',
+    'written-off': 'bg-red-50 text-red-600',
+    'follow-on': 'bg-amber-50 text-amber-700',
+  };
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+          {c.logo
+            ? <img src={c.logo} alt={c.companyName} className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center"><Building2 size={18} className="text-gray-400" /></div>
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
+          <p className="text-xs text-gray-400 capitalize">{c.industry} · {c.stage}</p>
+        </div>
+        {c.status && (
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+          </span>
+        )}
+      </div>
+      {c.shortDescription && <p className="text-xs text-gray-600 leading-relaxed mb-3 line-clamp-2">{c.shortDescription}</p>}
+      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-50">
+        <div>
+          <p className="text-xs text-gray-400">Invested</p>
+          <p className="text-sm font-bold text-gray-900">{amount >= 1000000 ? `$${(amount/1000000).toFixed(1)}M` : amount >= 1000 ? `$${(amount/1000).toFixed(0)}K` : `$${amount}`}</p>
+        </div>
+        {c.ownershipPct && (
+          <div>
+            <p className="text-xs text-gray-400">Ownership</p>
+            <p className="text-sm font-bold text-gray-900">{c.ownershipPct}%</p>
+          </div>
+        )}
+      </div>
+      {(c.location || c.investmentDate) && (
+        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+          {c.location && <span className="flex items-center gap-1"><MapPin size={10} />{c.location}</span>}
+          {c.investmentDate && <span className="flex items-center gap-1"><Calendar size={10} />{new Date(c.investmentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Portfolio() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
+  const [storedCompanies, setStoredCompanies] = useState<StoredPortfolioCompany[]>([]);
 
   useEffect(() => {
     companiesService.getAll().then(setCompanies);
     investmentsService.getAll().then(setInvestments);
+    setStoredCompanies(getPortfolioCompanies());
   }, []);
 
   const getInvestment = (companyId: string) => investments.find((i) => i.company.id === companyId);
@@ -536,6 +594,9 @@ export default function Portfolio() {
         {/* Portfolio companies */}
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Portfolio Companies</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {storedCompanies.map((c) => (
+            <StoredCompanyCard key={c.id} c={c} />
+          ))}
           {investedCompanies.map((company) => (
             <PortfolioCompanyCard
               key={company.id}

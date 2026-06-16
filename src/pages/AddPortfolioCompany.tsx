@@ -5,6 +5,7 @@ import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
+import { savePortfolioCompany } from '../services/store';
 
 // ---------------------------------------------------------------------------
 // LogoUpload
@@ -148,7 +149,7 @@ export default function AddPortfolioCompany() {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    console.log('AddPortfolioCompany submit:', form);
+    savePortfolioCompany(form);
     navigate('/portfolio');
   }
 

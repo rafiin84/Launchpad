@@ -4,10 +4,11 @@ import {
   Inbox, TrendingUp, DollarSign, Users, Clock,
   BarChart2, Search, ArrowUpRight, ChevronRight,
   AlertCircle, CheckCircle2, Eye, CalendarClock,
-  Target, Layers, Plus,
+  Target, Layers, Plus, Building2,
 } from 'lucide-react';
 import { applicationsService } from '../services/dealsService';
 import { mockApplications } from '../data/mockData';
+import { getApplications, type StoredApplication } from '../services/store';
 import type { Application, DealStage } from '../types';
 import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -287,10 +288,12 @@ function ChipRow({ chips }: { chips: Chip[] }) {
 
 export default function Applications() {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [storedApps, setStoredApps] = useState<StoredApplication[]>([]);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     applicationsService.getAll().then(setApplications);
+    setStoredApps(getApplications());
   }, []);
 
   // Use mockApplications for synchronous chip calculation
@@ -425,6 +428,73 @@ export default function Applications() {
           </div>
         </div>
         <ApplicationsTable apps={tableApps} />
+
+        {/* Manually added applications */}
+        {storedApps.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Manually Added ({storedApps.length})</h3>
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3.5 w-48">Company</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-40">Founder</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-44">Contact</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5">What they're building</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Stage</th>
+                      <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Ask</th>
+                      <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {storedApps.map((app) => {
+                      const amount = parseFloat(app.amountRequested) || 0;
+                      const fmtAmt = amount >= 1_000_000 ? `$${(amount/1_000_000).toFixed(1)}M` : amount >= 1000 ? `$${(amount/1000).toFixed(0)}K` : `$${amount}`;
+                      return (
+                        <tr key={app.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors last:border-0">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                                {app.logo ? <img src={app.logo} alt={app.companyName} className="w-full h-full object-cover" /> : <Building2 size={14} className="text-gray-400" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName}</p>
+                                <p className="text-xs text-gray-400 truncate capitalize">{app.industry}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="text-sm font-medium text-gray-900 truncate">{app.founderName || '—'}</p>
+                            <p className="text-xs text-gray-400 truncate">{app.location}</p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="text-xs text-gray-700 truncate">{app.founderEmail}</p>
+                            {app.website && <p className="text-xs text-indigo-500 truncate">{app.website.replace('https://', '')}</p>}
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="text-xs text-gray-600 line-clamp-2">{app.shortDescription}</p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">
+                              {app.pipelineStage}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <span className="text-sm font-semibold text-gray-900">{fmtAmt}</span>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <span className="text-xs text-gray-400">{new Date(app.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
