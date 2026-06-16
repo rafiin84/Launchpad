@@ -3,13 +3,14 @@ import { zohoList, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
 const MODULE = 'My_Activities';
 
 const FIELD_MAP: Record<string, string> = {
-  title:        'Name',
-  activityType: 'Activity_Type',
-  content:      'Content',
-  companyName:  'Company_Name',
-  authorName:   'Author_Name',
-  tags:         'Activity_Tags',
-  imageUrl:     'Image_URL',
+  title:           'Name',
+  activityType:    'Activity_Type',
+  content:         'Content',
+  companyName:     'Company_Name',
+  authorName:      'Author_Name',
+  tags:            'Activity_Tags',
+  imageUrl:        'Image_URL',        // website field — stores public URLs only
+  imageData:       'Activity_Image_Data', // large textarea — stores compressed base64
 };
 
 export interface CRMActivity {
@@ -20,7 +21,8 @@ export interface CRMActivity {
   companyName: string;
   authorName: string;
   tags: string;
-  imageUrl: string;
+  imageUrl: string;   // public URL (from URL mode)
+  imageData: string;  // compressed base64 (from file upload)
 }
 
 export type CRMActivityFields = Omit<CRMActivity, 'id'>;
@@ -40,6 +42,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     authorName:   str(FIELD_MAP.authorName),
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
+    imageData:    str(FIELD_MAP.imageData),
   };
 }
 

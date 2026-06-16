@@ -69,10 +69,15 @@ function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete:
           </div>
         )}
 
-        {/* Image */}
-        {activity.imageUrl && (
+        {/* Image — prefer uploaded base64, fallback to URL */}
+        {(activity.imageData || activity.imageUrl) && (
           <div className="mt-3 rounded-xl overflow-hidden mb-3">
-            <img src={activity.imageUrl} alt="" className="w-full h-[220px] object-cover" loading="lazy" />
+            <img
+              src={activity.imageData || activity.imageUrl}
+              alt=""
+              className="w-full h-[220px] object-cover"
+              loading="lazy"
+            />
           </div>
         )}
 
