@@ -17,6 +17,7 @@ import AddApplication from './pages/AddApplication';
 import DealFlow from './pages/DealFlow';
 import Portfolio from './pages/Portfolio';
 import AddPortfolioCompany from './pages/AddPortfolioCompany';
+import EditPortfolioCompany from './pages/EditPortfolioCompany';
 import Investments from './pages/Investments';
 import Funds from './pages/Funds';
 import Documents from './pages/Documents';
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/deals" element={<DealFlow />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
+            <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />

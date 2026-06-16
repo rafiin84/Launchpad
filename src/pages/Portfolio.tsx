@@ -14,15 +14,20 @@ import {
   MapPin,
   Calendar,
   Trash2,
+  Pencil,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getPortfolioCompanies, deletePortfolioCompany, type StoredPortfolioCompany } from '../services/store';
 import { companiesService } from '../services/companiesService';
 import { investmentsService } from '../services/investmentsService';
 import { mockInvestments } from '../data/mockData';
 import type { Company, Investment } from '../types';
 import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
+import { fetchCRMPortfolio, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { loadToken } from '../services/oauth';
 
 function formatCurrency(amount: number) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -406,9 +411,9 @@ function PortfolioCompanyCard({ company, investment, onDelete }: { company: Comp
   );
 }
 
-// ─── Stored Company Card ──────────────────────────────────────────────────────
+// ─── CRM Company Card ────────────────────────────────────────────────────────
 
-function StoredCompanyCard({ c, onDelete }: { c: StoredPortfolioCompany; onDelete: (id: string) => void }) {
+function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id: string) => void }) {
   const amount = parseFloat(c.investmentAmount) || 0;
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
@@ -421,21 +426,25 @@ function StoredCompanyCard({ c, onDelete }: { c: StoredPortfolioCompany; onDelet
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all">
       <div className="flex items-start gap-3 mb-3">
         <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-          {c.logo
-            ? <img src={c.logo} alt={c.companyName} className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center"><Building2 size={18} className="text-gray-400" /></div>
-          }
+          <div className="w-full h-full flex items-center justify-center"><Building2 size={18} className="text-gray-400" /></div>
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
-          <p className="text-xs text-gray-400 capitalize">{c.industry} · {c.stage}</p>
+          <p className="text-xs text-gray-400 capitalize">{c.industry}{c.stage ? ` · ${c.stage}` : ''}</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {c.status && (
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
               {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
             </span>
           )}
+          <Link
+            to={`/portfolio/${c.id}/edit`}
+            className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+            title="Edit"
+          >
+            <Pencil size={13} />
+          </Link>
           <button
             onClick={() => onDelete(c.id)}
             className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -473,18 +482,35 @@ function StoredCompanyCard({ c, onDelete }: { c: StoredPortfolioCompany; onDelet
 export default function Portfolio() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [storedCompanies, setStoredCompanies] = useState<StoredPortfolioCompany[]>([]);
+  const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [crmError, setCrmError] = useState('');
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const isConnected = !!loadToken();
+
+  const loadCRMData = () => {
+    if (!isConnected) return;
+    setCrmLoading(true);
+    setCrmError('');
+    fetchCRMPortfolio()
+      .then(setCrmCompanies)
+      .catch(err => setCrmError(err instanceof Error ? err.message : 'Failed to load CRM data'))
+      .finally(() => setCrmLoading(false));
+  };
 
   useEffect(() => {
     companiesService.getAll().then(setCompanies);
     investmentsService.getAll().then(setInvestments);
-    setStoredCompanies(getPortfolioCompanies());
+    loadCRMData();
   }, []);
 
-  const handleDeleteCompany = (id: string) => {
-    deletePortfolioCompany(id);
-    setStoredCompanies(prev => prev.filter(c => c.id !== id));
+  const handleDeleteCRM = async (id: string) => {
+    try {
+      await deleteCRMPortfolioRecord(id);
+      setCrmCompanies(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      setCrmError(err instanceof Error ? err.message : 'Delete failed');
+    }
   };
 
   const handleHideMockCompany = (id: string) => {
@@ -620,11 +646,67 @@ export default function Portfolio() {
         </div>
 
         {/* Portfolio companies */}
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Portfolio Companies</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-900">Portfolio Companies</h2>
+          {isConnected && (
+            <button
+              onClick={loadCRMData}
+              disabled={crmLoading}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <RefreshCw size={12} className={crmLoading ? 'animate-spin' : ''} />
+              {crmLoading ? 'Loading…' : 'Refresh'}
+            </button>
+          )}
+        </div>
+
+        {/* Not connected notice */}
+        {!isConnected && (
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-4">
+            <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live portfolio data</p>
+              <p className="text-xs text-amber-600 mt-0.5">Go to Login page and click "Sign in with Zoho CRM".</p>
+            </div>
+            <Link to="/login" className="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0">
+              Connect
+            </Link>
+          </div>
+        )}
+
+        {/* CRM error */}
+        {crmError && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
+            <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-red-600">{crmError}</p>
+          </div>
+        )}
+
+        {/* CRM loading skeleton */}
+        {crmLoading && crmCompanies.length === 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-gray-100 rounded w-3/4" />
+                    <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="h-2.5 bg-gray-100 rounded w-full mb-2" />
+                <div className="h-2.5 bg-gray-100 rounded w-4/5" />
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {storedCompanies.map((c) => (
-            <StoredCompanyCard key={c.id} c={c} onDelete={handleDeleteCompany} />
+          {/* CRM records */}
+          {crmCompanies.map(c => (
+            <CRMCompanyCard key={c.id} c={c} onDelete={handleDeleteCRM} />
           ))}
+          {/* Mock companies */}
           {visibleInvested.map((company) => (
             <PortfolioCompanyCard
               key={company.id}
@@ -634,6 +716,17 @@ export default function Portfolio() {
             />
           ))}
         </div>
+
+        {isConnected && !crmLoading && crmCompanies.length === 0 && !crmError && (
+          <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center mt-4">
+            <Building2 size={28} className="text-gray-200 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-500 mb-1">No records in Zoho CRM yet</p>
+            <p className="text-xs text-gray-400 mb-4">Add your first portfolio company to sync it to your CRM.</p>
+            <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+              <Plus size={14} /> Add Company
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

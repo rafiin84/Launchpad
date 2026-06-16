@@ -1,26 +1,15 @@
-import React, { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useRef, useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
-import { savePortfolioCompany } from '../services/store';
-import { createCRMPortfolioRecord } from '../services/crmPortfolio';
-import { loadToken } from '../services/oauth';
+import { getCRMPortfolioRecord, updateCRMPortfolioRecord, type CRMFormFields } from '../services/crmPortfolio';
 
-// ---------------------------------------------------------------------------
-// LogoUpload
-// ---------------------------------------------------------------------------
-interface LogoUploadProps {
-  label?: string;
-  value: string;
-  onChange: (dataUrl: string) => void;
-}
-
-function LogoUpload({ label = 'Company Logo', value, onChange }: LogoUploadProps) {
+// ─── Logo Upload ──────────────────────────────────────────────────────────────
+function LogoUpload({ label = 'Company Logo', value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
   const ref = useRef<HTMLInputElement>(null);
-
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -28,26 +17,16 @@ function LogoUpload({ label = 'Company Logo', value, onChange }: LogoUploadProps
     reader.onload = (ev) => onChange(ev.target?.result as string);
     reader.readAsDataURL(file);
   }
-
   return (
     <div>
       <p className="block text-sm font-medium text-gray-700 mb-1.5">{label}</p>
-      <button
-        type="button"
-        onClick={() => ref.current?.click()}
-        className={cn(
-          'w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center',
-          'hover:border-gray-400 hover:bg-gray-50 transition-all overflow-hidden',
-          value ? 'border-solid border-gray-200 p-0' : 'gap-1'
-        )}
-      >
-        {value ? (
-          <img src={value} alt="Logo preview" className="w-full h-full object-cover" />
-        ) : (
-          <>
-            <Upload className="w-5 h-5 text-gray-400" />
-            <span className="text-xs text-gray-400 text-center leading-tight px-1">Upload logo</span>
-          </>
+      <button type="button" onClick={() => ref.current?.click()} className={cn(
+        'w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center',
+        'hover:border-gray-400 hover:bg-gray-50 transition-all overflow-hidden',
+        value ? 'border-solid border-gray-200 p-0' : 'gap-1'
+      )}>
+        {value ? <img src={value} alt="Logo" className="w-full h-full object-cover" /> : (
+          <><Upload className="w-5 h-5 text-gray-400" /><span className="text-xs text-gray-400 text-center leading-tight px-1">Upload logo</span></>
         )}
       </button>
       <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handleFile} />
@@ -55,9 +34,7 @@ function LogoUpload({ label = 'Company Logo', value, onChange }: LogoUploadProps
   );
 }
 
-// ---------------------------------------------------------------------------
-// Options
-// ---------------------------------------------------------------------------
+// ─── Options ──────────────────────────────────────────────────────────────────
 const industryOptions = [
   { value: 'fintech', label: 'FinTech' },
   { value: 'healthtech', label: 'HealthTech' },
@@ -68,7 +45,6 @@ const industryOptions = [
   { value: 'ecommerce', label: 'E-Commerce' },
   { value: 'other', label: 'Other' },
 ];
-
 const stageOptions = [
   { value: 'pre-seed', label: 'Pre-Seed' },
   { value: 'seed', label: 'Seed' },
@@ -78,7 +54,6 @@ const stageOptions = [
   { value: 'growth', label: 'Growth' },
   { value: 'pre-ipo', label: 'Pre-IPO' },
 ];
-
 const statusOptions = [
   { value: 'active', label: 'Active' },
   { value: 'exited', label: 'Exited' },
@@ -86,34 +61,9 @@ const statusOptions = [
   { value: 'follow-on', label: 'Follow-On' },
 ];
 
-// ---------------------------------------------------------------------------
-// Form state
-// ---------------------------------------------------------------------------
-interface FormState {
-  logo: string;
-  companyName: string;
-  website: string;
-  location: string;
-  industry: string;
-  stage: string;
-  foundedYear: string;
-  teamSize: string;
-  shortDescription: string;
-  fullDescription: string;
-  tags: string;
-  investmentAmount: string;
-  investmentDate: string;
-  preMoneyValuation: string;
-  ownershipPct: string;
-  status: string;
-  notes: string;
-  founderName: string;
-  founderEmail: string;
-  founderLinkedin: string;
-  founderPhone: string;
-}
+interface FormState extends CRMFormFields { logo: string; }
 
-const empty: FormState = {
+const emptyForm: FormState = {
   logo: '', companyName: '', website: '', location: '', industry: '', stage: '',
   foundedYear: '', teamSize: '', shortDescription: '', fullDescription: '', tags: '',
   investmentAmount: '', investmentDate: '', preMoneyValuation: '', ownershipPct: '',
@@ -132,21 +82,30 @@ function validate(f: FormState): Record<string, string> {
   return e;
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-export default function AddPortfolioCompany() {
+export default function EditPortfolioCompany() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [form, setForm] = useState<FormState>(empty);
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
-  const isConnected = !!loadToken();
+
+  useEffect(() => {
+    if (!id) return;
+    getCRMPortfolioRecord(id).then(rec => {
+      if (rec) setForm({ logo: '', ...rec });
+      setLoading(false);
+    }).catch(err => {
+      setApiError(err instanceof Error ? err.message : 'Failed to load record');
+      setLoading(false);
+    });
+  }, [id]);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
-      if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
+      setForm(prev => ({ ...prev, [field]: e.target.value }));
+      if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     };
   }
 
@@ -154,42 +113,41 @@ export default function AddPortfolioCompany() {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (!id) return;
 
     setSubmitting(true);
     setApiError('');
-
     try {
-      if (isConnected) {
-        await createCRMPortfolioRecord(form);
-      } else {
-        savePortfolioCompany(form);
-      }
+      const { logo: _logo, ...fields } = form;
+      await updateCRMPortfolioRecord(id, fields);
       navigate('/portfolio');
     } catch (err) {
-      setApiError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
+      setApiError(err instanceof Error ? err.message : 'Update failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
   }
 
+  if (loading) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="max-w-3xl mx-auto animate-pulse space-y-4">
+          <div className="h-6 bg-gray-100 rounded w-32" />
+          <div className="h-40 bg-gray-100 rounded-2xl" />
+          <div className="h-48 bg-gray-100 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="max-w-3xl mx-auto">
-        {/* Back nav */}
         <Link to="/portfolio" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Portfolio
+          <ArrowLeft className="w-4 h-4" /> Back to Portfolio
         </Link>
 
-        <PageHeader title="Add Portfolio Company" description="Record a new investment in your portfolio." />
-
-        {/* CRM connection status */}
-        <div className={`flex items-center gap-2 rounded-xl px-4 py-3 mb-4 text-xs font-medium ${isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-          {isConnected
-            ? 'Connected to Zoho CRM — data will be saved directly to your Portfolio module.'
-            : 'Not connected to Zoho CRM — data will be saved locally. Go to Login to connect.'}
-        </div>
+        <PageHeader title="Edit Portfolio Company" description="Update this investment record in Zoho CRM." />
 
         {apiError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
@@ -203,7 +161,7 @@ export default function AddPortfolioCompany() {
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
             <p className="text-sm font-semibold text-gray-900 mb-4">Company Info</p>
             <div className="mb-4">
-              <LogoUpload value={form.logo} onChange={(v) => setForm((p) => ({ ...p, logo: v }))} />
+              <LogoUpload value={form.logo} onChange={v => setForm(p => ({ ...p, logo: v }))} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Company Name *" value={form.companyName} onChange={set('companyName')} error={errors.companyName} placeholder="Acme Inc." />
@@ -216,7 +174,7 @@ export default function AddPortfolioCompany() {
               <Input label="Short Description *" value={form.shortDescription} onChange={set('shortDescription')} error={errors.shortDescription} placeholder="One-line pitch" className="sm:col-span-2" />
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4">
-              <Textarea label="Full Description" value={form.fullDescription} onChange={set('fullDescription')} placeholder="Describe the company, its mission, and market opportunity..." rows={4} />
+              <Textarea label="Full Description" value={form.fullDescription} onChange={set('fullDescription')} placeholder="Describe the company..." rows={4} />
               <Input label="Tags" value={form.tags} onChange={set('tags')} placeholder="e.g. fintech, b2b, saas — comma separated" />
             </div>
           </div>
@@ -247,7 +205,6 @@ export default function AddPortfolioCompany() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-end gap-3 pt-2 pb-8">
             <Link to="/portfolio">
               <Button type="button" variant="outline" disabled={submitting}>Cancel</Button>
@@ -255,10 +212,9 @@ export default function AddPortfolioCompany() {
             <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin" />
-                  Saving to CRM…
+                  <Loader2 size={14} className="animate-spin" />Updating…
                 </span>
-              ) : 'Add to Portfolio'}
+              ) : 'Save Changes'}
             </Button>
           </div>
         </form>
