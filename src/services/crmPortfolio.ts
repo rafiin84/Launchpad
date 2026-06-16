@@ -6,12 +6,25 @@
 
 import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, findModuleApiName, type ZohoRecord } from './zohoApi';
 
-// Resolved at runtime via auto-discovery; falls back to 'Portfolio'.
+const MODULE_STORAGE_KEY = 'lp_crm_portfolio_module';
+
+// Allow the module name to be overridden from the UI and persisted.
+export function getPortfolioModuleOverride(): string | null {
+  try { return localStorage.getItem(MODULE_STORAGE_KEY); } catch { return null; }
+}
+export function setPortfolioModuleOverride(name: string): void {
+  localStorage.setItem(MODULE_STORAGE_KEY, name);
+  resolvedModule = name; // update in-memory cache immediately
+}
+
+// Resolved at runtime; checks localStorage override first, then auto-discovery.
 let resolvedModule: string | null = null;
 
 async function getModule(): Promise<string> {
   if (resolvedModule) return resolvedModule;
-  // Try to discover the exact API name for the Portfolio module.
+  const override = getPortfolioModuleOverride();
+  if (override) { resolvedModule = override; return resolvedModule; }
+  // Auto-discover by searching all modules for 'portfolio' in name.
   const discovered = await findModuleApiName('portfolio').catch(() => null);
   resolvedModule = discovered ?? 'Portfolio';
   return resolvedModule;

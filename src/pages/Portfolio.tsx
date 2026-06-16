@@ -26,7 +26,7 @@ import { mockInvestments } from '../data/mockData';
 import type { Company, Investment } from '../types';
 import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
-import { fetchCRMPortfolio, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { loadToken } from '../services/oauth';
 
@@ -487,6 +487,7 @@ export default function Portfolio() {
   const [crmLoading, setCrmLoading] = useState(false);
   const [crmError, setCrmError] = useState('');
   const [availableModules, setAvailableModules] = useState<ZohoModule[]>([]);
+  const [modulesLoading, setModulesLoading] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const isConnected = !!loadToken();
 
@@ -494,18 +495,25 @@ export default function Portfolio() {
     if (!isConnected) return;
     setCrmLoading(true);
     setCrmError('');
-    setAvailableModules([]);
     fetchCRMPortfolio()
-      .then(setCrmCompanies)
-      .catch(err => {
-        const msg: string = err instanceof Error ? err.message : 'Failed to load CRM data';
-        setCrmError(msg);
-        // When module name is wrong, fetch the full module list for diagnosis
-        if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('module')) {
-          fetchZohoModules().then(setAvailableModules).catch(() => {});
-        }
-      })
+      .then(data => { setCrmCompanies(data); setAvailableModules([]); })
+      .catch(err => setCrmError(err instanceof Error ? err.message : 'Failed to load CRM data'))
       .finally(() => setCrmLoading(false));
+  };
+
+  const handleFetchModules = () => {
+    setModulesLoading(true);
+    fetchZohoModules()
+      .then(setAvailableModules)
+      .catch(err => setCrmError(err instanceof Error ? err.message : 'Could not load module list'))
+      .finally(() => setModulesLoading(false));
+  };
+
+  const handleSelectModule = (apiName: string) => {
+    setPortfolioModuleOverride(apiName);
+    setAvailableModules([]);
+    setCrmError('');
+    loadCRMData();
   };
 
   useEffect(() => {
@@ -684,28 +692,48 @@ export default function Portfolio() {
           </div>
         )}
 
-        {/* CRM error */}
+        {/* CRM error + module picker */}
         {crmError && (
           <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-4 mb-4">
-            <div className="flex items-start gap-2 mb-2">
-              <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
-              <p className="text-sm font-medium text-red-700">{crmError}</p>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm font-medium text-red-700">{crmError}</p>
+              </div>
+              {availableModules.length === 0 && (
+                <button
+                  onClick={handleFetchModules}
+                  disabled={modulesLoading}
+                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-white border border-red-200 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {modulesLoading
+                    ? <><Loader2 size={12} className="animate-spin" /> Loading…</>
+                    : <><RefreshCw size={12} /> Show my modules</>}
+                </button>
+              )}
             </div>
+
             {availableModules.length > 0 && (
-              <div className="mt-3 pl-5">
-                <p className="text-xs font-semibold text-red-600 mb-2">
-                  Your Zoho CRM has these modules — find your Portfolio module's API name:
+              <div>
+                <p className="text-xs font-semibold text-red-700 mb-3">
+                  Click the correct module below to connect it as your Portfolio module:
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {availableModules.map(m => (
-                    <span key={m.api_name} className="inline-flex flex-col text-xs bg-white border border-red-100 rounded-lg px-2.5 py-1.5">
-                      <span className="font-semibold text-gray-900">{m.plural_label}</span>
-                      <span className="text-gray-400 font-mono">{m.api_name}</span>
-                    </span>
+                    <button
+                      key={m.api_name}
+                      onClick={() => handleSelectModule(m.api_name)}
+                      className="text-left bg-white border border-red-100 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl px-3 py-2.5 transition-all group"
+                    >
+                      <p className="text-xs font-semibold text-gray-900 truncate group-hover:text-indigo-700">
+                        {m.plural_label || m.module_name}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">{m.api_name}</p>
+                    </button>
                   ))}
                 </div>
-                <p className="text-xs text-red-500 mt-3">
-                  Copy the <strong>API name</strong> (monospace) of your Portfolio module and update <code className="bg-red-100 px-1 rounded">crmPortfolio.ts → getModule()</code>.
+                <p className="text-xs text-red-400 mt-3">
+                  This saves your selection. The app will retry immediately.
                 </p>
               </div>
             )}
