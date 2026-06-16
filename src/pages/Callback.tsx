@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle } from 'lucide-react';
-import { consumePendingToken, saveToken } from '../services/oauth';
+import { consumePendingToken, saveToken, loadToken } from '../services/oauth';
 
 export default function Callback() {
   const navigate = useNavigate();
@@ -14,11 +14,20 @@ export default function Callback() {
       setStatus('success');
       const t = setTimeout(() => navigate('/'), 1500);
       return () => clearTimeout(t);
-    } else {
-      setStatus('error');
-      const t = setTimeout(() => navigate('/login'), 2500);
+    }
+
+    // React StrictMode runs effects twice; on the second run the token was
+    // already consumed and saved above — check localStorage directly.
+    const existing = loadToken();
+    if (existing) {
+      setStatus('success');
+      const t = setTimeout(() => navigate('/'), 1500);
       return () => clearTimeout(t);
     }
+
+    setStatus('error');
+    const t = setTimeout(() => navigate('/login'), 2500);
+    return () => clearTimeout(t);
   }, [navigate]);
 
   return (
