@@ -174,3 +174,58 @@ export function clearToken(): void {
   localStorage.removeItem(OAuthConfig.storage.tokenKey);
   localStorage.removeItem(OAuthConfig.storage.expiryKey);
 }
+
+// -----------------------------------------------------------------------------
+// Role Persistence
+// -----------------------------------------------------------------------------
+
+const ROLE_KEY = 'lp_user_role';
+const PENDING_ROLE_KEY = 'lp_pending_role';
+
+export function saveRole(role: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ROLE_KEY, role);
+}
+
+export function loadRole(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ROLE_KEY);
+}
+
+export function clearRole(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(ROLE_KEY);
+}
+
+export function savePendingRole(role: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PENDING_ROLE_KEY, role);
+}
+
+export function consumePendingRole(): string | null {
+  if (typeof window === "undefined") return null;
+  const role = localStorage.getItem(PENDING_ROLE_KEY);
+  localStorage.removeItem(PENDING_ROLE_KEY);
+  return role;
+}
+
+// -----------------------------------------------------------------------------
+// User Name Persistence
+// -----------------------------------------------------------------------------
+
+const USER_NAME_KEY = 'lp_user_name';
+
+export function saveUserName(name: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(USER_NAME_KEY, name);
+}
+
+export function loadUserName(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(USER_NAME_KEY);
+}
+
+export function clearUserName(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(USER_NAME_KEY);
+}

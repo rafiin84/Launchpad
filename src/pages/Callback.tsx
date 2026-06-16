@@ -1,19 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle } from 'lucide-react';
-import { consumePendingToken, saveToken, loadToken } from '../services/oauth';
+import { consumePendingToken, saveToken, loadToken, consumePendingRole, saveUserName } from '../services/oauth';
+import { fetchCurrentZohoUser } from '../services/zohoApi';
+import { useAuth } from '../context/AuthContext';
+import type { UserRole } from '../types';
 
 export default function Callback() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
 
   useEffect(() => {
     const pending = consumePendingToken();
     if (pending) {
       saveToken(pending.token, pending.expiresAt);
-      setStatus('success');
-      const t = setTimeout(() => navigate('/'), 1500);
-      return () => clearTimeout(t);
+      const role = (consumePendingRole() ?? 'investor') as UserRole;
+      // Fetch real name from Zoho then complete login
+      fetchCurrentZohoUser().then((zohoUser) => {
+        if (zohoUser?.full_name) saveUserName(zohoUser.full_name);
+        login(role);
+        setStatus('success');
+        setTimeout(() => navigate('/'), 1500);
+      });
+      return;
     }
 
     // React StrictMode runs effects twice; on the second run the token was
@@ -28,7 +38,8 @@ export default function Callback() {
     setStatus('error');
     const t = setTimeout(() => navigate('/login'), 2500);
     return () => clearTimeout(t);
-  }, [navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-100 flex flex-col items-center justify-center gap-4">

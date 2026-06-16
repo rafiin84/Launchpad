@@ -137,6 +137,25 @@ export async function zohoDelete(module: string, id: string): Promise<void> {
   }
 }
 
+// ─── Current user ─────────────────────────────────────────────────────────────
+
+export interface ZohoCurrentUser {
+  id: string;
+  full_name: string;
+  email: string;
+  profile?: { name: string };
+}
+
+export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
+  try {
+    const res = await fetch(`${ZOHO_BASE}/users?type=CurrentUser`, { headers: authHeaders() });
+    const json = await res.json() as { users?: ZohoCurrentUser[] };
+    return json.users?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Module discovery ─────────────────────────────────────────────────────────
 
 export interface ZohoModule {

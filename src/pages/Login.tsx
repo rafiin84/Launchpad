@@ -1,13 +1,13 @@
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
-  Rocket, TrendingUp, ArrowRight, Building2, Users,
-  PieChart, Inbox, LayoutDashboard,
+  Rocket, TrendingUp, ArrowRight, ArrowLeft, Building2, Users,
+  PieChart, Inbox, LayoutDashboard, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
-import { redirectToZoho, loadToken } from '../services/oauth';
-
+import { redirectToZoho, savePendingRole } from '../services/oauth';
 
 function Logo() {
   return (
@@ -19,6 +19,8 @@ function Logo() {
     </div>
   );
 }
+
+// ─── Step 1: Role selection ────────────────────────────────────────────────────
 
 function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
   return (
@@ -38,8 +40,7 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
-
-        {/* Investor card — dark */}
+        {/* Investor card */}
         <button
           onClick={() => onSelect('investor')}
           className="group relative bg-black rounded-3xl p-8 text-left transition-all duration-200 hover:shadow-2xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
@@ -77,7 +78,7 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
           </div>
         </button>
 
-        {/* Founder card — light */}
+        {/* Founder card */}
         <button
           onClick={() => onSelect('founder')}
           className="group relative bg-white border-2 border-gray-100 hover:border-gray-900 rounded-3xl p-8 text-left transition-all duration-200 hover:shadow-xl hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
@@ -116,61 +117,89 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
         </button>
       </div>
 
-      <div className="mt-10 text-center">
-        <p className="text-xs text-gray-400 mb-3">Trusted by teams building at</p>
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          {['SynthFlow', 'HealthBridge', 'CarbonLoop', 'DataMesh', 'Nexus Ventures'].map(name => (
-            <span key={name} className="text-xs font-medium text-gray-400">{name}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Zoho sign-in */}
-      <div className="mt-8 w-full max-w-2xl">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400 font-medium">or sign in with</span>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-
-        <button
-          onClick={redirectToZoho}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:border-gray-400 rounded-2xl px-6 py-4 transition-all hover:shadow-md group"
-        >
-          {/* Zoho logo mark */}
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="24" height="24" rx="6" fill="#E42527"/>
-            <text x="12" y="17" textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" fontFamily="sans-serif">Z</text>
-          </svg>
-          <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">
-            {loadToken() ? 'Reconnect Zoho CRM' : 'Sign in with Zoho CRM'}
-          </span>
-        </button>
-
-        {loadToken() && (
-          <p className="text-xs text-emerald-600 text-center mt-3 font-medium">
-            ✓ Zoho CRM connected
-          </p>
-        )}
-      </div>
-
-      <p className="text-xs text-gray-400 mt-8 text-center max-w-sm">
+      <p className="text-xs text-gray-400 mt-10 text-center max-w-sm">
         Private & invite-only. All data shared on Launchpad is strictly confidential between founders and their investors.
       </p>
     </div>
   );
 }
 
+// ─── Step 2: Per-role Zoho auth screen ────────────────────────────────────────
+
+function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }) {
+  const isInvestor = role === 'investor';
+
+  const handleZohoSignIn = () => {
+    savePendingRole(role);
+    redirectToZoho();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div className="w-full max-w-md">
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-8 transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to role selection
+        </button>
+
+        {/* Role badge */}
+        <div className={cn(
+          'inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full mb-6',
+          isInvestor ? 'bg-black text-white' : 'bg-indigo-50 text-indigo-700'
+        )}>
+          {isInvestor ? <TrendingUp size={12} /> : <Rocket size={12} />}
+          {isInvestor ? 'Investor Access' : 'Founder Access'}
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Sign in as {isInvestor ? 'an Investor' : 'a Founder'}
+        </h1>
+        <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+          {isInvestor
+            ? 'Connect your Zoho CRM account to access your portfolio, deal flow, and founder network.'
+            : 'Connect your Zoho CRM account to share updates, get intros, and grow with your investors.'}
+        </p>
+
+        {/* Zoho sign-in button */}
+        <button
+          onClick={handleZohoSignIn}
+          className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-gray-900 rounded-2xl px-6 py-4 transition-all hover:shadow-lg group mb-6"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="6" fill="#E42527"/>
+            <text x="12" y="17" textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" fontFamily="sans-serif">Z</text>
+          </svg>
+          <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">
+            Sign in with Zoho CRM
+          </span>
+          <ArrowRight size={16} className="text-gray-400 group-hover:text-gray-700 ml-auto transition-colors" />
+        </button>
+
+        {/* Security note */}
+        <div className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-4">
+          <ShieldCheck size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-gray-500 leading-relaxed">
+            You'll be redirected to Zoho's secure login page. We never store your Zoho password.
+            Your role will be saved so you're taken directly to your{' '}
+            <span className="font-semibold">{isInvestor ? 'investor' : 'founder'}</span> dashboard after sign-in.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Login() {
-  const { isLoggedIn, login } = useAuth();
-  const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
 
   if (isLoggedIn) return <Navigate to="/" replace />;
-
-  const handleSelect = (role: UserRole) => {
-    login(role);
-    navigate('/');
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-gray-100 flex flex-col">
@@ -180,7 +209,12 @@ export default function Login() {
           Invite Only
         </span>
       </div>
-      <RoleSelection onSelect={handleSelect} />
+
+      {selectedRole === null ? (
+        <RoleSelection onSelect={setSelectedRole} />
+      ) : (
+        <ZohoAuthScreen role={selectedRole} onBack={() => setSelectedRole(null)} />
+      )}
     </div>
   );
 }

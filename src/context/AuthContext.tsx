@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { mockFounder, mockInvestor } from '../data/mockData';
+import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
 
 interface AuthContextValue {
   currentUser: User;
@@ -15,18 +15,51 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>('investor');
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+function buildUser(role: UserRole, name?: string | null): User {
+  const displayName = name || (role === 'investor' ? 'Investor' : 'Founder');
+  return {
+    id: role === 'investor' ? 'investor-1' : 'founder-1',
+    name: displayName,
+    email: `${role}@launchpad.app`,
+    avatar: '',
+    role,
+    bio: '',
+    expertise: [],
+    joinedAt: new Date().toISOString(),
+  };
+}
 
-  const currentUser: User = role === 'investor' ? mockInvestor : mockFounder;
+function getInitialState(): { role: UserRole; isLoggedIn: boolean } {
+  const token = loadToken();
+  const savedRole = loadRole() as UserRole | null;
+  if (token && savedRole) {
+    return { role: savedRole, isLoggedIn: true };
+  }
+  return { role: 'investor', isLoggedIn: false };
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const initial = getInitialState();
+  const [role, setRole] = useState<UserRole>(initial.role);
+  const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
+  const [userName, setUserName] = useState<string | null>(loadUserName);
+
+  const currentUser: User = buildUser(role, userName);
 
   function login(selectedRole: UserRole) {
+    saveRole(selectedRole);
     setRole(selectedRole);
+    // Reload name in case it was just saved by Callback
+    const name = loadUserName();
+    setUserName(name);
     setIsLoggedIn(true);
   }
 
   function logout() {
+    clearToken();
+    clearRole();
+    clearUserName();
+    setUserName(null);
     setIsLoggedIn(false);
   }
 
