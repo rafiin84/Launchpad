@@ -4,11 +4,11 @@ import {
   Inbox, TrendingUp, DollarSign, Users, Clock,
   BarChart2, Search, ArrowUpRight, ChevronRight,
   AlertCircle, CheckCircle2, Eye, CalendarClock,
-  Target, Layers, Plus, Building2,
+  Target, Layers, Plus, Building2, Trash2,
 } from 'lucide-react';
 import { applicationsService } from '../services/dealsService';
 import { mockApplications } from '../data/mockData';
-import { getApplications, type StoredApplication } from '../services/store';
+import { getApplications, deleteApplication, type StoredApplication } from '../services/store';
 import type { Application, DealStage } from '../types';
 import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -296,6 +296,11 @@ export default function Applications() {
     setStoredApps(getApplications());
   }, []);
 
+  const handleDeleteApp = (id: string) => {
+    deleteApplication(id);
+    setStoredApps(prev => prev.filter(a => a.id !== id));
+  };
+
   // Use mockApplications for synchronous chip calculation
   const active = mockApplications.filter(a => a.stage !== 'approved' && a.stage !== 'invested');
   const totalFunding = active.reduce((s, a) => s + a.fundingRequested, 0);
@@ -445,6 +450,7 @@ export default function Applications() {
                       <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Stage</th>
                       <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Ask</th>
                       <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Submitted</th>
+                      <th className="px-4 py-3.5 w-10" />
                     </tr>
                   </thead>
                   <tbody>
@@ -485,6 +491,15 @@ export default function Applications() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="text-xs text-gray-400">{new Date(app.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => handleDeleteApp(app.id)}
+                              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </td>
                         </tr>
                       );

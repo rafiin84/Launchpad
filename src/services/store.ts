@@ -39,6 +39,10 @@ export function getPortfolioCompanies(): StoredPortfolioCompany[] {
   }
 }
 
+export function deletePortfolioCompany(id: string): void {
+  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(getPortfolioCompanies().filter(c => c.id !== id)));
+}
+
 export function savePortfolioCompany(data: Omit<StoredPortfolioCompany, 'id' | 'createdAt'>): StoredPortfolioCompany {
   const entry: StoredPortfolioCompany = {
     ...data,
@@ -86,6 +90,10 @@ export function getApplications(): StoredApplication[] {
   }
 }
 
+export function deleteApplication(id: string): void {
+  localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(getApplications().filter(a => a.id !== id)));
+}
+
 export function saveApplication(data: Omit<StoredApplication, 'id' | 'submittedAt'>): StoredApplication {
   const entry: StoredApplication = {
     ...data,
@@ -119,6 +127,10 @@ export function getDocuments(): StoredDocument[] {
   } catch {
     return [];
   }
+}
+
+export function deleteDocument(id: string): void {
+  localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(getDocuments().filter(d => d.id !== id)));
 }
 
 export function saveDocument(data: Omit<StoredDocument, 'id' | 'uploadedAt'>): StoredDocument {

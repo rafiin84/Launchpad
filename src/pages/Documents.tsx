@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff } from 'lucide-react';
+import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
-import { getDocuments, type StoredDocument } from '../services/store';
+import { getDocuments, deleteDocument, type StoredDocument } from '../services/store';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   'pitch-deck':       { icon: File,          color: 'text-indigo-500 bg-indigo-50',  label: 'Pitch Deck' },
@@ -31,6 +31,11 @@ export default function Documents() {
   useEffect(() => {
     setDocs(getDocuments());
   }, []);
+
+  const handleDelete = (id: string) => {
+    deleteDocument(id);
+    setDocs(prev => prev.filter(d => d.id !== id));
+  };
 
   // Build category counts (stored + mock baselines)
   const mockCounts: Record<string, number> = {
@@ -130,6 +135,13 @@ export default function Documents() {
                     <span className="text-xs text-gray-400">
                       {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
               );

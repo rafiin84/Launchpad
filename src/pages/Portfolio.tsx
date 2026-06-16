@@ -13,9 +13,10 @@ import {
   Plus,
   MapPin,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getPortfolioCompanies, type StoredPortfolioCompany } from '../services/store';
+import { getPortfolioCompanies, deletePortfolioCompany, type StoredPortfolioCompany } from '../services/store';
 import { companiesService } from '../services/companiesService';
 import { investmentsService } from '../services/investmentsService';
 import { mockInvestments } from '../data/mockData';
@@ -400,7 +401,7 @@ function PortfolioCompanyCard({ company, investment }: { company: Company; inves
 
 // ─── Stored Company Card ──────────────────────────────────────────────────────
 
-function StoredCompanyCard({ c }: { c: StoredPortfolioCompany }) {
+function StoredCompanyCard({ c, onDelete }: { c: StoredPortfolioCompany; onDelete: (id: string) => void }) {
   const amount = parseFloat(c.investmentAmount) || 0;
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
@@ -422,11 +423,20 @@ function StoredCompanyCard({ c }: { c: StoredPortfolioCompany }) {
           <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
           <p className="text-xs text-gray-400 capitalize">{c.industry} · {c.stage}</p>
         </div>
-        {c.status && (
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {c.status && (
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+            </span>
+          )}
+          <button
+            onClick={() => onDelete(c.id)}
+            className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
       {c.shortDescription && <p className="text-xs text-gray-600 leading-relaxed mb-3 line-clamp-2">{c.shortDescription}</p>}
       <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-50">
@@ -463,6 +473,11 @@ export default function Portfolio() {
     investmentsService.getAll().then(setInvestments);
     setStoredCompanies(getPortfolioCompanies());
   }, []);
+
+  const handleDeleteCompany = (id: string) => {
+    deletePortfolioCompany(id);
+    setStoredCompanies(prev => prev.filter(c => c.id !== id));
+  };
 
   const getInvestment = (companyId: string) => investments.find((i) => i.company.id === companyId);
   const investedIds = new Set(mockInvestments.map(i => i.company.id));
@@ -595,7 +610,7 @@ export default function Portfolio() {
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Portfolio Companies</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {storedCompanies.map((c) => (
-            <StoredCompanyCard key={c.id} c={c} />
+            <StoredCompanyCard key={c.id} c={c} onDelete={handleDeleteCompany} />
           ))}
           {investedCompanies.map((company) => (
             <PortfolioCompanyCard
