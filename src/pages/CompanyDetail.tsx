@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Trophy, Calendar, Users, MapPin, Globe } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, Trophy, Calendar, Users, MapPin, Globe, Trash2 } from 'lucide-react';
 import { companiesService } from '../services/companiesService';
 import { postsService } from '../services/postsService';
 import type { Company, Post } from '../types';
@@ -8,6 +8,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { StageBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { FeedCard } from '../components/feed/FeedCard';
+import { getPortfolioCompanies, deletePortfolioCompany } from '../services/store';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -17,6 +18,7 @@ const TABS = [
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
@@ -28,6 +30,13 @@ export default function CompanyDetail() {
       setPosts(allPosts.filter((p) => p.company?.id === id));
     });
   }, [id]);
+
+  function handleDelete() {
+    if (!company) return;
+    const stored = getPortfolioCompanies().find(c => c.companyName === company.name);
+    if (stored) deletePortfolioCompany(stored.id);
+    navigate('/companies');
+  }
 
   if (!company) {
     return (
@@ -42,11 +51,20 @@ export default function CompanyDetail() {
 
   return (
     <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
-      {/* Back */}
-      <Link to="/companies" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
-        <ArrowLeft size={16} />
-        All Companies
-      </Link>
+      {/* Back + Delete */}
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/companies" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+          <ArrowLeft size={16} />
+          All Companies
+        </Link>
+        <button
+          onClick={handleDelete}
+          className="inline-flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
+        >
+          <Trash2 size={14} />
+          Delete
+        </button>
+      </div>
 
       {/* Company header */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-6">

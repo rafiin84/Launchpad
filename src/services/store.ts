@@ -116,6 +116,7 @@ export interface StoredDocument {
   visibility: string;
   fileName: string;
   fileSize: number;
+  fileData?: string;
   uploadedAt: string;
 }
 

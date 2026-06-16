@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Inbox, TrendingUp, DollarSign, Users, Clock,
   BarChart2, Search, ArrowUpRight, ChevronRight,
@@ -135,6 +135,7 @@ function StagePill({ stage }: { stage: DealStage }) {
 // ─── Applications Table ───────────────────────────────────────────────────────
 
 function ApplicationsTable({ apps, onDelete }: { apps: Application[]; onDelete: (id: string) => void }) {
+  const navigate = useNavigate();
   if (apps.length === 0) {
     return (
       <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center">
@@ -164,7 +165,8 @@ function ApplicationsTable({ apps, onDelete }: { apps: Application[]; onDelete: 
             {apps.map((app, i) => (
               <tr
                 key={app.id}
-                className={`group border-b border-gray-50 hover:bg-gray-50/60 transition-colors last:border-0 ${i % 2 === 0 ? '' : ''}`}
+                className={`group border-b border-gray-50 hover:bg-gray-50/60 transition-colors last:border-0 cursor-pointer ${i % 2 === 0 ? '' : ''}`}
+                onClick={() => navigate(`/applications/${app.id}`)}
               >
                 {/* Company */}
                 <td className="px-5 py-4">
@@ -231,13 +233,10 @@ function ApplicationsTable({ apps, onDelete }: { apps: Application[]; onDelete: 
 
                 {/* Actions */}
                 <td className="px-4 py-4">
-                  <div className="flex items-center gap-1.5">
-                    <Link
-                      to={`/applications/${app.id}`}
-                      className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 hover:bg-indigo-100 hover:text-indigo-600 text-gray-400 transition-colors"
-                    >
+                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 text-gray-400">
                       <ChevronRight size={14} />
-                    </Link>
+                    </div>
                     <button
                       onClick={() => onDelete(app.id)}
                       className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"

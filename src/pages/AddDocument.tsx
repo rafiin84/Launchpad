@@ -35,11 +35,12 @@ interface FormState {
   visibility: string;
   fileName: string;
   fileSize: number;
+  fileData: string;
 }
 
 const empty: FormState = {
   documentName: '', type: '', relatedCompany: '', description: '', visibility: '',
-  fileName: '', fileSize: 0,
+  fileName: '', fileSize: 0, fileData: '',
 };
 
 function formatBytes(bytes: number): string {
@@ -75,7 +76,12 @@ export default function AddDocument() {
   }
 
   function handleFile(file: File) {
-    setForm((prev) => ({ ...prev, fileName: file.name, fileSize: file.size }));
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const fileData = (e.target?.result as string) ?? '';
+      setForm((prev) => ({ ...prev, fileName: file.name, fileSize: file.size, fileData }));
+    };
+    reader.readAsDataURL(file);
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -91,7 +97,7 @@ export default function AddDocument() {
   }
 
   function clearFile() {
-    setForm((prev) => ({ ...prev, fileName: '', fileSize: 0 }));
+    setForm((prev) => ({ ...prev, fileName: '', fileSize: 0, fileData: '' }));
     if (fileRef.current) fileRef.current.value = '';
   }
 

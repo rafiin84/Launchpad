@@ -37,6 +37,18 @@ export default function Documents() {
     setDocs(prev => prev.filter(d => d.id !== id));
   };
 
+  const handleOpen = (doc: StoredDocument) => {
+    if (!doc.fileData) return;
+    const [meta, base64] = doc.fileData.split(',');
+    const mime = meta.match(/:(.*?);/)?.[1] ?? 'application/octet-stream';
+    const bytes = atob(base64);
+    const buf = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
+    const blob = new Blob([buf], { type: mime });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  };
+
   // Build category counts (stored + mock baselines)
   const mockCounts: Record<string, number> = {
     'pitch-deck': 3, 'financial-model': 2, 'legal-document': 5, 'due-diligence': 1, 'other': 0,
@@ -96,7 +108,8 @@ export default function Documents() {
               return (
                 <div
                   key={doc.id}
-                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < docs.length - 1 ? 'border-b border-gray-50' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < docs.length - 1 ? 'border-b border-gray-50' : ''} ${doc.fileData ? 'cursor-pointer' : ''}`}
+                  onClick={() => doc.fileData && handleOpen(doc)}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.color}`}>
                     <Icon size={16} />
@@ -136,7 +149,7 @@ export default function Documents() {
                       {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                     <button
-                      onClick={() => handleDelete(doc.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       title="Delete"
                     >

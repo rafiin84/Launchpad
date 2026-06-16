@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Mail, MapPin, Users,
   DollarSign, TrendingUp, ExternalLink,
-  Building2, Link2,
+  Building2, Link2, Trash2,
 } from 'lucide-react';
 import { applicationsService } from '../services/dealsService';
 import type { Application, DealStage } from '../types';
 import { Avatar } from '../components/ui/Avatar';
+import { getApplications, deleteApplication } from '../services/store';
 
 function formatCurrency(amount: number) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -95,8 +96,10 @@ function StageTimeline({ current }: { current: DealStage }) {
 
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [app, setApp] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
+  const isStored = id?.startsWith('app-') ?? false;
 
   useEffect(() => {
     if (!id) return;
@@ -105,6 +108,14 @@ export default function ApplicationDetail() {
       setLoading(false);
     });
   }, [id]);
+
+  function handleDelete() {
+    if (!id) return;
+    if (isStored) {
+      deleteApplication(id);
+    }
+    navigate('/applications');
+  }
 
   if (loading) {
     return (
@@ -141,14 +152,23 @@ export default function ApplicationDetail() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="max-w-5xl">
-        {/* Back */}
-        <Link
-          to="/applications"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors"
-        >
-          <ArrowLeft size={15} />
-          All Applications
-        </Link>
+        {/* Back + Delete */}
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            to="/applications"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft size={15} />
+            All Applications
+          </Link>
+          <button
+            onClick={handleDelete}
+            className="inline-flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
 
         {/* Hero card */}
         <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
