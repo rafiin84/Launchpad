@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, Users, Calendar } from 'lucide-react';
+import { Search, ExternalLink, Users, Calendar, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { companiesService } from '../services/companiesService';
 import type { Company } from '../types';
@@ -95,6 +95,11 @@ export default function Companies() {
       <PageHeader
         title="Portfolio Companies"
         description="The founders and companies in our network"
+        action={
+          <Link to="/companies/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus size={15} /> Add Company
+          </Link>
+        }
       />
 
       {/* Search */}

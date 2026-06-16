@@ -10,6 +10,7 @@ import {
   Percent,
   Layers,
   PieChart,
+  Plus,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { companiesService } from '../services/companiesService';
@@ -505,7 +506,15 @@ export default function Portfolio() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Constrained header */}
       <div className="max-w-5xl">
-        <PageHeader title="Portfolio" description="Your invested companies and portfolio performance" />
+        <PageHeader
+          title="Portfolio"
+          description="Your invested companies and portfolio performance"
+          action={
+            <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+              <Plus size={15} /> Add Company
+            </Link>
+          }
+        />
       </div>
 
       {/* Full-width scrollable KPI row */}

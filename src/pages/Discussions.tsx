@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  ThumbsUp, MessageSquare, Share2, Image, Send, X, MoreHorizontal,
+  ThumbsUp, MessageSquare, Share2, Image, Send, X, MoreHorizontal, Plus,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -338,6 +339,11 @@ export default function Discussions() {
           title="Discussions"
           description="Share insights, ask questions, and learn from the network"
           className="mb-5"
+          action={
+            <Link to="/discussions/new" className="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">
+              <Plus size={15} /> New Post
+            </Link>
+          }
         />
 
         <div className="mb-4">

@@ -2,7 +2,7 @@ export { Button } from './Button';
 export { Avatar, AvatarGroup } from './Avatar';
 export { Badge, StageBadge } from './Badge';
 export { Card, CardHeader, CardDivider } from './Card';
-export { Input, Textarea } from './Input';
+export { Input, Textarea, Select } from './Input';
 export { Modal } from './Modal';
 export { EmptyState } from './EmptyState';
 export { Tabs } from './Tabs';

@@ -4,7 +4,7 @@ import {
   Inbox, TrendingUp, DollarSign, Users, Clock,
   BarChart2, Search, ArrowUpRight, ChevronRight,
   AlertCircle, CheckCircle2, Eye, CalendarClock,
-  Target, Layers,
+  Target, Layers, Plus,
 } from 'lucide-react';
 import { applicationsService } from '../services/dealsService';
 import { mockApplications } from '../data/mockData';
@@ -386,6 +386,11 @@ export default function Applications() {
         <PageHeader
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
+          action={
+            <Link to="/applications/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+              <Plus size={15} /> Add Application
+            </Link>
+          }
         />
       </div>
 

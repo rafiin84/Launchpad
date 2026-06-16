@@ -1,5 +1,6 @@
 import React from 'react';
-import { FileText, Lock, Upload, File, FileSpreadsheet, Scale } from 'lucide-react';
+import { FileText, Lock, Upload, File, FileSpreadsheet, Scale, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -18,7 +19,11 @@ export default function Documents() {
       <PageHeader
         title="Documents"
         description="Secure document repository for your portfolio"
-        action={<Button size="sm" icon={<Upload size={15} />}>Upload</Button>}
+        action={
+          <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus size={15} /> Upload Document
+          </Link>
+        }
       />
 
       {/* Privacy notice */}
