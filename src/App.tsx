@@ -28,6 +28,7 @@ import AddCompany from './pages/AddCompany';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Activities from './pages/Activities';
+import AddActivity from './pages/AddActivity';
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
+            <Route path="/activities/new" element={<AddActivity />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/new" element={<AddCompany />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />

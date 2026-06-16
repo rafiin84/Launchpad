@@ -38,6 +38,7 @@ const investorNav: NavItem[] = [
 
 const founderNav: NavItem[] = [
   { label: 'Home',          path: '/',              icon: Home },
+  { label: 'Activities',    path: '/activities',    icon: Rss },
   { label: 'Companies',     path: '/companies',     icon: Building2 },
   { label: 'Discussions',   path: '/discussions',   icon: Users },
   { label: 'Conversations', path: '/conversations', icon: MessageSquare },
