@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Image, X, Trophy, Lightbulb, TrendingUp,
-  Bell, Megaphone, Tag, Building2, User, Send, Upload,
+  ArrowLeft, Image, X, Tag, Building2, User, Send, Upload,
 } from 'lucide-react';
 import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -13,15 +12,12 @@ import { cn } from '../lib/cn';
 // ─── Options ──────────────────────────────────────────────────────────────────
 
 const ACTIVITY_TYPES = [
-  { value: 'win',       label: '🏆  Win',       icon: Trophy,      bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  { value: 'insight',   label: '💡  Insight',   icon: Lightbulb,   bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
-  { value: 'update',    label: '📈  Update',    icon: TrendingUp,  bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-200' },
-  { value: 'advice',    label: '💬  Advice',    icon: Megaphone,   bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200' },
-  { value: 'milestone', label: '🎯  Milestone', icon: Bell,        bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200' },
-  { value: 'news',      label: '📰  News',      icon: Bell,        bg: 'bg-gray-100',   text: 'text-gray-700',    border: 'border-gray-200' },
+  { value: 'win',          label: '🏆  Win',          bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  { value: 'insight',      label: '💡  Insight',      bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
+  { value: 'update',       label: '📈  Update',       bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-200' },
+  { value: 'advice',       label: '💬  Advice',       bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200' },
+  { value: 'introduction', label: '🤝  Introduction', bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200' },
 ];
-
-const typeSelectOptions = ACTIVITY_TYPES.map(t => ({ value: t.value, label: t.label }));
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
@@ -32,8 +28,8 @@ interface FormState {
   companyName: string;
   authorName: string;
   tags: string;
-  imageUrl: string;        // URL string stored in CRM
-  imagePreview: string;    // local blob preview (not sent to CRM)
+  imageUrl: string;        // real URL stored in CRM (max 450 chars)
+  imagePreview: string;    // local blob preview only — never sent to CRM
 }
 
 const empty = (name: string): FormState => ({
@@ -80,13 +76,10 @@ export default function AddActivity() {
 
   function handleImageFile(file: File) {
     if (!file.type.startsWith('image/')) return;
+    // Only for local preview — Image_URL in CRM is a website field (max 450 chars)
+    // so we can't store base64 there. Preview shows locally; imageUrl stays empty.
     const preview = URL.createObjectURL(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string ?? '';
-      setForm(prev => ({ ...prev, imagePreview: preview, imageUrl: dataUrl }));
-    };
-    reader.readAsDataURL(file);
+    setForm(prev => ({ ...prev, imagePreview: preview, imageUrl: '' }));
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -240,8 +233,8 @@ export default function AddActivity() {
               </div>
             </div>
 
-            {/* Image preview (both modes) */}
-            {(form.imagePreview || (imageMode === 'url' && form.imageUrl && form.imageUrl.startsWith('http'))) && (
+            {/* Image preview */}
+            {(form.imagePreview || (form.imageUrl && form.imageUrl.startsWith('http'))) && (
               <div className="relative mb-4 rounded-xl overflow-hidden">
                 <img
                   src={form.imagePreview || form.imageUrl}
@@ -255,6 +248,11 @@ export default function AddActivity() {
                 >
                   <X size={13} className="text-white" />
                 </button>
+                {imageMode === 'upload' && form.imagePreview && !form.imageUrl && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-3 py-1.5 text-xs text-white/80 text-center">
+                    Preview only — paste an image URL above to save it to the activity
+                  </div>
+                )}
               </div>
             )}
 
