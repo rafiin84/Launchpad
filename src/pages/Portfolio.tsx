@@ -319,26 +319,34 @@ function KpiChipRow({ chips }: { chips: KpiChip[] }) {
 
 // ─── Portfolio Company Card ────────────────────────────────────────────────────
 
-function PortfolioCompanyCard({ company, investment }: { company: Company; investment?: Investment }) {
+function PortfolioCompanyCard({ company, investment, onDelete }: { company: Company; investment?: Investment; onDelete: () => void }) {
   const moic = investment?.moic ?? 1;
   const gain = investment ? investment.amount * (moic - 1) : 0;
 
   return (
-    <Link to={`/companies/${company.id}`}>
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-            <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-              {company.name}
-            </h3>
-            <p className="text-xs text-gray-500">{company.industry} · {company.location}</p>
-          </div>
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-3">
+        <Link to={`/companies/${company.id}`} className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+          <img src={company.logo} alt={company.name} className="w-full h-full object-cover" />
+        </Link>
+        <Link to={`/companies/${company.id}`} className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+            {company.name}
+          </h3>
+          <p className="text-xs text-gray-500">{company.industry} · {company.location}</p>
+        </Link>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <StageBadge stage={company.stage} />
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
+      </div>
 
         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2 mb-3">
           {company.shortDescription}
@@ -394,8 +402,7 @@ function PortfolioCompanyCard({ company, investment }: { company: Company; inves
             <p className="text-xs font-medium text-gray-700">{company.publicMilestones[0].title}</p>
           </div>
         )}
-      </div>
-    </Link>
+    </div>
   );
 }
 
@@ -467,6 +474,7 @@ export default function Portfolio() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [storedCompanies, setStoredCompanies] = useState<StoredPortfolioCompany[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     companiesService.getAll().then(setCompanies);
@@ -479,9 +487,14 @@ export default function Portfolio() {
     setStoredCompanies(prev => prev.filter(c => c.id !== id));
   };
 
+  const handleHideMockCompany = (id: string) => {
+    setHiddenIds(prev => new Set([...prev, id]));
+  };
+
   const getInvestment = (companyId: string) => investments.find((i) => i.company.id === companyId);
   const investedIds = new Set(mockInvestments.map(i => i.company.id));
   const investedCompanies = companies.filter(c => investedIds.has(c.id));
+  const visibleInvested = investedCompanies.filter(c => !hiddenIds.has(c.id));
 
   // Pre-computed from mockInvestments (synchronous, no loading flash)
   const totalDeployed = mockInvestments.reduce((s, i) => s + i.amount, 0);
@@ -612,10 +625,11 @@ export default function Portfolio() {
           {storedCompanies.map((c) => (
             <StoredCompanyCard key={c.id} c={c} onDelete={handleDeleteCompany} />
           ))}
-          {investedCompanies.map((company) => (
+          {visibleInvested.map((company) => (
             <PortfolioCompanyCard
               key={company.id}
               company={company}
+              onDelete={() => handleHideMockCompany(company.id)}
               investment={getInvestment(company.id)}
             />
           ))}

@@ -134,7 +134,7 @@ function StagePill({ stage }: { stage: DealStage }) {
 
 // ─── Applications Table ───────────────────────────────────────────────────────
 
-function ApplicationsTable({ apps }: { apps: Application[] }) {
+function ApplicationsTable({ apps, onDelete }: { apps: Application[]; onDelete: (id: string) => void }) {
   if (apps.length === 0) {
     return (
       <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center">
@@ -229,14 +229,23 @@ function ApplicationsTable({ apps }: { apps: Application[] }) {
                   <span className="text-xs text-gray-400">{formatDate(app.submittedAt)}</span>
                 </td>
 
-                {/* Arrow */}
+                {/* Actions */}
                 <td className="px-4 py-4">
-                  <Link
-                    to={`/applications/${app.id}`}
-                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 hover:bg-indigo-100 hover:text-indigo-600 text-gray-400 transition-colors"
-                  >
-                    <ChevronRight size={14} />
-                  </Link>
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      to={`/applications/${app.id}`}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100 hover:bg-indigo-100 hover:text-indigo-600 text-gray-400 transition-colors"
+                    >
+                      <ChevronRight size={14} />
+                    </Link>
+                    <button
+                      onClick={() => onDelete(app.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -296,9 +305,15 @@ export default function Applications() {
     setStoredApps(getApplications());
   }, []);
 
+  const [hiddenAppIds, setHiddenAppIds] = useState<Set<string>>(new Set());
+
   const handleDeleteApp = (id: string) => {
     deleteApplication(id);
     setStoredApps(prev => prev.filter(a => a.id !== id));
+  };
+
+  const handleHideMockApp = (id: string) => {
+    setHiddenAppIds(prev => new Set([...prev, id]));
   };
 
   // Use mockApplications for synchronous chip calculation
@@ -385,7 +400,7 @@ export default function Applications() {
       )
     : applications;
 
-  const tableApps = filtered.filter(a => a.stage !== 'approved' && a.stage !== 'invested');
+  const tableApps = filtered.filter(a => a.stage !== 'approved' && a.stage !== 'invested' && !hiddenAppIds.has(a.id));
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -432,7 +447,7 @@ export default function Applications() {
             />
           </div>
         </div>
-        <ApplicationsTable apps={tableApps} />
+        <ApplicationsTable apps={tableApps} onDelete={handleHideMockApp} />
 
         {/* Manually added applications */}
         {storedApps.length > 0 && (
