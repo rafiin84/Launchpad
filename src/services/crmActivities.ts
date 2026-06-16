@@ -46,8 +46,16 @@ function fromRecord(r: ZohoRecord): CRMActivity {
   };
 }
 
+// Explicitly list all fields — Zoho omits large textarea fields from default list responses
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Activity_Tags,Image_URL,Activity_Image_Data';
+
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
-  const records = await zohoList(MODULE, { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' });
+  const records = await zohoList(MODULE, {
+    per_page: '200',
+    sort_by: 'Modified_Time',
+    sort_order: 'desc',
+    fields: ALL_FIELDS,
+  });
   return records.map(fromRecord);
 }
 
