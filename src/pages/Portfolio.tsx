@@ -27,6 +27,7 @@ import type { Company, Investment } from '../types';
 import { StageBadge } from '../components/ui/Badge';
 import { PageHeader } from '../components/layout/PageHeader';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { loadToken } from '../services/oauth';
 
 function formatCurrency(amount: number) {
@@ -485,6 +486,7 @@ export default function Portfolio() {
   const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [crmLoading, setCrmLoading] = useState(false);
   const [crmError, setCrmError] = useState('');
+  const [availableModules, setAvailableModules] = useState<ZohoModule[]>([]);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const isConnected = !!loadToken();
 
@@ -492,9 +494,17 @@ export default function Portfolio() {
     if (!isConnected) return;
     setCrmLoading(true);
     setCrmError('');
+    setAvailableModules([]);
     fetchCRMPortfolio()
       .then(setCrmCompanies)
-      .catch(err => setCrmError(err instanceof Error ? err.message : 'Failed to load CRM data'))
+      .catch(err => {
+        const msg: string = err instanceof Error ? err.message : 'Failed to load CRM data';
+        setCrmError(msg);
+        // When module name is wrong, fetch the full module list for diagnosis
+        if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('module')) {
+          fetchZohoModules().then(setAvailableModules).catch(() => {});
+        }
+      })
       .finally(() => setCrmLoading(false));
   };
 
@@ -676,9 +686,29 @@ export default function Portfolio() {
 
         {/* CRM error */}
         {crmError && (
-          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
-            <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-red-600">{crmError}</p>
+          <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-4 mb-4">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-medium text-red-700">{crmError}</p>
+            </div>
+            {availableModules.length > 0 && (
+              <div className="mt-3 pl-5">
+                <p className="text-xs font-semibold text-red-600 mb-2">
+                  Your Zoho CRM has these modules — find your Portfolio module's API name:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {availableModules.map(m => (
+                    <span key={m.api_name} className="inline-flex flex-col text-xs bg-white border border-red-100 rounded-lg px-2.5 py-1.5">
+                      <span className="font-semibold text-gray-900">{m.plural_label}</span>
+                      <span className="text-gray-400 font-mono">{m.api_name}</span>
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-red-500 mt-3">
+                  Copy the <strong>API name</strong> (monospace) of your Portfolio module and update <code className="bg-red-100 px-1 rounded">crmPortfolio.ts → getModule()</code>.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

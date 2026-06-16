@@ -7,9 +7,11 @@ export const ZOHO_BASE = 'https://www.zohoapis.in/crm/v2';
 
 export class ZohoApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code: string;
+  constructor(status: number, message: string, code = '') {
     super(message);
     this.status = status;
+    this.code = code;
     this.name = 'ZohoApiError';
   }
 }
@@ -22,6 +24,10 @@ export interface ZohoRecord {
 interface ZohoListResponse {
   data: ZohoRecord[];
   info?: { page: number; per_page: number; count: number; more_records: boolean };
+  // error shape
+  code?: string;
+  message?: string;
+  status?: string;
 }
 
 interface ZohoCUDResponse {
@@ -31,50 +37,72 @@ interface ZohoCUDResponse {
     message: string;
     details: { id: string };
   }>;
+  // error shape (some endpoints return top-level error)
+  code?: string;
+  message?: string;
 }
 
-function headers(): HeadersInit {
+function authHeaders(): HeadersInit {
   const token = loadToken();
-  if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.');
+  if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
   return {
     'Authorization': `Zoho-oauthtoken ${token}`,
     'Content-Type': 'application/json',
   };
 }
 
+// Zoho sometimes returns HTTP 200 with an error body — check both.
+function assertNoZohoError(json: ZohoListResponse | ZohoCUDResponse, httpStatus: number): void {
+  if ('code' in json && json.code && json.code !== 'SUCCESS') {
+    throw new ZohoApiError(httpStatus, (json as { message?: string }).message ?? json.code, json.code);
+  }
+}
+
 export async function zohoList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
   const url = new URL(`${ZOHO_BASE}/${module}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const res = await fetch(url.toString(), { headers: headers() });
+  const res = await fetch(url.toString(), { headers: authHeaders() });
   if (res.status === 204) return [];
 
-  const json = await res.json();
-  if (!res.ok) throw new ZohoApiError(res.status, json?.message ?? `HTTP ${res.status}`);
+  const json: ZohoListResponse = await res.json();
 
-  return (json as ZohoListResponse).data ?? [];
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  assertNoZohoError(json, res.status);
+
+  return json.data ?? [];
 }
 
 export async function zohoGetById(module: string, id: string): Promise<ZohoRecord | null> {
-  const res = await fetch(`${ZOHO_BASE}/${module}/${id}`, { headers: headers() });
+  const res = await fetch(`${ZOHO_BASE}/${module}/${id}`, { headers: authHeaders() });
   if (res.status === 404) return null;
 
-  const json = await res.json();
-  if (!res.ok) throw new ZohoApiError(res.status, json?.message ?? `HTTP ${res.status}`);
+  const json: ZohoListResponse = await res.json();
 
-  return (json as ZohoListResponse).data?.[0] ?? null;
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  assertNoZohoError(json, res.status);
+
+  return json.data?.[0] ?? null;
 }
 
 export async function zohoCreate(module: string, data: Record<string, unknown>): Promise<string> {
   const res = await fetch(`${ZOHO_BASE}/${module}`, {
     method: 'POST',
-    headers: headers(),
+    headers: authHeaders(),
     body: JSON.stringify({ data: [data] }),
   });
 
   const json: ZohoCUDResponse = await res.json();
+
+  // Top-level error (e.g. INVALID_MODULE on POST)
+  if (json.code && json.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  }
+
   const result = json.data?.[0];
-  if (!result || result.code !== 'SUCCESS') throw new ZohoApiError(res.status, result?.message ?? 'Create failed');
+  if (!result || result.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, result?.message ?? 'Create failed', result?.code ?? '');
+  }
 
   return result.details.id;
 }
@@ -82,19 +110,55 @@ export async function zohoCreate(module: string, data: Record<string, unknown>):
 export async function zohoUpdate(module: string, id: string, data: Record<string, unknown>): Promise<void> {
   const res = await fetch(`${ZOHO_BASE}/${module}/${id}`, {
     method: 'PUT',
-    headers: headers(),
+    headers: authHeaders(),
     body: JSON.stringify({ data: [{ id, ...data }] }),
   });
 
   const json: ZohoCUDResponse = await res.json();
+
+  if (json.code && json.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  }
+
   const result = json.data?.[0];
-  if (!result || result.code !== 'SUCCESS') throw new ZohoApiError(res.status, result?.message ?? 'Update failed');
+  if (!result || result.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, result?.message ?? 'Update failed', result?.code ?? '');
+  }
 }
 
 export async function zohoDelete(module: string, id: string): Promise<void> {
   const res = await fetch(`${ZOHO_BASE}/${module}/${id}`, {
     method: 'DELETE',
-    headers: headers(),
+    headers: authHeaders(),
   });
-  if (!res.ok) throw new ZohoApiError(res.status, `Delete failed: ${res.status}`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
+    throw new ZohoApiError(res.status, json.message ?? `Delete failed: ${res.status}`, json.code ?? '');
+  }
+}
+
+// ─── Module discovery ─────────────────────────────────────────────────────────
+
+export interface ZohoModule {
+  id: string;
+  module_name: string;       // display name
+  api_name: string;          // use this in API calls
+  plural_label: string;
+  singular_label: string;
+}
+
+export async function fetchZohoModules(): Promise<ZohoModule[]> {
+  const res = await fetch(`${ZOHO_BASE}/settings/modules`, { headers: authHeaders() });
+  const json = await res.json() as { modules?: ZohoModule[] };
+  return json.modules ?? [];
+}
+
+// Find module whose display name or api_name matches a keyword (case-insensitive).
+export async function findModuleApiName(keyword: string): Promise<string | null> {
+  const modules = await fetchZohoModules();
+  const kw = keyword.toLowerCase();
+  const found = modules.find(
+    m => m.api_name.toLowerCase().includes(kw) || m.module_name.toLowerCase().includes(kw)
+  );
+  return found?.api_name ?? null;
 }

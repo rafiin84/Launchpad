@@ -4,9 +4,18 @@
 //   Zoho CRM → Setup → Customization → Modules → Portfolio → Fields
 // The "API Name" column is the key — adjust FIELD_MAP if yours differ.
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, findModuleApiName, type ZohoRecord } from './zohoApi';
 
-const MODULE = 'Portfolio';
+// Resolved at runtime via auto-discovery; falls back to 'Portfolio'.
+let resolvedModule: string | null = null;
+
+async function getModule(): Promise<string> {
+  if (resolvedModule) return resolvedModule;
+  // Try to discover the exact API name for the Portfolio module.
+  const discovered = await findModuleApiName('portfolio').catch(() => null);
+  resolvedModule = discovered ?? 'Portfolio';
+  return resolvedModule;
+}
 
 // ─── Field mapping (form key → Zoho CRM API name) ────────────────────────────
 const FIELD_MAP: Record<string, string> = {
@@ -115,7 +124,8 @@ function fromRecord(r: ZohoRecord): CRMPortfolioRecord {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export async function fetchCRMPortfolio(): Promise<CRMPortfolioRecord[]> {
-  const records = await zohoList(MODULE, {
+  const mod = await getModule();
+  const records = await zohoList(mod, {
     per_page: '200',
     sort_by: 'Modified_Time',
     sort_order: 'desc',
@@ -124,18 +134,26 @@ export async function fetchCRMPortfolio(): Promise<CRMPortfolioRecord[]> {
 }
 
 export async function getCRMPortfolioRecord(id: string): Promise<CRMPortfolioRecord | null> {
-  const r = await zohoGetById(MODULE, id);
+  const mod = await getModule();
+  const r = await zohoGetById(mod, id);
   return r ? fromRecord(r) : null;
 }
 
 export async function createCRMPortfolioRecord(fields: CRMFormFields): Promise<string> {
-  return zohoCreate(MODULE, toPayload(fields));
+  const mod = await getModule();
+  return zohoCreate(mod, toPayload(fields));
 }
 
 export async function updateCRMPortfolioRecord(id: string, fields: CRMFormFields): Promise<void> {
-  return zohoUpdate(MODULE, id, toPayload(fields));
+  const mod = await getModule();
+  return zohoUpdate(mod, id, toPayload(fields));
 }
 
 export async function deleteCRMPortfolioRecord(id: string): Promise<void> {
-  return zohoDelete(MODULE, id);
+  const mod = await getModule();
+  return zohoDelete(mod, id);
 }
+
+// Expose for diagnostic use in the UI
+export { findModuleApiName } from './zohoApi';
+export { fetchZohoModules } from './zohoApi';
