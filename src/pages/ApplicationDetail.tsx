@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Mail, MapPin, Users, Phone,
@@ -6,6 +6,7 @@ import {
   Link2, Trash2, Calendar, Briefcase, FileText, CheckCircle, Edit2, Video,
 } from 'lucide-react';
 import { getCRMApplication, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
+import { loadPitchVideoUrl } from '../lib/pitchVideoStore';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 
 function formatCurrency(val: string) {
@@ -354,9 +355,28 @@ export default function ApplicationDetail() {
 }
 
 function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }) {
-  // Check localStorage for an uploaded video file
-  const localVideo = localStorage.getItem(`lp_pitchvideo_${appId}`) || '';
-  const effectiveUrl = localVideo || videoUrl || '';
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const [loadingLocal, setLoadingLocal] = useState(true);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    loadPitchVideoUrl(appId)
+      .then(url => {
+        objectUrlRef.current = url;
+        setLocalUrl(url);
+      })
+      .catch(() => setLocalUrl(null))
+      .finally(() => setLoadingLocal(false));
+
+    return () => {
+      // Revoke the object URL when the component unmounts to free memory
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, [appId]);
+
+  if (loadingLocal) return null; // wait silently
+
+  const effectiveUrl = localUrl || videoUrl || '';
 
   if (!effectiveUrl) {
     return (
@@ -368,8 +388,8 @@ function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }
     );
   }
 
-  const embedUrl = effectiveUrl.startsWith('data:') ? null : toEmbedUrl(effectiveUrl);
-  const isDirectVideo = !effectiveUrl.startsWith('data:') && !embedUrl;
+  const isBlob   = effectiveUrl.startsWith('blob:');
+  const embedUrl = isBlob ? null : toEmbedUrl(effectiveUrl);
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 md:col-span-2">
@@ -377,20 +397,18 @@ function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }
         <Video size={14} className="text-indigo-500" /> Pitch Video
       </h3>
       <div className="rounded-xl overflow-hidden bg-black aspect-video">
-        {effectiveUrl.startsWith('data:') ? (
+        {isBlob || !embedUrl ? (
           <video src={effectiveUrl} controls className="w-full h-full object-contain" />
-        ) : embedUrl ? (
+        ) : (
           <iframe
             src={embedUrl}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-        ) : (
-          <video src={effectiveUrl} controls className="w-full h-full object-contain" />
         )}
       </div>
-      {!effectiveUrl.startsWith('data:') && (
+      {!isBlob && (
         <a
           href={effectiveUrl}
           target="_blank"

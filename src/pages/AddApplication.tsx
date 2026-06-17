@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { createCRMApplication } from '../services/crmApplications';
+import { savePitchVideo } from '../lib/pitchVideoStore';
 
 // ---------------------------------------------------------------------------
 // LogoUpload
@@ -94,7 +95,6 @@ interface FormState {
   previousFunding: string;
   pitchDeckName: string;
   pitchVideoUrl: string;
-  pitchVideoData: string; // base64 for local uploads
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -106,7 +106,7 @@ const empty: FormState = {
   logo: '', companyName: '', website: '', location: '', industry: '', stage: '',
   foundedYear: '', teamSize: '', shortDescription: '', fullDescription: '',
   amountRequested: '', useOfFunds: '', previousFunding: '', pitchDeckName: '',
-  pitchVideoUrl: '', pitchVideoData: '',
+  pitchVideoUrl: '',
   founderName: '', founderEmail: '', founderPhone: '', founderLinkedin: '', founderBio: '',
 };
 
@@ -132,6 +132,8 @@ export default function AddApplication() {
   const [form, setForm] = useState<FormState>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [videoTab, setVideoTab] = useState<'url' | 'upload'>('url');
+  const [pitchVideoFile, setPitchVideoFile] = useState<File | null>(null);
+  const [pitchVideoPreview, setPitchVideoPreview] = useState('');
   const pitchDeckRef = useRef<HTMLInputElement>(null);
   const pitchVideoRef = useRef<HTMLInputElement>(null);
 
@@ -150,12 +152,12 @@ export default function AddApplication() {
   function handlePitchVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setForm(prev => ({ ...prev, pitchVideoData: dataUrl, pitchVideoUrl: '' }));
-    };
-    reader.readAsDataURL(file);
+    // Revoke previous preview URL to avoid memory leaks
+    if (pitchVideoPreview) URL.revokeObjectURL(pitchVideoPreview);
+    const objectUrl = URL.createObjectURL(file);
+    setPitchVideoFile(file);
+    setPitchVideoPreview(objectUrl);
+    setForm(prev => ({ ...prev, pitchVideoUrl: '' }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -181,9 +183,9 @@ export default function AddApplication() {
         foundedYear:        form.foundedYear,
         pitchVideoUrl:      form.pitchVideoUrl,
       });
-      // Save local video upload to localStorage keyed by CRM record ID
-      if (form.pitchVideoData && newId) {
-        localStorage.setItem(`lp_pitchvideo_${newId}`, form.pitchVideoData);
+      // Save local video upload to IndexedDB keyed by CRM record ID
+      if (pitchVideoFile && newId) {
+        await savePitchVideo(newId, pitchVideoFile);
       }
       navigate('/applications');
     } catch (err) {
@@ -304,12 +306,12 @@ export default function AddApplication() {
                 </div>
               ) : (
                 <div>
-                  {form.pitchVideoData ? (
+                  {pitchVideoPreview ? (
                     <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black">
-                      <video src={form.pitchVideoData} controls className="w-full max-h-48 object-contain" />
+                      <video src={pitchVideoPreview} controls className="w-full max-h-48 object-contain" />
                       <button
                         type="button"
-                        onClick={() => setForm(p => ({ ...p, pitchVideoData: '' }))}
+                        onClick={() => { URL.revokeObjectURL(pitchVideoPreview); setPitchVideoFile(null); setPitchVideoPreview(''); }}
                         className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors"
                       >
                         <X size={13} className="text-white" />

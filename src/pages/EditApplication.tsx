@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Upload, FileText, Video, Link2, X } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { getCRMApplication, updateCRMApplication } from '../services/crmApplications';
+import { savePitchVideo, loadPitchVideoUrl, deletePitchVideo } from '../lib/pitchVideoStore';
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,6 @@ interface FormState {
   useOfFunds: string;
   pitchDeckName: string;
   pitchVideoUrl: string;
-  pitchVideoData: string;
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -86,7 +86,7 @@ const EMPTY: FormState = {
   logo: '', companyName: '', website: '', location: '', industry: '',
   companyStage: '', foundedYear: '', teamSize: '', companyDescription: '',
   fundingAsk: '', previousFunding: '', useOfFunds: '',
-  pitchDeckName: '', pitchVideoUrl: '', pitchVideoData: '',
+  pitchDeckName: '', pitchVideoUrl: '',
   founderName: '', founderEmail: '', founderPhone: '', founderLinkedin: '', founderBio: '',
   pipelineStage: 'New',
 };
@@ -101,7 +101,9 @@ export default function EditApplication() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
-  const [videoTab, setVideoTab] = useState<'url' | 'upload'>('url');
+  const [videoTab, setVideoTab]         = useState<'url' | 'upload'>('url');
+  const [pitchVideoFile, setPitchVideoFile]       = useState<File | null>(null);
+  const [pitchVideoPreview, setPitchVideoPreview] = useState('');
 
   const logoRef       = useRef<HTMLInputElement>(null);
   const pitchDeckRef  = useRef<HTMLInputElement>(null);
@@ -112,8 +114,8 @@ export default function EditApplication() {
     getCRMApplication(id)
       .then(app => {
         if (!app) { setError('Application not found'); setLoading(false); return; }
-        // Load any locally-uploaded pitch video
-        const localVideo = localStorage.getItem(`lp_pitchvideo_${id}`) || '';
+        // Load any locally-uploaded pitch video from IndexedDB
+        const localVideoUrl = await loadPitchVideoUrl(id!);
         setForm({
           logo:               localStorage.getItem(`lp_applogo_${id}`) || '',
           companyName:        app.companyName,
@@ -128,8 +130,7 @@ export default function EditApplication() {
           previousFunding:    app.previousFunding,
           useOfFunds:         app.useOfFunds,
           pitchDeckName:      '',
-          pitchVideoUrl:      localVideo ? '' : (app.pitchVideoUrl || ''),
-          pitchVideoData:     localVideo,
+          pitchVideoUrl:      localVideoUrl ? '' : (app.pitchVideoUrl || ''),
           founderName:        app.founderName,
           founderEmail:       app.founderEmail,
           founderPhone:       app.founderPhone,
@@ -137,7 +138,10 @@ export default function EditApplication() {
           founderBio:         '',
           pipelineStage:      app.pipelineStage || 'New',
         });
-        if (localVideo) setVideoTab('upload');
+        if (localVideoUrl) {
+          setPitchVideoPreview(localVideoUrl);
+          setVideoTab('upload');
+        }
         setLoading(false);
       })
       .catch(err => { setError(err instanceof Error ? err.message : 'Failed to load'); setLoading(false); });
@@ -163,10 +167,11 @@ export default function EditApplication() {
   function handlePitchVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev =>
-      setForm(p => ({ ...p, pitchVideoData: ev.target?.result as string, pitchVideoUrl: '' }));
-    reader.readAsDataURL(file);
+    if (pitchVideoPreview) URL.revokeObjectURL(pitchVideoPreview);
+    const objectUrl = URL.createObjectURL(file);
+    setPitchVideoFile(file);
+    setPitchVideoPreview(objectUrl);
+    setForm(p => ({ ...p, pitchVideoUrl: '' }));
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,11 +199,15 @@ export default function EditApplication() {
         foundedYear:        form.foundedYear,
         pitchVideoUrl:      form.pitchVideoUrl,
       });
-      // Persist local-only fields to localStorage
+      // Persist local-only fields
       if (id) {
-        if (form.logo)           localStorage.setItem(`lp_applogo_${id}`, form.logo);
-        if (form.pitchVideoData) localStorage.setItem(`lp_pitchvideo_${id}`, form.pitchVideoData);
-        else if (form.pitchVideoUrl) localStorage.removeItem(`lp_pitchvideo_${id}`);
+        if (form.logo) localStorage.setItem(`lp_applogo_${id}`, form.logo);
+        if (pitchVideoFile) {
+          await savePitchVideo(id, pitchVideoFile);
+        } else if (form.pitchVideoUrl) {
+          // User switched to URL mode — remove any stored blob
+          await deletePitchVideo(id);
+        }
       }
       navigate(`/applications/${id}`);
     } catch (err) {
@@ -357,11 +366,11 @@ export default function EditApplication() {
                 </div>
               ) : (
                 <div>
-                  {form.pitchVideoData ? (
+                  {pitchVideoPreview ? (
                     <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black">
-                      <video src={form.pitchVideoData} controls className="w-full max-h-48 object-contain" />
+                      <video src={pitchVideoPreview} controls className="w-full max-h-48 object-contain" />
                       <button type="button"
-                        onClick={() => setForm(p => ({ ...p, pitchVideoData: '' }))}
+                        onClick={() => { URL.revokeObjectURL(pitchVideoPreview); setPitchVideoFile(null); setPitchVideoPreview(''); }}
                         className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors">
                         <X size={13} className="text-white" />
                       </button>
