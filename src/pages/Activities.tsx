@@ -65,7 +65,7 @@ function compressImage(file: File): Promise<string> {
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
 function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
-  const { currentUser } = useAuth();
+  const { currentUser, isInvestor } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded]       = useState(false);
@@ -194,7 +194,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
       <textarea
         value={content}
         onChange={e => setContent(e.target.value)}
-        placeholder="What do you want to share with your investor?"
+        placeholder={isInvestor ? "What do you want to share with your founders?" : "What do you want to share with your investor?"}
         className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none border-0 outline-none leading-relaxed min-h-[90px]"
       />
 
