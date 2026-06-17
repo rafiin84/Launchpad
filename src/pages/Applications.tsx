@@ -79,85 +79,6 @@ function ChipRow({ chips }: { chips: Chip[] }) {
   );
 }
 
-// ─── Pipeline Funnel Chart ────────────────────────────────────────────────────
-
-function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
-  const counts = PIPELINE_STAGES.map(s => ({
-    ...s,
-    count: apps.filter(a => a.pipelineStage === s.id).length,
-  }));
-  const max = Math.max(...counts.map(c => c.count), 1);
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-gray-900">Pipeline Funnel</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Applications per stage</p>
-      </div>
-      <div className="space-y-3">
-        {counts.map(s => (
-          <div key={s.id}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-gray-600 w-36 flex-shrink-0">{s.label}</span>
-              <span className="text-xs font-bold text-gray-900">{s.count}</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${(s.count / max) * 100}%`, backgroundColor: s.color }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Industry Breakdown Chart ─────────────────────────────────────────────────
-
-function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
-  const byIndustry: Record<string, number> = {};
-  apps.forEach(a => {
-    const ind = a.industry || 'Unknown';
-    byIndustry[ind] = (byIndustry[ind] ?? 0) + (parseFloat(a.fundingAsk) || 0);
-  });
-  const data = Object.entries(byIndustry)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
-  const max = data[0]?.[1] ?? 1;
-  const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ef4444'];
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-gray-900">Funding Ask by Industry</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Total requested per sector</p>
-      </div>
-      {data.length === 0 ? (
-        <p className="text-xs text-gray-400 py-4 text-center">No data yet</p>
-      ) : (
-        <div className="space-y-3">
-          {data.map(([industry, amount], i) => (
-            <div key={industry}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-600 truncate w-40 flex-shrink-0">{industry}</span>
-                <span className="text-xs font-bold text-gray-900">{formatCurrency(amount)}</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${(amount / max) * 100}%`, backgroundColor: colors[i] }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Applications Table ───────────────────────────────────────────────────────
 
 function ApplicationsTable({ apps, onDelete }: { apps: CRMApplication[]; onDelete: (id: string) => void }) {
@@ -364,14 +285,6 @@ export default function Applications() {
 
       {/* KPI chips */}
       <ChipRow chips={chips} />
-
-      {/* Charts */}
-      <div className="w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <PipelineFunnelChart apps={records} />
-          <IndustryBreakdownChart apps={records} />
-        </div>
-      </div>
 
       {/* Table section */}
       <div className="w-full">
