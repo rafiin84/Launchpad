@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Inbox, DollarSign, Search, ArrowUpRight, ChevronRight,
-  AlertCircle, CheckCircle2, Eye, CalendarClock,
-  Target, BarChart2, Plus, Building2, Trash2, RefreshCw,
+  Inbox, Search, ArrowUpRight, ChevronRight,
+  AlertCircle, Plus, Building2, Trash2, RefreshCw,
 } from 'lucide-react';
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
@@ -39,43 +38,6 @@ function StagePill({ stage }: { stage: string }) {
     >
       {s.label}
     </span>
-  );
-}
-
-// ─── KPI Chips ────────────────────────────────────────────────────────────────
-
-interface Chip {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ReactNode;
-  color?: string;
-  accent?: boolean;
-}
-
-function ChipRow({ chips }: { chips: Chip[] }) {
-  return (
-    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 mb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      {chips.map((chip) => (
-        <div
-          key={chip.label}
-          className={`flex-shrink-0 w-44 rounded-2xl p-5 ${
-            chip.accent ? 'bg-black' : 'bg-white border border-gray-100 hover:border-gray-200'
-          }`}
-        >
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
-            <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
-          </div>
-          <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>
-            {chip.value}
-          </p>
-          <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
-          {chip.sub && (
-            <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>
-          )}
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -224,22 +186,6 @@ export default function Applications() {
     }
   };
 
-  const totalFunding = records.reduce((s, a) => s + (parseFloat(a.fundingAsk) || 0), 0);
-  const stageCount = (stage: string) => records.filter(a => a.pipelineStage === stage).length;
-
-  const chips: Chip[] = [
-    { label: 'Total Applications', value: records.length, sub: 'in pipeline', icon: <Inbox size={16} />, accent: true },
-    { label: 'New', value: stageCount('New'), sub: 'awaiting review', icon: <Inbox size={16} /> },
-    { label: 'Under Review', value: stageCount('Under Review'), sub: 'being evaluated', icon: <Eye size={16} /> },
-    { label: 'Meeting Scheduled', value: stageCount('Meeting Scheduled'), sub: 'call booked', icon: <CalendarClock size={16} />, color: 'text-indigo-600' },
-    { label: 'Due Diligence', value: stageCount('Due Diligence'), sub: 'deep review', icon: <Search size={16} />, color: 'text-amber-600' },
-    { label: 'IC Review', value: stageCount('IC Review'), sub: 'committee stage', icon: <CheckCircle2 size={16} />, color: 'text-emerald-600' },
-    { label: 'Rejected', value: stageCount('Rejected'), sub: 'passed', icon: <AlertCircle size={16} />, color: 'text-red-500' },
-    { label: 'Total Funding Ask', value: formatCurrency(totalFunding), sub: 'pipeline value', icon: <DollarSign size={16} /> },
-    { label: 'Avg Deal Size', value: formatCurrency(totalFunding / (records.length || 1)), sub: 'per application', icon: <BarChart2 size={16} /> },
-    { label: 'IC Rate', value: `${Math.round((stageCount('IC Review') / (records.length || 1)) * 100)}%`, sub: 'to IC stage', icon: <Target size={16} />, color: 'text-indigo-600' },
-  ];
-
   const filtered = query
     ? records.filter(a =>
         a.companyName.toLowerCase().includes(query.toLowerCase()) ||
@@ -282,9 +228,6 @@ export default function Applications() {
           <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
         </div>
       )}
-
-      {/* KPI chips */}
-      <ChipRow chips={chips} />
 
       {/* Table section */}
       <div className="w-full">

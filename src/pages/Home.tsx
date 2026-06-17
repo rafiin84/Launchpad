@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   DollarSign, Building2, Inbox, Briefcase,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
+  Percent, Layers, PieChart, Target, Award,
+  Eye, CalendarClock, CheckCircle2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -295,6 +297,86 @@ export default function Home() {
           );
         })}
       </div>
+
+      {/* Portfolio KPI chips */}
+      {(() => {
+        const totalDeployed = portfolio.reduce((s, c) => s + (parseFloat(c.investmentAmount) || 0), 0);
+        const totalPreMoney = portfolio.reduce((s, c) => s + (parseFloat(c.preMoneyValuation) || 0), 0);
+        const avgOwnership = portfolio.length ? portfolio.reduce((s, c) => s + (parseFloat(c.ownershipPct) || 0), 0) / portfolio.length : 0;
+        const activeCount = portfolio.filter(c => c.status === 'active').length;
+        const seedCount = portfolio.filter(c => c.stage === 'seed').length;
+        const seriesACount = portfolio.filter(c => c.stage === 'series-a').length;
+        const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
+
+        const portfolioChips = [
+          { label: 'Portfolio Companies', value: String(portfolio.length),                                         sub: `${activeCount} Active`,        icon: <Building2 size={16} />, accent: true  },
+          { label: 'Total Deployed',      value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                    sub: 'capital invested',              icon: <DollarSign size={16} />               },
+          { label: 'Avg Ownership',       value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',          sub: 'per company',                   icon: <Percent size={16} />                  },
+          { label: 'Avg Deal Size',       value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per investment', icon: <DollarSign size={16} />  },
+          { label: 'Entry Valuations',    value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                    sub: 'combined pre-money',            icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
+          { label: 'Stage Mix',           value: `${seedCount}S / ${seriesACount}A`,                              sub: 'Seed / Series A',               icon: <Layers size={16} />                   },
+          { label: 'Portfolio Value',     value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                    sub: 'at cost basis',                 icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
+          { label: 'Active',              value: String(activeCount),                                             sub: 'active investments',            icon: <Award size={16} />,    color: 'text-amber-600' },
+          { label: 'Est. IRR',            value: '—',                                                             sub: 'add more data',                 icon: <Target size={16} />,   color: 'text-emerald-600' },
+          { label: 'MOIC',               value: '—',                                                             sub: 'mark to market',                icon: <PieChart size={16} />                 },
+        ];
+
+        return (
+          <div className="mb-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Portfolio KPIs</h2>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+              {portfolioChips.map(chip => (
+                <div key={chip.label} className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${chip.accent ? 'bg-black' : 'bg-white border border-gray-100'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
+                    <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
+                  </div>
+                  <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>{chip.value}</p>
+                  <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
+                  {chip.sub && <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Applications KPI chips */}
+      {(() => {
+        const totalFunding = applications.reduce((s, a) => s + (parseFloat(a.fundingAsk) || 0), 0);
+        const stageCount = (stage: string) => applications.filter(a => a.pipelineStage === stage).length;
+        const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
+
+        const appChips = [
+          { label: 'Total Applications',  value: applications.length,                                              sub: 'in pipeline',       icon: <Inbox size={16} />,        accent: true  },
+          { label: 'New',                 value: stageCount('New'),                                               sub: 'awaiting review',   icon: <Inbox size={16} />                        },
+          { label: 'Under Review',        value: stageCount('Under Review'),                                      sub: 'being evaluated',   icon: <Eye size={16} />                          },
+          { label: 'Meeting Scheduled',   value: stageCount('Meeting Scheduled'),                                 sub: 'call booked',       icon: <CalendarClock size={16} />, color: 'text-indigo-600' },
+          { label: 'Due Diligence',       value: stageCount('Due Diligence'),                                    sub: 'deep review',       icon: <Target size={16} />,        color: 'text-amber-600' },
+          { label: 'IC Review',           value: stageCount('IC Review'),                                        sub: 'committee stage',   icon: <CheckCircle2 size={16} />,  color: 'text-emerald-600' },
+          { label: 'Rejected',            value: stageCount('Rejected'),                                         sub: 'passed',            icon: <AlertCircle size={16} />,   color: 'text-red-500' },
+          { label: 'Total Funding Ask',   value: fmt(totalFunding),                                              sub: 'pipeline value',    icon: <DollarSign size={16} />                   },
+          { label: 'Avg Deal Size',       value: fmt(totalFunding / (applications.length || 1)),                 sub: 'per application',   icon: <BarChart2 size={16} />                    },
+          { label: 'IC Rate',             value: `${Math.round((stageCount('IC Review') / (applications.length || 1)) * 100)}%`, sub: 'to IC stage', icon: <Percent size={16} />, color: 'text-indigo-600' },
+        ];
+
+        return (
+          <div className="mb-8">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Applications KPIs</h2>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+              {appChips.map(chip => (
+                <div key={chip.label} className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${chip.accent ? 'bg-black' : 'bg-white border border-gray-100'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
+                    <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
+                  </div>
+                  <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>{chip.value}</p>
+                  <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
+                  {chip.sub && <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Analytics section */}
       <div className="mb-8">

@@ -1,15 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import {
   TrendingUp,
-  DollarSign,
   Building2,
-  Target,
-  Award,
-  BarChart2,
-  Percent,
-  Layers,
-  PieChart,
   Plus,
   MapPin,
   Calendar,
@@ -25,58 +18,6 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { loadToken } from '../services/oauth';
-
-function formatCurrency(amount: number) {
-  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
-  return `$${amount}`;
-}
-
-// ─── KPI Chip row ─────────────────────────────────────────────────────────────
-
-interface KpiChip {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  color?: string;
-  accent?: boolean;
-  onClick?: () => void;
-}
-
-function KpiChipRow({ chips }: { chips: KpiChip[] }) {
-  return (
-    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 mb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      {chips.map((chip) => (
-        <div
-          key={chip.label}
-          onClick={chip.onClick}
-          className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${
-            chip.accent ? 'bg-black' : 'bg-white border border-gray-100 hover:border-gray-200'
-          } ${chip.onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-md active:scale-[0.97]' : ''}`}
-        >
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
-            <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
-          </div>
-          <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>
-            {chip.value}
-          </p>
-          <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>
-            {chip.label}
-          </p>
-          {chip.sub && (
-            <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>
-              {chip.sub}
-            </p>
-          )}
-          {chip.onClick && (
-            <p className="text-[10px] text-indigo-400 mt-1.5 font-medium">↓ View list</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ─── CRM Company Card ────────────────────────────────────────────────────────
 
@@ -161,38 +102,6 @@ export default function Portfolio() {
   // Ref for the Portfolio Companies section
   const companiesSectionRef = useRef<HTMLDivElement>(null);
 
-  // Parallax-style smooth scroll using easeInOutCubic easing
-  // The scroll container is the <main> element in AppLayout (overflow-y-auto), not window
-  const scrollToCompanies = useCallback(() => {
-    const target = companiesSectionRef.current;
-    if (!target) return;
-
-    // Walk up the DOM to find the scrollable <main> container
-    const scrollEl = target.closest('main') as HTMLElement | null;
-    if (!scrollEl) return;
-
-    const startY = scrollEl.scrollTop;
-    // target's offset relative to scrollEl
-    const targetY = target.offsetTop - 80;
-    const distance = targetY - startY;
-    const duration = Math.min(1200, Math.max(600, Math.abs(distance) * 0.6));
-    let startTime: number | null = null;
-
-    function easeInOutCubic(t: number) {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
-
-    function step(timestamp: number) {
-      if (!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      (scrollEl as HTMLElement).scrollTop = startY + distance * easeInOutCubic(progress);
-      if (progress < 1) requestAnimationFrame(step);
-    }
-
-    requestAnimationFrame(step);
-  }, []);
-
   const loadCRMData = () => {
     if (!isConnected) { setCrmLoading(false); return; }
     setCrmLoading(true);
@@ -234,100 +143,6 @@ export default function Portfolio() {
     }
   };
 
-  // KPIs derived from real CRM data
-  const totalDeployed = crmCompanies.reduce((s, c) => s + (parseFloat(c.investmentAmount) || 0), 0);
-  const totalPreMoney = crmCompanies.reduce((s, c) => s + (parseFloat(c.preMoneyValuation) || 0), 0);
-  const avgOwnership = crmCompanies.length
-    ? crmCompanies.reduce((s, c) => s + (parseFloat(c.ownershipPct) || 0), 0) / crmCompanies.length
-    : 0;
-  const activeCount = crmCompanies.filter(c => c.status === 'active').length;
-  const seedCount = crmCompanies.filter(c => c.stage === 'seed').length;
-  const seriesACount = crmCompanies.filter(c => c.stage === 'series-a').length;
-
-  const kpiChips: KpiChip[] = [
-    {
-      label: 'Portfolio Companies',
-      value: String(crmCompanies.length),
-      sub: `${activeCount} Active`,
-      icon: <Building2 size={16} />,
-      onClick: scrollToCompanies,
-    },
-    {
-      label: 'Total Deployed',
-      value: totalDeployed > 0 ? formatCurrency(totalDeployed) : '—',
-      sub: 'capital invested',
-      icon: <DollarSign size={16} />,
-      accent: true,
-    },
-    {
-      label: 'Avg Ownership',
-      value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',
-      sub: 'per company',
-      icon: <Percent size={16} />,
-    },
-    {
-      label: 'Avg Deal Size',
-      value: crmCompanies.length > 0 && totalDeployed > 0
-        ? formatCurrency(totalDeployed / crmCompanies.length)
-        : '—',
-      sub: 'per investment',
-      icon: <DollarSign size={16} />,
-    },
-    {
-      label: 'Entry Valuations',
-      value: totalPreMoney > 0 ? formatCurrency(totalPreMoney) : '—',
-      sub: 'combined pre-money',
-      icon: <TrendingUp size={16} />,
-      color: 'text-emerald-600',
-    },
-    {
-      label: 'Stage Mix',
-      value: `${seedCount}S / ${seriesACount}A`,
-      sub: 'Seed / Series A',
-      icon: <Layers size={16} />,
-    },
-    {
-      label: 'Portfolio Value',
-      value: totalDeployed > 0 ? formatCurrency(totalDeployed) : '—',
-      sub: 'at cost basis',
-      icon: <BarChart2 size={16} />,
-      color: 'text-indigo-600',
-    },
-    {
-      label: 'Active',
-      value: String(activeCount),
-      sub: 'active investments',
-      icon: <Award size={16} />,
-      color: 'text-amber-600',
-    },
-    {
-      label: 'Est. IRR',
-      value: '—',
-      sub: 'add more data',
-      icon: <Target size={16} />,
-      color: 'text-emerald-600',
-    },
-    {
-      label: 'MOIC',
-      value: '—',
-      sub: 'mark to market',
-      icon: <PieChart size={16} />,
-    },
-    {
-      label: 'Unrealized Gain',
-      value: '—',
-      sub: 'needs current val.',
-      icon: <TrendingUp size={16} />,
-      color: 'text-emerald-600',
-    },
-    {
-      label: 'Total Companies',
-      value: String(crmCompanies.length),
-      sub: 'in portfolio',
-      icon: <Building2 size={16} />,
-    },
-  ];
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {pendingDeleteId !== null && (
@@ -351,9 +166,6 @@ export default function Portfolio() {
           }
         />
       </div>
-
-      {/* Full-width scrollable KPI row */}
-      <KpiChipRow chips={kpiChips} />
 
       {/* Everything else constrained to max-w-5xl */}
       <div className="w-full">
