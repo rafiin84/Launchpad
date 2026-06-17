@@ -111,11 +111,12 @@ export default function EditApplication() {
 
   useEffect(() => {
     if (!id) return;
-    getCRMApplication(id)
-      .then(app => {
+    const load = async () => {
+      try {
+        const app = await getCRMApplication(id);
         if (!app) { setError('Application not found'); setLoading(false); return; }
         // Load any locally-uploaded pitch video from IndexedDB
-        const localVideoUrl = await loadPitchVideoUrl(id!);
+        const localVideoUrl = await loadPitchVideoUrl(id);
         setForm({
           logo:               localStorage.getItem(`lp_applogo_${id}`) || '',
           companyName:        app.companyName,
@@ -143,8 +144,12 @@ export default function EditApplication() {
           setVideoTab('upload');
         }
         setLoading(false);
-      })
-      .catch(err => { setError(err instanceof Error ? err.message : 'Failed to load'); setLoading(false); });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load');
+        setLoading(false);
+      }
+    };
+    load();
   }, [id]);
 
   const set = (field: keyof FormState) =>
