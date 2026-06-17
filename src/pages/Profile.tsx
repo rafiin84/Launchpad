@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MapPin, ExternalLink, Calendar, Edit3, Trophy,
   MessageSquare, Lightbulb, Link2, Mail, X, Plus, Trash2, LogOut,
@@ -191,6 +192,12 @@ function EditProfileModal({
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
   const { currentUser, role, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
   const [extra, setExtra] = useState<ProfileExtra>(loadExtra);
   const [showEdit, setShowEdit] = useState(false);
 
@@ -347,7 +354,7 @@ export default function Profile() {
             <p className="text-xs text-gray-400 mt-0.5">You'll be returned to the login screen</p>
           </div>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="inline-flex items-center gap-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2 rounded-xl transition-colors"
           >
             <LogOut size={14} /> Sign Out
