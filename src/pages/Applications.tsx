@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Inbox, Search, ArrowUpRight, ChevronRight,
   AlertCircle, Plus, Building2, Trash2, RefreshCw,
-  LayoutGrid, List,
+  LayoutGrid, List, Video,
 } from 'lucide-react';
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
+import { loadPitchVideoUrl, hasPitchVideo } from '../lib/pitchVideoStore';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
@@ -39,6 +40,108 @@ function StagePill({ stage }: { stage: string }) {
     >
       {s.label}
     </span>
+  );
+}
+
+// ─── Video helpers ────────────────────────────────────────────────────────────
+
+/** Small inline indicator shown in list rows when a video exists */
+function VideoBadge({ appId, videoUrl }: { appId: string; videoUrl: string }) {
+  const [has, setHas] = useState(false);
+
+  useEffect(() => {
+    if (videoUrl) { setHas(true); return; }
+    hasPitchVideo(appId).then(setHas).catch(() => {});
+  }, [appId, videoUrl]);
+
+  if (!has) return null;
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-full ml-1.5">
+      <Video size={9} /> Video
+    </span>
+  );
+}
+
+/** YouTube thumbnail that expands to an iframe on click (no page navigation) */
+function YoutubeMiniPlayer({ ytId }: { ytId: string }) {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div
+      className="mt-3 rounded-xl overflow-hidden bg-black h-36 relative"
+      onClick={e => { e.stopPropagation(); setPlaying(true); }}
+    >
+      {playing ? (
+        <iframe
+          src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <>
+          <img
+            src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`}
+            alt="Video thumbnail"
+            className="w-full h-full object-cover opacity-80"
+          />
+          <div className="absolute inset-0 flex items-center justify-center cursor-pointer">
+            <div className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow">
+              <Video size={14} className="text-gray-800 ml-0.5" />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Mini video preview for grid cards — blob player or YouTube thumbnail */
+function VideoPreviewMini({ appId, videoUrl }: { appId: string; videoUrl: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    loadPitchVideoUrl(appId)
+      .then(url => { objectUrlRef.current = url; setBlobUrl(url); })
+      .catch(() => {})
+      .finally(() => setChecked(true));
+    return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
+  }, [appId]);
+
+  if (!checked) return null;
+
+  const effective = blobUrl || videoUrl || '';
+  if (!effective) return null;
+
+  const isBlob = effective.startsWith('blob:');
+
+  if (!isBlob) {
+    // YouTube thumbnail — clicking opens an inline iframe, doesn't navigate
+    try {
+      const u = new URL(effective);
+      if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+        const ytId = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
+        if (ytId) {
+          return (
+            <YoutubeMiniPlayer ytId={ytId} />
+          );
+        }
+      }
+    } catch { /* ignore */ }
+    // Generic URL — just a badge, no embed
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-indigo-600" onClick={e => e.stopPropagation()}>
+        <Video size={12} /> Pitch video attached
+      </div>
+    );
+  }
+
+  // Local blob — small playable video, stop propagation so clicks don't navigate
+  return (
+    <div className="mt-3 rounded-xl overflow-hidden bg-black h-36" onClick={e => e.stopPropagation()}>
+      <video src={effective} controls className="w-full h-full object-contain" playsInline />
+    </div>
   );
 }
 
@@ -116,7 +219,10 @@ function ApplicationsTable({ apps, onDelete }: { apps: CRMApplication[]; onDelet
 
                 {/* Stage */}
                 <td className="px-4 py-4">
-                  <StagePill stage={app.pipelineStage} />
+                  <div className="flex items-center flex-wrap gap-1">
+                    <StagePill stage={app.pipelineStage} />
+                    <VideoBadge appId={app.id} videoUrl={app.pitchVideoUrl} />
+                  </div>
                 </td>
 
                 {/* Ask */}
@@ -199,6 +305,8 @@ function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete
               {app.companyDescription || app.useOfFunds}
             </p>
           )}
+
+          <VideoPreviewMini appId={app.id} videoUrl={app.pitchVideoUrl} />
         </div>
       ))}
     </div>
@@ -208,7 +316,10 @@ function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Applications() {
-  const [view, setView] = useState<'grid' | 'list'>('list');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+  const setView = (v: 'grid' | 'list') =>
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const [records, setRecords] = useState<CRMApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -267,7 +378,7 @@ export default function Applications() {
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
           action={
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 ml-auto">
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setView('grid')}
@@ -284,8 +395,14 @@ export default function Applications() {
                   <List size={15} />
                 </button>
               </div>
-              <Link to="/applications/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-                <Plus size={15} /> Add Application
+              {/* Mobile: icon only; Desktop: full label */}
+              <Link
+                to="/applications/new"
+                className="inline-flex items-center justify-center gap-2 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors px-3 py-2 sm:px-4"
+                title="Add Application"
+              >
+                <Plus size={15} />
+                <span className="hidden sm:inline text-sm">Add Application</span>
               </Link>
             </div>
           }
@@ -318,6 +435,7 @@ export default function Applications() {
               placeholder="Search companies, founders..."
               value={query}
               onChange={e => setQuery(e.target.value)}
+              id="app-search"
               className="pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 w-64"
             />
           </div>

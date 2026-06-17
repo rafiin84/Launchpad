@@ -151,13 +151,31 @@ export default function PortfolioCompanyDetail() {
         />
       )}
 
-      {/* Back */}
-      <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6">
-        <ArrowLeft size={15} /> Portfolio
-      </Link>
+      {/* Back + Actions */}
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+          <ArrowLeft size={15} /> Portfolio
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/portfolio/${id}/edit`}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-gray-300 transition-colors"
+            title="Edit"
+          >
+            <Edit2 size={14} /><span className="hidden sm:inline ml-1">Edit</span>
+          </Link>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-100 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:bg-red-100 transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={14} /><span className="hidden sm:inline ml-1">Delete</span>
+          </button>
+        </div>
+      </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-8">
+      <div className="flex items-start gap-4 mb-8">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
             <Building2 size={22} className="text-gray-400" />
@@ -177,20 +195,6 @@ export default function PortfolioCompanyDetail() {
               )}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Link
-            to={`/portfolio/${id}/edit`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:border-gray-300 transition-colors"
-          >
-            <Edit2 size={14} /> Edit
-          </Link>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="inline-flex items-center gap-2 text-sm font-medium text-red-600 bg-red-50 border border-red-100 px-4 py-2 rounded-xl hover:bg-red-100 transition-colors"
-          >
-            <Trash2 size={14} /> Delete
-          </button>
         </div>
       </div>
 

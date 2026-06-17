@@ -105,15 +105,17 @@ export default function ActivityDetail() {
           <div className="flex items-center gap-2">
             <Link
               to={`/activities/${id}/edit`}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 px-3 py-1.5 rounded-xl transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 sm:px-3 rounded-xl transition-colors"
+              title="Edit"
             >
-              <Edit2 size={14} /> Edit
+              <Edit2 size={14} /><span className="hidden sm:inline ml-1">Edit</span>
             </Link>
             <button
               onClick={() => setShowDelete(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 sm:px-3 rounded-xl transition-colors"
+              title="Delete"
             >
-              <Trash2 size={14} /> Delete
+              <Trash2 size={14} /><span className="hidden sm:inline ml-1">Delete</span>
             </button>
           </div>
         )}

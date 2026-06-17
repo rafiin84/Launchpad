@@ -14,7 +14,7 @@ import {
   LayoutGrid,
   List,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
@@ -196,7 +196,10 @@ function PortfolioTable({ companies, onDelete }: { companies: CRMPortfolioRecord
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Portfolio() {
-  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+  const setView = (v: 'grid' | 'list') =>
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [crmLoading, setCrmLoading] = useState(false);
   const [crmError, setCrmError] = useState('');
@@ -267,7 +270,7 @@ export default function Portfolio() {
           title="Portfolio"
           description="Your invested companies and portfolio performance"
           action={
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setView('grid')}

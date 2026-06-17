@@ -83,11 +83,6 @@ export default function Documents() {
       <PageHeader
         title="Documents"
         description="Secure document repository for your portfolio"
-        action={
-          <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={15} /> Add Document
-          </Link>
-        }
       />
 
       {/* Not-connected banner */}
@@ -111,7 +106,7 @@ export default function Documents() {
       </div>
 
       {/* Category cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {allTypes.map((type) => {
           const meta = TYPE_META[type];
           const Icon = meta.icon;
@@ -158,10 +153,7 @@ export default function Documents() {
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
-          <p className="text-xs text-gray-400 mb-4">Add pitch decks, financial models, and legal documents.</p>
-          <Link to="/documents/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={14} /> Add your first document
-          </Link>
+          <p className="text-xs text-gray-400">Add pitch decks, financial models, and legal documents.</p>
         </div>
       )}
 
