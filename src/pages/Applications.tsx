@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Inbox, Search, ArrowUpRight, ChevronRight,
   AlertCircle, Plus, Building2, Trash2, RefreshCw,
+  LayoutGrid, List,
 } from 'lucide-react';
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
@@ -149,9 +150,65 @@ function ApplicationsTable({ apps, onDelete }: { apps: CRMApplication[]; onDelet
   );
 }
 
+// ─── Applications Grid ────────────────────────────────────────────────────────
+
+function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete: (id: string) => void }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {apps.map(app => (
+        <div
+          key={app.id}
+          className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all cursor-pointer"
+          onClick={() => navigate(`/applications/${app.id}`)}
+        >
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
+              <Building2 size={16} className="text-gray-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || '—'}</p>
+              <p className="text-xs text-gray-400 truncate">{app.industry || '—'}</p>
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(app.id); }}
+              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+              title="Delete"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-xs font-medium text-gray-700">{app.founderName || '—'}</p>
+              {app.location && <p className="text-xs text-gray-400">{app.location}</p>}
+            </div>
+            <StagePill stage={app.pipelineStage} />
+          </div>
+
+          {app.fundingAsk && (
+            <p className="text-xs text-gray-500 mb-2">
+              Asking <span className="font-semibold text-gray-800">{formatCurrency(parseFloat(app.fundingAsk))}</span>
+            </p>
+          )}
+
+          {(app.companyDescription || app.useOfFunds) && (
+            <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
+              {app.companyDescription || app.useOfFunds}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Applications() {
+  const [view, setView] = useState<'grid' | 'list'>('list');
   const [records, setRecords] = useState<CRMApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -210,9 +267,27 @@ export default function Applications() {
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
           action={
-            <Link to="/applications/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-              <Plus size={15} /> Add Application
-            </Link>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setView('grid')}
+                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  onClick={() => setView('list')}
+                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="List view"
+                >
+                  <List size={15} />
+                </button>
+              </div>
+              <Link to="/applications/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+                <Plus size={15} /> Add Application
+              </Link>
+            </div>
           }
         />
       </div>
@@ -286,7 +361,9 @@ export default function Applications() {
         )}
 
         {!loading && !error && filtered.length > 0 && (
-          <ApplicationsTable apps={filtered} onDelete={setPendingDeleteId} />
+          view === 'list'
+            ? <ApplicationsTable apps={filtered} onDelete={setPendingDeleteId} />
+            : <ApplicationsGrid apps={filtered} onDelete={setPendingDeleteId} />
         )}
       </div>
     </div>

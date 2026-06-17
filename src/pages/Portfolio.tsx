@@ -11,6 +11,8 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -87,9 +89,114 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
   );
 }
 
+// ─── Portfolio List Table ─────────────────────────────────────────────────────
+
+function PortfolioTable({ companies, onDelete }: { companies: CRMPortfolioRecord[]; onDelete: (id: string) => void }) {
+  const statusColors: Record<string, string> = {
+    active: 'bg-emerald-50 text-emerald-700',
+    exited: 'bg-indigo-50 text-indigo-700',
+    'written-off': 'bg-red-50 text-red-600',
+    'follow-on': 'bg-amber-50 text-amber-700',
+  };
+
+  function fmtAmount(val: string) {
+    const amount = parseFloat(val) || 0;
+    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
+    return amount ? `$${amount}` : '—';
+  }
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[800px]">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50/60">
+              <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3.5 w-52">Company</th>
+              <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-40">Industry / Stage</th>
+              <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-32">Status</th>
+              <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Invested</th>
+              <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">Ownership %</th>
+              <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-36">Location</th>
+              <th className="px-4 py-3.5 w-20" />
+            </tr>
+          </thead>
+          <tbody>
+            {companies.map(c => (
+              <tr
+                key={c.id}
+                className="group border-b border-gray-50 hover:bg-gray-50/60 transition-colors last:border-0"
+              >
+                {/* Logo + Name */}
+                <td className="px-5 py-4">
+                  <Link to={`/portfolio/${c.id}`} className="flex items-center gap-3">
+                    <CompanyLogo name={c.companyName || '?'} website={c.website} size={8} />
+                    <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
+                  </Link>
+                </td>
+
+                {/* Industry / Stage */}
+                <td className="px-4 py-4">
+                  <p className="text-xs text-gray-700 truncate capitalize">{c.industry || '—'}</p>
+                  {c.stage && <p className="text-xs text-gray-400 truncate capitalize">{c.stage}</p>}
+                </td>
+
+                {/* Status */}
+                <td className="px-4 py-4">
+                  {c.status ? (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                    </span>
+                  ) : <span className="text-xs text-gray-400">—</span>}
+                </td>
+
+                {/* Invested */}
+                <td className="px-4 py-4 text-right">
+                  <span className="text-sm font-semibold text-gray-900">{fmtAmount(c.investmentAmount)}</span>
+                </td>
+
+                {/* Ownership */}
+                <td className="px-4 py-4 text-right">
+                  <span className="text-sm font-semibold text-gray-900">{c.ownershipPct ? `${c.ownershipPct}%` : '—'}</span>
+                </td>
+
+                {/* Location */}
+                <td className="px-4 py-4">
+                  <span className="text-xs text-gray-600">{c.location || '—'}</span>
+                </td>
+
+                {/* Actions */}
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <Link
+                      to={`/portfolio/${c.id}/edit`}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={13} />
+                    </Link>
+                    <button
+                      onClick={() => onDelete(c.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Portfolio() {
+  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [crmLoading, setCrmLoading] = useState(false);
   const [crmError, setCrmError] = useState('');
@@ -160,9 +267,27 @@ export default function Portfolio() {
           title="Portfolio"
           description="Your invested companies and portfolio performance"
           action={
-            <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-              <Plus size={15} /> Add Company
-            </Link>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setView('grid')}
+                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  onClick={() => setView('list')}
+                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="List view"
+                >
+                  <List size={15} />
+                </button>
+              </div>
+              <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+                <Plus size={15} /> Add Company
+              </Link>
+            </div>
           }
         />
       </div>
@@ -265,11 +390,17 @@ export default function Portfolio() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {crmCompanies.map(c => (
-            <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} />
-          ))}
-        </div>
+        {view === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {crmCompanies.map(c => (
+              <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} />
+            ))}
+          </div>
+        ) : (
+          crmCompanies.length > 0 && (
+            <PortfolioTable companies={crmCompanies} onDelete={setPendingDeleteId} />
+          )
+        )}
 
         {isConnected && !crmLoading && crmCompanies.length === 0 && !crmError && (
           <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center mt-4">
