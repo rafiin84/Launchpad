@@ -6,7 +6,7 @@ import {
   Link2, Trash2, Calendar, Briefcase, FileText, CheckCircle, Edit2, Video,
 } from 'lucide-react';
 import { getCRMApplication, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
-import { loadPitchVideoUrl } from '../lib/pitchVideoStore';
+import { loadPitchVideoUrl, videoWasUploaded } from '../lib/pitchVideoStore';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 
 function formatCurrency(val: string) {
@@ -381,9 +381,24 @@ function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }
 
   const effectiveUrl = localUrl || videoUrl || '';
 
-  if (!effectiveUrl) {
-    return null;
+  // No blob in IndexedDB, no CRM URL, but we know a video was uploaded before
+  if (!effectiveUrl && videoWasUploaded(appId)) {
+    return (
+      <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 mb-4 flex items-start gap-3">
+        <Video size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-amber-800">Video not available in this browser</p>
+          <p className="text-xs text-amber-600 mt-0.5">
+            The pitch video was uploaded on a different browser or device. Please{' '}
+            <Link to={`/applications/${appId}/edit`} className="underline font-medium">edit this application</Link>
+            {' '}to re-upload the video or add a YouTube/Vimeo URL instead.
+          </p>
+        </div>
+      </div>
+    );
   }
+
+  if (!effectiveUrl) return null;
 
   const isBlob   = effectiveUrl.startsWith('blob:');
   const embedUrl = isBlob ? null : toEmbedUrl(effectiveUrl);

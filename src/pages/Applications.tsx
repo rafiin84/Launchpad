@@ -6,7 +6,7 @@ import {
   LayoutGrid, List, Video,
 } from 'lucide-react';
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
-import { loadPitchVideoUrl, hasPitchVideo } from '../lib/pitchVideoStore';
+import { loadPitchVideoUrl, hasPitchVideo, videoWasUploaded } from '../lib/pitchVideoStore';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
@@ -47,12 +47,12 @@ function StagePill({ stage }: { stage: string }) {
 
 /** Small inline indicator shown in list rows when a video exists */
 function VideoBadge({ appId, videoUrl }: { appId: string; videoUrl: string }) {
-  const [has, setHas] = useState(false);
+  const [has, setHas] = useState(() => !!videoUrl || videoWasUploaded(appId));
 
   useEffect(() => {
-    if (videoUrl) { setHas(true); return; }
+    if (has) return;
     hasPitchVideo(appId).then(setHas).catch(() => {});
-  }, [appId, videoUrl]);
+  }, [appId, has]);
 
   if (!has) return null;
   return (
@@ -95,41 +95,41 @@ function YoutubeMiniPlayer({ ytId }: { ytId: string }) {
   );
 }
 
-/** Mini video preview for grid cards — blob player or YouTube thumbnail */
+/** Mini video preview for grid cards — blob player, YouTube thumbnail, or re-upload prompt */
 function VideoPreviewMini({ appId, videoUrl }: { appId: string; videoUrl: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
+  const cancelled = useRef(false);
 
   useEffect(() => {
+    cancelled.current = false;
     loadPitchVideoUrl(appId)
-      .then(url => { objectUrlRef.current = url; setBlobUrl(url); })
+      .then(url => {
+        if (cancelled.current) { if (url) URL.revokeObjectURL(url); return; }
+        objectUrlRef.current = url;
+        setBlobUrl(url);
+      })
       .catch(() => {})
-      .finally(() => setChecked(true));
-    return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
+      .finally(() => { if (!cancelled.current) setChecked(true); });
+    return () => {
+      cancelled.current = true;
+      if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null; }
+    };
   }, [appId]);
 
   if (!checked) return null;
 
+  // CRM URL video (YouTube etc.)
   const effective = blobUrl || videoUrl || '';
-  if (!effective) return null;
-
-  const isBlob = effective.startsWith('blob:');
-
-  if (!isBlob) {
-    // YouTube thumbnail — clicking opens an inline iframe, doesn't navigate
+  if (effective && !effective.startsWith('blob:')) {
     try {
       const u = new URL(effective);
       if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
         const ytId = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-        if (ytId) {
-          return (
-            <YoutubeMiniPlayer ytId={ytId} />
-          );
-        }
+        if (ytId) return <YoutubeMiniPlayer ytId={ytId} />;
       }
     } catch { /* ignore */ }
-    // Generic URL — just a badge, no embed
     return (
       <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-indigo-600" onClick={e => e.stopPropagation()}>
         <Video size={12} /> Pitch video attached
@@ -137,12 +137,30 @@ function VideoPreviewMini({ appId, videoUrl }: { appId: string; videoUrl: string
     );
   }
 
-  // Local blob — small playable video, stop propagation so clicks don't navigate
-  return (
-    <div className="mt-3 rounded-xl overflow-hidden bg-black h-36" onClick={e => e.stopPropagation()}>
-      <video src={effective} controls className="w-full h-full object-contain" playsInline />
-    </div>
-  );
+  // Local blob — playable inline
+  if (blobUrl) {
+    return (
+      <div className="mt-3 rounded-xl overflow-hidden bg-black h-36" onClick={e => e.stopPropagation()}>
+        <video src={blobUrl} controls className="w-full h-full object-contain" playsInline />
+      </div>
+    );
+  }
+
+  // Blob was uploaded in this browser (localStorage flag) but not in IndexedDB anymore
+  // (e.g. different origin / storage cleared) — show re-upload prompt
+  if (videoWasUploaded(appId)) {
+    return (
+      <div
+        className="mt-3 flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2"
+        onClick={e => e.stopPropagation()}
+      >
+        <Video size={12} className="flex-shrink-0" />
+        <span>Video stored locally — <Link to={`/applications/${appId}/edit`} className="underline font-medium">re-upload</Link> to view here.</span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── Applications Table ───────────────────────────────────────────────────────
