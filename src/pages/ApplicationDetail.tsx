@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Mail, MapPin, Users, Phone,
   DollarSign, TrendingUp, ExternalLink, Building2,
-  Link2, Trash2, Calendar, Briefcase, FileText, CheckCircle, Edit2,
+  Link2, Trash2, Calendar, Briefcase, FileText, CheckCircle, Edit2, Video,
 } from 'lucide-react';
 import { getCRMApplication, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
@@ -78,6 +78,32 @@ function StageTimeline({ current }: { current: string }) {
       )}
     </div>
   );
+}
+
+/** Convert a YouTube/Vimeo/Loom watch URL → embed URL */
+function toEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // YouTube
+    const ytId = u.searchParams.get('v') || u.pathname.split('/').pop();
+    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    // Vimeo
+    if (u.hostname.includes('vimeo.com')) {
+      const id = u.pathname.split('/').filter(Boolean).pop();
+      return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+    // Loom
+    if (u.hostname.includes('loom.com') && u.pathname.includes('/share/')) {
+      const id = u.pathname.split('/share/')[1]?.split('?')[0];
+      return id ? `https://www.loom.com/embed/${id}` : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function Field({ icon, label, value, href }: { icon: React.ReactNode; label: string; value?: string; href?: string }) {
@@ -319,7 +345,61 @@ export default function ApplicationDetail() {
           </div>
         )}
 
+        {/* Pitch Video */}
+        <PitchVideoCard appId={app.id} videoUrl={app.pitchVideoUrl} />
+
       </div>
+    </div>
+  );
+}
+
+function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }) {
+  // Check localStorage for an uploaded video file
+  const localVideo = localStorage.getItem(`lp_pitchvideo_${appId}`) || '';
+  const effectiveUrl = localVideo || videoUrl || '';
+
+  if (!effectiveUrl) {
+    return (
+      <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center md:col-span-2">
+        <Video size={28} className="text-gray-200 mx-auto mb-3" />
+        <p className="text-sm font-medium text-gray-500">No pitch video uploaded</p>
+        <p className="text-xs text-gray-400 mt-1">Add a video URL or upload a file when editing this application.</p>
+      </div>
+    );
+  }
+
+  const embedUrl = effectiveUrl.startsWith('data:') ? null : toEmbedUrl(effectiveUrl);
+  const isDirectVideo = !effectiveUrl.startsWith('data:') && !embedUrl;
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 md:col-span-2">
+      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Video size={14} className="text-indigo-500" /> Pitch Video
+      </h3>
+      <div className="rounded-xl overflow-hidden bg-black aspect-video">
+        {effectiveUrl.startsWith('data:') ? (
+          <video src={effectiveUrl} controls className="w-full h-full object-contain" />
+        ) : embedUrl ? (
+          <iframe
+            src={embedUrl}
+            className="w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <video src={effectiveUrl} controls className="w-full h-full object-contain" />
+        )}
+      </div>
+      {!effectiveUrl.startsWith('data:') && (
+        <a
+          href={effectiveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-3 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+        >
+          <ExternalLink size={11} /> Open in new tab
+        </a>
+      )}
     </div>
   );
 }

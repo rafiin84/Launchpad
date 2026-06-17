@@ -18,6 +18,7 @@ const FIELD_MAP: Record<string, string> = {
   location:           'Location',
   teamSize:           'Team_Size',
   foundedYear:        'Founded_Year',
+  pitchVideoUrl:      'Pitch_Video_URL',
 };
 
 const NUMERIC_FIELDS = new Set(['fundingAsk', 'previousFunding', 'teamSize', 'foundedYear']);
@@ -39,6 +40,7 @@ export interface CRMApplication {
   location: string;
   teamSize: string;
   foundedYear: string;
+  pitchVideoUrl: string;
 }
 
 export type CRMApplicationFields = Omit<CRMApplication, 'id'>;
@@ -81,6 +83,7 @@ function fromRecord(r: ZohoRecord): CRMApplication {
     location:           str(FIELD_MAP.location),
     teamSize:           str(FIELD_MAP.teamSize),
     foundedYear:        str(FIELD_MAP.foundedYear),
+    pitchVideoUrl:      str(FIELD_MAP.pitchVideoUrl),
   };
 }
 

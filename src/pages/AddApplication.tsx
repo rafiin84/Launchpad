@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Video, Link2, X } from 'lucide-react';
 import { Input, Textarea, Select } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -93,6 +93,8 @@ interface FormState {
   useOfFunds: string;
   previousFunding: string;
   pitchDeckName: string;
+  pitchVideoUrl: string;
+  pitchVideoData: string; // base64 for local uploads
   founderName: string;
   founderEmail: string;
   founderPhone: string;
@@ -104,6 +106,7 @@ const empty: FormState = {
   logo: '', companyName: '', website: '', location: '', industry: '', stage: '',
   foundedYear: '', teamSize: '', shortDescription: '', fullDescription: '',
   amountRequested: '', useOfFunds: '', previousFunding: '', pitchDeckName: '',
+  pitchVideoUrl: '', pitchVideoData: '',
   founderName: '', founderEmail: '', founderPhone: '', founderLinkedin: '', founderBio: '',
 };
 
@@ -128,7 +131,9 @@ export default function AddApplication() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [videoTab, setVideoTab] = useState<'url' | 'upload'>('url');
   const pitchDeckRef = useRef<HTMLInputElement>(null);
+  const pitchVideoRef = useRef<HTMLInputElement>(null);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -142,12 +147,23 @@ export default function AddApplication() {
     if (file) setForm((prev) => ({ ...prev, pitchDeckName: file.name }));
   }
 
+  function handlePitchVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setForm(prev => ({ ...prev, pitchVideoData: dataUrl, pitchVideoUrl: '' }));
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); return; }
     try {
-      await createCRMApplication({
+      const newId = await createCRMApplication({
         companyName:        form.companyName,
         industry:           form.industry,
         website:            form.website,
@@ -163,7 +179,12 @@ export default function AddApplication() {
         location:           form.location,
         teamSize:           form.teamSize,
         foundedYear:        form.foundedYear,
+        pitchVideoUrl:      form.pitchVideoUrl,
       });
+      // Save local video upload to localStorage keyed by CRM record ID
+      if (form.pitchVideoData && newId) {
+        localStorage.setItem(`lp_pitchvideo_${newId}`, form.pitchVideoData);
+      }
       navigate('/applications');
     } catch (err) {
       // Surface error to user if desired — for now just log
@@ -243,6 +264,74 @@ export default function AddApplication() {
                 )}
               </button>
               <input ref={pitchDeckRef} type="file" accept=".pdf" className="hidden" onChange={handlePitchDeck} />
+            </div>
+
+            {/* Pitch Video */}
+            <div className="mt-4">
+              <p className="block text-sm font-medium text-gray-700 mb-2">Pitch Video</p>
+
+              {/* Tab toggle */}
+              <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-3">
+                <button
+                  type="button"
+                  onClick={() => { setVideoTab('url'); setForm(p => ({ ...p, pitchVideoData: '' })); }}
+                  className={cn('flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all', videoTab === 'url' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+                >
+                  <Link2 size={12} /> Video URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setVideoTab('upload'); setForm(p => ({ ...p, pitchVideoUrl: '' })); }}
+                  className={cn('flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all', videoTab === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+                >
+                  <Upload size={12} /> Upload File
+                </button>
+              </div>
+
+              {videoTab === 'url' ? (
+                <div>
+                  <div className="relative">
+                    <Video size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="url"
+                      value={form.pitchVideoUrl}
+                      onChange={e => setForm(p => ({ ...p, pitchVideoUrl: e.target.value }))}
+                      placeholder="https://youtube.com/watch?v=... or Vimeo / Loom link"
+                      className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">Supports YouTube, Vimeo, Loom, or any direct .mp4 URL</p>
+                </div>
+              ) : (
+                <div>
+                  {form.pitchVideoData ? (
+                    <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black">
+                      <video src={form.pitchVideoData} controls className="w-full max-h-48 object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, pitchVideoData: '' }))}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors"
+                      >
+                        <X size={13} className="text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => pitchVideoRef.current?.click()}
+                      className={cn(
+                        'w-full border-2 border-dashed border-gray-200 rounded-xl px-4 py-6 flex flex-col items-center gap-2',
+                        'hover:border-gray-400 hover:bg-gray-50 transition-all'
+                      )}
+                    >
+                      <Video className="w-7 h-7 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">Click to upload video</span>
+                      <span className="text-xs text-gray-400">MP4, MOV, WebM — max 100MB</span>
+                    </button>
+                  )}
+                  <input ref={pitchVideoRef} type="file" accept="video/*" className="hidden" onChange={handlePitchVideoUpload} />
+                </div>
+              )}
             </div>
           </div>
 
