@@ -287,7 +287,7 @@ export default function FounderDashboard() {
           </div>
 
           {loadingActs ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 animate-pulse">
                   <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
@@ -306,7 +306,7 @@ export default function FounderDashboard() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {activities.map(act => {
                 const cfg = TYPE_CONFIG[act.activityType?.toLowerCase()] ?? { bg: 'bg-gray-100', text: 'text-gray-600' };
                 return (
