@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Building2, MessageSquare, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Users } from 'lucide-react';
+import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,11 +8,11 @@ export function BottomNav() {
   const location = useLocation();
 
   const founderItems = [
-    { label: 'Home', path: '/', icon: Home },
-    { label: 'Companies', path: '/companies', icon: Building2 },
-    { label: 'Discuss', path: '/discussions', icon: Users },
-    { label: 'Chats', path: '/conversations', icon: MessageSquare },
-    { label: 'Profile', path: '/profile', icon: User },
+    { label: 'Dashboard',   path: '/',           icon: Home },
+    { label: 'Activities',  path: '/activities', icon: Rss },
+    { label: 'Company',     path: '/company',    icon: Building2 },
+    { label: 'Documents',   path: '/documents',  icon: FileText },
+    { label: 'Profile',     path: '/profile',    icon: User },
   ];
 
   const investorItems = [
