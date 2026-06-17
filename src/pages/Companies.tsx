@@ -5,6 +5,7 @@ import { fetchCRMPortfolio, deleteCRMPortfolioRecord, type CRMPortfolioRecord } 
 import { loadToken } from '../services/oauth';
 import { Input } from '../components/ui/Input';
 import { PageHeader } from '../components/layout/PageHeader';
+import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 
 const STAGE_STYLES: Record<string, string> = {
   'Pre-Seed': 'bg-gray-100 text-gray-600',
@@ -97,6 +98,8 @@ export default function Companies() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -111,12 +114,17 @@ export default function Companies() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
     try {
-      await deleteCRMPortfolioRecord(id);
-      setCompanies(prev => prev.filter(c => c.id !== id));
+      await deleteCRMPortfolioRecord(pendingDeleteId);
+      setCompanies(prev => prev.filter(c => c.id !== pendingDeleteId));
     } catch {
       // swallow
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -132,6 +140,15 @@ export default function Companies() {
 
   return (
     <div className="max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          title="Delete Company"
+          message="Are you sure you want to delete this company? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDeleteId(null)}
+          deleting={deleting}
+        />
+      )}
       <PageHeader
         title="Portfolio Companies"
         description="The founders and companies in our network"
@@ -225,7 +242,7 @@ export default function Companies() {
           <p className="text-xs text-gray-500 mb-4">{filtered.length} companies</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((company) => (
-              <CompanyCard key={company.id} company={company} onDelete={handleDelete} />
+              <CompanyCard key={company.id} company={company} onDelete={setPendingDeleteId} />
             ))}
           </div>
         </>

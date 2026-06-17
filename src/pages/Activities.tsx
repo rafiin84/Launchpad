@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import {
-  Activity, AlertCircle, RefreshCw, Trash2, Building2,
+  Activity, AlertCircle, RefreshCw, Building2,
   Image, X, Send, Link as LinkIcon,
+  PlusCircle, DollarSign, FileText, Users, TrendingUp, MessageSquare, Upload, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
-  fetchCRMActivities, createCRMActivity, deleteCRMActivity,
+  fetchCRMActivities, createCRMActivity,
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
 import { loadToken } from '../services/oauth';
@@ -268,16 +269,18 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
-function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete: (id: string) => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const LIMIT = 320;
+function ActivityCard({ activity }: { activity: CRMActivity }) {
+  const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
-  const display = isLong && !expanded ? activity.content.slice(0, LIMIT) : activity.content;
+  const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;
   const tags = activity.tags ? activity.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const cfg = TYPE_CONFIG[activity.activityType?.toLowerCase()] ?? { label: activity.activityType || 'Activity', bg: 'bg-gray-100', text: 'text-gray-600' };
 
   return (
-    <article className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 transition-colors">
+    <Link
+      to={`/activities/${activity.id}`}
+      className="block bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all"
+    >
       {/* Header row: company | type badge */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
         <div className="flex items-center gap-2.5">
@@ -300,22 +303,21 @@ function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete:
           <p className="text-xs text-gray-400 mb-2">{activity.authorName}</p>
         )}
         {activity.content && (
-          <div>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {display}{isLong && !expanded && '…'}
-            </p>
-            {isLong && (
-              <button onClick={() => setExpanded(v => !v)} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 mt-1">
-                {expanded ? 'Show less' : 'See more'}
-              </button>
-            )}
-          </div>
+          <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
+            {display}{isLong && '…'}
+          </p>
         )}
 
-        {/* Image */}
-        {(activity.imageData || activity.imageUrl) && (
+        {/* Image — prefer full imageData (base64), fallback to imageUrl */}
+        {(activity.imageUrl || (activity.imageData && activity.imageData.startsWith('data:'))) && (
           <div className="mt-3 rounded-xl overflow-hidden">
-            <img src={activity.imageData || activity.imageUrl} alt="" className="w-full max-h-64 object-cover" loading="lazy" />
+            <img
+              src={activity.imageData?.startsWith('data:') ? activity.imageData : activity.imageUrl}
+              alt=""
+              className="w-full max-h-48 object-cover"
+              loading="lazy"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
           </div>
         )}
 
@@ -327,18 +329,8 @@ function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete:
             ))}
           </div>
         )}
-
-        {/* Delete */}
-        <div className="flex justify-end mt-3">
-          <button
-            onClick={() => onDelete(activity.id)}
-            className="p-1.5 rounded-lg text-gray-200 hover:text-red-400 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
@@ -361,85 +353,146 @@ export default function Activities() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
-    try { await deleteCRMActivity(id); setRecords(prev => prev.filter(r => r.id !== id)); } catch { /* ignore */ }
-  };
-
   const handlePost = (activity: CRMActivity) => {
     setRecords(prev => [activity, ...prev]);
   };
 
-  return (
-    <div className="py-6 sm:py-8 px-4 sm:px-6">
-      <div className="max-w-[600px]">
+  const RECENT_EVENTS = [
+    { icon: PlusCircle,   color: 'text-indigo-500 bg-indigo-50',  text: 'NeuralPath AI added to portfolio',            time: '2h ago' },
+    { icon: DollarSign,   color: 'text-emerald-500 bg-emerald-50', text: 'Investment completed — FinFlow Payments $3M', time: '5h ago' },
+    { icon: Users,        color: 'text-violet-500 bg-violet-50',   text: 'Founder meeting with Lena Kovacs (Stackly)',  time: '1d ago' },
+    { icon: FileText,     color: 'text-blue-500 bg-blue-50',       text: 'Startup application received — GreenVault',  time: '1d ago' },
+    { icon: TrendingUp,   color: 'text-amber-500 bg-amber-50',     text: 'Deal stage updated — Orbis Logistics',       time: '2d ago' },
+    { icon: Upload,       color: 'text-pink-500 bg-pink-50',       text: 'Document uploaded — Medisync Term Sheet',    time: '2d ago' },
+    { icon: MessageSquare,color: 'text-teal-500 bg-teal-50',       text: 'Discussion post created — Q2 Review',        time: '3d ago' },
+    { icon: DollarSign,   color: 'text-emerald-500 bg-emerald-50', text: 'Valuation updated — Medisync Health $58M',   time: '4d ago' },
+    { icon: PlusCircle,   color: 'text-indigo-500 bg-indigo-50',   text: 'RetailMind 34% revenue milestone achieved',  time: '5d ago' },
+    { icon: Users,        color: 'text-violet-500 bg-violet-50',   text: 'Intro: Priya Mehta ↔ Dr. Sarah Okonkwo',    time: '6d ago' },
+  ];
 
-        {/* Page title */}
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-gray-900">Activities</h1>
-          <p className="text-sm text-gray-400 mt-0.5">What's happening across your portfolio network</p>
+  return (
+    <div className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8 w-full">
+
+      {/* Page title */}
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-gray-900">Activities</h1>
+        <p className="text-sm text-gray-400 mt-0.5">What's happening across your portfolio network</p>
+      </div>
+
+      {/* Not connected */}
+      {!isConnected && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
+            <p className="text-xs text-amber-600 mt-0.5">Sign in with Zoho CRM to get started.</p>
+          </div>
+          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">Connect</Link>
+        </div>
+      )}
+
+      {/* Two-column layout */}
+      <div className="flex flex-col lg:flex-row gap-6 w-full">
+
+        {/* Left — Composer + Feed */}
+        <div className="flex-1 min-w-0">
+          <Composer onPost={handlePost} />
+
+          {/* Loading skeletons */}
+          {loading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-gray-100 rounded-xl" />
+                    <div className="h-3 bg-gray-100 rounded w-24" />
+                  </div>
+                  <div className="h-4 bg-gray-100 rounded w-2/3 mb-2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/3 mb-2" />
+                  <div className="h-3 bg-gray-100 rounded w-full" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center mt-4">
+              <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+              <p className="text-sm text-red-600 mb-3">{error}</p>
+              <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
+                <RefreshCw size={12} /> Retry
+              </button>
+            </div>
+          )}
+
+          {/* Empty */}
+          {!loading && !error && records.length === 0 && isConnected && (
+            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
+              <Activity size={28} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
+              <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
+            </div>
+          )}
+
+          {/* Feed */}
+          {!loading && !error && records.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              {records.map(activity => (
+                <ActivityCard key={activity.id} activity={activity} />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Not connected */}
-        {!isConnected && (
-          <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-4">
-            <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
-              <p className="text-xs text-amber-600 mt-0.5">Sign in with Zoho CRM to get started.</p>
+        {/* Right — Recent Activity sidebar */}
+        <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
+
+          {/* Recent Activity */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Clock size={14} className="text-indigo-500" /> Recent Activity
+            </h3>
+            <div className="space-y-3">
+              {RECENT_EVENTS.map((ev, i) => {
+                const Icon = ev.icon;
+                return (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0', ev.color)}>
+                      <Icon size={13} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-700 leading-snug">{ev.text}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{ev.time}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">Connect</Link>
           </div>
-        )}
 
-        {/* Inline composer */}
-        <Composer onPost={handlePost} />
-
-        {/* Loading skeletons */}
-        {loading && (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-xl" />
-                  <div className="h-3 bg-gray-100 rounded w-24" />
+          {/* Quick stats */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">This Month</h3>
+            <div className="space-y-2.5">
+              {[
+                { label: 'Posts shared',      value: records.length,                                                    color: 'bg-indigo-500' },
+                { label: 'Wins logged',        value: records.filter(r => r.activityType === 'win').length,             color: 'bg-emerald-500' },
+                { label: 'Introductions made', value: records.filter(r => r.activityType === 'introduction').length,    color: 'bg-violet-500' },
+                { label: 'Insights shared',    value: records.filter(r => r.activityType === 'insight').length,         color: 'bg-amber-500' },
+              ].map(s => (
+                <div key={s.label} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn('w-2 h-2 rounded-full', s.color)} />
+                    <span className="text-xs text-gray-600">{s.label}</span>
+                  </div>
+                  <span className="text-xs font-bold text-gray-900">{s.value}</span>
                 </div>
-                <div className="h-4 bg-gray-100 rounded w-2/3 mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-1/3 mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-full" />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
-            <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
-            <p className="text-sm text-red-600 mb-3">{error}</p>
-            <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
-              <RefreshCw size={12} /> Retry
-            </button>
-          </div>
-        )}
-
-        {/* Empty */}
-        {!loading && !error && records.length === 0 && isConnected && (
-          <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
-            <Activity size={28} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
-            <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
-          </div>
-        )}
-
-        {/* Feed */}
-        {!loading && !error && records.length > 0 && (
-          <div className="space-y-3">
-            {records.map(activity => (
-              <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} />
-            ))}
-          </div>
-        )}
-
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import {
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
+import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 
 function formatCurrency(amount: number) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -272,6 +273,8 @@ export default function Applications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -286,12 +289,17 @@ export default function Applications() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
     try {
-      await deleteCRMApplication(id);
-      setRecords(prev => prev.filter(r => r.id !== id));
+      await deleteCRMApplication(pendingDeleteId);
+      setRecords(prev => prev.filter(r => r.id !== pendingDeleteId));
     } catch {
       // swallow
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -321,7 +329,16 @@ export default function Applications() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <div className="max-w-5xl">
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          title="Delete Application"
+          message="Are you sure you want to delete this application? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDeleteId(null)}
+          deleting={deleting}
+        />
+      )}
+      <div className="w-full">
         <PageHeader
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
@@ -335,7 +352,7 @@ export default function Applications() {
 
       {/* Not-connected banner */}
       {!isConnected && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 max-w-5xl">
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
@@ -349,7 +366,7 @@ export default function Applications() {
       <ChipRow chips={chips} />
 
       {/* Charts */}
-      <div className="max-w-5xl">
+      <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <PipelineFunnelChart apps={records} />
           <IndustryBreakdownChart apps={records} />
@@ -357,7 +374,7 @@ export default function Applications() {
       </div>
 
       {/* Table section */}
-      <div className="max-w-5xl">
+      <div className="w-full">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900">
             All Applications
@@ -413,7 +430,7 @@ export default function Applications() {
         )}
 
         {!loading && !error && filtered.length > 0 && (
-          <ApplicationsTable apps={filtered} onDelete={handleDelete} />
+          <ApplicationsTable apps={filtered} onDelete={setPendingDeleteId} />
         )}
       </div>
     </div>

@@ -43,6 +43,17 @@ const DEFAULT_KPIS: KPI[] = [
 const STORAGE_KPIS       = 'lp_founder_kpis';
 const STORAGE_MILESTONES = 'lp_founder_milestones';
 
+const SAMPLE_KPIS: KPI[] = [
+  { key: 'mrr',       label: 'MRR',         value: '$68,000',  sub: 'monthly recurring revenue',          prefix: '$',  accent: true },
+  { key: 'runway',    label: 'Runway',       value: '18',       sub: 'months of cash left',                suffix: ' mo' },
+  { key: 'raised',    label: 'Total Raised', value: '$2.8M',    sub: 'capital raised to date',             prefix: '$' },
+  { key: 'burn',      label: 'Burn Rate',    value: '$135,000', sub: 'per month',                          prefix: '$' },
+  { key: 'customers', label: 'Customers',    value: '312',      sub: 'active paying customers' },
+  { key: 'growth',    label: 'MoM Growth',   value: '14',       sub: 'revenue growth month-on-month',      suffix: '%' },
+  { key: 'churn',     label: 'Churn',        value: '1.8',      sub: 'monthly churn rate',                 suffix: '%' },
+  { key: 'team',      label: 'Team Size',    value: '14',       sub: 'full-time employees' },
+];
+
 function loadKPIs(): KPI[] {
   try {
     const saved = localStorage.getItem(STORAGE_KPIS);
@@ -52,19 +63,32 @@ function loadKPIs(): KPI[] {
       return DEFAULT_KPIS.map(def => parsed.find(p => p.key === def.key) ?? def);
     }
   } catch { /* ignore */ }
-  return DEFAULT_KPIS;
+  // Pre-populate with sample data on first load
+  localStorage.setItem(STORAGE_KPIS, JSON.stringify(SAMPLE_KPIS));
+  return SAMPLE_KPIS;
 }
 
 function saveKPIs(kpis: KPI[]) {
   localStorage.setItem(STORAGE_KPIS, JSON.stringify(kpis));
 }
 
+const SAMPLE_MILESTONES: Milestone[] = [
+  { id: '1', text: 'Reach $1M ARR',                    done: false, dueDate: '2025-09-30' },
+  { id: '2', text: 'Launch Enterprise tier with SSO',   done: false, dueDate: '2025-12-31' },
+  { id: '3', text: 'Hire Senior Full-Stack Engineer',   done: true,  dueDate: '2025-06-01' },
+  { id: '4', text: 'Reach 500 paying customers',       done: false, dueDate: '2026-03-31' },
+  { id: '5', text: 'Close Series A — $15M target',     done: false, dueDate: '2026-06-30' },
+  { id: '6', text: 'Reduce LLM inference cost by 60%', done: true,  dueDate: '2025-05-01' },
+];
+
 function loadMilestones(): Milestone[] {
   try {
     const saved = localStorage.getItem(STORAGE_MILESTONES);
     if (saved) return JSON.parse(saved);
   } catch { /* ignore */ }
-  return [];
+  // Pre-populate with sample milestones on first load
+  localStorage.setItem(STORAGE_MILESTONES, JSON.stringify(SAMPLE_MILESTONES));
+  return SAMPLE_MILESTONES;
 }
 
 function saveMilestones(ms: Milestone[]) {
@@ -190,7 +214,7 @@ export default function FounderDashboard() {
   const emptyCount = kpis.filter(k => !k.value.trim()).length;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
 
       {/* Greeting */}
       <div className="flex items-start justify-between mb-6">
@@ -263,11 +287,12 @@ export default function FounderDashboard() {
           </div>
 
           {loadingActs ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 animate-pulse">
                   <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2 mb-3" />
+                  <div className="h-20 bg-gray-100 rounded-xl" />
                 </div>
               ))}
             </div>
@@ -281,31 +306,33 @@ export default function FounderDashboard() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {activities.map(act => {
                 const cfg = TYPE_CONFIG[act.activityType?.toLowerCase()] ?? { bg: 'bg-gray-100', text: 'text-gray-600' };
                 return (
-                  <div key={act.id} className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-gray-200 transition-colors">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <h3 className="text-sm font-semibold text-gray-900 leading-snug">{act.title || '—'}</h3>
+                  <Link key={act.id} to={`/activities/${act.id}`} className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-gray-200 hover:shadow-sm transition-all flex flex-col">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2">{act.title || '—'}</h3>
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 capitalize', cfg.bg, cfg.text)}>
                         {act.activityType || 'update'}
                       </span>
                     </div>
                     {act.content && (
-                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{act.content}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 mb-2">{act.content}</p>
                     )}
-                    {(act.imageData || act.imageUrl) && (
-                      <div className="mt-2 rounded-xl overflow-hidden">
-                        <img src={act.imageData || act.imageUrl} alt="" className="w-full h-28 object-cover" />
+                    {(act.imageUrl || (act.imageData && act.imageData.startsWith('data:'))) && (
+                      <div className="mt-auto rounded-xl overflow-hidden">
+                        <img
+                          src={act.imageData?.startsWith('data:') ? act.imageData : act.imageUrl}
+                          alt=""
+                          className="w-full h-36 object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
                       </div>
                     )}
-                  </div>
+                  </Link>
                 );
               })}
-              <Link to="/activities/new" className="flex items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 border border-dashed border-gray-200 rounded-2xl py-3 transition-colors hover:border-gray-400">
-                <Plus size={14} /> Post a new update
-              </Link>
             </div>
           )}
         </div>

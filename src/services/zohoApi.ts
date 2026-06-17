@@ -73,8 +73,9 @@ export async function zohoList(module: string, params: Record<string, string> = 
   return json.data ?? [];
 }
 
-export async function zohoGetById(module: string, id: string): Promise<ZohoRecord | null> {
-  const res = await fetch(`${ZOHO_BASE}/${module}/${id}`, { headers: authHeaders() });
+export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
+  const url = fields ? `${ZOHO_BASE}/${module}/${id}?fields=${encodeURIComponent(fields)}` : `${ZOHO_BASE}/${module}/${id}`;
+  const res = await fetch(url, { headers: authHeaders() });
   if (res.status === 404) return null;
 
   const json: ZohoListResponse = await res.json();

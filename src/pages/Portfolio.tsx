@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { CompanyLogo } from '../components/ui/CompanyLogo';
 import {
   TrendingUp,
   DollarSign,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
+import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { loadToken } from '../services/oauth';
@@ -103,6 +105,7 @@ interface KpiChip {
   icon: React.ReactNode;
   color?: string;
   accent?: boolean;
+  onClick?: () => void;
 }
 
 function KpiChipRow({ chips }: { chips: KpiChip[] }) {
@@ -111,9 +114,10 @@ function KpiChipRow({ chips }: { chips: KpiChip[] }) {
       {chips.map((chip) => (
         <div
           key={chip.label}
-          className={`flex-shrink-0 w-44 rounded-2xl p-5 ${
+          onClick={chip.onClick}
+          className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${
             chip.accent ? 'bg-black' : 'bg-white border border-gray-100 hover:border-gray-200'
-          }`}
+          } ${chip.onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-md active:scale-[0.97]' : ''}`}
         >
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
             <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
@@ -128,6 +132,9 @@ function KpiChipRow({ chips }: { chips: KpiChip[] }) {
             <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>
               {chip.sub}
             </p>
+          )}
+          {chip.onClick && (
+            <p className="text-[10px] text-indigo-400 mt-1.5 font-medium">↓ View list</p>
           )}
         </div>
       ))}
@@ -149,13 +156,13 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all">
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-          <div className="w-full h-full flex items-center justify-center"><Building2 size={18} className="text-gray-400" /></div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
-          <p className="text-xs text-gray-400 capitalize">{c.industry}{c.stage ? ` · ${c.stage}` : ''}</p>
-        </div>
+        <Link to={`/portfolio/${c.id}`} className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer">
+          <CompanyLogo name={c.companyName || '?'} website={c.website} size={10} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
+            <p className="text-xs text-gray-400 capitalize">{c.industry}{c.stage ? ` · ${c.stage}` : ''}</p>
+          </div>
+        </Link>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {c.status && (
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -178,25 +185,27 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
           </button>
         </div>
       </div>
-      {c.shortDescription && <p className="text-xs text-gray-600 leading-relaxed mb-3 line-clamp-2">{c.shortDescription}</p>}
-      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-50">
-        <div>
-          <p className="text-xs text-gray-400">Invested</p>
-          <p className="text-sm font-bold text-gray-900">{amount >= 1000000 ? `$${(amount/1000000).toFixed(1)}M` : amount >= 1000 ? `$${(amount/1000).toFixed(0)}K` : `$${amount}`}</p>
-        </div>
-        {c.ownershipPct && (
+      <Link to={`/portfolio/${c.id}`} className="block cursor-pointer">
+        {c.shortDescription && <p className="text-xs text-gray-600 leading-relaxed mb-3 line-clamp-2">{c.shortDescription}</p>}
+        <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-50">
           <div>
-            <p className="text-xs text-gray-400">Ownership</p>
-            <p className="text-sm font-bold text-gray-900">{c.ownershipPct}%</p>
+            <p className="text-xs text-gray-400">Invested</p>
+            <p className="text-sm font-bold text-gray-900">{amount >= 1000000 ? `$${(amount/1000000).toFixed(1)}M` : amount >= 1000 ? `$${(amount/1000).toFixed(0)}K` : `$${amount}`}</p>
+          </div>
+          {c.ownershipPct && (
+            <div>
+              <p className="text-xs text-gray-400">Ownership</p>
+              <p className="text-sm font-bold text-gray-900">{c.ownershipPct}%</p>
+            </div>
+          )}
+        </div>
+        {(c.location || c.investmentDate) && (
+          <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+            {c.location && <span className="flex items-center gap-1"><MapPin size={10} />{c.location}</span>}
+            {c.investmentDate && <span className="flex items-center gap-1"><Calendar size={10} />{new Date(c.investmentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>}
           </div>
         )}
-      </div>
-      {(c.location || c.investmentDate) && (
-        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-          {c.location && <span className="flex items-center gap-1"><MapPin size={10} />{c.location}</span>}
-          {c.investmentDate && <span className="flex items-center gap-1"><Calendar size={10} />{new Date(c.investmentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>}
-        </div>
-      )}
+      </Link>
     </div>
   );
 }
@@ -209,7 +218,44 @@ export default function Portfolio() {
   const [crmError, setCrmError] = useState('');
   const [availableModules, setAvailableModules] = useState<ZohoModule[]>([]);
   const [modulesLoading, setModulesLoading] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const isConnected = !!loadToken();
+
+  // Ref for the Portfolio Companies section
+  const companiesSectionRef = useRef<HTMLDivElement>(null);
+
+  // Parallax-style smooth scroll using easeInOutCubic easing
+  // The scroll container is the <main> element in AppLayout (overflow-y-auto), not window
+  const scrollToCompanies = useCallback(() => {
+    const target = companiesSectionRef.current;
+    if (!target) return;
+
+    // Walk up the DOM to find the scrollable <main> container
+    const scrollEl = target.closest('main') as HTMLElement | null;
+    if (!scrollEl) return;
+
+    const startY = scrollEl.scrollTop;
+    // target's offset relative to scrollEl
+    const targetY = target.offsetTop - 80;
+    const distance = targetY - startY;
+    const duration = Math.min(1200, Math.max(600, Math.abs(distance) * 0.6));
+    let startTime: number | null = null;
+
+    function easeInOutCubic(t: number) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function step(timestamp: number) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      scrollEl.scrollTop = startY + distance * easeInOutCubic(progress);
+      if (progress < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+  }, []);
 
   const loadCRMData = () => {
     if (!isConnected) { setCrmLoading(false); return; }
@@ -238,12 +284,17 @@ export default function Portfolio() {
 
   useEffect(() => { loadCRMData(); }, []);
 
-  const handleDeleteCRM = async (id: string) => {
+  const handleDeleteCRM = async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
     try {
-      await deleteCRMPortfolioRecord(id);
-      setCrmCompanies(prev => prev.filter(c => c.id !== id));
+      await deleteCRMPortfolioRecord(pendingDeleteId);
+      setCrmCompanies(prev => prev.filter(c => c.id !== pendingDeleteId));
     } catch (err) {
       setCrmError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -261,8 +312,9 @@ export default function Portfolio() {
     {
       label: 'Portfolio Companies',
       value: String(crmCompanies.length),
-      sub: `${activeCount} active`,
+      sub: `${activeCount} Active`,
       icon: <Building2 size={16} />,
+      onClick: scrollToCompanies,
     },
     {
       label: 'Total Deployed',
@@ -342,8 +394,17 @@ export default function Portfolio() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          title="Delete Portfolio Company"
+          message="Are you sure you want to delete this company record? This action cannot be undone."
+          onConfirm={handleDeleteCRM}
+          onCancel={() => setPendingDeleteId(null)}
+          deleting={deleting}
+        />
+      )}
       {/* Constrained header */}
-      <div className="max-w-5xl">
+      <div className="w-full">
         <PageHeader
           title="Portfolio"
           description="Your invested companies and portfolio performance"
@@ -359,7 +420,7 @@ export default function Portfolio() {
       <KpiChipRow chips={kpiChips} />
 
       {/* Everything else constrained to max-w-5xl */}
-      <div className="max-w-5xl">
+      <div className="w-full">
         {/* Analytics charts — static growth chart only */}
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Performance Analytics</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -372,7 +433,7 @@ export default function Portfolio() {
         </div>
 
         {/* Portfolio companies */}
-        <div className="flex items-center justify-between mb-4">
+        <div ref={companiesSectionRef} className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900">Portfolio Companies</h2>
           {isConnected && (
             <button
@@ -469,7 +530,7 @@ export default function Portfolio() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {crmCompanies.map(c => (
-            <CRMCompanyCard key={c.id} c={c} onDelete={handleDeleteCRM} />
+            <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} />
           ))}
         </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
+import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMDocuments, deleteCRMDocument, type CRMDocument } from '../services/crmDocuments';
 import { loadToken } from '../services/oauth';
 
@@ -30,6 +31,8 @@ export default function Documents() {
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -44,12 +47,17 @@ export default function Documents() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
     try {
-      await deleteCRMDocument(id);
-      setDocs(prev => prev.filter(d => d.id !== id));
+      await deleteCRMDocument(pendingDeleteId);
+      setDocs(prev => prev.filter(d => d.id !== pendingDeleteId));
     } catch {
       // swallow
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -62,7 +70,16 @@ export default function Documents() {
   const allTypes = Object.keys(TYPE_META);
 
   return (
-    <div className="max-w-5xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      {pendingDeleteId !== null && (
+        <DeleteConfirmModal
+          title="Delete Document"
+          message="Are you sure you want to delete this document? This action cannot be undone."
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDeleteId(null)}
+          deleting={deleting}
+        />
+      )}
       <PageHeader
         title="Documents"
         description="Secure document repository for your portfolio"
@@ -198,7 +215,7 @@ export default function Documents() {
                       </span>
                     )}
                     <button
-                      onClick={() => handleDelete(doc.id)}
+                      onClick={() => setPendingDeleteId(doc.id)}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       title="Delete"
                     >

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
@@ -179,9 +180,7 @@ export default function Home() {
                 {recentPortfolio.map(company => (
                   <Link key={company.id} to={`/portfolio/${company.id}`} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
-                        <Building2 size={16} className="text-gray-400" />
-                      </div>
+                      <CompanyLogo name={company.companyName || '?'} website={company.website} size={10} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors truncate">
                           {company.companyName || '—'}

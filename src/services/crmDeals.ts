@@ -1,4 +1,4 @@
-import { zohoList, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 
 const MODULE = 'Deals';
 
@@ -76,6 +76,11 @@ function fromRecord(r: ZohoRecord): CRMDeal {
     probability: str(FIELD_MAP.probability),
     leadSource:  str(FIELD_MAP.leadSource),
   };
+}
+
+export async function getCRMDeal(id: string): Promise<CRMDeal | null> {
+  const r = await zohoGetById(MODULE, id);
+  return r ? fromRecord(r) : null;
 }
 
 export async function fetchCRMDeals(): Promise<CRMDeal[]> {

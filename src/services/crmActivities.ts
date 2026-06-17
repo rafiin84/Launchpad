@@ -1,4 +1,4 @@
-import { zohoList, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 
 const MODULE = 'My_Activities';
 
@@ -49,6 +49,12 @@ function fromRecord(r: ZohoRecord): CRMActivity {
 // Explicitly list all fields — Zoho omits large textarea fields from default list responses
 const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Activity_Tags,Image_URL,Activity_Image_Data';
 
+export async function getCRMActivity(id: string): Promise<CRMActivity> {
+  const record = await zohoGetById(MODULE, id, ALL_FIELDS);
+  if (!record) throw new Error('Activity not found');
+  return fromRecord(record);
+}
+
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
   const records = await zohoList(MODULE, {
     per_page: '200',
@@ -66,6 +72,15 @@ export async function createCRMActivity(fields: CRMActivityFields): Promise<stri
     if (raw !== '') payload[crmKey] = raw;
   }
   return zohoCreate(MODULE, payload);
+}
+
+export async function updateCRMActivity(id: string, fields: CRMActivityFields): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
+    const raw = (fields as Record<string, string>)[formKey] ?? '';
+    payload[crmKey] = raw; // allow empty to clear fields
+  }
+  return zohoUpdate(MODULE, id, payload);
 }
 
 export async function deleteCRMActivity(id: string): Promise<void> {

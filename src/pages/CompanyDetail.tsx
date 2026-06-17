@@ -9,6 +9,7 @@ import { StageBadge } from '../components/ui/Badge';
 import { Tabs } from '../components/ui/Tabs';
 import { FeedCard } from '../components/feed/FeedCard';
 import { getPortfolioCompanies, deletePortfolioCompany } from '../services/store';
+import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -22,6 +23,7 @@ export default function CompanyDetail() {
   const [company, setCompany] = useState<Company | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -38,6 +40,10 @@ export default function CompanyDetail() {
     navigate('/companies');
   }
 
+  function confirmDelete() {
+    setShowDeleteModal(true);
+  }
+
   if (!company) {
     return (
       <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
@@ -51,6 +57,14 @@ export default function CompanyDetail() {
 
   return (
     <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          title="Delete Company"
+          message={`Are you sure you want to delete "${company?.name}"? This action cannot be undone.`}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
       {/* Back + Delete */}
       <div className="flex items-center justify-between mb-6">
         <Link to="/companies" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
@@ -58,7 +72,7 @@ export default function CompanyDetail() {
           All Companies
         </Link>
         <button
-          onClick={handleDelete}
+          onClick={confirmDelete}
           className="inline-flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-colors"
         >
           <Trash2 size={14} />

@@ -14,9 +14,14 @@ import Introductions from './pages/Introductions';
 import Applications from './pages/Applications';
 import ApplicationDetail from './pages/ApplicationDetail';
 import AddApplication from './pages/AddApplication';
+import EditApplication from './pages/EditApplication';
 import DealFlow from './pages/DealFlow';
+import AddDeal from './pages/AddDeal';
+import DealDetail from './pages/DealDetail';
+import EditDeal from './pages/EditDeal';
 import Portfolio from './pages/Portfolio';
 import AddPortfolioCompany from './pages/AddPortfolioCompany';
+import PortfolioCompanyDetail from './pages/PortfolioCompanyDetail';
 import EditPortfolioCompany from './pages/EditPortfolioCompany';
 import Investments from './pages/Investments';
 import Funds from './pages/Funds';
@@ -29,6 +34,8 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Activities from './pages/Activities';
 import AddActivity from './pages/AddActivity';
+import ActivityDetail from './pages/ActivityDetail';
+import EditActivity from './pages/EditActivity';
 import FounderCompany from './pages/FounderCompany';
 
 export default function App() {
@@ -42,6 +49,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
             <Route path="/activities/new" element={<AddActivity />} />
+            <Route path="/activities/:id" element={<ActivityDetail />} />
+            <Route path="/activities/:id/edit" element={<EditActivity />} />
             <Route path="/company" element={<FounderCompany />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/new" element={<AddCompany />} />
@@ -53,9 +62,14 @@ export default function App() {
             <Route path="/applications" element={<Applications />} />
             <Route path="/applications/new" element={<AddApplication />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
+            <Route path="/applications/:id/edit" element={<EditApplication />} />
             <Route path="/deals" element={<DealFlow />} />
+            <Route path="/deals/new" element={<AddDeal />} />
+            <Route path="/deals/:id" element={<DealDetail />} />
+            <Route path="/deals/:id/edit" element={<EditDeal />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
+            <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
             <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/funds" element={<Funds />} />
