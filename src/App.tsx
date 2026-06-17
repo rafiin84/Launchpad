@@ -1,6 +1,14 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+
+// Redirects to /login if not authenticated
+function ProtectedLayout() {
+  const { isLoggedIn } = useAuth();
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  return <AppLayout />;
+}
 
 import Login from './pages/Login';
 import Callback from './pages/Callback';
@@ -45,7 +53,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
-          <Route element={<AppLayout />}>
+          <Route element={<ProtectedLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
             <Route path="/activities/new" element={<AddActivity />} />
