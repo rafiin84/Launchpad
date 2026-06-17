@@ -331,6 +331,66 @@ export default function Home() {
           <PortfolioGrowthChart />
           <MoicChart />
         </div>
+
+        {/* Recent Portfolio Companies — between chart rows */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Recent Portfolio Companies</h2>
+            <Link to="/portfolio" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+              View all <ArrowUpRight size={12} />
+            </Link>
+          </div>
+
+          {loadingPortfolio ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[1, 2].map(i => (
+                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+                  <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : recentPortfolio.length === 0 ? (
+            <div className="bg-white border border-dashed border-gray-100 rounded-2xl p-8 text-center">
+              <Building2 size={24} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400 mb-3">No portfolio companies yet</p>
+              <Link to="/portfolio/new" className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg">
+                <Plus size={12} /> Add Company
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {recentPortfolio.map(company => (
+                <Link key={company.id} to={`/portfolio/${company.id}`} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
+                  <div className="flex items-start gap-3 mb-3">
+                    <CompanyLogo name={company.companyName || '?'} website={company.website} size={10} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors truncate">
+                        {company.companyName || '—'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{company.industry || '—'}</p>
+                      {company.stage && (
+                        <span className={cn('inline-block mt-1.5 text-xs px-2 py-0.5 rounded-full font-medium', STAGE_STYLES[company.stage] ?? 'bg-gray-100 text-gray-600')}>
+                          {company.stage}
+                        </span>
+                      )}
+                    </div>
+                    {company.investmentAmount && parseFloat(company.investmentAmount) > 0 && (
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-gray-900">{formatCurrency(parseFloat(company.investmentAmount))}</p>
+                        <p className="text-xs text-gray-400">invested</p>
+                      </div>
+                    )}
+                  </div>
+                  {company.shortDescription && (
+                    <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{company.shortDescription}</p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <PipelineFunnelChart apps={applications} />
           <IndustryBreakdownChart apps={applications} />
@@ -341,65 +401,6 @@ export default function Home() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main */}
         <div className="flex-1 min-w-0 space-y-8">
-
-          {/* Recent Portfolio */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-900">Recent Portfolio Companies</h2>
-              <Link to="/portfolio" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-                View all <ArrowUpRight size={12} />
-              </Link>
-            </div>
-
-            {loadingPortfolio ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2].map(i => (
-                  <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-                    <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : recentPortfolio.length === 0 ? (
-              <div className="bg-white border border-dashed border-gray-100 rounded-2xl p-8 text-center">
-                <Building2 size={24} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-xs text-gray-400 mb-3">No portfolio companies yet</p>
-                <Link to="/portfolio/new" className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg">
-                  <Plus size={12} /> Add Company
-                </Link>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {recentPortfolio.map(company => (
-                  <Link key={company.id} to={`/portfolio/${company.id}`} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
-                    <div className="flex items-start gap-3 mb-3">
-                      <CompanyLogo name={company.companyName || '?'} website={company.website} size={10} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors truncate">
-                          {company.companyName || '—'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{company.industry || '—'}</p>
-                        {company.stage && (
-                          <span className={cn('inline-block mt-1.5 text-xs px-2 py-0.5 rounded-full font-medium', STAGE_STYLES[company.stage] ?? 'bg-gray-100 text-gray-600')}>
-                            {company.stage}
-                          </span>
-                        )}
-                      </div>
-                      {company.investmentAmount && parseFloat(company.investmentAmount) > 0 && (
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-gray-900">{formatCurrency(parseFloat(company.investmentAmount))}</p>
-                          <p className="text-xs text-gray-400">invested</p>
-                        </div>
-                      )}
-                    </div>
-                    {company.shortDescription && (
-                      <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{company.shortDescription}</p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Recent Deals */}
           <div>
