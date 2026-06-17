@@ -250,7 +250,7 @@ export default function Portfolio() {
       if (!startTime) startTime = timestamp;
       const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      scrollEl.scrollTop = startY + distance * easeInOutCubic(progress);
+      (scrollEl as HTMLElement).scrollTop = startY + distance * easeInOutCubic(progress);
       if (progress < 1) requestAnimationFrame(step);
     }
 

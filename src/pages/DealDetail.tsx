@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, TrendingUp, Building2, DollarSign, Calendar,
@@ -31,7 +31,7 @@ const ACTIVE_STAGES = CRM_DEAL_STAGES.filter(s => s !== 'Closed Lost');
 
 function StageTimeline({ current }: { current: string }) {
   const isLost = current === 'Closed Lost';
-  const currentIdx = ACTIVE_STAGES.indexOf(current as typeof CRM_DEAL_STAGES[number]);
+  const currentIdx = ACTIVE_STAGES.indexOf(current as typeof ACTIVE_STAGES[number]);
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-4">
@@ -295,7 +295,7 @@ export default function DealDetail() {
                   style={{
                     color,
                     backgroundColor: `${color}18`,
-                    ringColor: isCurrentStage ? color : undefined,
+                    ...(isCurrentStage ? { '--tw-ring-color': color } as React.CSSProperties : {}),
                   }}
                 >
                   {stage}
