@@ -274,7 +274,7 @@ export default function Home() {
         ];
 
         // Static portfolio metric chips (no link)
-        const staticChips: { label: string; value: string; sub: string; icon: JSX.Element; color?: string }[] = [
+        const staticChips: { label: string; value: string; sub: string; icon: React.ReactElement; color?: string }[] = [
           { label: 'Total Deployed',   value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'capital invested',   icon: <DollarSign size={16} /> },
           { label: 'Avg Ownership',    value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',                                 sub: 'per company',        icon: <Percent size={16} /> },
           { label: 'Avg Deal Size',    value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per investment',     icon: <DollarSign size={16} /> },
