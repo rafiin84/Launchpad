@@ -3,7 +3,6 @@ import {
   DollarSign, Building2, Inbox, Briefcase,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
   Percent, Layers, PieChart, Target, Award,
-  Eye, CalendarClock, CheckCircle2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -224,15 +223,7 @@ export default function Home() {
     return 'Good evening';
   })();
 
-  const totalInvested = portfolio.reduce((s, r) => s + (parseFloat(r.investmentAmount) || 0), 0);
   const activeDeals = deals.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').length;
-
-  const kpiCards = [
-    { label: 'Total Invested',      value: formatCurrency(totalInvested), sub: 'across portfolio', icon: DollarSign, accent: true,  path: '/investments', loading: loadingPortfolio },
-    { label: 'Portfolio Companies', value: portfolio.length,              sub: 'active companies', icon: Building2,  accent: false, path: '/portfolio',   loading: loadingPortfolio },
-    { label: 'Active Deals',        value: activeDeals,                  sub: 'in pipeline',      icon: Briefcase,  accent: false, path: '/deals',       loading: loadingDeals },
-    { label: 'Applications',        value: applications.length,          sub: 'submitted',        icon: Inbox,      accent: false, path: '/applications',loading: loadingApps },
-  ];
 
   const recentPortfolio = portfolio.slice(0, 4);
   const recentDeals = deals.slice(0, 4);
@@ -264,41 +255,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* KPI cards */}
-      <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 mb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        {kpiCards.map(card => {
-          const Icon = card.icon;
-          return (
-            <Link
-              key={card.label}
-              to={card.path}
-              className={cn(
-                'flex-shrink-0 w-44 rounded-2xl p-5 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer',
-                card.accent ? 'bg-black text-white' : 'bg-white border border-gray-100 hover:border-gray-200'
-              )}
-            >
-              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-3', card.accent ? 'bg-white/15' : 'bg-gray-50')}>
-                <Icon size={16} className={card.accent ? 'text-white' : 'text-gray-500'} />
-              </div>
-              {card.loading ? (
-                <div className="h-7 bg-gray-200/40 rounded w-16 mb-1 animate-pulse" />
-              ) : (
-                <p className={cn('text-2xl font-bold mb-0.5', card.accent ? 'text-white' : 'text-gray-900')}>
-                  {card.value}
-                </p>
-              )}
-              <p className={cn('text-xs font-semibold', card.accent ? 'text-gray-200' : 'text-gray-700')}>
-                {card.label}
-              </p>
-              <p className={cn('text-xs mt-0.5', card.accent ? 'text-gray-400' : 'text-gray-400')}>
-                {card.sub}
-              </p>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Portfolio KPI chips */}
+      {/* Combined KPI chips row — top-4 summary cards merged with portfolio KPIs */}
       {(() => {
         const totalDeployed = portfolio.reduce((s, c) => s + (parseFloat(c.investmentAmount) || 0), 0);
         const totalPreMoney = portfolio.reduce((s, c) => s + (parseFloat(c.preMoneyValuation) || 0), 0);
@@ -308,72 +265,61 @@ export default function Home() {
         const seriesACount = portfolio.filter(c => c.stage === 'series-a').length;
         const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
 
-        const portfolioChips = [
-          { label: 'Portfolio Companies', value: String(portfolio.length),                                         sub: `${activeCount} Active`,        icon: <Building2 size={16} />, accent: true  },
-          { label: 'Total Deployed',      value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                    sub: 'capital invested',              icon: <DollarSign size={16} />               },
-          { label: 'Avg Ownership',       value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',          sub: 'per company',                   icon: <Percent size={16} />                  },
-          { label: 'Avg Deal Size',       value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per investment', icon: <DollarSign size={16} />  },
-          { label: 'Entry Valuations',    value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                    sub: 'combined pre-money',            icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
-          { label: 'Stage Mix',           value: `${seedCount}S / ${seriesACount}A`,                              sub: 'Seed / Series A',               icon: <Layers size={16} />                   },
-          { label: 'Portfolio Value',     value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                    sub: 'at cost basis',                 icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
-          { label: 'Active',              value: String(activeCount),                                             sub: 'active investments',            icon: <Award size={16} />,    color: 'text-amber-600' },
-          { label: 'Est. IRR',            value: '—',                                                             sub: 'add more data',                 icon: <Target size={16} />,   color: 'text-emerald-600' },
-          { label: 'MOIC',               value: '—',                                                             sub: 'mark to market',                icon: <PieChart size={16} />                 },
+        // Chips that are also navigation links
+        const linkedChips = [
+          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/investments', icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio, sub: 'across portfolio' },
+          { label: 'Portfolio Companies', value: String(portfolio.length),          path: '/portfolio',   icon: <Building2 size={16} />,  accent: false, loading: loadingPortfolio, sub: `${activeCount} active` },
+          { label: 'Active Deals',        value: String(activeDeals),              path: '/deals',       icon: <Briefcase size={16} />,  accent: false, loading: loadingDeals,     sub: 'in pipeline' },
+          { label: 'Applications',        value: String(applications.length),       path: '/applications',icon: <Inbox size={16} />,      accent: false, loading: loadingApps,      sub: 'submitted' },
+        ];
+
+        // Static portfolio metric chips (no link)
+        const staticChips: { label: string; value: string; sub: string; icon: JSX.Element; color?: string }[] = [
+          { label: 'Total Deployed',   value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'capital invested',   icon: <DollarSign size={16} /> },
+          { label: 'Avg Ownership',    value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',                                 sub: 'per company',        icon: <Percent size={16} /> },
+          { label: 'Avg Deal Size',    value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per investment',     icon: <DollarSign size={16} /> },
+          { label: 'Entry Valuations', value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                                           sub: 'combined pre-money', icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
+          { label: 'Stage Mix',        value: `${seedCount}S / ${seriesACount}A`,                                                     sub: 'Seed / Series A',    icon: <Layers size={16} /> },
+          { label: 'Portfolio Value',  value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'at cost basis',      icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
+          { label: 'Active',           value: String(activeCount),                                                                    sub: 'active investments',  icon: <Award size={16} />,    color: 'text-amber-600' },
+          { label: 'Est. IRR',         value: '—',                                                                                    sub: 'add more data',      icon: <Target size={16} />,   color: 'text-emerald-600' },
+          { label: 'MOIC',             value: '—',                                                                                    sub: 'mark to market',     icon: <PieChart size={16} /> },
         ];
 
         return (
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Portfolio KPIs</h2>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-              {portfolioChips.map(chip => (
-                <div key={chip.label} className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${chip.accent ? 'bg-black' : 'bg-white border border-gray-100'}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
-                    <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
-                  </div>
-                  <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>{chip.value}</p>
-                  <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
-                  {chip.sub && <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>}
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 mb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            {/* Linked navigation chips */}
+            {linkedChips.map(chip => (
+              <Link
+                key={chip.label}
+                to={chip.path}
+                className={`flex-shrink-0 w-44 rounded-2xl p-5 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer ${chip.accent ? 'bg-black' : 'bg-white border border-gray-100 hover:border-gray-200'}`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
+                  <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Applications KPI chips */}
-      {(() => {
-        const totalFunding = applications.reduce((s, a) => s + (parseFloat(a.fundingAsk) || 0), 0);
-        const stageCount = (stage: string) => applications.filter(a => a.pipelineStage === stage).length;
-        const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
-
-        const appChips = [
-          { label: 'Total Applications',  value: applications.length,                                              sub: 'in pipeline',       icon: <Inbox size={16} />,        accent: true  },
-          { label: 'New',                 value: stageCount('New'),                                               sub: 'awaiting review',   icon: <Inbox size={16} />                        },
-          { label: 'Under Review',        value: stageCount('Under Review'),                                      sub: 'being evaluated',   icon: <Eye size={16} />                          },
-          { label: 'Meeting Scheduled',   value: stageCount('Meeting Scheduled'),                                 sub: 'call booked',       icon: <CalendarClock size={16} />, color: 'text-indigo-600' },
-          { label: 'Due Diligence',       value: stageCount('Due Diligence'),                                    sub: 'deep review',       icon: <Target size={16} />,        color: 'text-amber-600' },
-          { label: 'IC Review',           value: stageCount('IC Review'),                                        sub: 'committee stage',   icon: <CheckCircle2 size={16} />,  color: 'text-emerald-600' },
-          { label: 'Rejected',            value: stageCount('Rejected'),                                         sub: 'passed',            icon: <AlertCircle size={16} />,   color: 'text-red-500' },
-          { label: 'Total Funding Ask',   value: fmt(totalFunding),                                              sub: 'pipeline value',    icon: <DollarSign size={16} />                   },
-          { label: 'Avg Deal Size',       value: fmt(totalFunding / (applications.length || 1)),                 sub: 'per application',   icon: <BarChart2 size={16} />                    },
-          { label: 'IC Rate',             value: `${Math.round((stageCount('IC Review') / (applications.length || 1)) * 100)}%`, sub: 'to IC stage', icon: <Percent size={16} />, color: 'text-indigo-600' },
-        ];
-
-        return (
-          <div className="mb-8">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Applications KPIs</h2>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-              {appChips.map(chip => (
-                <div key={chip.label} className={`flex-shrink-0 w-44 rounded-2xl p-5 transition-all ${chip.accent ? 'bg-black' : 'bg-white border border-gray-100'}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${chip.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
-                    <span className={chip.accent ? 'text-white' : 'text-gray-500'}>{chip.icon}</span>
-                  </div>
-                  <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : (chip.color ?? 'text-gray-900')}`}>{chip.value}</p>
-                  <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
-                  {chip.sub && <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>}
+                {chip.loading ? (
+                  <div className="h-7 bg-gray-200/40 rounded w-16 mb-1 animate-pulse" />
+                ) : (
+                  <p className={`text-2xl font-bold mb-0.5 ${chip.accent ? 'text-white' : 'text-gray-900'}`}>{chip.value}</p>
+                )}
+                <p className={`text-xs font-semibold ${chip.accent ? 'text-gray-200' : 'text-gray-700'}`}>{chip.label}</p>
+                <p className={`text-xs mt-0.5 ${chip.accent ? 'text-gray-400' : 'text-gray-400'}`}>{chip.sub}</p>
+              </Link>
+            ))}
+            {/* Divider */}
+            <div className="flex-shrink-0 w-px bg-gray-200 self-stretch my-2" />
+            {/* Static portfolio metric chips */}
+            {staticChips.map(chip => (
+              <div key={chip.label} className="flex-shrink-0 w-44 rounded-2xl p-5 bg-white border border-gray-100">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-3 bg-gray-50">
+                  <span className="text-gray-500">{chip.icon}</span>
                 </div>
-              ))}
-            </div>
+                <p className={`text-2xl font-bold mb-0.5 ${chip.color ?? 'text-gray-900'}`}>{chip.value}</p>
+                <p className="text-xs font-semibold text-gray-700">{chip.label}</p>
+                <p className="text-xs mt-0.5 text-gray-400">{chip.sub}</p>
+              </div>
+            ))}
           </div>
         );
       })()}
