@@ -449,65 +449,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="w-full lg:w-64 flex-shrink-0 space-y-4">
-          {/* Quick actions */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
-            <div>
-              {[
-                { label: 'Review Applications', path: '/applications', icon: Inbox },
-                { label: 'Deal Flow',           path: '/deals',        icon: TrendingUp },
-                { label: 'Portfolio Overview',  path: '/portfolio',    icon: Building2 },
-                { label: 'Investments',         path: '/investments',  icon: DollarSign },
-              ].map(action => {
-                const Icon = action.icon;
-                return (
-                  <Link
-                    key={action.path}
-                    to={action.path}
-                    className="flex items-center gap-2.5 py-2.5 border-b border-gray-50 last:border-0 hover:text-indigo-600 transition-colors group"
-                  >
-                    <Icon size={14} className="text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
-                    <span className="text-sm text-gray-700 group-hover:text-indigo-600">{action.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Deal pipeline summary */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <TrendingUp size={15} className="text-indigo-500" />
-              Deal Pipeline
-            </h3>
-            {loadingDeals ? (
-              <div className="space-y-2 animate-pulse">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="flex justify-between py-1">
-                    <div className="h-3 bg-gray-100 rounded w-24" />
-                    <div className="h-3 bg-gray-100 rounded w-6" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {['Qualification', 'Value Proposition', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won'].map(stage => (
-                  <div key={stage} className="flex items-center justify-between py-1.5">
-                    <span className="text-xs text-gray-600 truncate mr-2">{stage}</span>
-                    <span className="text-xs font-semibold text-gray-900 bg-gray-50 px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                      {deals.filter(d => d.stage === stage).length}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Link to="/deals" className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-              View all deals <ArrowUpRight size={12} />
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );
