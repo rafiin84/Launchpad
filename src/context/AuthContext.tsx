@@ -1,7 +1,8 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
+import { fetchCurrentZohoUser } from '../services/zohoApi';
 
 interface AuthContextValue {
   currentUser: User;
@@ -43,8 +44,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>(initial.role);
   const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
   const [userName, setUserName] = useState<string | null>(loadUserName);
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
 
-  const currentUser: User = buildUser(role, userName);
+  // Fetch Zoho profile photo once on mount (or when logged in)
+  useEffect(() => {
+    if (!loadToken()) return;
+    fetchCurrentZohoUser().then(user => {
+      const zuid = user?.Zuid ?? user?.zuid ?? null;
+      if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
+    }).catch(() => {});
+  }, [isLoggedIn]);
+
+  const currentUser: User = { ...buildUser(role, userName), avatar: avatarUrl };
 
   function login(selectedRole: UserRole) {
     saveRole(selectedRole);

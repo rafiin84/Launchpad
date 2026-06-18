@@ -7,7 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadToken } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoOrgName } from '../services/zohoApi';
+import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -224,31 +224,11 @@ export default function FounderDashboard() {
   const [showKPIEditor, setShowKPIEditor] = useState(false);
   const [newMilestone, setNewMilestone] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
-  const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isConnected) return;
-    let cancelled = false;
-    (async () => {
-      const [user, org] = await Promise.all([
-        fetchCurrentZohoUser(),
-        fetchZohoOrgName(),
-      ]);
-      if (cancelled) return;
-      if (user) {
-        const zuid = user.Zuid ?? user.zuid ?? null;
-        if (zuid) {
-          // Zoho public profile photo — no auth required
-          setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
-        } else {
-          const photo = await fetchUserPhoto(user.id, null);
-          if (!cancelled && photo) setAvatarUrl(photo);
-        }
-      }
-      setCompanyName(org);
-    })();
-    return () => { cancelled = true; };
+    fetchZohoOrgName().then(org => setCompanyName(org)).catch(() => {});
   }, [isConnected]);
 
   const greeting = (() => {
@@ -314,9 +294,9 @@ export default function FounderDashboard() {
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-3">
           {/* Avatar */}
-          {avatarUrl ? (
+          {currentUser.avatar ? (
             <img
-              src={avatarUrl}
+              src={currentUser.avatar}
               alt={currentUser.name}
               className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}

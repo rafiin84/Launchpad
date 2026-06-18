@@ -11,7 +11,6 @@ import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortf
 import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
-import { fetchCurrentZohoUser } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import FounderDashboard from './FounderDashboard';
 
@@ -195,17 +194,6 @@ export default function Home() {
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingDeals, setLoadingDeals] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isConnected) {
-      fetchCurrentZohoUser().then(user => {
-        const zuid = user?.Zuid ?? user?.zuid ?? null;
-        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
-      }).catch(() => {});
-    }
-  }, []);
-
   useEffect(() => {
     if (!isConnected) {
       setLoadingPortfolio(false);
@@ -243,9 +231,9 @@ export default function Home() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Welcome */}
       <div className="flex items-center gap-3 mb-6">
-        {avatarUrl ? (
+        {currentUser.avatar ? (
           <img
-            src={avatarUrl}
+            src={currentUser.avatar}
             alt={currentUser.name}
             className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
