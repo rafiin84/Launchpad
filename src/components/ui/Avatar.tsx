@@ -53,17 +53,21 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
         className
       )}
     >
-      {src && !imgError ? (
+      {/* Initials fallback — always rendered behind */}
+      <div className={cn('absolute inset-0 flex items-center justify-center font-semibold z-0', getColor(name))}>
+        {getInitials(name)}
+      </div>
+      {src && !imgError && (
         <img
           src={src}
           alt={name}
-          className="w-full h-full object-cover scale-150"
+          className="absolute inset-0 w-full h-full object-cover scale-150 z-10"
           onError={() => setImgError(true)}
+          onLoad={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.naturalWidth === 0) setImgError(true);
+          }}
         />
-      ) : (
-        <div className={cn('w-full h-full flex items-center justify-center font-semibold', getColor(name))}>
-          {getInitials(name)}
-        </div>
       )}
     </div>
   );
