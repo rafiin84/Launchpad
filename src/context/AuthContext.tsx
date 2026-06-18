@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
-import { fetchCurrentZohoUser } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
 
 export interface ZohoProfile {
   email: string | null;
@@ -64,11 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch Zoho profile data once on login
   useEffect(() => {
     if (!loadToken()) return;
-    fetchCurrentZohoUser().then(user => {
+    fetchCurrentZohoUser().then(async (user) => {
       if (!user) return;
       const u = user as unknown as Record<string, unknown>;
-      const zuid = user.Zuid ?? user.zuid ?? null;
-      if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
+      const zuid = (user.Zuid ?? user.zuid ?? null) as string | null;
       if (user.email) setZohoEmail(user.email);
       setZohoProfile({
         email:    user.email ?? null,
@@ -78,6 +77,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         country:  (u['country'] as string) ?? null,
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
+
+      // Fetch profile photo via OAuth API (works on all devices including mobile)
+      // Check localStorage cache first
+      const AVATAR_CACHE_KEY = 'lp_avatar_data';
+      const cached = localStorage.getItem(AVATAR_CACHE_KEY);
+      if (cached) {
+        setAvatarUrl(cached);
+      }
+
+      // Always try to refresh from API
+      try {
+        const photoUrl = await fetchUserPhoto(user.id, zuid ?? undefined);
+        if (photoUrl) {
+          setAvatarUrl(photoUrl);
+          // Cache as data URL in localStorage for persistence
+          try {
+            const res = await fetch(photoUrl);
+            const blob = await res.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result as string;
+              if (dataUrl && dataUrl.startsWith('data:')) {
+                localStorage.setItem(AVATAR_CACHE_KEY, dataUrl);
+                setAvatarUrl(dataUrl);
+              }
+            };
+            reader.readAsDataURL(blob);
+          } catch { /* blob URL works fine even if caching fails */ }
+        }
+      } catch {
+        // If API photo fetch fails, fall back to cookie-based URL (works on desktop)
+        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
+      }
     }).catch(() => {});
   }, [isLoggedIn]);
 
