@@ -154,6 +154,7 @@ export default function Profile() {
             </a>
           )}
         </div>
+        </div>
       </div>
 
       {/* ── About ────────────────────────────────────────────── */}
