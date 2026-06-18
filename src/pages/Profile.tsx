@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase } from 'lucide-react';
+import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/layout/PageHeader';
 
@@ -20,7 +20,16 @@ function loadExtra(): ProfileExtra {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* empty */ }
-  return { bio: '', location: '', twitter: '', linkedIn: '', expertise: [] };
+  // Pre-populate with Kumar Vembu's real data on first load
+  const defaults: ProfileExtra = {
+    bio: 'Coach, Entrepreneur, Engineer, Product Manager and Learner. Passionate about building products that solve real problems and mentoring the next generation of founders.',
+    location: 'Chennai, Tamil Nadu, India',
+    twitter: '',
+    linkedIn: 'https://in.linkedin.com/in/kumar-vembu-a0a45710',
+    expertise: ['Entrepreneurship', 'Product Management', 'Engineering', 'Coaching', 'Leadership', 'Fundraising', 'Strategy'],
+  };
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(defaults));
+  return defaults;
 }
 
 /* ── Profile Page ───────────────────────────────────────────── */
@@ -137,13 +146,34 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Bio ──────────────────────────────────────────────── */}
+      {/* ── About ────────────────────────────────────────────── */}
       {extra.bio && (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">About</h3>
           <p className="text-sm text-gray-700 leading-relaxed">{extra.bio}</p>
         </div>
       )}
+
+      {/* ── Company ──────────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Current Company</h3>
+        <div className="space-y-4">
+          {[
+            { name: 'Launchpad', role: 'Founder & CEO', period: '2024 – Present', color: 'bg-black' },
+            { name: 'Mudhal Partners', role: 'Co-founder', period: '2020 – Present', color: 'bg-emerald-600' },
+          ].map(c => (
+            <div key={c.name} className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl ${c.color} flex items-center justify-center flex-shrink-0`}>
+                <Building2 size={14} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{c.name}</p>
+                <p className="text-xs text-gray-500">{c.role} · {c.period}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ── Skills ───────────────────────────────────────────── */}
       {extra.expertise.length > 0 && (
@@ -158,6 +188,21 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* ── Quick stats ───────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { label: 'Years Experience', value: '20+', icon: <Calendar size={14} className="text-indigo-400" /> },
+          { label: 'Companies Built', value: '3', icon: <Building2 size={14} className="text-emerald-400" /> },
+          { label: 'Startups Mentored', value: '50+', icon: <Briefcase size={14} className="text-amber-400" /> },
+        ].map(s => (
+          <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+            <div className="flex justify-center mb-1.5">{s.icon}</div>
+            <p className="text-lg font-bold text-gray-900">{s.value}</p>
+            <p className="text-xs text-gray-400 leading-tight mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
 
       {/* ── Empty state ──────────────────────────────────────── */}
       {!hasExtra && (
