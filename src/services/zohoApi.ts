@@ -157,6 +157,28 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   }
 }
 
+export async function fetchUserPhoto(userId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${ZOHO_BASE}/users/${userId}/photo`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.size) return null;
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchZohoOrgName(): Promise<string | null> {
+  try {
+    const res = await fetch(`${ZOHO_BASE}/org`, { headers: authHeaders() });
+    const json = await res.json() as { org?: Array<{ company_name?: string }> };
+    return json.org?.[0]?.company_name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Module discovery ─────────────────────────────────────────────────────────
 
 export interface ZohoModule {

@@ -7,6 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadToken } from '../services/oauth';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -223,6 +224,25 @@ export default function FounderDashboard() {
   const [showKPIEditor, setShowKPIEditor] = useState(false);
   const [newMilestone, setNewMilestone] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
+  const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    let cancelled = false;
+    (async () => {
+      const user = await fetchCurrentZohoUser();
+      if (cancelled || !user) return;
+      const [photo, org] = await Promise.all([
+        fetchUserPhoto(user.id),
+        fetchZohoOrgName(),
+      ]);
+      if (cancelled) { if (photo) URL.revokeObjectURL(photo); return; }
+      setAvatarUrl(photo);
+      setCompanyName(org);
+    })();
+    return () => { cancelled = true; };
+  }, [isConnected]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -285,14 +305,31 @@ export default function FounderDashboard() {
 
       {/* Greeting */}
       <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {greeting}, {currentUser.name.split(' ')[0]} 👋
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            {' · '}Founder Dashboard
-          </p>
+        <div className="flex items-center gap-3">
+          {/* Avatar */}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={currentUser.name}
+              className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center ring-2 ring-white shadow flex-shrink-0">
+              <span className="text-indigo-700 font-bold text-sm">
+                {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              {greeting}, {currentUser.name.split(' ')[0]} 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {companyName ?? 'Launchpad'}
+              {' · '}
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
         </div>
         <button
           onClick={() => setShowKPIEditor(true)}
