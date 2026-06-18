@@ -174,7 +174,7 @@ function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }
             <text x="12" y="17" textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" fontFamily="sans-serif">Z</text>
           </svg>
           <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">
-            Sign in with Launchpad
+            Sign in to Launchpad
           </span>
           <ArrowRight size={16} className="text-gray-400 group-hover:text-gray-700 ml-auto transition-colors" />
         </button>
