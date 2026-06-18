@@ -74,30 +74,40 @@ export default function Profile() {
       />
 
       {/* ── Identity card ─────────────────────────────────────── */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-        <div className="flex items-center gap-4">
-          {/* Avatar */}
-          {currentUser.avatar ? (
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-16 h-16 rounded-full object-cover flex-shrink-0"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <span className="text-indigo-700 font-bold text-lg">{initials}</span>
-            </div>
-          )}
+      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-4">
+
+        {/* Cover image */}
+        <div className="h-32 sm:h-40 relative overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1518655048521-f130df041f66?fm=jpg&q=80&w=1200&auto=format&fit=crop"
+            alt="cover"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/10" />
+        </div>
+
+        <div className="px-6 pb-6">
+          {/* Avatar overlapping cover */}
+          <div className="flex items-end justify-between -mt-10 mb-4">
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md flex-shrink-0"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-indigo-100 border-4 border-white shadow-md flex items-center justify-center flex-shrink-0">
+                <span className="text-indigo-700 font-bold text-xl">{initials}</span>
+              </div>
+            )}
+          </div>
 
           {/* Name + role */}
-          <div>
-            <h2 className="text-base font-bold text-gray-900">{currentUser.name}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {zohoProfile.jobTitle ? `${zohoProfile.jobTitle} · ` : ''}<span className="capitalize">{role}</span>
-            </p>
-          </div>
-        </div>
+          <h2 className="text-base font-bold text-gray-900">{currentUser.name}</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {zohoProfile.jobTitle ? `${zohoProfile.jobTitle} · ` : ''}<span className="capitalize">{role}</span>
+          </p>
 
         {/* Details */}
         <div className="mt-5 space-y-2.5">
