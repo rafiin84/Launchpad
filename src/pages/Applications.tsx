@@ -383,7 +383,7 @@ export default function Applications() {
   return (
     <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative"
       style={{
-        backgroundImage: `url("https://images.unsplash.com/photo-1428908728789-d2de25dbd4e2?fm=jpg&q=80&w=1920&auto=format&fit=crop")`,
+        backgroundImage: `url("https://images.unsplash.com/photo-1518655048521-f130df041f66?fm=jpg&q=80&w=1920&auto=format&fit=crop")`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
