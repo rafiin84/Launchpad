@@ -12,6 +12,7 @@ interface AuthContextValue {
   isLoggedIn: boolean;
   login: (role: UserRole) => void;
   logout: () => void;
+  zohoEmail: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,13 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
   const [userName, setUserName] = useState<string | null>(loadUserName);
   const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [zohoEmail, setZohoEmail] = useState<string | null>(null);
 
-  // Fetch Zoho profile photo once on mount (or when logged in)
+  // Fetch Zoho profile photo + real email once on login
   useEffect(() => {
     if (!loadToken()) return;
     fetchCurrentZohoUser().then(user => {
-      const zuid = user?.Zuid ?? user?.zuid ?? null;
+      if (!user) return;
+      const zuid = user.Zuid ?? user.zuid ?? null;
       if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
+      if (user.email) setZohoEmail(user.email);
     }).catch(() => {});
   }, [isLoggedIn]);
 
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoggedIn,
         login,
         logout,
+        zohoEmail,
       }}
     >
       {children}
