@@ -13,6 +13,10 @@ import { fetchCRMApplications, type CRMApplication } from '../services/crmApplic
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import FounderDashboard from './FounderDashboard';
+import {
+  PieChart as RePieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from 'recharts';
 
 // ─── Chart constants ───────────────────────────────────────────────────────────
 
@@ -94,39 +98,98 @@ function MoicChart() {
   );
 }
 
-// ─── Pipeline Funnel Chart ────────────────────────────────────────────────────
+// ─── Custom Tooltip ──────────────────────────────────────────────────────────
+
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl">
+      {label && <p className="font-medium mb-0.5">{label}</p>}
+      {payload.map((p: any, i: number) => (
+        <p key={i} className="text-gray-300">{p.name}: <span className="text-white font-semibold">{p.value}</span></p>
+      ))}
+    </div>
+  );
+}
+
+// ─── Pipeline Funnel Chart (Donut — Recharts) ───────────────────────────────
 
 function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
-  const counts = PIPELINE_STAGES_CONFIG.map(s => ({
-    ...s,
-    count: apps.filter(a => a.pipelineStage === s.id).length,
-  }));
-  const max = Math.max(...counts.map(c => c.count), 1);
+  const chartData = PIPELINE_STAGES_CONFIG.map(s => ({
+    name: s.label,
+    value: apps.filter(a => a.pipelineStage === s.id).length,
+    color: s.color,
+  })).filter(d => d.value > 0);
+
+  const total = chartData.reduce((sum, d) => sum + d.value, 0) || 0;
+
+  // If all zero, show a placeholder ring
+  const displayData = chartData.length > 0 ? chartData : [{ name: 'No data', value: 1, color: '#e5e7eb' }];
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
+      <div className="mb-4">
         <h3 className="text-sm font-semibold text-gray-900">Pipeline Funnel</h3>
         <p className="text-xs text-gray-400 mt-0.5">Applications per stage</p>
       </div>
-      <div className="space-y-3">
-        {counts.map(s => (
-          <div key={s.id}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-gray-600 w-36 flex-shrink-0">{s.label}</span>
-              <span className="text-xs font-bold text-gray-900">{s.count}</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${(s.count / max) * 100}%`, backgroundColor: s.color }} />
-            </div>
+
+      <div className="flex items-center gap-5">
+        {/* Donut chart */}
+        <div className="relative flex-shrink-0" style={{ width: 160, height: 160 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <RePieChart>
+              <Pie
+                data={displayData}
+                cx="50%"
+                cy="50%"
+                innerRadius={64}
+                outerRadius={72}
+                paddingAngle={4}
+                cornerRadius={3}
+                dataKey="value"
+                strokeWidth={0}
+                animationBegin={0}
+                animationDuration={800}
+              >
+                {displayData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltip />} />
+            </RePieChart>
+          </ResponsiveContainer>
+          {/* Centre label */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-2xl font-bold text-gray-900">{total}</span>
+            <span className="text-[10px] text-gray-400 -mt-0.5">Total</span>
           </div>
-        ))}
+        </div>
+
+        {/* Legend */}
+        <div className="flex-1 space-y-2.5">
+          {PIPELINE_STAGES_CONFIG.map(s => {
+            const count = apps.filter(a => a.pipelineStage === s.id).length;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            return (
+              <div key={s.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="text-xs text-gray-600">{s.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400">{pct}%</span>
+                  <span className="text-xs font-bold text-gray-900 w-5 text-right">{count}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Funding Ask by Industry ──────────────────────────────────────────────────
+// ─── Funding Ask by Industry (Bar Chart — Recharts) ─────────────────────────
 
 function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
   const byIndustry: Record<string, number> = {};
@@ -134,32 +197,75 @@ function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
     const ind = a.industry || 'Unknown';
     byIndustry[ind] = (byIndustry[ind] ?? 0) + (parseFloat(a.fundingAsk) || 0);
   });
-  const data = Object.entries(byIndustry).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const max = data[0]?.[1] ?? 1;
+  const sorted = Object.entries(byIndustry).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const totalFunding = sorted.reduce((sum, [, v]) => sum + v, 0);
   const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ef4444'];
   const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
 
+  const chartData = sorted.map(([name, amount], i) => ({
+    name: name.length > 12 ? name.slice(0, 12) + '…' : name,
+    fullName: name,
+    amount,
+    fill: colors[i],
+  }));
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-gray-900">Funding Ask by Industry</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Total requested per sector</p>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Funding Ask by Industry</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Total requested per sector</p>
+        </div>
+        {totalFunding > 0 && (
+          <div className="text-right">
+            <p className="text-lg font-bold text-gray-900">{fmt(totalFunding)}</p>
+            <p className="text-[10px] text-gray-400">Total</p>
+          </div>
+        )}
       </div>
-      {data.length === 0 ? (
-        <p className="text-xs text-gray-400 py-4 text-center">No data yet</p>
+      {chartData.length === 0 ? (
+        <p className="text-xs text-gray-400 py-8 text-center">No data yet</p>
       ) : (
-        <div className="space-y-3">
-          {data.map(([industry, amount], i) => (
-            <div key={industry}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-600 truncate w-40 flex-shrink-0">{industry}</span>
-                <span className="text-xs font-bold text-gray-900">{fmt(amount)}</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${(amount / max) * 100}%`, backgroundColor: colors[i] }} />
-              </div>
-            </div>
-          ))}
+        <div style={{ width: '100%', height: 220 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 40, bottom: 0, left: 0 }} barCategoryGap="30%">
+              <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                width={90}
+                tick={{ fontSize: 11, fill: '#6b7280' }}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <div className="bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl">
+                      <p className="font-medium">{d.fullName}</p>
+                      <p className="text-gray-300 mt-0.5">{fmt(d.amount)}</p>
+                    </div>
+                  );
+                }}
+                cursor={{ fill: 'rgba(99,102,241,0.04)' }}
+              />
+              <Bar
+                dataKey="amount"
+                barSize={6}
+                radius={[0, 4, 4, 0]}
+                animationBegin={0}
+                animationDuration={800}
+                label={{ position: 'right', formatter: (v: number) => fmt(v), fontSize: 10, fontWeight: 600, fill: '#6b7280' }}
+              >
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
     </div>
