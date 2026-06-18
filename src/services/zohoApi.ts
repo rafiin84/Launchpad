@@ -159,7 +159,12 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
 
 export async function fetchUserPhoto(userId: string): Promise<string | null> {
   try {
-    const res = await fetch(`${ZOHO_BASE}/users/${userId}/photo`, { headers: authHeaders() });
+    const token = loadToken();
+    if (!token) return null;
+    // Use auth-only headers (no Content-Type) for binary photo fetch
+    const res = await fetch(`${ZOHO_BASE}/users/${userId}/photo`, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
     if (!res.ok) return null;
     const blob = await res.blob();
     if (!blob.size) return null;
