@@ -381,24 +381,16 @@ export default function Applications() {
     : records;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative overflow-hidden"
+    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative"
       style={{
-        backgroundColor: '#f7f7f5',
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cdefs%3E%3Cfilter id='s'%3E%3CfeDropShadow dx='0' dy='1' stdDeviation='1.5' flood-color='%23000' flood-opacity='0.06'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='120' height='120' fill='%23f7f7f5'/%3E%3Crect x='4' y='4' width='112' height='112' fill='none' stroke='%23e8e8e4' stroke-width='0.5'/%3E%3Crect x='2' y='2' width='116' height='116' rx='1' fill='%23ffffff' filter='url(%23s)' opacity='0.6'/%3E%3C/svg%3E")`,
+        backgroundImage: `url("https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?fm=jpg&q=80&w=1920&auto=format&fit=crop")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
       }}
     >
-      {/* Subtle top-left light source */}
-      <div className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'radial-gradient(ellipse 70% 50% at 0% 0%, rgba(255,255,255,0.9) 0%, transparent 60%)',
-        }}
-      />
-      {/* Soft bottom-right shadow for depth */}
-      <div className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0,0,0,0.03) 0%, transparent 60%)',
-        }}
-      />
+      {/* Slight white overlay so cards stay readable */}
+      <div className="pointer-events-none absolute inset-0 bg-white/30" />
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
           title="Delete Application"
