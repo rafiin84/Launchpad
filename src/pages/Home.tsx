@@ -12,6 +12,7 @@ import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { useImageLoaded } from '../lib/useImageLoaded';
 import FounderDashboard from './FounderDashboard';
 import {
   PieChart as RePieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -289,6 +290,7 @@ const STAGE_STYLES: Record<string, string> = {
 
 export default function Home() {
   const { currentUser, isFounder } = useAuth();
+  const avatarReady = useImageLoaded(currentUser.avatar);
 
   // Founders get their own dedicated dashboard
   if (isFounder) return <FounderDashboard />;
@@ -337,24 +339,19 @@ export default function Home() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Welcome */}
       <div className="flex items-center gap-5 mb-6">
-        <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white shadow flex-shrink-0 relative bg-indigo-100">
-          {/* Initials fallback — always visible */}
-          <div className="absolute inset-0 flex items-center justify-center z-0">
-            <span className="text-indigo-700 font-bold text-sm">
-              {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-            </span>
-          </div>
-          {currentUser.avatar && (
+        <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white shadow flex-shrink-0">
+          {avatarReady ? (
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
-              className="absolute inset-0 w-full h-full object-cover scale-150 z-10"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              onLoad={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                if (img.naturalWidth === 0) img.style.display = 'none';
-              }}
+              className="w-full h-full object-cover scale-150"
             />
+          ) : (
+            <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
+              <span className="text-indigo-700 font-bold text-sm">
+                {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </span>
+            </div>
           )}
         </div>
         <div>
