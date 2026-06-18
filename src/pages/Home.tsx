@@ -267,7 +267,7 @@ export default function Home() {
 
         // Chips that are also navigation links
         const linkedChips = [
-          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/investments', icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio, sub: 'across portfolio' },
+          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/portfolio',   icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio, sub: 'across portfolio' },
           { label: 'Portfolio Companies', value: String(portfolio.length),          path: '/portfolio',   icon: <Building2 size={16} />,  accent: false, loading: loadingPortfolio, sub: `${activeCount} active` },
           { label: 'Active Deals',        value: String(activeDeals),              path: '/deals',       icon: <Briefcase size={16} />,  accent: false, loading: loadingDeals,     sub: 'in pipeline' },
           { label: 'Applications',        value: String(applications.length),       path: '/applications',icon: <Inbox size={16} />,      accent: false, loading: loadingApps,      sub: 'submitted' },

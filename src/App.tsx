@@ -31,7 +31,6 @@ import Portfolio from './pages/Portfolio';
 import AddPortfolioCompany from './pages/AddPortfolioCompany';
 import PortfolioCompanyDetail from './pages/PortfolioCompanyDetail';
 import EditPortfolioCompany from './pages/EditPortfolioCompany';
-import Investments from './pages/Investments';
 import Funds from './pages/Funds';
 import Documents from './pages/Documents';
 import AddDocument from './pages/AddDocument';
@@ -79,7 +78,6 @@ export default function App() {
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
             <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
             <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
-            <Route path="/investments" element={<Investments />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/new" element={<AddDocument />} />
