@@ -280,7 +280,7 @@ function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete
   const navigate = useNavigate();
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4">
       {apps.map(app => (
         <div
           key={app.id}
@@ -381,7 +381,11 @@ export default function Applications() {
     : records;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+      style={{
+        background: 'radial-gradient(ellipse at 20% 0%, #eef2ff 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, #f0fdf4 0%, transparent 50%), #f8fafc',
+      }}
+    >
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
           title="Delete Application"
@@ -391,7 +395,7 @@ export default function Applications() {
           deleting={deleting}
         />
       )}
-      <div className="w-full">
+      <div className="w-full max-w-2xl">
         <PageHeader
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
@@ -440,7 +444,7 @@ export default function Applications() {
       )}
 
       {/* Table section */}
-      <div className="w-full">
+      <div className="w-full max-w-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900">
             All Applications
