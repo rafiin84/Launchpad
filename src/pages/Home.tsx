@@ -235,7 +235,7 @@ export default function Home() {
           <img
             src={currentUser.avatar}
             alt={currentUser.name}
-            className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
+            className="w-11 h-11 rounded-full object-cover scale-150 ring-2 ring-white shadow flex-shrink-0"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
         ) : (

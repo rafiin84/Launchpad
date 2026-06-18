@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return;
       const u = user as unknown as Record<string, unknown>;
       const zuid = user.Zuid ?? user.zuid ?? null;
-      if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
+      if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
       if (user.email) setZohoEmail(user.email);
       setZohoProfile({
         email:    user.email ?? null,

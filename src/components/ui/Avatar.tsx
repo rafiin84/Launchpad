@@ -57,7 +57,7 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
         <img
           src={src}
           alt={name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover scale-150"
           onError={() => setImgError(true)}
         />
       ) : (

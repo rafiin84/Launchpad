@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Globe, MapPin, Users, Calendar, DollarSign,
   TrendingUp, Percent, FileText, User, Mail, Link2, Phone,
-  Edit2, Trash2, Tag, ExternalLink,
+  Edit2, Trash2, Tag, ExternalLink, Newspaper,
 } from 'lucide-react';
 import { getCRMPortfolioRecord, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
@@ -28,47 +28,7 @@ const statusColors: Record<string, string> = {
   'follow-on': 'bg-amber-50 text-amber-700',
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-6">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
-      <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string | null }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-start gap-3">
-      <span className="text-gray-300 mt-0.5 flex-shrink-0">{icon}</span>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-sm text-gray-800 font-medium">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function LinkField({ icon, label, href, text }: { icon: React.ReactNode; label: string; href?: string | null; text?: string | null }) {
-  if (!href && !text) return null;
-  return (
-    <div className="flex items-start gap-3">
-      <span className="text-gray-300 mt-0.5 flex-shrink-0">{icon}</span>
-      <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        {href ? (
-          <a href={href.startsWith('http') ? href : `https://${href}`} target="_blank" rel="noopener noreferrer"
-            className="text-sm text-indigo-600 font-medium hover:underline inline-flex items-center gap-1">
-            {text || href} <ExternalLink size={11} />
-          </a>
-        ) : (
-          <p className="text-sm text-gray-800 font-medium">{text}</p>
-        )}
-      </div>
-    </div>
-  );
-}
+type Tab = 'overview' | 'founder' | 'funding' | 'updates';
 
 export default function PortfolioCompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -78,6 +38,7 @@ export default function PortfolioCompanyDetail() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   useEffect(() => {
     if (!id) return;
@@ -103,19 +64,26 @@ export default function PortfolioCompanyDetail() {
 
   if (loading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-24 h-4 bg-gray-100 rounded animate-pulse" />
-        </div>
-        <div className="h-8 bg-gray-100 rounded w-64 mb-2 animate-pulse" />
-        <div className="h-4 bg-gray-100 rounded w-40 mb-8 animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse space-y-3">
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-              {[1,2,3,4].map(j => <div key={j} className="h-3 bg-gray-100 rounded" />)}
-            </div>
-          ))}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-24 h-4 bg-gray-100 rounded animate-pulse mb-6" />
+        <div className="h-48 sm:h-64 bg-gray-100 rounded-2xl animate-pulse mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse space-y-3">
+                <div className="h-3 bg-gray-100 rounded w-1/3" />
+                {[1, 2, 3].map(j => <div key={j} className="h-3 bg-gray-100 rounded" />)}
+              </div>
+            ))}
+          </div>
+          <div className="space-y-4">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse space-y-3">
+                <div className="h-3 bg-gray-100 rounded w-1/2" />
+                {[1, 2, 3].map(j => <div key={j} className="h-3 bg-gray-100 rounded" />)}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -123,7 +91,7 @@ export default function PortfolioCompanyDetail() {
 
   if (error || !record) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
           <ArrowLeft size={15} /> Portfolio
         </Link>
@@ -138,9 +106,15 @@ export default function PortfolioCompanyDetail() {
   const preMoneyValuation = parseFloat(record.preMoneyValuation) || 0;
   const tags = record.tags ? record.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'founder', label: 'Founder' },
+    { key: 'funding', label: 'Funding' },
+    { key: 'updates', label: 'Updates' },
+  ];
+
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl">
-      {/* Delete confirmation modal */}
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       {showDeleteModal && (
         <DeleteConfirmModal
           title="Delete Company"
@@ -151,173 +125,352 @@ export default function PortfolioCompanyDetail() {
         />
       )}
 
-      {/* Back + Actions */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Back link */}
+      <div className="pt-6 pb-4">
         <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
           <ArrowLeft size={15} /> Portfolio
         </Link>
-        <div className="flex items-center gap-2">
+      </div>
+
+      {/* Banner */}
+      <div className="relative rounded-2xl overflow-hidden h-48 sm:h-64 mb-0">
+        <img
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?fm=jpg&q=80&w=1600&auto=format&fit=crop"
+          alt="Company banner"
+          className="w-full h-full object-cover"
+        />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+
+        {/* Action buttons top-right */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
           <Link
             to={`/portfolio/${id}/edit`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:border-gray-300 transition-colors"
-            title="Edit"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-white/20 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-xl hover:bg-white/30 transition-colors"
           >
-            <Edit2 size={14} /><span className="hidden sm:inline ml-1">Edit</span>
+            <Edit2 size={13} /><span className="hidden sm:inline">Edit</span>
           </Link>
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-100 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl hover:bg-red-100 transition-colors"
-            title="Delete"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-red-500/70 backdrop-blur-sm border border-red-400/50 px-3 py-1.5 rounded-xl hover:bg-red-500/90 transition-colors"
           >
-            <Trash2 size={14} /><span className="hidden sm:inline ml-1">Delete</span>
+            <Trash2 size={13} /><span className="hidden sm:inline">Delete</span>
           </button>
         </div>
-      </div>
 
-      {/* Header */}
-      <div className="flex items-start gap-4 mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <Building2 size={22} className="text-gray-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{record.companyName}</h1>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {record.stage && (
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${stageColors[record.stage] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {record.stage.replace(/-/g, ' ')}
-                </span>
-              )}
-              {record.status && (
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusColors[record.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                </span>
-              )}
-            </div>
+        {/* Logo — left-aligned, straddling banner bottom */}
+        <div className="absolute -bottom-6 left-6">
+          <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center">
+            <Building2 size={30} className="text-gray-400" />
           </div>
         </div>
       </div>
 
-      {/* Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Company Overview */}
-        <Section title="Company Overview">
-          <LinkField icon={<Globe size={14} />} label="Website" href={record.website} text={record.website} />
-          <Field icon={<MapPin size={14} />} label="Location" value={record.location} />
-          <Field icon={<Building2 size={14} />} label="Industry" value={record.industry} />
-          <Field icon={<Calendar size={14} />} label="Founded Year" value={record.foundedYear} />
-          <Field icon={<Users size={14} />} label="Team Size" value={record.teamSize} />
-          {record.shortDescription && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><FileText size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Short Description</p>
-                <p className="text-sm text-gray-800">{record.shortDescription}</p>
-              </div>
-            </div>
+      {/* Company name + badges — left-aligned below banner */}
+      <div className="mt-10 mb-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{record.companyName}</h1>
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {record.stage && (
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${stageColors[record.stage] ?? 'bg-gray-100 text-gray-600'}`}>
+              {record.stage.replace(/-/g, ' ')}
+            </span>
           )}
-          {record.fullDescription && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><FileText size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Full Description</p>
-                <p className="text-sm text-gray-800 leading-relaxed">{record.fullDescription}</p>
-              </div>
-            </div>
+          {record.status && (
+            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusColors[record.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+            </span>
           )}
-          {tags.length > 0 && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><Tag size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400 mb-1.5">Tags</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map(tag => (
-                    <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{tag}</span>
+        </div>
+      </div>
+
+      {/* Main two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+
+        {/* Left: Tabs (65%) */}
+        <div className="lg:col-span-2">
+          {/* Tab bar */}
+          <div className="flex items-center gap-1 border-b border-gray-100 mb-6">
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors relative ${
+                  activeTab === tab.key
+                    ? 'text-indigo-600 border-b-2 border-indigo-600 -mb-px bg-indigo-50/50'
+                    : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Overview tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-5">
+              {(record.shortDescription || record.fullDescription) && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">About</h3>
+                  {record.shortDescription && (
+                    <p className="text-sm font-medium text-gray-700 mb-3">{record.shortDescription}</p>
+                  )}
+                  {record.fullDescription && (
+                    <p className="text-sm text-gray-600 leading-relaxed">{record.fullDescription}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Mock update cards */}
+              <div className="bg-white border border-gray-100 rounded-2xl p-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Recent Updates</h3>
+                <div className="space-y-4">
+                  {[
+                    { date: 'Jun 10, 2025', text: 'Completed Series A funding round. Raised additional capital to scale product and expand team.', icon: <TrendingUp size={14} className="text-emerald-500" /> },
+                    { date: 'Apr 22, 2025', text: 'Launched v2.0 of the platform with new enterprise features. Early customer feedback has been very positive.', icon: <FileText size={14} className="text-indigo-500" /> },
+                    { date: 'Feb 5, 2025', text: 'Onboarded 3 new enterprise clients. Monthly recurring revenue grew 40% QoQ.', icon: <Users size={14} className="text-blue-500" /> },
+                  ].map((update, i) => (
+                    <div key={i} className="flex items-start gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                      <div className="w-7 h-7 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        {update.icon}
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">{update.date}</p>
+                        <p className="text-sm text-gray-700 leading-relaxed">{update.text}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
             </div>
           )}
-        </Section>
 
-        {/* Investment Details */}
-        <Section title="Investment Details">
-          {investmentAmount > 0 && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><DollarSign size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Investment Amount</p>
-                <p className="text-sm text-gray-800 font-medium">{formatCurrency(investmentAmount)}</p>
+          {/* Founder tab */}
+          {activeTab === 'founder' && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-5">Founder Information</h3>
+              {record.founderName || record.founderEmail || record.founderLinkedin || record.founderPhone ? (
+                <div className="flex items-start gap-5">
+                  {/* Avatar initial */}
+                  <div className="w-14 h-14 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xl font-bold text-indigo-400">
+                      {record.founderName ? record.founderName.charAt(0).toUpperCase() : <User size={20} />}
+                    </span>
+                  </div>
+                  <div className="space-y-3 flex-1">
+                    {record.founderName && (
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">{record.founderName}</p>
+                        <p className="text-xs text-gray-400">Founder</p>
+                      </div>
+                    )}
+                    {record.founderEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail size={14} className="text-gray-300 flex-shrink-0" />
+                        <a href={`mailto:${record.founderEmail}`} className="text-sm text-indigo-600 hover:underline">
+                          {record.founderEmail}
+                        </a>
+                      </div>
+                    )}
+                    {record.founderPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} className="text-gray-300 flex-shrink-0" />
+                        <a href={`tel:${record.founderPhone}`} className="text-sm text-gray-700 hover:underline">
+                          {record.founderPhone}
+                        </a>
+                      </div>
+                    )}
+                    {record.founderLinkedin && (
+                      <div className="flex items-center gap-2">
+                        <Link2 size={14} className="text-gray-300 flex-shrink-0" />
+                        <a
+                          href={record.founderLinkedin.startsWith('http') ? record.founderLinkedin : `https://${record.founderLinkedin}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-indigo-600 hover:underline inline-flex items-center gap-1"
+                        >
+                          LinkedIn Profile <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No founder information available.</p>
+              )}
+            </div>
+          )}
+
+          {/* Funding tab */}
+          {activeTab === 'funding' && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-5">Funding Details</h3>
+              <div className="relative pl-6 border-l-2 border-indigo-100 space-y-6">
+                {investmentAmount > 0 && (
+                  <div className="relative">
+                    <div className="absolute -left-[1.35rem] top-0.5 w-4 h-4 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-0.5">Investment Amount</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(investmentAmount)}</p>
+                  </div>
+                )}
+                {record.investmentDate && (
+                  <div className="relative">
+                    <div className="absolute -left-[1.35rem] top-0.5 w-4 h-4 rounded-full bg-indigo-50 border-2 border-indigo-300 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-0.5">Investment Date</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {new Date(record.investmentDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                )}
+                {preMoneyValuation > 0 && (
+                  <div className="relative">
+                    <div className="absolute -left-[1.35rem] top-0.5 w-4 h-4 rounded-full bg-indigo-50 border-2 border-indigo-300 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-0.5">Pre-Money Valuation</p>
+                    <p className="text-sm font-semibold text-gray-800">{formatCurrency(preMoneyValuation)}</p>
+                  </div>
+                )}
+                {record.ownershipPct && (
+                  <div className="relative">
+                    <div className="absolute -left-[1.35rem] top-0.5 w-4 h-4 rounded-full bg-indigo-50 border-2 border-indigo-300 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-0.5">Ownership %</p>
+                    <p className="text-sm font-semibold text-gray-800">{record.ownershipPct}%</p>
+                  </div>
+                )}
+                {record.notes && (
+                  <div className="relative">
+                    <div className="absolute -left-[1.35rem] top-0.5 w-4 h-4 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-0.5">Investment Notes</p>
+                    <p className="text-sm text-gray-700 leading-relaxed">{record.notes}</p>
+                  </div>
+                )}
+                {investmentAmount === 0 && !record.investmentDate && preMoneyValuation === 0 && !record.ownershipPct && !record.notes && (
+                  <p className="text-sm text-gray-400">No funding details available.</p>
+                )}
               </div>
             </div>
           )}
-          {record.investmentDate && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><Calendar size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Investment Date</p>
-                <p className="text-sm text-gray-800 font-medium">
-                  {new Date(record.investmentDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+
+          {/* Updates tab */}
+          {activeTab === 'updates' && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-4">
+                <Newspaper size={24} className="text-gray-300" />
+              </div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">No updates yet</h3>
+              <p className="text-xs text-gray-400 max-w-xs">
+                Updates and announcements for this company will appear here once added.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Sidebar (35%) */}
+        <div className="space-y-4">
+          {/* Key stats */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Key Stats</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-indigo-50/60 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <DollarSign size={13} className="text-indigo-400" />
+                  <span className="text-xs text-gray-400">Invested</span>
+                </div>
+                <p className="text-base font-bold text-gray-900">
+                  {investmentAmount > 0 ? formatCurrency(investmentAmount) : '—'}
+                </p>
+              </div>
+              <div className="bg-emerald-50/60 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Percent size={13} className="text-emerald-400" />
+                  <span className="text-xs text-gray-400">Ownership</span>
+                </div>
+                <p className="text-base font-bold text-gray-900">
+                  {record.ownershipPct ? `${record.ownershipPct}%` : '—'}
+                </p>
+              </div>
+              <div className="bg-blue-50/60 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingUp size={13} className="text-blue-400" />
+                  <span className="text-xs text-gray-400">Valuation</span>
+                </div>
+                <p className="text-base font-bold text-gray-900">
+                  {preMoneyValuation > 0 ? formatCurrency(preMoneyValuation) : '—'}
+                </p>
+              </div>
+              <div className="bg-amber-50/60 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Users size={13} className="text-amber-400" />
+                  <span className="text-xs text-gray-400">Team Size</span>
+                </div>
+                <p className="text-base font-bold text-gray-900">
+                  {record.teamSize || '—'}
                 </p>
               </div>
             </div>
-          )}
-          {preMoneyValuation > 0 && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><TrendingUp size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Pre-Money Valuation</p>
-                <p className="text-sm text-gray-800 font-medium">{formatCurrency(preMoneyValuation)}</p>
-              </div>
-            </div>
-          )}
-          {record.ownershipPct && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><Percent size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Ownership %</p>
-                <p className="text-sm text-gray-800 font-medium">{record.ownershipPct}%</p>
-              </div>
-            </div>
-          )}
-          {record.notes && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><FileText size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Investment Notes</p>
-                <p className="text-sm text-gray-800 leading-relaxed">{record.notes}</p>
-              </div>
-            </div>
-          )}
-        </Section>
+          </div>
 
-        {/* Founder Info */}
-        <Section title="Founder Info">
-          <Field icon={<User size={14} />} label="Founder Name" value={record.founderName} />
-          {record.founderEmail && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><Mail size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Email</p>
-                <a href={`mailto:${record.founderEmail}`} className="text-sm text-indigo-600 font-medium hover:underline">
-                  {record.founderEmail}
-                </a>
+          {/* Company Info */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Company Info</h3>
+            <div className="space-y-3">
+              {record.website && (
+                <div className="flex items-center gap-2.5">
+                  <Globe size={14} className="text-gray-300 flex-shrink-0" />
+                  <a
+                    href={record.website.startsWith('http') ? record.website : `https://${record.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-indigo-600 hover:underline truncate inline-flex items-center gap-1"
+                  >
+                    {record.website} <ExternalLink size={10} />
+                  </a>
+                </div>
+              )}
+              {record.location && (
+                <div className="flex items-center gap-2.5">
+                  <MapPin size={14} className="text-gray-300 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{record.location}</span>
+                </div>
+              )}
+              {record.industry && (
+                <div className="flex items-center gap-2.5">
+                  <Building2 size={14} className="text-gray-300 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{record.industry}</span>
+                </div>
+              )}
+              {record.foundedYear && (
+                <div className="flex items-center gap-2.5">
+                  <Calendar size={14} className="text-gray-300 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">Founded {record.foundedYear}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Tag size={13} className="text-gray-300" />
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tags</h3>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map(tag => (
+                  <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{tag}</span>
+                ))}
               </div>
             </div>
           )}
-          <LinkField icon={<Link2 size={14} />} label="LinkedIn" href={record.founderLinkedin} text={record.founderLinkedin} />
-          {record.founderPhone && (
-            <div className="flex items-start gap-3">
-              <span className="text-gray-300 mt-0.5 flex-shrink-0"><Phone size={14} /></span>
-              <div>
-                <p className="text-xs text-gray-400">Phone</p>
-                <a href={`tel:${record.founderPhone}`} className="text-sm text-gray-800 font-medium hover:underline">
-                  {record.founderPhone}
-                </a>
-              </div>
-            </div>
-          )}
-        </Section>
+        </div>
       </div>
     </div>
   );

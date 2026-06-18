@@ -37,9 +37,8 @@ const STAGE_COLOR: Record<string, string> = {
 function StageTimeline({ current }: { current: string }) {
   const currentIdx = PIPELINE_STAGES.findIndex(s => s.id === current);
   const isRejected  = current === 'Rejected';
-
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-4">
+    <div className="bg-white border border-gray-100 rounded-2xl p-5">
       <h3 className="text-sm font-semibold text-gray-900 mb-4">Application Progress</h3>
       <div className="flex items-center gap-1">
         {PIPELINE_STAGES.map((stage, i) => {
@@ -81,30 +80,23 @@ function StageTimeline({ current }: { current: string }) {
   );
 }
 
-/** Convert a YouTube/Vimeo/Loom watch URL → embed URL */
 function toEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
-    // YouTube
-    const ytId = u.searchParams.get('v') || u.pathname.split('/').pop();
     if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
       const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
       return id ? `https://www.youtube.com/embed/${id}` : null;
     }
-    // Vimeo
     if (u.hostname.includes('vimeo.com')) {
       const id = u.pathname.split('/').filter(Boolean).pop();
       return id ? `https://player.vimeo.com/video/${id}` : null;
     }
-    // Loom
     if (u.hostname.includes('loom.com') && u.pathname.includes('/share/')) {
       const id = u.pathname.split('/share/')[1]?.split('?')[0];
       return id ? `https://www.loom.com/embed/${id}` : null;
     }
     return null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function Field({ icon, label, value, href }: { icon: React.ReactNode; label: string; value?: string; href?: string }) {
@@ -127,6 +119,9 @@ function Field({ icon, label, value, href }: { icon: React.ReactNode; label: str
   );
 }
 
+const TABS = ['Overview', 'Founder', 'Funding', 'Video'] as const;
+type Tab = typeof TABS[number];
+
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -136,6 +131,7 @@ export default function ApplicationDetail() {
   const [error, setError]           = useState('');
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  const [activeTab, setActiveTab]   = useState<Tab>('Overview');
 
   useEffect(() => {
     if (!id) return;
@@ -157,11 +153,10 @@ export default function ApplicationDetail() {
     }
   };
 
-  /* ── Loading ── */
   if (loading) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl animate-pulse space-y-4">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto animate-pulse space-y-4">
       <div className="h-4 bg-gray-100 rounded w-32" />
-      <div className="h-40 bg-gray-100 rounded-2xl" />
+      <div className="h-48 bg-gray-100 rounded-2xl" />
       <div className="grid grid-cols-2 gap-4">
         <div className="h-48 bg-gray-100 rounded-2xl" />
         <div className="h-48 bg-gray-100 rounded-2xl" />
@@ -169,9 +164,8 @@ export default function ApplicationDetail() {
     </div>
   );
 
-  /* ── Error / Not found ── */
   if (error || !app) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
         <ArrowLeft size={15} /> Applications
       </Link>
@@ -187,7 +181,7 @@ export default function ApplicationDetail() {
   const prevFunding = formatCurrency(app.previousFunding);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
       {showDelete && (
         <DeleteConfirmModal
           title="Delete Application"
@@ -198,160 +192,222 @@ export default function ApplicationDetail() {
         />
       )}
 
-      {/* Back + Actions */}
-      <div className="flex items-center justify-between mb-6">
-        <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
-          <ArrowLeft size={15} /> Applications
-        </Link>
-        <div className="flex items-center gap-2">
+      {/* Back link */}
+      <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-4">
+        <ArrowLeft size={15} /> Applications
+      </Link>
+
+      {/* ── Banner ──────────────────────────────────────────────── */}
+      <div className="relative rounded-2xl overflow-hidden mb-4">
+        <div className="h-48 sm:h-60">
+          <img
+            src="https://images.unsplash.com/photo-1559136555-9303baea8ebd?fm=jpg&q=80&w=1600&auto=format&fit=crop"
+            alt="banner"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+              (e.currentTarget.parentElement as HTMLElement).style.background = 'linear-gradient(135deg,#1e1b4b,#4338ca)';
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+        </div>
+
+        {/* Edit / Delete top-right */}
+        <div className="absolute top-4 right-4 flex gap-2">
           <Link
             to={`/applications/${id}/edit`}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 sm:px-3 rounded-xl transition-colors"
-            title="Edit"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-white/20 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-xl hover:bg-white/30 transition-colors"
           >
-            <Edit2 size={14} /><span className="hidden sm:inline ml-1">Edit</span>
+            <Edit2 size={13} /><span className="hidden sm:inline">Edit</span>
           </Link>
           <button
             onClick={() => setShowDelete(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 sm:px-3 rounded-xl transition-colors"
-            title="Delete"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-red-500/70 backdrop-blur-sm border border-red-400/30 px-3 py-1.5 rounded-xl hover:bg-red-500/90 transition-colors"
           >
-            <Trash2 size={14} /><span className="hidden sm:inline ml-1">Delete</span>
+            <Trash2 size={13} /><span className="hidden sm:inline">Delete</span>
           </button>
         </div>
+
+        {/* Company logo — centred, straddling banner bottom */}
+        <div className="absolute -bottom-6 left-6">
+          <div className="w-20 h-20 rounded-2xl bg-white shadow-lg flex items-center justify-center border-4 border-white">
+            <Building2 size={30} className="text-gray-400" />
+          </div>
+        </div>
       </div>
 
-      {/* Hero card */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <Building2 size={22} className="text-gray-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{app.companyName}</h1>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {app.industry}{app.location ? ` · ${app.location}` : ''}
-                </p>
-              </div>
-              <span
-                className="inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
-                style={{ color: stageColor, backgroundColor: `${stageColor}18` }}
-              >
-                {app.pipelineStage || 'New'}
-              </span>
+      {/* Company name + badges — left-aligned */}
+      <div className="mt-10 mb-6">
+        <h1 className="text-xl font-bold text-gray-900">{app.companyName}</h1>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {app.industry && <span className="text-sm text-gray-500">{app.industry}</span>}
+          {app.location && <span className="text-sm text-gray-400">· {app.location}</span>}
+          <span
+            className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full"
+            style={{ color: stageColor, backgroundColor: `${stageColor}18` }}
+          >
+            {app.pipelineStage || 'New'}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Two-column layout ──────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+
+        {/* LEFT — tabs */}
+        <div className="lg:col-span-2 space-y-4">
+
+          {/* Stage progress */}
+          <StageTimeline current={app.pipelineStage} />
+
+          {/* Tab bar */}
+          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+            <div className="flex border-b border-gray-100">
+              {TABS.map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'text-indigo-600 border-b-2 border-indigo-500 bg-indigo-50/50'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
-            {app.companyDescription && (
-              <p className="text-sm text-gray-600 leading-relaxed mt-3">{app.companyDescription}</p>
-            )}
+
+            <div className="p-5">
+
+              {/* ── Overview tab ── */}
+              {activeTab === 'Overview' && (
+                <div className="space-y-5">
+                  {app.companyDescription ? (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">About the Company</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">{app.companyDescription}</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <FileText size={28} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No description provided</p>
+                    </div>
+                  )}
+                  {app.useOfFunds && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <DollarSign size={12} className="text-emerald-500" /> Use of Funds
+                      </h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">{app.useOfFunds}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Founder tab ── */}
+              {activeTab === 'Founder' && (
+                <div className="space-y-4">
+                  {app.founderName ? (
+                    <>
+                      <div className="flex items-center gap-4 mb-5">
+                        <div className="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-indigo-700 font-bold text-xl">
+                            {app.founderName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-gray-900">{app.founderName}</p>
+                          <p className="text-sm text-gray-500">Founder</p>
+                        </div>
+                      </div>
+                      <Field icon={<Mail size={14} />}  label="Email"    value={app.founderEmail}
+                        href={app.founderEmail ? `mailto:${app.founderEmail}` : undefined} />
+                      <Field icon={<Phone size={14} />} label="Phone"    value={app.founderPhone}
+                        href={app.founderPhone ? `tel:${app.founderPhone}` : undefined} />
+                      <Field icon={<Link2 size={14} />} label="LinkedIn" value={app.founderLinkedin ? 'View Profile' : undefined}
+                        href={app.founderLinkedin || undefined} />
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <Users size={28} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No founder info provided</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Funding tab ── */}
+              {activeTab === 'Funding' && (
+                <div className="space-y-0">
+                  {[
+                    { label: 'Funding Ask',       value: fundingAsk,   icon: <DollarSign size={14} className="text-emerald-500" /> },
+                    { label: 'Previous Funding',  value: prevFunding,  icon: <TrendingUp size={14} className="text-indigo-500" /> },
+                    { label: 'Pipeline Stage',    value: app.pipelineStage || 'New', icon: <CheckCircle size={14} className="text-violet-500" /> },
+                    { label: 'Founded Year',      value: app.foundedYear || '—', icon: <Calendar size={14} className="text-amber-500" /> },
+                  ].map((row, i, arr) => (
+                    <div key={row.label} className={`flex items-center justify-between py-3.5 ${i < arr.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                      <div className="flex items-center gap-2.5 text-sm text-gray-600">
+                        {row.icon}
+                        {row.label}
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">{row.value}</span>
+                    </div>
+                  ))}
+                  {app.useOfFunds && (
+                    <div className="pt-4 mt-2 border-t border-gray-50">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Use of Funds</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{app.useOfFunds}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Video tab ── */}
+              {activeTab === 'Video' && (
+                <PitchVideoCard appId={app.id} videoUrl={app.pitchVideoUrl} />
+              )}
+
+            </div>
           </div>
+
         </div>
 
-        {/* Key metrics row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-50">
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Funding Ask</p>
-            <p className="text-lg font-bold text-gray-900">{fundingAsk}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Previous Funding</p>
-            <p className="text-lg font-bold text-gray-900">{prevFunding}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Founded</p>
-            <p className="text-lg font-bold text-gray-900">{app.foundedYear || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Team Size</p>
-            <p className="text-lg font-bold text-gray-900">{app.teamSize ? `${app.teamSize} people` : '—'}</p>
-          </div>
-        </div>
-      </div>
+        {/* RIGHT — sidebar */}
+        <div className="space-y-4">
 
-      {/* Stage timeline */}
-      <StageTimeline current={app.pipelineStage} />
-
-      {/* Pitch Video — above founder info */}
-      <PitchVideoCard appId={app.id} videoUrl={app.pitchVideoUrl} />
-
-      {/* Two-column detail */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        {/* Founder info */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Founder Information</h3>
-          <div className="space-y-3">
-            <Field icon={<Users size={14} />}    label="Founder Name"  value={app.founderName} />
-            <Field icon={<Mail size={14} />}     label="Email"         value={app.founderEmail}
-              href={app.founderEmail ? `mailto:${app.founderEmail}` : undefined} />
-            <Field icon={<Phone size={14} />}    label="Phone"         value={app.founderPhone}
-              href={app.founderPhone ? `tel:${app.founderPhone}` : undefined} />
-            <Field icon={<Link2 size={14} />}    label="LinkedIn"      value={app.founderLinkedin ? 'View Profile' : undefined}
-              href={app.founderLinkedin || undefined} />
-          </div>
-        </div>
-
-        {/* Company details */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Company Details</h3>
-          <div className="space-y-3">
-            <Field icon={<Globe size={14} />}      label="Website"   value={app.website}
-              href={app.website ? (app.website.startsWith('http') ? app.website : `https://${app.website}`) : undefined} />
-            <Field icon={<MapPin size={14} />}     label="Location"  value={app.location} />
-            <Field icon={<Briefcase size={14} />}  label="Industry"  value={app.industry} />
-            <Field icon={<Calendar size={14} />}   label="Founded"   value={app.foundedYear} />
-            <Field icon={<Users size={14} />}      label="Team Size" value={app.teamSize ? `${app.teamSize} people` : undefined} />
-          </div>
-        </div>
-
-        {/* Use of funds */}
-        {app.useOfFunds && (
+          {/* Key metrics */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <DollarSign size={14} className="text-emerald-500" /> Use of Funds
-            </h3>
-            <p className="text-sm text-gray-700 leading-relaxed">{app.useOfFunds}</p>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Key Metrics</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Funding Ask',      value: fundingAsk,   color: 'bg-emerald-50 text-emerald-600' },
+                { label: 'Prev. Funding',    value: prevFunding,  color: 'bg-indigo-50 text-indigo-600' },
+                { label: 'Founded',          value: app.foundedYear || '—', color: 'bg-amber-50 text-amber-600' },
+                { label: 'Team Size',        value: app.teamSize ? `${app.teamSize}` : '—', color: 'bg-violet-50 text-violet-600' },
+              ].map(s => (
+                <div key={s.label} className={`rounded-xl p-3 ${s.color.split(' ')[0]}`}>
+                  <p className={`text-lg font-bold ${s.color.split(' ')[1]}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Investment summary */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <TrendingUp size={14} className="text-indigo-500" /> Investment Summary
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-gray-50">
-              <span className="text-xs text-gray-500">Funding Ask</span>
-              <span className="text-sm font-bold text-gray-900">{fundingAsk}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-gray-50">
-              <span className="text-xs text-gray-500">Previous Funding</span>
-              <span className="text-sm font-bold text-gray-900">{prevFunding}</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-xs text-gray-500">Pipeline Stage</span>
-              <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ color: stageColor, backgroundColor: `${stageColor}18` }}
-              >
-                {app.pipelineStage || 'New'}
-              </span>
+          {/* Company details */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Company Info</h3>
+            <div className="space-y-3">
+              <Field icon={<Globe size={14} />}     label="Website"  value={app.website}
+                href={app.website ? (app.website.startsWith('http') ? app.website : `https://${app.website}`) : undefined} />
+              <Field icon={<MapPin size={14} />}    label="Location" value={app.location} />
+              <Field icon={<Briefcase size={14} />} label="Industry" value={app.industry} />
+              <Field icon={<Calendar size={14} />}  label="Founded"  value={app.foundedYear} />
+              <Field icon={<Users size={14} />}     label="Team"     value={app.teamSize ? `${app.teamSize} people` : undefined} />
             </div>
           </div>
+
         </div>
-
-        {/* Company description full */}
-        {app.companyDescription && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-5 md:col-span-2">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <FileText size={14} className="text-violet-500" /> About the Company
-            </h3>
-            <p className="text-sm text-gray-700 leading-relaxed">{app.companyDescription}</p>
-          </div>
-        )}
-
-
       </div>
     </div>
   );
@@ -364,50 +420,47 @@ function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }
 
   useEffect(() => {
     loadPitchVideoUrl(appId)
-      .then(url => {
-        objectUrlRef.current = url;
-        setLocalUrl(url);
-      })
+      .then(url => { objectUrlRef.current = url; setLocalUrl(url); })
       .catch(() => setLocalUrl(null))
       .finally(() => setLoadingLocal(false));
-
-    return () => {
-      // Revoke the object URL when the component unmounts to free memory
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    };
+    return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
   }, [appId]);
 
-  if (loadingLocal) return null; // wait silently
+  if (loadingLocal) return <div className="h-8 animate-pulse bg-gray-50 rounded-xl" />;
 
   const effectiveUrl = localUrl || videoUrl || '';
 
-  // No blob in IndexedDB, no CRM URL, but we know a video was uploaded before
   if (!effectiveUrl && videoWasUploaded(appId)) {
     return (
-      <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 mb-4 flex items-start gap-3">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3">
         <Video size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium text-amber-800">Video not available in this browser</p>
           <p className="text-xs text-amber-600 mt-0.5">
             The pitch video was uploaded on a different browser or device. Please{' '}
             <Link to={`/applications/${appId}/edit`} className="underline font-medium">edit this application</Link>
-            {' '}to re-upload the video or add a YouTube/Vimeo URL instead.
+            {' '}to re-upload or add a YouTube/Vimeo URL.
           </p>
         </div>
       </div>
     );
   }
 
-  if (!effectiveUrl) return null;
+  if (!effectiveUrl) return (
+    <div className="text-center py-8 text-gray-400">
+      <Video size={28} className="mx-auto mb-2 opacity-40" />
+      <p className="text-sm">No pitch video uploaded yet</p>
+      <Link to={`/applications/${appId}/edit`} className="text-xs text-indigo-500 hover:underline mt-1 inline-block">
+        Add a video
+      </Link>
+    </div>
+  );
 
   const isBlob   = effectiveUrl.startsWith('blob:');
   const embedUrl = isBlob ? null : toEmbedUrl(effectiveUrl);
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-4">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Video size={14} className="text-indigo-500" /> Pitch Video
-      </h3>
+    <div className="space-y-3">
       <div className="rounded-xl overflow-hidden bg-black aspect-video">
         {isBlob || !embedUrl ? (
           <video src={effectiveUrl} controls className="w-full h-full object-contain" />
@@ -421,12 +474,8 @@ function PitchVideoCard({ appId, videoUrl }: { appId: string; videoUrl: string }
         )}
       </div>
       {!isBlob && (
-        <a
-          href={effectiveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 mt-3 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-        >
+        <a href={effectiveUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
           <ExternalLink size={11} /> Open in new tab
         </a>
       )}

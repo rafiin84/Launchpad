@@ -191,15 +191,21 @@ function EditField({ label, field, value, onChange, type = 'text', options, plac
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 
-function Section({ title, icon: Icon, children, editing, accent }: {
+function Section({ title, icon: Icon, children, editing, accent, iconColor = 'text-indigo-500', iconBg = 'bg-indigo-50' }: {
   title: string; icon: React.ElementType; children: React.ReactNode; editing: boolean; accent?: boolean;
+  iconColor?: string; iconBg?: string;
 }) {
   return (
-    <div className={cn('rounded-2xl border p-6', accent ? 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-100' : 'bg-white border-gray-100')}>
-      <h2 className={cn('text-sm font-bold mb-5 flex items-center gap-2', accent ? 'text-indigo-900' : 'text-gray-900')}>
-        <Icon size={15} className={accent ? 'text-indigo-500' : 'text-gray-400'} />
-        {title}
-      </h2>
+    <div className={cn(
+      'rounded-2xl border p-6 shadow-sm',
+      accent ? 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-100' : 'bg-white border-gray-100'
+    )}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0', accent ? 'bg-indigo-100' : iconBg)}>
+          <Icon size={15} className={accent ? 'text-indigo-600' : iconColor} />
+        </div>
+        <h2 className={cn('text-sm font-bold', accent ? 'text-indigo-900' : 'text-gray-900')}>{title}</h2>
+      </div>
       <div className={cn('grid gap-4', editing ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2')}>
         {children}
       </div>
@@ -210,9 +216,9 @@ function Section({ title, icon: Icon, children, editing, accent }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
-  const [data, setData]     = useState<CompanyData>(load);
+  const [data, setData]       = useState<CompanyData>(load);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]   = useState<CompanyData>(data);
+  const [draft, setDraft]     = useState<CompanyData>(data);
 
   useEffect(() => {
     if (editing) setDraft({ ...data });
@@ -245,385 +251,475 @@ export default function FounderCompany() {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="w-full">
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-            <Building2 size={24} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{data.name || 'Your Company'}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{data.tagline || 'Add your tagline'}</p>
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              {data.stage && (
-                <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{data.stage}</span>
-              )}
-              {data.industry && (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{data.industry}</span>
-              )}
-              {data.location && (
-                <span className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={10} />{data.location}</span>
-              )}
-              {data.website && (
-                <a href={data.website} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-indigo-500 flex items-center gap-1 hover:underline">
-                  <Globe size={10} />{data.website.replace(/https?:\/\//, '')}
-                </a>
-              )}
+      {/* ── Hero Banner ── */}
+      <div className="relative w-full h-44 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 overflow-hidden">
+        {/* subtle texture overlay */}
+        <div className="absolute inset-0 opacity-20"
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #6366f1 0%, transparent 50%), radial-gradient(circle at 80% 20%, #a855f7 0%, transparent 40%)' }}
+        />
+
+        <div className="relative h-full flex items-center justify-between px-6 sm:px-8">
+          {/* Left: logo + name + tagline */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-900/40">
+              <Building2 size={28} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white leading-tight">
+                {d.name || 'Your Company'}
+              </h1>
+              <p className="text-sm text-white/60 mt-0.5 max-w-md leading-relaxed">
+                {d.tagline || 'Add your one-liner tagline'}
+              </p>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {editing ? (
-            <>
-              <button onClick={handleCancel} className="flex items-center gap-1.5 text-sm text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50">
-                <X size={14} /> Cancel
+
+          {/* Right: action buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {editing ? (
+              <>
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
+                >
+                  <X size={14} /> Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all"
+                >
+                  <Check size={14} /> Save Changes
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
+              >
+                <Edit3 size={14} /> Edit Profile
               </button>
-              <button onClick={handleSave} className="flex items-center gap-1.5 text-sm font-semibold text-white bg-black px-4 py-2 rounded-xl hover:bg-gray-800">
-                <Check size={14} /> Save
-              </button>
-            </>
-          ) : (
-            <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-3 py-2 rounded-xl hover:border-gray-400 transition-all">
-              <Edit3 size={14} /> Edit Profile
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {!hasData && !editing && (
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
-          <Lightbulb size={16} className="text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-900">Complete your company profile</p>
-            <p className="text-xs text-amber-600 mt-0.5">This is what your investor sees when they review your company data.</p>
-          </div>
-          <button onClick={() => setEditing(true)} className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg whitespace-nowrap">
-            Get Started
-          </button>
-        </div>
-      )}
+      {/* ── Meta strip ── */}
+      <div className="bg-white border-b border-gray-100 px-6 sm:px-8 py-3 flex items-center gap-3 flex-wrap">
+        {data.stage && (
+          <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
+            {data.stage}
+          </span>
+        )}
+        {data.industry && (
+          <span className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+            {data.industry}
+          </span>
+        )}
+        {data.foundedYear && (
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            <Calendar size={11} /> Est. {data.foundedYear}
+          </span>
+        )}
+        {data.location && (
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            <MapPin size={11} /> {data.location}
+          </span>
+        )}
+        {data.website && (
+          <a
+            href={data.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-500 flex items-center gap-1 hover:underline"
+          >
+            <Globe size={11} /> {data.website.replace(/https?:\/\//, '')}
+          </a>
+        )}
+      </div>
 
-      {/* Two-column layout */}
-      <div className="flex gap-6 items-start">
+      {/* ── Page body ── */}
+      <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-        {/* Left: main sections */}
-        <div className="flex-1 min-w-0 space-y-4">
-
-          {/* ── Overview ── */}
-          <Section title="Company Overview" icon={Building2} editing={editing}>
-            {editing ? (
-              <>
-                <EditField label="Company Name" field="name" value={d.name} onChange={handleChange} placeholder="Acme Inc" />
-                <EditField label="Tagline" field="tagline" value={d.tagline} onChange={handleChange} placeholder="One-liner about your company" />
-                <EditField label="Website" field="website" value={d.website} onChange={handleChange} placeholder="https://yourcompany.com" />
-                <EditField label="Industry" field="industry" value={d.industry} onChange={handleChange} options={INDUSTRIES} />
-                <EditField label="Stage" field="stage" value={d.stage} onChange={handleChange} options={STAGES} />
-                <EditField label="Founded Year" field="foundedYear" value={d.foundedYear} onChange={handleChange} placeholder="2022" />
-                <EditField label="Location / HQ" field="location" value={d.location} onChange={handleChange} placeholder="San Francisco, CA" />
-                <div className="sm:col-span-2">
-                  <EditField label="Company Description" field="description" value={d.description} onChange={handleChange}
-                    placeholder="Describe what your company does, the problem you solve, and who you serve…" multiline />
-                </div>
-              </>
-            ) : (
-              <>
-                <DisplayField label="Website" value={d.website} href={d.website} />
-                <DisplayField label="Industry" value={d.industry} />
-                <DisplayField label="Stage" value={d.stage} />
-                <DisplayField label="Founded" value={d.foundedYear} />
-                <div className="sm:col-span-2">
-                  <DisplayField label="Description" value={d.description} />
-                </div>
-              </>
-            )}
-          </Section>
-
-          {/* ── Team ── */}
-          <Section title="Founding Team" icon={Users} editing={editing}>
-            {editing ? (
-              <>
-                <div className="sm:col-span-2">
-                  <EditField label="Founder(s)" field="founderNames" value={d.founderNames} onChange={handleChange} placeholder="e.g. Alice Smith (CEO), Bob Jones (CTO)" />
-                </div>
-                <EditField label="Total Team Size" field="teamSize" value={d.teamSize} onChange={handleChange} placeholder="12" />
-                <EditField label="Open Roles" field="openRoles" value={d.openRoles} onChange={handleChange} placeholder="e.g. Senior Engineer, Head of Sales" />
-              </>
-            ) : (
-              <>
-                <div className="sm:col-span-2">
-                  <DisplayField label="Founder(s)" value={d.founderNames} />
-                </div>
-                <DisplayField label="Team Size" value={d.teamSize ? `${d.teamSize} people` : ''} />
-                <DisplayField label="Open Roles" value={d.openRoles} />
-              </>
-            )}
-          </Section>
-
-          {/* ── Product & Traction ── */}
-          <Section title="Product & Traction" icon={TrendingUp} editing={editing}>
-            {editing ? (
-              <>
-                <div className="sm:col-span-2">
-                  <EditField label="Product Description" field="productDescription" value={d.productDescription} onChange={handleChange}
-                    placeholder="What does your product do? Who is it for? What's the core value?" multiline />
-                </div>
-                <EditField label="MRR ($)" field="mrr" value={d.mrr} onChange={handleChange} placeholder="50,000" />
-                <EditField label="ARR ($)" field="arr" value={d.arr} onChange={handleChange} placeholder="600,000" />
-                <EditField label="Active Customers" field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
-                <EditField label="MoM Revenue Growth (%)" field="momGrowth" value={d.momGrowth} onChange={handleChange} placeholder="12" />
-                <EditField label="Monthly Churn Rate (%)" field="churnRate" value={d.churnRate} onChange={handleChange} placeholder="2.5" />
-                <EditField label="NPS Score" field="nps" value={d.nps} onChange={handleChange} placeholder="72" />
-                <EditField label="Key Metric Value" field="keyMetric" value={d.keyMetric} onChange={handleChange} placeholder="4.2M" />
-                <EditField label="Key Metric Label" field="keyMetricLabel" value={d.keyMetricLabel} onChange={handleChange} placeholder="API calls / month" />
-              </>
-            ) : (
-              <>
-                <div className="sm:col-span-2">
-                  <DisplayField label="Product" value={d.productDescription} />
-                </div>
-                <DisplayField label="MRR" value={d.mrr ? `$${d.mrr}` : ''} />
-                <DisplayField label="ARR" value={d.arr ? `$${d.arr}` : ''} />
-                <DisplayField label="Active Customers" value={d.activeCustomers} />
-                <DisplayField label="MoM Growth" value={d.momGrowth ? `${d.momGrowth}%` : ''} />
-                <DisplayField label="Monthly Churn" value={d.churnRate ? `${d.churnRate}%` : ''} />
-                <DisplayField label="NPS" value={d.nps} />
-                {d.keyMetric && <DisplayField label={d.keyMetricLabel || 'Key Metric'} value={d.keyMetric} />}
-              </>
-            )}
-          </Section>
-
-          {/* ── Financials ── */}
-          <Section title="Financials & Funding" icon={DollarSign} editing={editing}>
-            {editing ? (
-              <>
-                <EditField label="Total Raised ($)" field="totalRaised" value={d.totalRaised} onChange={handleChange} placeholder="2,500,000" />
-                <EditField label="Last Round Size ($)" field="lastRoundSize" value={d.lastRoundSize} onChange={handleChange} placeholder="2,000,000" />
-                <EditField label="Last Round Stage" field="lastRoundStage" value={d.lastRoundStage} onChange={handleChange} options={STAGES} />
-                <EditField label="Last Round Date" field="lastRoundDate" value={d.lastRoundDate} onChange={handleChange} type="month" />
-                <EditField label="Pre-Money Valuation ($)" field="preMoneyValuation" value={d.preMoneyValuation} onChange={handleChange} placeholder="10,000,000" />
-                <EditField label="Monthly Burn ($)" field="monthlyBurn" value={d.monthlyBurn} onChange={handleChange} placeholder="120,000" />
-                <EditField label="Runway (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="18" />
-                <div className="sm:col-span-2">
-                  <EditField label="Revenue Model" field="revenueModel" value={d.revenueModel} onChange={handleChange}
-                    placeholder="e.g. SaaS subscription — $99/mo per seat, enterprise contracts from $5K/mo" multiline />
-                </div>
-              </>
-            ) : (
-              <>
-                <DisplayField label="Total Raised" value={d.totalRaised ? `$${d.totalRaised}` : ''} />
-                <DisplayField label="Last Round" value={d.lastRoundStage && d.lastRoundSize ? `${d.lastRoundStage} · $${d.lastRoundSize}` : (d.lastRoundSize || '')} />
-                <DisplayField label="Pre-Money Valuation" value={d.preMoneyValuation ? `$${d.preMoneyValuation}` : ''} />
-                <DisplayField label="Monthly Burn" value={d.monthlyBurn ? `$${d.monthlyBurn}` : ''} />
-                <DisplayField label="Runway" value={d.runway ? `${d.runway} months` : ''} />
-                <div className="sm:col-span-2">
-                  <DisplayField label="Revenue Model" value={d.revenueModel} />
-                </div>
-              </>
-            )}
-          </Section>
-
-          {/* ── Market ── */}
-          <Section title="Market & Competition" icon={Target} editing={editing}>
-            {editing ? (
-              <>
-                <div className="sm:col-span-2">
-                  <EditField label="Target Market" field="targetMarket" value={d.targetMarket} onChange={handleChange}
-                    placeholder="Who is your ideal customer? Industry, company size, geography…" multiline />
-                </div>
-                <EditField label="TAM ($)" field="tam" value={d.tam} onChange={handleChange} placeholder="50B" />
-                <EditField label="SAM ($)" field="sam" value={d.sam} onChange={handleChange} placeholder="5B" />
-                <EditField label="SOM ($)" field="som" value={d.som} onChange={handleChange} placeholder="500M" />
-                <div className="sm:col-span-2">
-                  <EditField label="Key Competitors" field="keyCompetitors" value={d.keyCompetitors} onChange={handleChange}
-                    placeholder="List your main competitors and how you compare" multiline />
-                </div>
-                <div className="sm:col-span-2">
-                  <EditField label="Your Differentiator / Moat" field="differentiator" value={d.differentiator} onChange={handleChange}
-                    placeholder="What makes you unique and hard to copy?" multiline />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="sm:col-span-2">
-                  <DisplayField label="Target Market" value={d.targetMarket} />
-                </div>
-                <DisplayField label="TAM" value={d.tam} />
-                <DisplayField label="SAM" value={d.sam} />
-                <DisplayField label="SOM" value={d.som} />
-                <div className="sm:col-span-2">
-                  <DisplayField label="Competitors" value={d.keyCompetitors} />
-                </div>
-                <div className="sm:col-span-2">
-                  <DisplayField label="Moat / Differentiator" value={d.differentiator} />
-                </div>
-              </>
-            )}
-          </Section>
-
-          {/* ── Investor Relations ── */}
-          <Section title="Current Round & Investor Ask" icon={Shield} editing={editing} accent>
-            {editing ? (
-              <>
-                <EditField label="Current Ask ($)" field="currentAsk" value={d.currentAsk} onChange={handleChange} placeholder="3,000,000" />
-                <EditField label="Expected Runway after raise (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="24" />
-                <div className="sm:col-span-2">
-                  <EditField label="Use of Funds" field="useOfFunds" value={d.useOfFunds} onChange={handleChange}
-                    placeholder="e.g. 50% engineering hires, 30% sales & marketing, 20% infrastructure" multiline />
-                </div>
-                <div className="sm:col-span-2">
-                  <EditField label="Next 12-Month Milestones" field="nextMilestones" value={d.nextMilestones} onChange={handleChange}
-                    placeholder="e.g. Reach $1M ARR, launch enterprise tier, hire 3 engineers" multiline />
-                </div>
-                <div className="sm:col-span-2">
-                  <EditField label="Key Risks" field="keyRisks" value={d.keyRisks} onChange={handleChange}
-                    placeholder="What are the biggest risks to the business and how are you mitigating them?" multiline />
-                </div>
-              </>
-            ) : (
-              <>
-                <DisplayField label="Current Ask" value={d.currentAsk ? `$${d.currentAsk}` : ''} />
-                <div className="sm:col-span-2">
-                  <DisplayField label="Use of Funds" value={d.useOfFunds} />
-                </div>
-                <div className="sm:col-span-2">
-                  <DisplayField label="12-Month Milestones" value={d.nextMilestones} />
-                </div>
-                <div className="sm:col-span-2">
-                  <DisplayField label="Key Risks" value={d.keyRisks} />
-                </div>
-              </>
-            )}
-          </Section>
-
-        </div>
-
-        {/* Right sidebar */}
-        <div className="w-72 flex-shrink-0 space-y-4 hidden lg:block sticky top-6">
-
-          {/* Key Metrics */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingUp size={14} className="text-indigo-500" /> Key Metrics
-            </h3>
-            <div className="space-y-3">
-              {[
-                { label: 'MRR',             value: fmt(data.mrr) },
-                { label: 'ARR',             value: fmt(data.arr) },
-                { label: 'Active Customers',value: data.activeCustomers || '—' },
-                { label: 'MoM Growth',      value: data.momGrowth ? `${data.momGrowth}%` : '—' },
-                { label: 'Churn Rate',      value: data.churnRate ? `${data.churnRate}%` : '—' },
-                { label: 'NPS',             value: data.nps || '—' },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <span className="text-xs text-gray-500">{label}</span>
-                  <span className="text-sm font-semibold text-gray-900">{value}</span>
-                </div>
-              ))}
+        {/* Empty state banner */}
+        {!hasData && !editing && (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
+            <Lightbulb size={16} className="text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-900">Complete your company profile</p>
+              <p className="text-xs text-amber-600 mt-0.5">This is what your investor sees when they review your company data.</p>
             </div>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg whitespace-nowrap"
+            >
+              Get Started
+            </button>
           </div>
+        )}
 
-          {/* Funding snapshot */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign size={14} className="text-emerald-500" /> Funding Snapshot
-            </h3>
-            <div className="space-y-3">
-              {[
-                { label: 'Total Raised',    value: fmt(data.totalRaised) },
-                { label: 'Last Round',      value: data.lastRoundStage || '—' },
-                { label: 'Pre-Money Val.',  value: fmt(data.preMoneyValuation) },
-                { label: 'Monthly Burn',    value: fmt(data.monthlyBurn) },
-                { label: 'Runway',          value: data.runway ? `${data.runway} mo` : '—' },
-                { label: 'Current Ask',     value: fmt(data.currentAsk) },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <span className="text-xs text-gray-500">{label}</span>
-                  <span className="text-sm font-semibold text-gray-900">{value}</span>
-                </div>
-              ))}
-            </div>
-            {data.runway && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>Runway used</span>
-                  <span>{Math.max(0, 24 - parseInt(data.runway || '0'))} / 24 mo</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn('h-full rounded-full', parseInt(data.runway) >= 12 ? 'bg-emerald-400' : 'bg-amber-400')}
-                    style={{ width: `${Math.min(100, (parseInt(data.runway) / 24) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+        {/* Two-column layout */}
+        <div className="flex gap-6 items-start">
 
-          {/* Market size */}
-          {(data.tam || data.sam || data.som) && (
-            <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Target size={14} className="text-violet-500" /> Market Size
-              </h3>
-              <div className="space-y-2">
-                {[
-                  { label: 'TAM', value: data.tam, color: 'bg-violet-500', width: '100%' },
-                  { label: 'SAM', value: data.sam, color: 'bg-indigo-400', width: '60%' },
-                  { label: 'SOM', value: data.som, color: 'bg-blue-300',   width: '25%' },
-                ].map(({ label, value, color, width }) => value ? (
-                  <div key={label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-700">{label}</span>
-                      <span className="text-gray-500">{value}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${color}`} style={{ width }} />
-                    </div>
+          {/* Left: main sections */}
+          <div className="flex-1 min-w-0 space-y-4">
+
+            {/* ── Overview ── */}
+            <Section title="Company Overview" icon={Building2} editing={editing} iconColor="text-indigo-500" iconBg="bg-indigo-50">
+              {editing ? (
+                <>
+                  <EditField label="Company Name" field="name" value={d.name} onChange={handleChange} placeholder="Acme Inc" />
+                  <EditField label="Tagline" field="tagline" value={d.tagline} onChange={handleChange} placeholder="One-liner about your company" />
+                  <EditField label="Website" field="website" value={d.website} onChange={handleChange} placeholder="https://yourcompany.com" />
+                  <EditField label="Industry" field="industry" value={d.industry} onChange={handleChange} options={INDUSTRIES} />
+                  <EditField label="Stage" field="stage" value={d.stage} onChange={handleChange} options={STAGES} />
+                  <EditField label="Founded Year" field="foundedYear" value={d.foundedYear} onChange={handleChange} placeholder="2022" />
+                  <EditField label="Location / HQ" field="location" value={d.location} onChange={handleChange} placeholder="San Francisco, CA" />
+                  <div className="sm:col-span-2">
+                    <EditField label="Company Description" field="description" value={d.description} onChange={handleChange}
+                      placeholder="Describe what your company does, the problem you solve, and who you serve…" multiline />
                   </div>
-                ) : null)}
-              </div>
-            </div>
-          )}
-
-          {/* Team card */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Users size={14} className="text-amber-500" /> Team
-            </h3>
-            <div className="space-y-2.5">
-              {data.founderNames ? (
-                data.founderNames.split(',').map((name, i) => (
-                  <div key={i} className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-[10px] font-bold">{name.trim().charAt(0)}</span>
-                    </div>
-                    <p className="text-xs text-gray-700 font-medium leading-snug">{name.trim()}</p>
-                  </div>
-                ))
+                </>
               ) : (
-                <p className="text-xs text-gray-400 italic">No founders added yet</p>
+                <>
+                  <DisplayField label="Website" value={d.website} href={d.website} />
+                  <DisplayField label="Industry" value={d.industry} />
+                  <DisplayField label="Stage" value={d.stage} />
+                  <DisplayField label="Founded" value={d.foundedYear} />
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Description" value={d.description} />
+                  </div>
+                </>
               )}
-              {data.teamSize && (
-                <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Total team</span>
-                  <span className="text-sm font-semibold text-gray-900">{data.teamSize} people</span>
+            </Section>
+
+            {/* ── Team ── */}
+            <Section title="Founding Team" icon={Users} editing={editing} iconColor="text-amber-500" iconBg="bg-amber-50">
+              {editing ? (
+                <>
+                  <div className="sm:col-span-2">
+                    <EditField label="Founder(s)" field="founderNames" value={d.founderNames} onChange={handleChange} placeholder="e.g. Alice Smith (CEO), Bob Jones (CTO)" />
+                  </div>
+                  <EditField label="Total Team Size" field="teamSize" value={d.teamSize} onChange={handleChange} placeholder="12" />
+                  <EditField label="Open Roles" field="openRoles" value={d.openRoles} onChange={handleChange} placeholder="e.g. Senior Engineer, Head of Sales" />
+                </>
+              ) : (
+                <>
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Founder(s)" value={d.founderNames} />
+                  </div>
+                  <DisplayField label="Team Size" value={d.teamSize ? `${d.teamSize} people` : ''} />
+                  <DisplayField label="Open Roles" value={d.openRoles} />
+                </>
+              )}
+            </Section>
+
+            {/* ── Product & Traction ── */}
+            <Section title="Product & Traction" icon={TrendingUp} editing={editing} iconColor="text-emerald-500" iconBg="bg-emerald-50">
+              {editing ? (
+                <>
+                  <div className="sm:col-span-2">
+                    <EditField label="Product Description" field="productDescription" value={d.productDescription} onChange={handleChange}
+                      placeholder="What does your product do? Who is it for? What's the core value?" multiline />
+                  </div>
+                  <EditField label="MRR ($)" field="mrr" value={d.mrr} onChange={handleChange} placeholder="50,000" />
+                  <EditField label="ARR ($)" field="arr" value={d.arr} onChange={handleChange} placeholder="600,000" />
+                  <EditField label="Active Customers" field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
+                  <EditField label="MoM Revenue Growth (%)" field="momGrowth" value={d.momGrowth} onChange={handleChange} placeholder="12" />
+                  <EditField label="Monthly Churn Rate (%)" field="churnRate" value={d.churnRate} onChange={handleChange} placeholder="2.5" />
+                  <EditField label="NPS Score" field="nps" value={d.nps} onChange={handleChange} placeholder="72" />
+                  <EditField label="Key Metric Value" field="keyMetric" value={d.keyMetric} onChange={handleChange} placeholder="4.2M" />
+                  <EditField label="Key Metric Label" field="keyMetricLabel" value={d.keyMetricLabel} onChange={handleChange} placeholder="API calls / month" />
+                </>
+              ) : (
+                <>
+                  {/* Traction stat chips */}
+                  {(d.mrr || d.arr || d.activeCustomers || d.momGrowth) && (
+                    <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3 mb-1">
+                      {d.mrr && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-emerald-700">{fmt(d.mrr)}</p>
+                          <p className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide mt-0.5">MRR</p>
+                        </div>
+                      )}
+                      {d.arr && (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-indigo-700">{fmt(d.arr)}</p>
+                          <p className="text-[10px] font-medium text-indigo-500 uppercase tracking-wide mt-0.5">ARR</p>
+                        </div>
+                      )}
+                      {d.activeCustomers && (
+                        <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-purple-700">{d.activeCustomers}</p>
+                          <p className="text-[10px] font-medium text-purple-500 uppercase tracking-wide mt-0.5">Customers</p>
+                        </div>
+                      )}
+                      {d.momGrowth && (
+                        <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-teal-700">{d.momGrowth}%</p>
+                          <p className="text-[10px] font-medium text-teal-500 uppercase tracking-wide mt-0.5">MoM Growth</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Product" value={d.productDescription} />
+                  </div>
+                  <DisplayField label="Monthly Churn" value={d.churnRate ? `${d.churnRate}%` : ''} />
+                  <DisplayField label="NPS" value={d.nps} />
+                  {d.keyMetric && <DisplayField label={d.keyMetricLabel || 'Key Metric'} value={d.keyMetric} />}
+                </>
+              )}
+            </Section>
+
+            {/* ── Financials ── */}
+            <Section title="Financials & Funding" icon={DollarSign} editing={editing} iconColor="text-green-600" iconBg="bg-green-50">
+              {editing ? (
+                <>
+                  <EditField label="Total Raised ($)" field="totalRaised" value={d.totalRaised} onChange={handleChange} placeholder="2,500,000" />
+                  <EditField label="Last Round Size ($)" field="lastRoundSize" value={d.lastRoundSize} onChange={handleChange} placeholder="2,000,000" />
+                  <EditField label="Last Round Stage" field="lastRoundStage" value={d.lastRoundStage} onChange={handleChange} options={STAGES} />
+                  <EditField label="Last Round Date" field="lastRoundDate" value={d.lastRoundDate} onChange={handleChange} type="month" />
+                  <EditField label="Pre-Money Valuation ($)" field="preMoneyValuation" value={d.preMoneyValuation} onChange={handleChange} placeholder="10,000,000" />
+                  <EditField label="Monthly Burn ($)" field="monthlyBurn" value={d.monthlyBurn} onChange={handleChange} placeholder="120,000" />
+                  <EditField label="Runway (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="18" />
+                  <div className="sm:col-span-2">
+                    <EditField label="Revenue Model" field="revenueModel" value={d.revenueModel} onChange={handleChange}
+                      placeholder="e.g. SaaS subscription — $99/mo per seat, enterprise contracts from $5K/mo" multiline />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <DisplayField label="Total Raised" value={d.totalRaised ? `$${d.totalRaised}` : ''} />
+                  <DisplayField label="Last Round" value={d.lastRoundStage && d.lastRoundSize ? `${d.lastRoundStage} · $${d.lastRoundSize}` : (d.lastRoundSize || '')} />
+                  <DisplayField label="Pre-Money Valuation" value={d.preMoneyValuation ? `$${d.preMoneyValuation}` : ''} />
+                  <DisplayField label="Monthly Burn" value={d.monthlyBurn ? `$${d.monthlyBurn}` : ''} />
+                  <DisplayField label="Runway" value={d.runway ? `${d.runway} months` : ''} />
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Revenue Model" value={d.revenueModel} />
+                  </div>
+                </>
+              )}
+            </Section>
+
+            {/* ── Market ── */}
+            <Section title="Market & Competition" icon={Target} editing={editing} iconColor="text-violet-500" iconBg="bg-violet-50">
+              {editing ? (
+                <>
+                  <div className="sm:col-span-2">
+                    <EditField label="Target Market" field="targetMarket" value={d.targetMarket} onChange={handleChange}
+                      placeholder="Who is your ideal customer? Industry, company size, geography…" multiline />
+                  </div>
+                  <EditField label="TAM ($)" field="tam" value={d.tam} onChange={handleChange} placeholder="50B" />
+                  <EditField label="SAM ($)" field="sam" value={d.sam} onChange={handleChange} placeholder="5B" />
+                  <EditField label="SOM ($)" field="som" value={d.som} onChange={handleChange} placeholder="500M" />
+                  <div className="sm:col-span-2">
+                    <EditField label="Key Competitors" field="keyCompetitors" value={d.keyCompetitors} onChange={handleChange}
+                      placeholder="List your main competitors and how you compare" multiline />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EditField label="Your Differentiator / Moat" field="differentiator" value={d.differentiator} onChange={handleChange}
+                      placeholder="What makes you unique and hard to copy?" multiline />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Target Market" value={d.targetMarket} />
+                  </div>
+                  <DisplayField label="TAM" value={d.tam} />
+                  <DisplayField label="SAM" value={d.sam} />
+                  <DisplayField label="SOM" value={d.som} />
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Competitors" value={d.keyCompetitors} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Moat / Differentiator" value={d.differentiator} />
+                  </div>
+                </>
+              )}
+            </Section>
+
+            {/* ── Investor Relations ── */}
+            <Section title="Current Round & Investor Ask" icon={Shield} editing={editing} accent>
+              {editing ? (
+                <>
+                  <EditField label="Current Ask ($)" field="currentAsk" value={d.currentAsk} onChange={handleChange} placeholder="3,000,000" />
+                  <EditField label="Expected Runway after raise (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="24" />
+                  <div className="sm:col-span-2">
+                    <EditField label="Use of Funds" field="useOfFunds" value={d.useOfFunds} onChange={handleChange}
+                      placeholder="e.g. 50% engineering hires, 30% sales & marketing, 20% infrastructure" multiline />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EditField label="Next 12-Month Milestones" field="nextMilestones" value={d.nextMilestones} onChange={handleChange}
+                      placeholder="e.g. Reach $1M ARR, launch enterprise tier, hire 3 engineers" multiline />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EditField label="Key Risks" field="keyRisks" value={d.keyRisks} onChange={handleChange}
+                      placeholder="What are the biggest risks to the business and how are you mitigating them?" multiline />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <DisplayField label="Current Ask" value={d.currentAsk ? `$${d.currentAsk}` : ''} />
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Use of Funds" value={d.useOfFunds} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <DisplayField label="12-Month Milestones" value={d.nextMilestones} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <DisplayField label="Key Risks" value={d.keyRisks} />
+                  </div>
+                </>
+              )}
+            </Section>
+
+          </div>
+
+          {/* Right sidebar */}
+          <div className="w-72 flex-shrink-0 space-y-4 hidden lg:block sticky top-6">
+
+            {/* Key Metrics */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <TrendingUp size={13} className="text-emerald-500" />
+                </div>
+                Key Metrics
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'MRR',             value: fmt(data.mrr) },
+                  { label: 'ARR',             value: fmt(data.arr) },
+                  { label: 'Active Customers',value: data.activeCustomers || '—' },
+                  { label: 'MoM Growth',      value: data.momGrowth ? `${data.momGrowth}%` : '—' },
+                  { label: 'Churn Rate',      value: data.churnRate ? `${data.churnRate}%` : '—' },
+                  { label: 'NPS',             value: data.nps || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-xs text-gray-500">{label}</span>
+                    <span className="text-sm font-bold text-gray-900">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Funding snapshot */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-green-50 flex items-center justify-center">
+                  <DollarSign size={13} className="text-green-600" />
+                </div>
+                Funding Snapshot
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'Total Raised',    value: fmt(data.totalRaised) },
+                  { label: 'Last Round',      value: data.lastRoundStage || '—' },
+                  { label: 'Pre-Money Val.',  value: fmt(data.preMoneyValuation) },
+                  { label: 'Monthly Burn',    value: fmt(data.monthlyBurn) },
+                  { label: 'Runway',          value: data.runway ? `${data.runway} mo` : '—' },
+                  { label: 'Current Ask',     value: fmt(data.currentAsk) },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-xs text-gray-500">{label}</span>
+                    <span className="text-sm font-bold text-gray-900">{value}</span>
+                  </div>
+                ))}
+              </div>
+              {data.runway && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+                    <span>Runway remaining</span>
+                    <span className={parseInt(data.runway) >= 12 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+                      {data.runway} mo
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', parseInt(data.runway) >= 12 ? 'bg-emerald-400' : 'bg-amber-400')}
+                      style={{ width: `${Math.min(100, (parseInt(data.runway) / 24) * 100)}%` }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Next milestones */}
-          {data.nextMilestones && (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
-                <Calendar size={14} className="text-indigo-500" /> Next Milestones
+            {/* Market size */}
+            {(data.tam || data.sam || data.som) && (
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-violet-50 flex items-center justify-center">
+                    <Target size={13} className="text-violet-500" />
+                  </div>
+                  Market Size
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    { label: 'TAM', value: data.tam, color: 'bg-violet-500', width: '100%' },
+                    { label: 'SAM', value: data.sam, color: 'bg-indigo-400', width: '60%' },
+                    { label: 'SOM', value: data.som, color: 'bg-blue-300',   width: '25%' },
+                  ].map(({ label, value, color, width }) => value ? (
+                    <div key={label}>
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="font-semibold text-gray-700">{label}</span>
+                        <span className="text-gray-500">{value}</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${color}`} style={{ width }} />
+                      </div>
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+            )}
+
+            {/* Team card */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <Users size={13} className="text-amber-500" />
+                </div>
+                Team
               </h3>
-              <p className="text-xs text-indigo-800 leading-relaxed">{data.nextMilestones}</p>
+              <div className="space-y-2.5">
+                {data.founderNames ? (
+                  data.founderNames.split(',').map((name, i) => (
+                    <div key={i} className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-[10px] font-bold">{name.trim().charAt(0)}</span>
+                      </div>
+                      <p className="text-xs text-gray-700 font-medium leading-snug">{name.trim()}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 italic">No founders added yet</p>
+                )}
+                {data.teamSize && (
+                  <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Total team</span>
+                    <span className="text-sm font-bold text-gray-900">{data.teamSize} people</span>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
 
+            {/* Next milestones */}
+            {data.nextMilestones && (
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <Calendar size={13} className="text-indigo-500" />
+                  </div>
+                  Next Milestones
+                </h3>
+                <p className="text-xs text-indigo-800 leading-relaxed">{data.nextMilestones}</p>
+              </div>
+            )}
+
+          </div>
         </div>
       </div>
     </div>
