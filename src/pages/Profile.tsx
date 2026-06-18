@@ -98,19 +98,18 @@ export default function Profile() {
 
             <div className="px-6 pb-6">
               {/* Avatar overlapping cover */}
-              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0">
-                {currentUser.avatar ? (
+              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0 relative">
+                {/* Initials fallback — always rendered behind */}
+                <div className="absolute inset-0 bg-indigo-100 flex items-center justify-center">
+                  <span className="text-indigo-700 font-bold text-xl">{initials}</span>
+                </div>
+                {currentUser.avatar && (
                   <img
                     src={currentUser.avatar}
                     alt={currentUser.name}
-                    className="w-full h-full object-cover object-center scale-150"
-                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover object-center scale-150"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
-                ) : (
-                  <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
-                    <span className="text-indigo-700 font-bold text-xl">{initials}</span>
-                  </div>
                 )}
               </div>
 
