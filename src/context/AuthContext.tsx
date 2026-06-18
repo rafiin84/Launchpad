@@ -64,6 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch Zoho profile data once on login
   useEffect(() => {
     if (!loadToken()) return;
+
+    // 1. Immediately show cached avatar (works everywhere, instant)
+    const AVATAR_CACHE_KEY = 'lp_avatar_data';
+    const cached = localStorage.getItem(AVATAR_CACHE_KEY);
+    if (cached) setAvatarUrl(cached);
+
     fetchCurrentZohoUser().then(async (user) => {
       if (!user) return;
       const u = user as unknown as Record<string, unknown>;
@@ -78,20 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
 
-      // Fetch profile photo via OAuth API (works on all devices including mobile)
-      // Check localStorage cache first
-      const AVATAR_CACHE_KEY = 'lp_avatar_data';
-      const cached = localStorage.getItem(AVATAR_CACHE_KEY);
-      if (cached) {
-        setAvatarUrl(cached);
+      // 2. Set the cookie-based URL immediately (works on desktop browsers)
+      if (zuid && !cached) {
+        setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
       }
 
-      // Always try to refresh from API
+      // 3. In background, try OAuth API fetch and cache as data URL for mobile
       try {
         const photoUrl = await fetchUserPhoto(user.id, zuid ?? undefined);
         if (photoUrl) {
           setAvatarUrl(photoUrl);
-          // Cache as data URL in localStorage for persistence
+          // Convert blob URL to data URL and cache in localStorage
           try {
             const res = await fetch(photoUrl);
             const blob = await res.blob();
@@ -104,12 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             };
             reader.readAsDataURL(blob);
-          } catch { /* blob URL works fine even if caching fails */ }
+          } catch { /* blob URL still works */ }
         }
-      } catch {
-        // If API photo fetch fails, fall back to cookie-based URL (works on desktop)
-        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
-      }
+      } catch { /* OAuth photo fetch failed — cookie URL or cache is already set */ }
     }).catch(() => {});
   }, [isLoggedIn]);
 

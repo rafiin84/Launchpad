@@ -2,19 +2,28 @@ import { useState, useEffect } from 'react';
 
 /**
  * Preloads an image URL in JS and returns whether it loaded successfully.
- * On mobile where Zoho profile photos silently fail (no CORS headers,
- * no onerror, just a blank element), this ensures we only render the
- * <img> if the browser can actually display it.
- *
- * Falls back to `false` after a timeout so initials always show.
+ * - data: and blob: URLs are trusted immediately (already local).
+ * - Remote URLs (like Zoho profile.zoho.in) are preloaded via new Image().
+ * - Falls back to false after a timeout so initials show on mobile.
  */
-export function useImageLoaded(src: string | undefined, timeoutMs = 4000): boolean {
-  const [loaded, setLoaded] = useState(false);
+export function useImageLoaded(src: string | undefined, timeoutMs = 5000): boolean {
+  const [loaded, setLoaded] = useState(() => {
+    // data: and blob: URLs are always ready
+    if (src && (src.startsWith('data:') || src.startsWith('blob:'))) return true;
+    return false;
+  });
 
   useEffect(() => {
-    setLoaded(false);
-    if (!src) return;
+    if (!src) { setLoaded(false); return; }
 
+    // data: and blob: URLs don't need preloading
+    if (src.startsWith('data:') || src.startsWith('blob:')) {
+      setLoaded(true);
+      return;
+    }
+
+    // Remote URL — preload to verify it actually works
+    setLoaded(false);
     let cancelled = false;
     const img = new Image();
 
@@ -30,7 +39,7 @@ export function useImageLoaded(src: string | undefined, timeoutMs = 4000): boole
 
     img.src = src;
 
-    // Safety timeout — if image hasn't loaded by now, it won't
+    // Safety timeout
     const timer = setTimeout(() => {
       if (!cancelled) setLoaded(false);
       cancelled = true;
