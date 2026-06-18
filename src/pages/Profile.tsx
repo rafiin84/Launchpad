@@ -104,6 +104,8 @@ export default function Profile() {
                     src={currentUser.avatar}
                     alt={currentUser.name}
                     className="w-full h-full object-cover object-center scale-150"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (

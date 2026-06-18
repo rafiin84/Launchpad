@@ -336,28 +336,33 @@ export default function Home() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Welcome */}
-      <div className="flex items-center gap-3 mb-6">
-        {currentUser.avatar ? (
-          <img
-            src={currentUser.avatar}
-            alt={currentUser.name}
-            className="w-11 h-11 rounded-full object-cover scale-150 ring-2 ring-white shadow flex-shrink-0"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
-        ) : (
-          <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center ring-2 ring-white shadow flex-shrink-0">
-            <span className="text-gray-600 font-bold text-sm">
-              {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-            </span>
-          </div>
-        )}
+      <div className="flex items-center gap-5 mb-6">
+        <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white shadow flex-shrink-0">
+          {currentUser.avatar ? (
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
+              className="w-full h-full object-cover scale-150"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <span className="text-gray-600 font-bold text-sm">
+                {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </div>
         <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           {greeting}, {currentUser.name.split(' ')[0]}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-gray-500 mt-1 truncate">
           Here's your portfolio at a glance ·{' '}
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+          <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </p>
         </div>
       </div>
