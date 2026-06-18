@@ -77,34 +77,38 @@ export default function Profile() {
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-4">
 
         {/* Cover image */}
-        <div className="h-32 sm:h-40 relative overflow-hidden">
+        <div className="h-36 sm:h-44 relative overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1518655048521-f130df041f66?fm=jpg&q=80&w=1200&auto=format&fit=crop"
+            src="https://source.unsplash.com/SqAxocN59ZE/1200x400"
             alt="cover"
             className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+              (e.currentTarget.parentElement as HTMLElement).style.background = 'linear-gradient(135deg,#1e1b4b,#312e81)';
+            }}
           />
-          <div className="absolute inset-0 bg-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         </div>
 
         <div className="px-6 pb-6">
           {/* Avatar overlapping cover */}
-          <div className="flex items-end justify-between -mt-10 mb-4">
+          <div className="-mt-10 mb-4">
             {currentUser.avatar ? (
               <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
-                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md flex-shrink-0"
+                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-indigo-100 border-4 border-white shadow-md flex items-center justify-center flex-shrink-0">
+              <div className="w-20 h-20 rounded-full bg-indigo-100 border-4 border-white shadow-lg flex items-center justify-center">
                 <span className="text-indigo-700 font-bold text-xl">{initials}</span>
               </div>
             )}
           </div>
 
           {/* Name + role */}
-          <h2 className="text-base font-bold text-gray-900">{currentUser.name}</h2>
+          <h2 className="text-lg font-bold text-gray-900">{currentUser.name}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
             {zohoProfile.jobTitle ? `${zohoProfile.jobTitle} · ` : ''}<span className="capitalize">{role}</span>
           </p>
