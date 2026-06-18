@@ -97,7 +97,7 @@ export default function Profile() {
               <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
-                className="w-full h-full object-cover object-top"
+                className="w-full h-full object-contain"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
