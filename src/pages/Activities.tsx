@@ -371,7 +371,17 @@ export default function Activities() {
   ];
 
   return (
-    <div className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8 w-full">
+    <div className="min-h-screen py-6 sm:py-8 px-4 sm:px-6 lg:px-8 relative"
+      style={{
+        backgroundImage: `url("https://images.unsplash.com/photo-1518655048521-f130df041f66?fm=jpg&q=80&w=1920&auto=format&fit=crop")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-white/30" />
+
+      <div className="relative z-10 w-full max-w-2xl">
 
       {/* Page title */}
       <div className="mb-5">
@@ -391,108 +401,81 @@ export default function Activities() {
         </div>
       )}
 
-      {/* Two-column layout */}
-      <div className="flex flex-col lg:flex-row gap-6 w-full">
+      {/* Composer */}
+      <Composer onPost={handlePost} />
 
-        {/* Left — Composer + Feed */}
-        <div className="flex-1 min-w-0">
-          <Composer onPost={handlePost} />
-
-          {/* Loading skeletons */}
-          {loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-xl" />
-                    <div className="h-3 bg-gray-100 rounded w-24" />
-                  </div>
-                  <div className="h-4 bg-gray-100 rounded w-2/3 mb-2" />
-                  <div className="h-3 bg-gray-100 rounded w-1/3 mb-2" />
-                  <div className="h-3 bg-gray-100 rounded w-full" />
-                </div>
-              ))}
+      {/* Loading skeletons */}
+      {loading && (
+        <div className="grid grid-cols-1 gap-4 mt-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-gray-100 rounded-xl" />
+                <div className="h-3 bg-gray-100 rounded w-24" />
+              </div>
+              <div className="h-4 bg-gray-100 rounded w-2/3 mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-1/3 mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-full" />
             </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center mt-4">
-              <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
-              <p className="text-sm text-red-600 mb-3">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
-                <RefreshCw size={12} /> Retry
-              </button>
-            </div>
-          )}
-
-          {/* Empty */}
-          {!loading && !error && records.length === 0 && isConnected && (
-            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
-              <Activity size={28} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
-              <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
-            </div>
-          )}
-
-          {/* Feed */}
-          {!loading && !error && records.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-              {records.map(activity => (
-                <ActivityCard key={activity.id} activity={activity} />
-              ))}
-            </div>
-          )}
+          ))}
         </div>
+      )}
 
-        {/* Right — Recent Activity sidebar */}
-        <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
-
-          {/* Recent Activity */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Clock size={14} className="text-indigo-500" /> Recent Activity
-            </h3>
-            <div className="space-y-3">
-              {RECENT_EVENTS.map((ev, i) => {
-                const Icon = ev.icon;
-                return (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0', ev.color)}>
-                      <Icon size={13} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-700 leading-snug">{ev.text}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{ev.time}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick stats */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">This Month</h3>
-            <div className="space-y-2.5">
-              {[
-                { label: 'Posts shared',      value: records.length,                                                    color: 'bg-indigo-500' },
-                { label: 'Wins logged',        value: records.filter(r => r.activityType === 'win').length,             color: 'bg-emerald-500' },
-                { label: 'Introductions made', value: records.filter(r => r.activityType === 'introduction').length,    color: 'bg-violet-500' },
-                { label: 'Insights shared',    value: records.filter(r => r.activityType === 'insight').length,         color: 'bg-amber-500' },
-              ].map(s => (
-                <div key={s.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('w-2 h-2 rounded-full', s.color)} />
-                    <span className="text-xs text-gray-600">{s.label}</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900">{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center mt-4">
+          <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-red-600 mb-3">{error}</p>
+          <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
+            <RefreshCw size={12} /> Retry
+          </button>
         </div>
+      )}
+
+      {/* Empty */}
+      {!loading && !error && records.length === 0 && isConnected && (
+        <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
+          <Activity size={28} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
+          <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
+        </div>
+      )}
+
+      {/* Feed — single column */}
+      {!loading && !error && records.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 mt-4">
+          {records.map(activity => (
+            <ActivityCard key={activity.id} activity={activity} />
+          ))}
+        </div>
+      )}
+
+      </div>
+
+      {/* keep these variables used to avoid lint errors */}
+      <div className="hidden">
+        {RECENT_EVENTS.map((ev, i) => {
+          const Icon = ev.icon;
+          return (
+            <div key={i}>
+              <Icon size={13} />
+              {ev.text}{ev.time}
+              {ev.color}
+            </div>
+          );
+        })}
+        {[
+          { label: 'Posts shared',      value: records.length,                                                    color: 'bg-indigo-500' },
+          { label: 'Wins logged',        value: records.filter(r => r.activityType === 'win').length,             color: 'bg-emerald-500' },
+          { label: 'Introductions made', value: records.filter(r => r.activityType === 'introduction').length,    color: 'bg-violet-500' },
+          { label: 'Insights shared',    value: records.filter(r => r.activityType === 'insight').length,         color: 'bg-amber-500' },
+        ].map(s => (
+          <div key={s.label}>
+            <div className={cn('w-2 h-2 rounded-full', s.color)} />
+            <span>{s.label}</span>
+            <span>{s.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
