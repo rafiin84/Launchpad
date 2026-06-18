@@ -145,6 +145,8 @@ export interface ZohoCurrentUser {
   full_name: string;
   email: string;
   profile?: { name: string };
+  Zuid?: string;
+  zuid?: string;
 }
 
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
@@ -157,21 +159,38 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   }
 }
 
-export async function fetchUserPhoto(userId: string): Promise<string | null> {
-  try {
-    const token = loadToken();
-    if (!token) return null;
-    // Use auth-only headers (no Content-Type) for binary photo fetch
-    const res = await fetch(`${ZOHO_BASE}/users/${userId}/photo`, {
-      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-    });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    if (!blob.size) return null;
-    return URL.createObjectURL(blob);
-  } catch {
-    return null;
+export async function fetchUserPhoto(userId: string, zuidOrNull?: string): Promise<string | null> {
+  const token = loadToken();
+  if (!token) return null;
+  const authHeader = { 'Authorization': `Zoho-oauthtoken ${token}` };
+
+  // Try endpoints in order until one returns a valid image
+  const endpoints: string[] = [
+    // CRM photo endpoint
+    `${ZOHO_BASE}/users/${userId}/photo`,
+  ];
+  // Zoho Contacts/profile photo via ZUID (no CORS restriction on same-origin Zoho service)
+  if (zuidOrNull) {
+    endpoints.unshift(
+      `https://contacts.zoho.in/api/v1/photos/${zuidOrNull}`,
+      `https://profiles.zoho.in/api/v1/user/${zuidOrNull}/photo?iszuid=true`,
+    );
   }
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { headers: authHeader });
+      if (!res.ok) continue;
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!contentType.startsWith('image/')) continue;
+      const blob = await res.blob();
+      if (!blob.size) continue;
+      return URL.createObjectURL(blob);
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export async function fetchZohoOrgName(): Promise<string | null> {

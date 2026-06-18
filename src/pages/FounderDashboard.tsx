@@ -233,8 +233,9 @@ export default function FounderDashboard() {
     (async () => {
       const user = await fetchCurrentZohoUser();
       if (cancelled || !user) return;
+      const zuid = user.Zuid ?? user.zuid ?? null;
       const [photo, org] = await Promise.all([
-        fetchUserPhoto(user.id),
+        fetchUserPhoto(user.id, zuid),
         fetchZohoOrgName(),
       ]);
       if (cancelled) { if (photo) URL.revokeObjectURL(photo); return; }
