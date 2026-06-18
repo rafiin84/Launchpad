@@ -168,8 +168,6 @@ export default function Profile() {
                   <span className="text-indigo-700 font-bold text-2xl">{initials}</span>
                 </div>
               )}
-              {/* Online indicator */}
-              <span className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
             </div>
 
             <button
