@@ -11,6 +11,7 @@ import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortf
 import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
+import { fetchCurrentZohoUser } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import FounderDashboard from './FounderDashboard';
 
@@ -194,6 +195,16 @@ export default function Home() {
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingDeals, setLoadingDeals] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isConnected) {
+      fetchCurrentZohoUser().then(user => {
+        const zuid = user?.Zuid ?? user?.zuid ?? null;
+        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
+      }).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!isConnected) {
@@ -231,7 +242,22 @@ export default function Home() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Welcome */}
-      <div className="mb-6">
+      <div className="flex items-center gap-3 mb-6">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={currentUser.name}
+            className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center ring-2 ring-white shadow flex-shrink-0">
+            <span className="text-gray-600 font-bold text-sm">
+              {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+            </span>
+          </div>
+        )}
+        <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           {greeting}, {currentUser.name.split(' ')[0]}
         </h1>
@@ -239,6 +265,7 @@ export default function Home() {
           Here's your portfolio at a glance ·{' '}
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
+        </div>
       </div>
 
       {/* Not-connected banner */}
