@@ -81,16 +81,74 @@ export default function Profile() {
       {/* ── Card 1: Hero ──────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
 
-        {/* Cover banner */}
-        <div className="h-32 sm:h-40 bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-500 relative">
-          {/* network dot pattern overlay */}
-          <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                <circle cx="2" cy="2" r="1.5" fill="white" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#dots)" />
+        {/* Cover banner — Launchpad branded */}
+        <div className="h-32 sm:h-40 relative overflow-hidden bg-black">
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 800 160" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            {/* Deep background */}
+            <rect width="800" height="160" fill="#0a0a0a" />
+
+            {/* Subtle grid lines */}
+            <g stroke="#ffffff" strokeOpacity="0.04" strokeWidth="1">
+              {[0,80,160,240,320,400,480,560,640,720,800].map(x => (
+                <line key={x} x1={x} y1="0" x2={x} y2="160" />
+              ))}
+              {[0,40,80,120,160].map(y => (
+                <line key={y} x1="0" y1={y} x2="800" y2={y} />
+              ))}
+            </g>
+
+            {/* Upward trending line chart — investor/growth theme */}
+            <polyline
+              points="0,140 80,125 160,115 240,100 320,88 400,70 480,55 560,42 640,30 720,20 800,10"
+              fill="none"
+              stroke="#6366f1"
+              strokeWidth="2.5"
+              strokeOpacity="0.6"
+            />
+            {/* Fill under chart line */}
+            <polygon
+              points="0,140 80,125 160,115 240,100 320,88 400,70 480,55 560,42 640,30 720,20 800,10 800,160 0,160"
+              fill="#6366f1"
+              fillOpacity="0.08"
+            />
+
+            {/* Second softer line */}
+            <polyline
+              points="0,155 100,148 200,138 300,122 400,105 500,88 600,72 700,58 800,45"
+              fill="none"
+              stroke="#a5b4fc"
+              strokeWidth="1.5"
+              strokeOpacity="0.25"
+            />
+
+            {/* Glowing dots on main chart */}
+            {[[0,140],[160,115],[320,88],[480,55],[640,30],[800,10]].map(([x,y], i) => (
+              <circle key={i} cx={x} cy={y} r="3.5" fill="#6366f1" fillOpacity="0.9" />
+            ))}
+
+            {/* Rocket icon — top right */}
+            <g transform="translate(720, 18) rotate(-45)" opacity="0.35">
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="white" />
+              <polygon points="-6,8 6,8 0,18" fill="white" />
+              <circle cx="0" cy="-4" r="3" fill="#0a0a0a" />
+            </g>
+
+            {/* Stars / data points scattered */}
+            {[[50,30],[150,50],[250,20],[450,35],[550,18],[680,45],[750,60]].map(([x,y],i) => (
+              <circle key={i} cx={x} cy={y} r="1.2" fill="white" fillOpacity="0.3" />
+            ))}
+
+            {/* "LAUNCHPAD" wordmark faint watermark */}
+            <text x="30" y="150" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="700" letterSpacing="4" fill="white" fillOpacity="0.08" textAnchor="start">
+              LAUNCHPAD
+            </text>
+
+            {/* Right-side indigo glow */}
+            <radialGradient id="glow" cx="85%" cy="20%" r="35%">
+              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+            </radialGradient>
+            <rect width="800" height="160" fill="url(#glow)" />
           </svg>
         </div>
 
