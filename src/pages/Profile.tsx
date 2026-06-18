@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, ExternalLink, Calendar, Edit3, Trophy,
-  MessageSquare, Lightbulb, Link2, Mail, X, Plus, Trash2, LogOut,
+  MessageSquare, Lightbulb, Link2, Mail, LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
@@ -30,165 +30,6 @@ function saveExtra(data: ProfileExtra) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
 }
 
-/* ── Edit Modal ─────────────────────────────────────────────── */
-function EditProfileModal({
-  extra,
-  onSave,
-  onClose,
-}: {
-  extra: ProfileExtra;
-  onSave: (data: ProfileExtra) => void;
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState<ProfileExtra>({ ...extra });
-  const [newTag, setNewTag] = useState('');
-
-  const set = (field: keyof ProfileExtra, val: string) =>
-    setForm(prev => ({ ...prev, [field]: val }));
-
-  const addTag = () => {
-    const tag = newTag.trim();
-    if (tag && !form.expertise.includes(tag)) {
-      setForm(prev => ({ ...prev, expertise: [...prev.expertise, tag] }));
-    }
-    setNewTag('');
-  };
-
-  const removeTag = (tag: string) =>
-    setForm(prev => ({ ...prev, expertise: prev.expertise.filter(e => e !== tag) }));
-
-  const handleSave = () => {
-    onSave(form);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h2 className="text-base font-bold text-gray-900">Edit Profile</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors">
-            <X size={16} className="text-gray-500" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
-
-          {/* Bio */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Bio</label>
-            <textarea
-              rows={3}
-              value={form.bio}
-              onChange={e => set('bio', e.target.value)}
-              placeholder="Tell others a bit about yourself…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-            />
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Location</label>
-            <div className="relative">
-              <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={form.location}
-                onChange={e => set('location', e.target.value)}
-                placeholder="City, Country"
-                className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* LinkedIn */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">LinkedIn URL</label>
-            <div className="relative">
-              <ExternalLink size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="url"
-                value={form.linkedIn}
-                onChange={e => set('linkedIn', e.target.value)}
-                placeholder="https://linkedin.com/in/yourname"
-                className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Twitter */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Twitter / X Handle</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
-              <input
-                type="text"
-                value={form.twitter.replace('@', '')}
-                onChange={e => set('twitter', e.target.value)}
-                placeholder="yourhandle"
-                className="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Expertise / Skills */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Skills &amp; Expertise</label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {form.expertise.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
-                  {tag}
-                  <button onClick={() => removeTag(tag)} className="hover:text-red-500 transition-colors">
-                    <Trash2 size={10} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newTag}
-                onChange={e => setNewTag(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                placeholder="Add a skill and press Enter"
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <button
-                onClick={addTag}
-                className="w-9 h-9 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center transition-colors"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 sticky bottom-0 bg-white rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
   const { currentUser, role, logout } = useAuth();
@@ -199,12 +40,6 @@ export default function Profile() {
     navigate('/login');
   }
   const [extra, setExtra] = useState<ProfileExtra>(loadExtra);
-  const [showEdit, setShowEdit] = useState(false);
-
-  const handleSave = (data: ProfileExtra) => {
-    saveExtra(data);
-    setExtra(data);
-  };
 
   const joinedDate = new Date(currentUser.joinedAt).toLocaleDateString('en-US', {
     month: 'long', year: 'numeric',
@@ -213,14 +48,6 @@ export default function Profile() {
   return (
     <div className="max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
 
-      {showEdit && (
-        <EditProfileModal
-          extra={extra}
-          onSave={handleSave}
-          onClose={() => setShowEdit(false)}
-        />
-      )}
-
       {/* Profile card */}
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-6">
         {/* Cover */}
@@ -228,11 +55,9 @@ export default function Profile() {
 
         <div className="px-6 pb-6">
           <div className="flex items-end justify-between -mt-8 mb-4">
-            <div className="ring-4 ring-white rounded-2xl overflow-hidden">
-              <Avatar src={currentUser.avatar} name={currentUser.name} size="xl" />
-            </div>
+            <Avatar src={currentUser.avatar} name={currentUser.name} size="xl" />
             <button
-              onClick={() => setShowEdit(true)}
+              onClick={() => navigate('/profile/edit')}
               className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-colors"
             >
               <Edit3 size={14} /> Edit Profile
@@ -338,7 +163,7 @@ export default function Profile() {
           <Lightbulb size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm text-gray-500 mb-4">Complete your profile to stand out</p>
           <button
-            onClick={() => setShowEdit(true)}
+            onClick={() => navigate('/profile/edit')}
             className="inline-flex items-center gap-2 text-sm font-medium bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
             <Edit3 size={14} /> Edit Profile

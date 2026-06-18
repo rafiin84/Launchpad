@@ -38,6 +38,7 @@ import Discussions from './pages/Discussions';
 import AddDiscussion from './pages/AddDiscussion';
 import AddCompany from './pages/AddCompany';
 import Profile from './pages/Profile';
+import EditProfile from './pages/EditProfile';
 import Settings from './pages/Settings';
 import Activities from './pages/Activities';
 import AddActivity from './pages/AddActivity';
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/discussions" element={<Discussions />} />
             <Route path="/discussions/new" element={<AddDiscussion />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/edit" element={<EditProfile />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>
