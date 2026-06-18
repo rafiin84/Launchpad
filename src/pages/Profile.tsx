@@ -22,7 +22,7 @@ function loadExtra(): ProfileExtra {
   } catch { /* empty */ }
   // Pre-populate with Kumar Vembu's real data on first load
   const defaults: ProfileExtra = {
-    bio: 'Coach, Entrepreneur, Engineer, Product Manager and Learner. Passionate about building products that solve real problems and mentoring the next generation of founders.',
+    bio: `Kumar Vembu is a seasoned entrepreneur, engineer, and startup coach based in Chennai, India, with over 20 years of experience building technology-driven businesses. As the Founder & CEO of Launchpad, he is on a mission to connect promising founders with the right investors, tools, and networks to scale their vision.\n\nA hands-on product thinker and systems builder, Kumar co-founded Mudhal Partners to back early-stage startups across India. He has mentored 50+ startups, helping them navigate product-market fit, fundraising, and growth. His approach blends engineering rigour with entrepreneurial empathy — he's been on both sides of the table.\n\nKumar is passionate about democratising access to capital for founders across Tier 2 and Tier 3 cities in India, and believes the next wave of great Indian startups will come from beyond the metros.`,
     location: 'Chennai, Tamil Nadu, India',
     twitter: '',
     linkedIn: 'https://in.linkedin.com/in/kumar-vembu-a0a45710',
@@ -150,7 +150,11 @@ export default function Profile() {
       {extra.bio && (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">About</h3>
-          <p className="text-sm text-gray-700 leading-relaxed">{extra.bio}</p>
+          <div className="space-y-3">
+            {extra.bio.split('\n\n').map((para, i) => (
+              <p key={i} className="text-sm text-gray-700 leading-relaxed">{para}</p>
+            ))}
+          </div>
         </div>
       )}
 
