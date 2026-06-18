@@ -164,26 +164,19 @@ export async function fetchUserPhoto(userId: string, zuidOrNull?: string): Promi
   if (!token) return null;
   const authHeader = { 'Authorization': `Zoho-oauthtoken ${token}` };
 
-  // Try endpoints in order until one returns a valid image
-  const endpoints: string[] = [
-    // CRM photo endpoint
-    `${ZOHO_BASE}/users/${userId}/photo`,
-  ];
-  // Zoho Contacts/profile photo via ZUID (no CORS restriction on same-origin Zoho service)
+  // Try endpoints in order until one returns a valid image blob
+  const endpoints: string[] = [];
   if (zuidOrNull) {
-    endpoints.unshift(
-      `https://contacts.zoho.in/api/v1/photos/${zuidOrNull}`,
-      `https://profiles.zoho.in/api/v1/user/${zuidOrNull}/photo?iszuid=true`,
-    );
+    endpoints.push(`https://contacts.zoho.in/api/v1/photos/${zuidOrNull}`);
   }
+  endpoints.push(`${ZOHO_BASE}/users/${userId}/photo`);
 
   for (const url of endpoints) {
     try {
       const res = await fetch(url, { headers: authHeader });
       if (!res.ok) continue;
-      const contentType = res.headers.get('content-type') ?? '';
-      if (!contentType.startsWith('image/')) continue;
       const blob = await res.blob();
+      // Accept any blob with content (image/* or application/octet-stream)
       if (!blob.size) continue;
       return URL.createObjectURL(blob);
     } catch {

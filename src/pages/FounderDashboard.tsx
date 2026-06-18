@@ -7,7 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadToken } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchZohoOrgName } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -237,12 +237,13 @@ export default function FounderDashboard() {
       ]);
       if (cancelled) return;
       if (user) {
-        // Build a direct URL with token as query param — bypasses CORS for img tags
-        const token = loadToken();
-        if (token) {
-          setAvatarUrl(
-            `https://www.zohoapis.in/crm/v2/users/${user.id}/photo?access_token=${token}`
-          );
+        const zuid = user.Zuid ?? user.zuid ?? null;
+        if (zuid) {
+          // Zoho public profile photo — no auth required
+          setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
+        } else {
+          const photo = await fetchUserPhoto(user.id, null);
+          if (!cancelled && photo) setAvatarUrl(photo);
         }
       }
       setCompanyName(org);
@@ -313,21 +314,20 @@ export default function FounderDashboard() {
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-3">
           {/* Avatar */}
-          <div className="relative w-11 h-11 flex-shrink-0">
-            {avatarUrl && (
-              <img
-                src={avatarUrl}
-                alt={currentUser.name}
-                className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow absolute inset-0"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
-            <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center ring-2 ring-white shadow">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={currentUser.name}
+              className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow flex-shrink-0"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center ring-2 ring-white shadow flex-shrink-0">
               <span className="text-indigo-700 font-bold text-sm">
                 {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
               </span>
             </div>
-          </div>
+          )}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
               {greeting}, {currentUser.name.split(' ')[0]} 👋
