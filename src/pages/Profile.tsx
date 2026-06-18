@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2 } from 'lucide-react';
+import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/layout/PageHeader';
 
@@ -25,11 +25,13 @@ function loadExtra(): ProfileExtra {
 
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
-  const { currentUser, role, logout, zohoEmail } = useAuth();
+  const { currentUser, role, logout, zohoEmail, zohoProfile } = useAuth();
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(loadExtra);
 
-  const displayEmail = zohoEmail || currentUser.email;
+  const displayEmail = zohoProfile.email || zohoEmail || currentUser.email;
+  const location = extra.location || [zohoProfile.state, zohoProfile.country].filter(Boolean).join(', ') || null;
+  const phone = zohoProfile.phone || zohoProfile.mobile || null;
 
   function handleLogout() {
     logout();
@@ -44,7 +46,7 @@ export default function Profile() {
     .toUpperCase();
 
   const hasExtra = extra.bio || extra.location || extra.expertise.length > 0
-    || extra.linkedIn || extra.twitter;
+    || extra.linkedIn || extra.twitter || phone || location || zohoProfile.jobTitle;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-2xl">
@@ -82,9 +84,9 @@ export default function Profile() {
           {/* Name + role */}
           <div>
             <h2 className="text-base font-bold text-gray-900">{currentUser.name}</h2>
-            <span className="inline-block mt-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
-              {role}
-            </span>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {zohoProfile.jobTitle ? `${zohoProfile.jobTitle} · ` : ''}<span className="capitalize">{role}</span>
+            </p>
           </div>
         </div>
 
@@ -94,10 +96,22 @@ export default function Profile() {
             <Mail size={14} className="text-gray-400 flex-shrink-0" />
             {displayEmail}
           </div>
-          {extra.location && (
+          {phone && (
+            <div className="flex items-center gap-2.5 text-sm text-gray-600">
+              <Phone size={14} className="text-gray-400 flex-shrink-0" />
+              {phone}
+            </div>
+          )}
+          {location && (
             <div className="flex items-center gap-2.5 text-sm text-gray-600">
               <MapPin size={14} className="text-gray-400 flex-shrink-0" />
-              {extra.location}
+              {location}
+            </div>
+          )}
+          {zohoProfile.jobTitle && (
+            <div className="flex items-center gap-2.5 text-sm text-gray-600">
+              <Briefcase size={14} className="text-gray-400 flex-shrink-0" />
+              {zohoProfile.jobTitle}
             </div>
           )}
           {extra.linkedIn && (

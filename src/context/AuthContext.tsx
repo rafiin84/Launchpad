@@ -4,6 +4,15 @@ import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
 import { fetchCurrentZohoUser } from '../services/zohoApi';
 
+export interface ZohoProfile {
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  state: string | null;
+  country: string | null;
+  jobTitle: string | null;
+}
+
 interface AuthContextValue {
   currentUser: User;
   role: UserRole;
@@ -13,6 +22,7 @@ interface AuthContextValue {
   login: (role: UserRole) => void;
   logout: () => void;
   zohoEmail: string | null;
+  zohoProfile: ZohoProfile;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -47,15 +57,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState<string | null>(loadUserName);
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [zohoEmail, setZohoEmail] = useState<string | null>(null);
+  const [zohoProfile, setZohoProfile] = useState<ZohoProfile>({
+    email: null, phone: null, mobile: null, state: null, country: null, jobTitle: null,
+  });
 
-  // Fetch Zoho profile photo + real email once on login
+  // Fetch Zoho profile data once on login
   useEffect(() => {
     if (!loadToken()) return;
     fetchCurrentZohoUser().then(user => {
       if (!user) return;
+      const u = user as unknown as Record<string, unknown>;
       const zuid = user.Zuid ?? user.zuid ?? null;
       if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=thumb`);
       if (user.email) setZohoEmail(user.email);
+      setZohoProfile({
+        email:    user.email ?? null,
+        phone:    (u['phone'] as string) ?? null,
+        mobile:   (u['mobile'] as string) ?? null,
+        state:    (u['state'] as string) ?? null,
+        country:  (u['country'] as string) ?? null,
+        jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
+      });
     }).catch(() => {});
   }, [isLoggedIn]);
 
@@ -89,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         zohoEmail,
+        zohoProfile,
       }}
     >
       {children}
