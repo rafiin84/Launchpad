@@ -105,7 +105,6 @@ export default function Profile() {
                     alt={currentUser.name}
                     className="w-full h-full object-cover object-center scale-150"
                     referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (

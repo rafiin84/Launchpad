@@ -301,7 +301,6 @@ export default function FounderDashboard() {
                 alt={currentUser.name}
                 className="w-full h-full object-cover scale-150"
                 referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (

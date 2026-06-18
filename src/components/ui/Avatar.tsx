@@ -59,7 +59,6 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
           alt={name}
           className="w-full h-full object-cover scale-150"
           referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
           onError={() => setImgError(true)}
         />
       ) : (
