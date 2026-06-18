@@ -79,7 +79,7 @@ export default function Profile() {
         {/* Cover image */}
         <div className="h-36 sm:h-44 relative overflow-hidden">
           <img
-            src="https://source.unsplash.com/SqAxocN59ZE/1200x400"
+            src="https://plus.unsplash.com/premium_photo-1746517836275-651a195a3fe5?fm=jpg&q=80&w=1200&auto=format&fit=crop"
             alt="cover"
             className="w-full h-full object-cover"
             onError={(e) => {
@@ -92,16 +92,16 @@ export default function Profile() {
 
         <div className="px-6 pb-6">
           {/* Avatar overlapping cover */}
-          <div className="-mt-10 mb-4">
+          <div className="-mt-10 mb-4 w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden bg-white flex-shrink-0">
             {currentUser.avatar ? (
               <img
                 src={currentUser.avatar}
                 alt={currentUser.name}
-                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                className="w-full h-full object-cover object-top"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-indigo-100 border-4 border-white shadow-lg flex items-center justify-center">
+              <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
                 <span className="text-indigo-700 font-bold text-xl">{initials}</span>
               </div>
             )}
