@@ -258,7 +258,7 @@ function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
                 radius={[0, 4, 4, 0]}
                 animationBegin={0}
                 animationDuration={800}
-                label={{ position: 'right', formatter: (v: number) => fmt(v), fontSize: 10, fontWeight: 600, fill: '#6b7280' }}
+                label={{ position: 'right', formatter: (v: unknown) => fmt(Number(v) || 0), fontSize: 10, fontWeight: 600, fill: '#6b7280' }}
               >
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
