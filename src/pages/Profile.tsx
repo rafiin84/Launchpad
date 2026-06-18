@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Mail, LogOut, Edit3, Briefcase, GraduationCap,
-  Users, Building2, ExternalLink,
+  Building2, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -203,17 +203,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Follower stats */}
-          <div className="flex items-center gap-4 mt-3">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Users size={13} className="text-gray-400" />
-              <span className="font-semibold text-gray-700">34K</span> followers
-            </div>
-            <div className="w-px h-3 bg-gray-200" />
-            <div className="text-xs text-gray-500">
-              <span className="font-semibold text-gray-700">500+</span> connections
-            </div>
-          </div>
 
           {/* Skills pills */}
           {extra.expertise.length > 0 && (
