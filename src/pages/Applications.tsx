@@ -381,11 +381,20 @@ export default function Applications() {
     : records;
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative overflow-hidden"
       style={{
-        background: 'radial-gradient(ellipse at 20% 0%, #eef2ff 0%, transparent 50%), radial-gradient(ellipse at 80% 100%, #f0fdf4 0%, transparent 50%), #f8fafc',
+        backgroundColor: '#f1f5f9',
+        backgroundImage: `
+          radial-gradient(ellipse 80% 60% at 10% -10%, rgba(99,102,241,0.12) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 50% at 90% 110%, rgba(139,92,246,0.10) 0%, transparent 60%),
+          url("data:image/svg+xml,%3Csvg width='52' height='52' viewBox='0 0 52 52' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1.5' fill='%236366f1' fill-opacity='0.07'/%3E%3C/svg%3E")
+        `,
       }}
     >
+      {/* Decorative blobs */}
+      <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-indigo-200 rounded-full opacity-10 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/2 -right-32 w-80 h-80 bg-violet-300 rounded-full opacity-10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 left-1/3 w-72 h-72 bg-blue-200 rounded-full opacity-10 blur-3xl" />
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
           title="Delete Application"
@@ -395,7 +404,7 @@ export default function Applications() {
           deleting={deleting}
         />
       )}
-      <div className="w-full max-w-2xl">
+      <div className="relative z-10 w-full max-w-2xl">
         <PageHeader
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
@@ -444,7 +453,7 @@ export default function Applications() {
       )}
 
       {/* Table section */}
-      <div className="w-full max-w-2xl">
+      <div className="relative z-10 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900">
             All Applications
