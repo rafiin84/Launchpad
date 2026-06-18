@@ -383,18 +383,22 @@ export default function Applications() {
   return (
     <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 relative overflow-hidden"
       style={{
-        backgroundColor: '#f1f5f9',
-        backgroundImage: `
-          radial-gradient(ellipse 80% 60% at 10% -10%, rgba(99,102,241,0.12) 0%, transparent 60%),
-          radial-gradient(ellipse 60% 50% at 90% 110%, rgba(139,92,246,0.10) 0%, transparent 60%),
-          url("data:image/svg+xml,%3Csvg width='52' height='52' viewBox='0 0 52 52' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1.5' fill='%236366f1' fill-opacity='0.07'/%3E%3C/svg%3E")
-        `,
+        backgroundColor: '#f7f7f5',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cdefs%3E%3Cfilter id='s'%3E%3CfeDropShadow dx='0' dy='1' stdDeviation='1.5' flood-color='%23000' flood-opacity='0.06'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='120' height='120' fill='%23f7f7f5'/%3E%3Crect x='4' y='4' width='112' height='112' fill='none' stroke='%23e8e8e4' stroke-width='0.5'/%3E%3Crect x='2' y='2' width='116' height='116' rx='1' fill='%23ffffff' filter='url(%23s)' opacity='0.6'/%3E%3C/svg%3E")`,
       }}
     >
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-indigo-200 rounded-full opacity-10 blur-3xl" />
-      <div className="pointer-events-none absolute top-1/2 -right-32 w-80 h-80 bg-violet-300 rounded-full opacity-10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 left-1/3 w-72 h-72 bg-blue-200 rounded-full opacity-10 blur-3xl" />
+      {/* Subtle top-left light source */}
+      <div className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'radial-gradient(ellipse 70% 50% at 0% 0%, rgba(255,255,255,0.9) 0%, transparent 60%)',
+        }}
+      />
+      {/* Soft bottom-right shadow for depth */}
+      <div className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'radial-gradient(ellipse 60% 50% at 100% 100%, rgba(0,0,0,0.03) 0%, transparent 60%)',
+        }}
+      />
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
           title="Delete Application"
