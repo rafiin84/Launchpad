@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle } from 'lucide-react';
 import { consumePendingToken, saveToken, loadToken, consumePendingRole, saveUserName } from '../services/oauth';
-import { fetchCurrentZohoUser } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
+import { syncAppUser, uploadAppUserPhoto } from '../services/crmAppUsers';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 
@@ -16,9 +17,46 @@ export default function Callback() {
     if (pending) {
       saveToken(pending.token, pending.expiresAt);
       const role = (consumePendingRole() ?? 'investor') as UserRole;
-      // Fetch real name from Zoho then complete login
-      fetchCurrentZohoUser().then((zohoUser) => {
+      // Fetch real name from Zoho, sync to appusers, then complete login
+      fetchCurrentZohoUser().then(async (zohoUser) => {
         if (zohoUser?.full_name) saveUserName(zohoUser.full_name);
+
+        // Sync user to appusers CRM module
+        if (zohoUser) {
+          const u = zohoUser as unknown as Record<string, unknown>;
+          try {
+            const recordId = await syncAppUser({
+              name:        zohoUser.full_name || 'User',
+              email:       zohoUser.email || '',
+              phone:       (u['phone'] as string) || '',
+              mobile:      (u['mobile'] as string) || '',
+              role,
+              zohoUserId:  zohoUser.id || '',
+              jobTitle:    ((u['role'] as Record<string,string>)?.name) || '',
+              state:       (u['state'] as string) || '',
+              country:     (u['country'] as string) || '',
+            });
+
+            // Upload Zoho profile photo to appusers record image
+            try {
+              const photoUrl = await fetchUserPhoto();
+              if (photoUrl) {
+                const photoRes = await fetch(photoUrl);
+                if (photoRes.ok) {
+                  const blob = await photoRes.blob();
+                  if (blob.size > 0 && !blob.type.includes('json')) {
+                    await uploadAppUserPhoto(recordId, blob, 'profile.jpg');
+                  }
+                }
+              }
+            } catch {
+              // Photo sync is best-effort — don't block login
+            }
+          } catch {
+            // appusers sync is best-effort — don't block login
+          }
+        }
+
         login(role);
         setStatus('success');
         setTimeout(() => navigate('/'), 1500);

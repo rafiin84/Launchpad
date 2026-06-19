@@ -154,7 +154,7 @@ export default function ApplicationDetail() {
   };
 
   if (loading) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto animate-pulse space-y-4">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full animate-pulse space-y-4">
       <div className="h-4 bg-gray-100 rounded w-32" />
       <div className="h-48 bg-gray-100 rounded-2xl" />
       <div className="grid grid-cols-2 gap-4">
@@ -165,7 +165,7 @@ export default function ApplicationDetail() {
   );
 
   if (error || !app) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
         <ArrowLeft size={15} /> Applications
       </Link>
@@ -181,7 +181,7 @@ export default function ApplicationDetail() {
   const prevFunding = formatCurrency(app.previousFunding);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
       {showDelete && (
         <DeleteConfirmModal
           title="Delete Application"

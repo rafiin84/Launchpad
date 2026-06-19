@@ -367,7 +367,7 @@ function ApplicationsGrid({ apps, onDelete, showAI }: { apps: CRMApplication[]; 
 
 export default function Applications() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
     setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const [records, setRecords] = useState<CRMApplication[]>([]);

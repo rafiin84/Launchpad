@@ -1,4 +1,5 @@
-import { zohoList, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoDelete, ZOHO_BASE, type ZohoRecord } from './zohoApi';
+import { loadToken } from './oauth';
 
 // Founders are stored as Contacts in Zoho CRM
 const MODULE = 'Contacts';
@@ -77,6 +78,12 @@ const FIELDS = [
   'Description', 'Created_Time',
 ].join(',');
 
+export async function getCRMFounder(id: string): Promise<CRMFounder> {
+  const record = await zohoGetById(MODULE, id, FIELDS);
+  if (!record) throw new Error('Founder not found');
+  return fromRecord(record);
+}
+
 export async function fetchCRMFounders(): Promise<CRMFounder[]> {
   const records = await zohoList(MODULE, {
     per_page: '200',
@@ -123,3 +130,45 @@ export const LEAD_SOURCE_OPTIONS = [
 ];
 
 export const SALUTATION_OPTIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'];
+
+/**
+ * Send a portal invitation to a Contact.
+ * Zoho CRM API: POST /crm/v3/Contacts/{id}/actions/portal_invite
+ * Requires the contact to have an email address.
+ */
+export async function sendPortalInvitation(contactId: string): Promise<string> {
+  const token = loadToken();
+  if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
+
+  // Use v3 endpoint for portal invite action
+  const res = await fetch(
+    `https://www.zohoapis.in/crm/v3/${MODULE}/${contactId}/actions/portal_invite`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: [{ type: 'invite' }],
+      }),
+    },
+  );
+
+  const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const msg = (json as { message?: string }).message
+      || (json as { data?: Array<{ message?: string }> }).data?.[0]?.message
+      || `Failed to send invitation (HTTP ${res.status})`;
+    throw new Error(msg);
+  }
+
+  // Success response
+  const data = (json as { data?: Array<{ message?: string; code?: string }> }).data;
+  if (data?.[0]?.code && data[0].code !== 'SUCCESS') {
+    throw new Error(data[0].message || 'Invitation failed');
+  }
+
+  return data?.[0]?.message || 'Portal invitation sent successfully';
+}

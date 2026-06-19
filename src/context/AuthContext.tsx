@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
 import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
+import { findAppUserByEmail, fetchAppUserPhoto, loadCachedRecordId, clearCachedRecordId, type AppUser } from '../services/crmAppUsers';
 
 export interface ZohoProfile {
   email: string | null;
@@ -23,6 +24,9 @@ interface AuthContextValue {
   logout: () => void;
   zohoEmail: string | null;
   zohoProfile: ZohoProfile;
+  appUser: AppUser | null;
+  appUserRecordId: string | null;
+  refreshAvatar: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -97,6 +101,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [zohoProfile, setZohoProfile] = useState<ZohoProfile>({
     email: null, phone: null, mobile: null, state: null, country: null, jobTitle: null,
   });
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
+  const [appUserRecordId, setAppUserRecordId] = useState<string | null>(loadCachedRecordId);
+
+  // Fetch photo from appusers record image API
+  const fetchAvatarFromAppUsers = async (recordId: string) => {
+    try {
+      const dataUrl = await fetchAppUserPhoto(recordId);
+      if (dataUrl) {
+        setAvatarUrl(dataUrl);
+        localStorage.setItem(AVATAR_CACHE_KEY, dataUrl);
+        return true;
+      }
+    } catch { /* fallback below */ }
+    return false;
+  };
 
   // Fetch Zoho profile data once on login
   useEffect(() => {
@@ -117,14 +136,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
 
-      // Fetch profile photo URL via Zoho Accounts API (works everywhere)
+      // Try to load appUser profile and photo from appusers module
+      if (user.email) {
+        try {
+          const found = await findAppUserByEmail(user.email);
+          if (found) {
+            setAppUser(found);
+            setAppUserRecordId(found.id);
+
+            // Fetch photo from appusers record image API
+            const gotPhoto = await fetchAvatarFromAppUsers(found.id);
+            if (gotPhoto) return; // done — got photo from appusers
+          }
+        } catch { /* fallback below */ }
+      }
+
+      // Fallback: also try cached record ID
+      const cachedId = loadCachedRecordId();
+      if (cachedId) {
+        setAppUserRecordId(cachedId);
+        const gotPhoto = await fetchAvatarFromAppUsers(cachedId);
+        if (gotPhoto) return;
+      }
+
+      // Final fallback: Zoho Accounts photo or profile URL
       try {
         const photoUrl = await fetchUserPhoto();
         if (photoUrl) {
           setAvatarUrl(photoUrl);
           localStorage.setItem(AVATAR_CACHE_KEY, photoUrl);
         } else if (zuid) {
-          // Fallback: cookie-based URL (works if logged into Zoho in browser)
           setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
         }
       } catch {
@@ -133,7 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [isLoggedIn]);
 
-  const currentUser: User = { ...buildUser(role, userName), avatar: avatarUrl };
+  // Use appUser name if available (they may have updated it via EditProfile)
+  const displayName = appUser?.name || userName;
+  const currentUser: User = { ...buildUser(role, displayName), avatar: avatarUrl };
 
   function login(selectedRole: UserRole) {
     saveRole(selectedRole);
@@ -147,10 +190,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearToken();
     clearRole();
     clearUserName();
+    clearCachedRecordId();
     try { localStorage.removeItem(AVATAR_CACHE_KEY); } catch { /* ok */ }
     setAvatarUrl('');
     setUserName(null);
+    setAppUser(null);
+    setAppUserRecordId(null);
     setIsLoggedIn(false);
+  }
+
+  /** Re-fetch avatar from appusers (call after uploading a new photo) */
+  function refreshAvatar() {
+    const rid = appUserRecordId || loadCachedRecordId();
+    if (rid) {
+      fetchAvatarFromAppUsers(rid);
+    }
   }
 
   return (
@@ -165,6 +219,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         zohoEmail,
         zohoProfile,
+        appUser,
+        appUserRecordId,
+        refreshAvatar,
       }}
     >
       {children}

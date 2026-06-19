@@ -18,10 +18,31 @@ export function MobileHeader() {
   const isPortfolio    = location.pathname === '/portfolio';
   const isSearchOnly   = location.pathname === '/activities';
   const isDocuments    = location.pathname === '/documents';
+  const isFounders     = location.pathname === '/founders';
 
-  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const toggleView = (v: 'grid' | 'list') =>
     setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
+
+  // Reusable grid/list toggle
+  const ViewToggle = () => (
+    <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden ml-1">
+      <button
+        onClick={() => toggleView('grid')}
+        className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
+        title="Grid view"
+      >
+        <LayoutGrid size={14} />
+      </button>
+      <button
+        onClick={() => toggleView('list')}
+        className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
+        title="List view"
+      >
+        <List size={14} />
+      </button>
+    </div>
+  );
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-100 md:hidden">
@@ -78,7 +99,6 @@ export function MobileHeader() {
 
           {isPortfolio && (
             <>
-              {/* Add */}
               <Link
                 to="/portfolio/new"
                 className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
@@ -86,39 +106,12 @@ export function MobileHeader() {
               >
                 <Plus size={18} className="text-gray-600" />
               </Link>
-
-              {/* Search — focuses search input if present */}
-              <button
-                className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                title="Search"
-                onClick={() => document.getElementById('portfolio-search')?.focus()}
-              >
-                <Search size={18} className="text-gray-600" />
-              </button>
-
-              {/* Grid / List toggle */}
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden ml-1">
-                <button
-                  onClick={() => toggleView('grid')}
-                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
-                  title="Grid view"
-                >
-                  <LayoutGrid size={14} />
-                </button>
-                <button
-                  onClick={() => toggleView('list')}
-                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
-                  title="List view"
-                >
-                  <List size={14} />
-                </button>
-              </div>
+              <ViewToggle />
             </>
           )}
 
           {isApplications && (
             <>
-              {/* Add */}
               <Link
                 to="/applications/new"
                 className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
@@ -126,33 +119,23 @@ export function MobileHeader() {
               >
                 <Plus size={18} className="text-gray-600" />
               </Link>
+              <ViewToggle />
+            </>
+          )}
 
-              {/* Search — focuses the search input in the page */}
+          {isFounders && (
+            <>
               <button
                 className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                title="Search"
-                onClick={() => document.getElementById('app-search')?.focus()}
+                title="Add Founder"
+                onClick={() => {
+                  // Dispatch custom event that the Founders page listens for
+                  window.dispatchEvent(new CustomEvent('open-add-founder'));
+                }}
               >
-                <Search size={18} className="text-gray-600" />
+                <Plus size={18} className="text-gray-600" />
               </button>
-
-              {/* Grid / List toggle */}
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden ml-1">
-                <button
-                  onClick={() => toggleView('grid')}
-                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
-                  title="Grid view"
-                >
-                  <LayoutGrid size={14} />
-                </button>
-                <button
-                  onClick={() => toggleView('list')}
-                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400'}`}
-                  title="List view"
-                >
-                  <List size={14} />
-                </button>
-              </div>
+              <ViewToggle />
             </>
           )}
         </div>

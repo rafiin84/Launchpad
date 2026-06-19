@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft,
+  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
+import { updateAppUser, uploadAppUserPhoto } from '../services/crmAppUsers';
+import { saveUserName } from '../services/oauth';
 
 const PROFILE_KEY = 'lp_profile_extra';
 
@@ -29,10 +31,15 @@ function saveExtra(data: ProfileExtra) {
 }
 
 export default function EditProfile() {
-  const { currentUser } = useAuth();
+  const { currentUser, appUserRecordId, refreshAvatar } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileExtra>(loadExtra);
   const [newTag, setNewTag] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (field: keyof ProfileExtra, val: string) =>
     setForm(prev => ({ ...prev, [field]: val }));
@@ -48,9 +55,57 @@ export default function EditProfile() {
   const removeTag = (tag: string) =>
     setForm(prev => ({ ...prev, expertise: prev.expertise.filter(e => e !== tag) }));
 
-  const handleSave = () => {
-    saveExtra(form);
-    navigate('/profile');
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    const url = URL.createObjectURL(file);
+    setPhotoPreview(url);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Save locally
+      saveExtra(form);
+
+      // Sync to appusers CRM module
+      if (appUserRecordId) {
+        try {
+          await updateAppUser(appUserRecordId, {
+            bio: form.bio,
+            location: form.location,
+            linkedIn: form.linkedIn,
+            twitter: form.twitter,
+            expertise: form.expertise,
+          });
+
+          // Also update the user's display name in localStorage if changed
+          if (currentUser.name) {
+            saveUserName(currentUser.name);
+          }
+        } catch {
+          // CRM update is best-effort
+        }
+
+        // Upload photo if selected
+        if (photoFile) {
+          setUploadingPhoto(true);
+          try {
+            await uploadAppUserPhoto(appUserRecordId, photoFile, photoFile.name || 'photo.jpg');
+            refreshAvatar(); // re-fetch avatar from appusers
+          } catch {
+            // Photo upload is best-effort
+          } finally {
+            setUploadingPhoto(false);
+          }
+        }
+      }
+
+      navigate('/profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -64,12 +119,25 @@ export default function EditProfile() {
         <ArrowLeft size={16} /> Back to Profile
       </button>
 
-      {/* Header */}
+      {/* Header with photo upload */}
       <div className="flex items-center gap-4 mb-8">
-        <Avatar src={currentUser.avatar} name={currentUser.name} size="lg" />
+        <div className="relative group">
+          <Avatar src={photoPreview || currentUser.avatar} name={currentUser.name} size="lg" />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          >
+            <Camera size={16} className="text-white" />
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+        </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Edit Profile</h1>
           <p className="text-sm text-gray-500 mt-0.5">{currentUser.name}</p>
+          {photoFile && (
+            <p className="text-xs text-emerald-600 mt-0.5">New photo selected — will upload on save</p>
+          )}
         </div>
       </div>
 
@@ -169,15 +237,18 @@ export default function EditProfile() {
       <div className="flex gap-3 mt-6">
         <button
           onClick={() => navigate('/profile')}
-          className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors"
+          disabled={saving}
+          className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           onClick={handleSave}
-          className="flex-1 px-4 py-3 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors"
+          disabled={saving || uploadingPhoto}
+          className="flex-1 px-4 py-3 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          Save Changes
+          {(saving || uploadingPhoto) && <Loader2 size={14} className="animate-spin" />}
+          {uploadingPhoto ? 'Uploading Photo…' : saving ? 'Saving…' : 'Save Changes'}
         </button>
       </div>
     </div>

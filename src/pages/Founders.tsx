@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   Users, Plus, AlertCircle, RefreshCw, Mail, Phone, Building2,
   Briefcase, Trash2, X, Search, UserPlus, MapPin, ChevronDown,
-  Sparkles, Link2, UserCheck, MessageSquare,
+  LayoutGrid, List,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../components/ui/Avatar';
 import {
   fetchCRMFounders, createCRMFounder, deleteCRMFounder,
@@ -13,8 +13,6 @@ import {
 } from '../services/crmFounders';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
-import { AIBadge } from '../components/ui/AIBadge';
-import { suggestFounderConnections, type AIFounderSuggestion } from '../services/aiEngine';
 
 // ─── Form Field Component ────────────────────────────────────────────────────
 
@@ -246,11 +244,15 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
       <div className="flex items-start gap-4">
-        <Avatar name={displayName} size="lg" />
+        <Link to={`/founders/${founder.id}`}>
+          <Avatar name={displayName} size="lg" />
+        </Link>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900 truncate">{fullName}</h3>
+            <Link to={`/founders/${founder.id}`} className="hover:text-indigo-600 transition-colors">
+              <h3 className="text-sm font-bold text-gray-900 truncate">{fullName}</h3>
+            </Link>
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -261,50 +263,157 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
             </button>
           </div>
 
-          {founder.title && (
-            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-              <Briefcase size={11} className="text-gray-400" />
-              {founder.title}{founder.department ? ` · ${founder.department}` : ''}
-            </p>
-          )}
+          <Link to={`/founders/${founder.id}`} className="block">
+            {founder.title && (
+              <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                <Briefcase size={11} className="text-gray-400" />
+                {founder.title}{founder.department ? ` · ${founder.department}` : ''}
+              </p>
+            )}
 
-          <div className="mt-2.5 space-y-1.5">
-            {founder.email && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Mail size={11} className="text-gray-400 flex-shrink-0" />
-                <span className="truncate">{founder.email}</span>
-              </div>
-            )}
-            {(founder.phone || founder.mobile) && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Phone size={11} className="text-gray-400 flex-shrink-0" />
-                {founder.phone || founder.mobile}
-              </div>
-            )}
-            {founder.company && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Building2 size={11} className="text-gray-400 flex-shrink-0" />
-                {founder.company}
-              </div>
-            )}
-            {location && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <MapPin size={11} className="text-gray-400 flex-shrink-0" />
-                {location}
-              </div>
-            )}
-          </div>
+            <div className="mt-2.5 space-y-1.5">
+              {founder.email && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Mail size={11} className="text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{founder.email}</span>
+                </div>
+              )}
+              {(founder.phone || founder.mobile) && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Phone size={11} className="text-gray-400 flex-shrink-0" />
+                  {founder.phone || founder.mobile}
+                </div>
+              )}
+              {founder.company && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Building2 size={11} className="text-gray-400 flex-shrink-0" />
+                  {founder.company}
+                </div>
+              )}
+              {location && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <MapPin size={11} className="text-gray-400 flex-shrink-0" />
+                  {location}
+                </div>
+              )}
+            </div>
 
-          {/* Tags row */}
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {founder.leadSource && founder.leadSource !== '-None-' && (
-              <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
-                {founder.leadSource}
-              </span>
-            )}
-          </div>
+            {/* Tags row */}
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              {founder.leadSource && founder.leadSource !== '-None-' && (
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+                  {founder.leadSource}
+                </span>
+              )}
+            </div>
+          </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Founder List Row ────────────────────────────────────────────────────────
+
+function FounderRow({ founder, onDelete }: { founder: CRMFounder; onDelete: (id: string) => void }) {
+  const [deleting, setDeleting] = useState(false);
+  const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
+  const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
+  const location = [founder.mailingCity, founder.mailingState, founder.mailingCountry].filter(Boolean).join(', ');
+
+  async function handleDelete() {
+    if (!confirm(`Remove ${displayName}?`)) return;
+    setDeleting(true);
+    try {
+      await deleteCRMFounder(founder.id);
+      onDelete(founder.id);
+    } catch {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
+      <Link to={`/founders/${founder.id}`}>
+        <Avatar name={displayName} size="sm" />
+      </Link>
+
+      {/* Name + title */}
+      <Link to={`/founders/${founder.id}`} className="w-48 min-w-0 flex-shrink-0 hover:text-indigo-600 transition-colors">
+        <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
+        {founder.title && (
+          <p className="text-xs text-gray-400 truncate">{founder.title}</p>
+        )}
+      </Link>
+
+      {/* Company */}
+      <div className="w-36 min-w-0 flex-shrink-0 hidden sm:block">
+        {founder.company ? (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <Building2 size={11} className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{founder.company}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
+      {/* Email */}
+      <div className="flex-1 min-w-0 hidden md:block">
+        {founder.email ? (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <Mail size={11} className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{founder.email}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
+      {/* Phone */}
+      <div className="w-36 min-w-0 flex-shrink-0 hidden lg:block">
+        {(founder.phone || founder.mobile) ? (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <Phone size={11} className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{founder.phone || founder.mobile}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
+      {/* Location */}
+      <div className="w-40 min-w-0 flex-shrink-0 hidden xl:block">
+        {location ? (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+            <MapPin size={11} className="text-gray-400 flex-shrink-0" />
+            <span className="truncate">{location}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
+      {/* Lead source tag */}
+      <div className="w-28 flex-shrink-0 hidden xl:block">
+        {founder.leadSource && founder.leadSource !== '-None-' ? (
+          <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+            {founder.leadSource}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
+      {/* Delete */}
+      <button
+        onClick={handleDelete}
+        disabled={deleting}
+        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all flex-shrink-0"
+        title="Remove founder"
+      >
+        <Trash2 size={13} />
+      </button>
     </div>
   );
 }
@@ -312,13 +421,23 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Founders() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [founders, setFounders]   = useState<CRMFounder[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch]       = useState('');
-  const [founderSuggestions, setFounderSuggestions] = useState<AIFounderSuggestion[]>([]);
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
+  const setView = (v: 'grid' | 'list') =>
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const isConnected = !!loadToken();
+
+  // Listen for mobile header "+" button
+  useEffect(() => {
+    const handler = () => setShowModal(true);
+    window.addEventListener('open-add-founder', handler);
+    return () => window.removeEventListener('open-add-founder', handler);
+  }, []);
 
   function load() {
     if (!isConnected) { setLoading(false); return; }
@@ -330,13 +449,6 @@ export default function Founders() {
   }
 
   useEffect(() => { load(); }, []);
-
-  // Generate AI founder suggestions
-  useEffect(() => {
-    if (founders.length >= 2) {
-      setFounderSuggestions(suggestFounderConnections(founders));
-    }
-  }, [founders]);
 
   const filtered = search.trim()
     ? founders.filter(f => {
@@ -353,7 +465,7 @@ export default function Founders() {
     : founders;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -366,13 +478,31 @@ export default function Founders() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          disabled={!isConnected}
-          className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <Plus size={15} /> Add Founder
-        </button>
+        <div className="hidden md:flex items-center gap-3">
+          <div className="flex rounded-xl overflow-hidden border border-gray-200">
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Grid view"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              title="List view"
+            >
+              <List size={15} />
+            </button>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            disabled={!isConnected}
+            className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <Plus size={15} /> Add Founder
+          </button>
+        </div>
       </div>
 
       {/* Not connected */}
@@ -403,7 +533,7 @@ export default function Founders() {
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
               <div className="flex items-start gap-4">
@@ -453,64 +583,40 @@ export default function Founders() {
         </div>
       )}
 
-      {/* AI Founder Suggestions */}
-      {!loading && founderSuggestions.length > 0 && founders.length >= 2 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles size={14} className="text-indigo-500" />
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">AI Suggestions</h3>
-            <AIBadge />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {founderSuggestions.slice(0, 4).map((s, i) => {
-              const typeIcon = s.type === 'connect'
-                ? <Link2 size={14} className="text-indigo-500" />
-                : s.type === 'followup'
-                ? <MessageSquare size={14} className="text-amber-500" />
-                : <UserCheck size={14} className="text-emerald-500" />;
-              const typeBorder = s.type === 'connect'
-                ? 'border-l-indigo-400'
-                : s.type === 'followup'
-                ? 'border-l-amber-400'
-                : 'border-l-emerald-400';
-              return (
-                <div key={i} className={cn(
-                  'bg-white border border-gray-100 rounded-xl p-3.5 border-l-[3px] hover:shadow-sm transition-all',
-                  typeBorder
-                )}>
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex-shrink-0">{typeIcon}</div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-semibold text-gray-900 mb-1">{s.title}</h4>
-                      <p className="text-xs text-gray-500 leading-relaxed">{s.description}</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {s.founders.slice(0, 3).map((name, j) => (
-                          <span key={j} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{name}</span>
-                        ))}
-                        {s.founders.length > 3 && (
-                          <span className="text-[10px] text-gray-400">+{s.founders.length - 3} more</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Founder cards */}
+      {/* Founder cards / list */}
       {!loading && !error && filtered.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filtered.map(f => (
-            <FounderCard
-              key={f.id}
-              founder={f}
-              onDelete={(id) => setFounders(prev => prev.filter(p => p.id !== id))}
-            />
-          ))}
-        </div>
+        view === 'list' ? (
+          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+            {/* Table header */}
+            <div className="flex items-center gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+              <div className="w-8" /> {/* avatar spacer */}
+              <div className="w-48 flex-shrink-0">Name</div>
+              <div className="w-36 flex-shrink-0 hidden sm:block">Company</div>
+              <div className="flex-1 hidden md:block">Email</div>
+              <div className="w-36 flex-shrink-0 hidden lg:block">Phone</div>
+              <div className="w-40 flex-shrink-0 hidden xl:block">Location</div>
+              <div className="w-28 flex-shrink-0 hidden xl:block">Source</div>
+              <div className="w-8" /> {/* delete spacer */}
+            </div>
+            {filtered.map(f => (
+              <FounderRow
+                key={f.id}
+                founder={f}
+                onDelete={(id) => setFounders(prev => prev.filter(p => p.id !== id))}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(f => (
+              <FounderCard
+                key={f.id}
+                founder={f}
+                onDelete={(id) => setFounders(prev => prev.filter(p => p.id !== id))}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {/* Add Modal */}

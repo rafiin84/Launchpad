@@ -7,7 +7,6 @@ import {
   Building2,
   PieChart,
   FileText,
-  Settings,
   Rocket,
   LayoutDashboard,
   LogOut,
@@ -34,7 +33,6 @@ const investorNav: NavItem[] = [
   { label: 'Applications', path: '/applications',icon: Inbox },
   { label: 'Founders',     path: '/founders',    icon: Users },
   { label: 'Documents',    path: '/documents',   icon: FileText },
-  { label: 'Settings',     path: '/settings',    icon: Settings },
 ];
 
 const founderNav: NavItem[] = [
@@ -42,7 +40,6 @@ const founderNav: NavItem[] = [
   { label: 'Activities', path: '/activities', icon: Rss },
   { label: 'Company',    path: '/company',    icon: Building2 },
   { label: 'Documents',  path: '/documents',  icon: FileText },
-  { label: 'Settings',   path: '/settings',   icon: Settings },
 ];
 
 export function Sidebar() {

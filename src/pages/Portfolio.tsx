@@ -204,7 +204,7 @@ function PortfolioTable({ companies, onDelete }: { companies: CRMPortfolioRecord
 
 export default function Portfolio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = (searchParams.get('view') as 'grid' | 'list') || 'grid';
+  const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
     setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const [crmCompanies, setCrmCompanies] = useState<CRMPortfolioRecord[]>([]);

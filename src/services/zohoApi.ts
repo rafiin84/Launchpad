@@ -138,6 +138,110 @@ export async function zohoDelete(module: string, id: string): Promise<void> {
   }
 }
 
+// ─── Upsert (insert-or-update) ────────────────────────────────────────────────
+
+export async function zohoUpsert(
+  module: string,
+  data: Record<string, unknown>,
+  duplicateCheckFields: string[],
+): Promise<{ id: string; action: 'insert' | 'update' }> {
+  const res = await fetch(`${ZOHO_BASE}/${module}/upsert`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      data: [data],
+      duplicate_check_fields: duplicateCheckFields,
+    }),
+  });
+
+  const json: ZohoCUDResponse = await res.json();
+
+  if (json.code && json.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  }
+
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, result?.message ?? 'Upsert failed', result?.code ?? '');
+  }
+
+  return {
+    id: result.details.id,
+    action: (result as unknown as { action: string }).action === 'update' ? 'update' : 'insert',
+  };
+}
+
+// ─── Search records (COQL or criteria) ───────────────────────────────────────
+
+export async function zohoSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
+  const url = `${ZOHO_BASE}/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 204) return [];
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok && res.status !== 204) {
+    throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  }
+  return json.data ?? [];
+}
+
+// ─── Record Image API ─────────────────────────────────────────────────────────
+
+/**
+ * Upload a photo to a CRM record.
+ * Uses the Record Image API: POST /crm/v2/{module}/{id}/photo
+ */
+export async function zohoUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
+  const token = loadToken();
+  if (!token) throw new ZohoApiError(401, 'Not connected', 'NO_TOKEN');
+
+  const formData = new FormData();
+  formData.append('file', file, fileName);
+
+  const res = await fetch(`${ZOHO_BASE}/${module}/${recordId}/photo`, {
+    method: 'POST',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
+    throw new ZohoApiError(res.status, json.message ?? 'Photo upload failed', json.code ?? '');
+  }
+}
+
+/**
+ * Download a record's photo as a data: URL (for caching/display).
+ * Uses: GET /crm/v2/{module}/{id}/photo
+ * Returns null if no photo exists.
+ */
+export async function zohoGetRecordPhoto(module: string, recordId: string): Promise<string | null> {
+  const token = loadToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${ZOHO_BASE}/${module}/${recordId}/photo`, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
+
+    if (!res.ok || res.status === 204) return null;
+
+    const blob = await res.blob();
+    if (!blob.size || blob.type.includes('json') || blob.type.includes('html')) return null;
+
+    return new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result?.startsWith('data:') ? result : null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ─── Current user ─────────────────────────────────────────────────────────────
 
 export interface ZohoCurrentUser {

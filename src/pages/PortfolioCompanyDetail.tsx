@@ -64,7 +64,7 @@ export default function PortfolioCompanyDetail() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="w-24 h-4 bg-gray-100 rounded animate-pulse mb-6" />
         <div className="h-48 sm:h-64 bg-gray-100 rounded-2xl animate-pulse mb-6" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -91,7 +91,7 @@ export default function PortfolioCompanyDetail() {
 
   if (error || !record) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
           <ArrowLeft size={15} /> Portfolio
         </Link>
@@ -114,7 +114,7 @@ export default function PortfolioCompanyDetail() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pb-12">
       {showDeleteModal && (
         <DeleteConfirmModal
           title="Delete Company"
