@@ -117,15 +117,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
 
-      // Fetch photo via our server-side proxy (works on ALL devices)
-      const dataUrl = await fetchAvatarViaProxy(token, user.id, zuid);
-      if (dataUrl) {
-        setAvatarUrl(dataUrl);
-        try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* quota */ }
-      } else if (zuid && !avatarUrl) {
-        // Last resort: cookie-based URL (only works on desktop)
+      // Set cookie-based URL immediately (works on desktop)
+      const cached = localStorage.getItem(AVATAR_CACHE_KEY);
+      if (zuid && !cached) {
         setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
       }
+
+      // Try server-side proxy in background (works on ALL devices)
+      try {
+        const dataUrl = await fetchAvatarViaProxy(token, user.id, zuid);
+        if (dataUrl) {
+          setAvatarUrl(dataUrl);
+          try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* quota */ }
+        }
+      } catch { /* proxy failed — cookie URL or cache is already set */ }
     }).catch(() => {});
   }, [isLoggedIn]);
 
