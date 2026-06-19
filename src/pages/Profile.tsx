@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useImageLoaded } from '../lib/useImageLoaded';
 import { PageHeader } from '../components/layout/PageHeader';
 
 /* ── localStorage helpers ───────────────────────────────────── */
@@ -36,7 +35,6 @@ function loadExtra(): ProfileExtra {
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
   const { currentUser, role, logout, zohoEmail, zohoProfile } = useAuth();
-  const avatarReady = useImageLoaded(currentUser.avatar);
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(loadExtra);
 
@@ -100,17 +98,18 @@ export default function Profile() {
 
             <div className="px-6 pb-6">
               {/* Avatar overlapping cover */}
-              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0">
-                {avatarReady ? (
+              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0 relative bg-indigo-100">
+                {/* Initials — always behind */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-indigo-700 font-bold text-xl">{initials}</span>
+                </div>
+                {currentUser.avatar && (
                   <img
                     src={currentUser.avatar}
                     alt={currentUser.name}
-                    className="w-full h-full object-cover object-center scale-150"
+                    className="relative w-full h-full object-cover object-center scale-150"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
-                ) : (
-                  <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
-                    <span className="text-indigo-700 font-bold text-xl">{initials}</span>
-                  </div>
                 )}
               </div>
 

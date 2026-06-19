@@ -1,5 +1,5 @@
+import React from 'react';
 import { cn } from '../../lib/cn';
-import { useImageLoaded } from '../../lib/useImageLoaded';
 
 type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -42,7 +42,7 @@ function getColor(name: string) {
 }
 
 export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps) {
-  const imgReady = useImageLoaded(src);
+  const [imgError, setImgError] = React.useState(false);
 
   return (
     <div
@@ -50,19 +50,21 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
         'relative flex-shrink-0 rounded-full overflow-hidden',
         sizes[size],
         ring && 'ring-2 ring-white',
+        getColor(name).split(' ')[0], // background color as fallback
         className
       )}
     >
-      {imgReady ? (
+      {/* Initials — always behind */}
+      <div className={cn('absolute inset-0 flex items-center justify-center font-semibold', getColor(name))}>
+        {getInitials(name)}
+      </div>
+      {src && !imgError && (
         <img
           src={src}
           alt={name}
-          className="w-full h-full object-cover scale-150"
+          className="relative w-full h-full object-cover scale-150"
+          onError={() => setImgError(true)}
         />
-      ) : (
-        <div className={cn('w-full h-full flex items-center justify-center font-semibold', getColor(name))}>
-          {getInitials(name)}
-        </div>
       )}
     </div>
   );
