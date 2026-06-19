@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
-import { fetchCurrentZohoUser } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
 
 export interface ZohoProfile {
   email: string | null;
@@ -117,20 +117,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
 
-      // Set cookie-based URL immediately (works on desktop)
-      const cached = localStorage.getItem(AVATAR_CACHE_KEY);
-      if (zuid && !cached) {
+      // 1. Set cookie-based URL immediately (works if logged into Zoho in browser)
+      if (zuid) {
         setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
       }
 
-      // Try server-side proxy in background (works on ALL devices)
+      // 2. Fetch photo via OAuth API (works everywhere with token)
       try {
-        const dataUrl = await fetchAvatarViaProxy(token, user.id, zuid);
-        if (dataUrl) {
-          setAvatarUrl(dataUrl);
-          try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* quota */ }
+        const blobUrl = await fetchUserPhoto(user.id, zuid ?? undefined);
+        if (blobUrl) {
+          setAvatarUrl(blobUrl);
+          // Cache as data URL in localStorage for instant load next time
+          try {
+            const res = await fetch(blobUrl);
+            const blob = await res.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result as string;
+              if (dataUrl?.startsWith('data:')) {
+                localStorage.setItem(AVATAR_CACHE_KEY, dataUrl);
+                setAvatarUrl(dataUrl);
+              }
+            };
+            reader.readAsDataURL(blob);
+          } catch { /* blob URL is fine */ }
         }
-      } catch { /* proxy failed — cookie URL or cache is already set */ }
+      } catch { /* OAuth fetch failed, cookie URL is already set */ }
     }).catch(() => {});
   }, [isLoggedIn]);
 
