@@ -1,26 +1,46 @@
 import { zohoList, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
 
-// Founders are stored in the Zoho CRM Contacts module
+// Founders are stored as Contacts in Zoho CRM
 const MODULE = 'Contacts';
 
 export interface CRMFounder {
   id: string;
+  salutation: string;
   firstName: string;
-  lastName: string;
+  lastName: string;       // Required by CRM
   email: string;
+  secondaryEmail: string;
   phone: string;
+  mobile: string;
+  title: string;          // Designation / Job Title
+  department: string;
   company: string;
-  designation: string;
+  leadSource: string;
+  mailingCity: string;
+  mailingState: string;
+  mailingCountry: string;
+  description: string;
   createdTime: string;
 }
 
 export interface CRMFounderFields {
+  salutation?: string;
   firstName: string;
-  lastName: string;
+  lastName: string;       // Required
   email: string;
-  phone: string;
-  company: string;
-  designation: string;
+  secondaryEmail?: string;
+  phone?: string;
+  mobile?: string;
+  title?: string;
+  department?: string;
+  company?: string;
+  leadSource?: string;
+  mailingCity?: string;
+  mailingState?: string;
+  mailingCountry?: string;
+  mailingStreet?: string;
+  mailingZip?: string;
+  description?: string;
 }
 
 function fromRecord(r: ZohoRecord): CRMFounder {
@@ -30,18 +50,32 @@ function fromRecord(r: ZohoRecord): CRMFounder {
     return String(v);
   };
   return {
-    id:          r.id,
-    firstName:   str('First_Name'),
-    lastName:    str('Last_Name'),
-    email:       str('Email'),
-    phone:       str('Phone'),
-    company:     str('Company') || (r['Account_Name'] as Record<string, string>)?.name || '',
-    designation: str('Designation') || str('Title'),
-    createdTime: str('Created_Time'),
+    id:             r.id,
+    salutation:     str('Salutation'),
+    firstName:      str('First_Name'),
+    lastName:       str('Last_Name'),
+    email:          str('Email'),
+    secondaryEmail: str('Secondary_Email'),
+    phone:          str('Phone'),
+    mobile:         str('Mobile'),
+    title:          str('Title'),
+    department:     str('Department'),
+    company:        str('Company') || ((r['Account_Name'] as Record<string, string>)?.name ?? ''),
+    leadSource:     str('Lead_Source'),
+    mailingCity:    str('Mailing_City'),
+    mailingState:   str('Mailing_State'),
+    mailingCountry: str('Mailing_Country'),
+    description:    str('Description'),
+    createdTime:    str('Created_Time'),
   };
 }
 
-const FIELDS = 'First_Name,Last_Name,Email,Phone,Company,Designation,Title,Account_Name,Created_Time';
+const FIELDS = [
+  'Salutation', 'First_Name', 'Last_Name', 'Email', 'Secondary_Email',
+  'Phone', 'Mobile', 'Title', 'Department', 'Company', 'Account_Name',
+  'Lead_Source', 'Mailing_City', 'Mailing_State', 'Mailing_Country',
+  'Description', 'Created_Time',
+].join(',');
 
 export async function fetchCRMFounders(): Promise<CRMFounder[]> {
   const records = await zohoList(MODULE, {
@@ -55,16 +89,37 @@ export async function fetchCRMFounders(): Promise<CRMFounder[]> {
 
 export async function createCRMFounder(fields: CRMFounderFields): Promise<string> {
   const payload: Record<string, unknown> = {
-    First_Name: fields.firstName,
-    Last_Name:  fields.lastName,
-    Email:      fields.email,
+    Last_Name: fields.lastName,   // Only required field
   };
-  if (fields.phone) payload.Phone = fields.phone;
-  if (fields.company) payload.Company = fields.company;
-  if (fields.designation) payload.Designation = fields.designation;
+  if (fields.salutation)     payload.Salutation     = fields.salutation;
+  if (fields.firstName)      payload.First_Name     = fields.firstName;
+  if (fields.email)          payload.Email           = fields.email;
+  if (fields.secondaryEmail) payload.Secondary_Email = fields.secondaryEmail;
+  if (fields.phone)          payload.Phone           = fields.phone;
+  if (fields.mobile)         payload.Mobile          = fields.mobile;
+  if (fields.title)          payload.Title           = fields.title;
+  if (fields.department)     payload.Department      = fields.department;
+  if (fields.company)        payload.Company         = fields.company;
+  if (fields.leadSource)     payload.Lead_Source     = fields.leadSource;
+  if (fields.mailingCity)    payload.Mailing_City    = fields.mailingCity;
+  if (fields.mailingState)   payload.Mailing_State   = fields.mailingState;
+  if (fields.mailingCountry) payload.Mailing_Country = fields.mailingCountry;
+  if (fields.mailingStreet)  payload.Mailing_Street  = fields.mailingStreet;
+  if (fields.mailingZip)     payload.Mailing_Zip     = fields.mailingZip;
+  if (fields.description)    payload.Description     = fields.description;
   return zohoCreate(MODULE, payload);
 }
 
 export async function deleteCRMFounder(id: string): Promise<void> {
   return zohoDelete(MODULE, id);
 }
+
+// Lead Source picklist values from CRM
+export const LEAD_SOURCE_OPTIONS = [
+  'Advertisement', 'Cold Call', 'Employee Referral', 'External Referral',
+  'Online Store', 'Partner', 'Public Relations', 'Sales Email Alias',
+  'Seminar Partner', 'Internal Seminar', 'Trade Show', 'Web Download',
+  'Web Research', 'Web Cases', 'Web Mail', 'Chat', 'X (Twitter)', 'Facebook',
+];
+
+export const SALUTATION_OPTIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'];
