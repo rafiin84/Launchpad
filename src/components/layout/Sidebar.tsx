@@ -32,6 +32,7 @@ const investorNav: NavItem[] = [
   { label: 'Activities',   path: '/activities',  icon: Rss },
   { label: 'Portfolio',    path: '/portfolio',   icon: PieChart },
   { label: 'Applications', path: '/applications',icon: Inbox },
+  { label: 'Founders',     path: '/founders',    icon: Users },
   { label: 'Documents',    path: '/documents',   icon: FileText },
   { label: 'Settings',     path: '/settings',    icon: Settings },
 ];

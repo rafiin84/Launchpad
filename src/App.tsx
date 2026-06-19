@@ -45,6 +45,7 @@ import AddActivity from './pages/AddActivity';
 import ActivityDetail from './pages/ActivityDetail';
 import EditActivity from './pages/EditActivity';
 import FounderCompany from './pages/FounderCompany';
+import Founders from './pages/Founders';
 
 export default function App() {
   return (
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
             <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
             <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
+            <Route path="/founders" element={<Founders />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/new" element={<AddDocument />} />
