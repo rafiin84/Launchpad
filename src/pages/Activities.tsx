@@ -381,7 +381,7 @@ export default function Activities() {
     >
       <div className="pointer-events-none absolute inset-0 bg-white/30" />
 
-      <div className="relative z-10 w-full max-w-5xl mx-auto">
+      <div className="relative z-10 w-full max-w-5xl">
 
       {/* Page title */}
       <div className="mb-5">
