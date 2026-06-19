@@ -381,7 +381,7 @@ export default function Activities() {
     >
       <div className="pointer-events-none absolute inset-0 bg-white/30" />
 
-      <div className="relative z-10 w-full max-w-2xl">
+      <div className="relative z-10 w-full max-w-5xl mx-auto">
 
       {/* Page title */}
       <div className="mb-5">
@@ -400,6 +400,12 @@ export default function Activities() {
           <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">Connect</Link>
         </div>
       )}
+
+      {/* Two-column: feed left, recent right */}
+      <div className="flex gap-5 items-start">
+
+      {/* LEFT — feed (same as before) */}
+      <div className="flex-1 min-w-0 max-w-2xl">
 
       {/* Composer */}
       <Composer onPost={handlePost} />
@@ -452,30 +458,35 @@ export default function Activities() {
 
       </div>
 
-      {/* keep these variables used to avoid lint errors */}
-      <div className="hidden">
-        {RECENT_EVENTS.map((ev, i) => {
-          const Icon = ev.icon;
-          return (
-            <div key={i}>
-              <Icon size={13} />
-              {ev.text}{ev.time}
-              {ev.color}
-            </div>
-          );
-        })}
-        {[
-          { label: 'Posts shared',      value: records.length,                                                    color: 'bg-indigo-500' },
-          { label: 'Wins logged',        value: records.filter(r => r.activityType === 'win').length,             color: 'bg-emerald-500' },
-          { label: 'Introductions made', value: records.filter(r => r.activityType === 'introduction').length,    color: 'bg-violet-500' },
-          { label: 'Insights shared',    value: records.filter(r => r.activityType === 'insight').length,         color: 'bg-amber-500' },
-        ].map(s => (
-          <div key={s.label}>
-            <div className={cn('w-2 h-2 rounded-full', s.color)} />
-            <span>{s.label}</span>
-            <span>{s.value}</span>
+      {/* RIGHT — Recent Activities (small box, 3 items) */}
+      <div className="hidden lg:block w-[280px] flex-shrink-0 sticky top-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock size={13} className="text-gray-400" />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Recent Activity</h3>
           </div>
-        ))}
+          <div className="space-y-3">
+            {RECENT_EVENTS.slice(0, 3).map((ev, i) => {
+              const Icon = ev.icon;
+              const [iconColor, iconBg] = ev.color.split(' ');
+              return (
+                <div key={i} className="flex items-start gap-2.5">
+                  <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', iconBg)}>
+                    <Icon size={12} className={iconColor} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-700 leading-snug">{ev.text}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{ev.time}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      </div>
+
       </div>
     </div>
   );
