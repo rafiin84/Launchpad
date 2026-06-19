@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import {
   DollarSign, TrendingUp, Users, Zap,
   Edit3, Check, X, Plus, AlertCircle,
   Clock, Target, Flame, BarChart2,
+  Sparkles, ArrowRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
+import { generateFounderInsights, type AIInsight } from '../services/aiEngine';
+import { AIBadge } from '../components/ui/AIBadge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -225,11 +228,20 @@ export default function FounderDashboard() {
   const [newMilestone, setNewMilestone] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
 
   useEffect(() => {
     if (!isConnected) return;
     fetchZohoOrgName().then(org => setCompanyName(org)).catch(() => {});
   }, [isConnected]);
+
+  useEffect(() => {
+    const insights = generateFounderInsights(
+      kpis.map(k => ({ key: k.key, label: k.label, value: k.value })),
+      milestones.map(m => ({ text: m.text, done: m.done, dueDate: m.dueDate }))
+    );
+    setAiInsights(insights);
+  }, [kpis, milestones]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -365,6 +377,57 @@ export default function FounderDashboard() {
           </button>
         ))}
       </div>
+
+      {/* AI Insights */}
+      {aiInsights.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-indigo-500" />
+            <h2 className="text-sm font-semibold text-gray-900">AI Insights</h2>
+            <AIBadge />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {aiInsights.slice(0, 3).map(insight => {
+              const priorityBorder: Record<string, string> = {
+                high: 'border-l-red-400',
+                medium: 'border-l-amber-400',
+                low: 'border-l-blue-400',
+              };
+              const typeIcon: Record<string, ReactNode> = {
+                risk: <AlertCircle size={14} className="text-red-500" />,
+                action: <Target size={14} className="text-amber-500" />,
+                trend: <TrendingUp size={14} className="text-emerald-500" />,
+                milestone: <Target size={14} className="text-indigo-500" />,
+                opportunity: <Zap size={14} className="text-violet-500" />,
+              };
+              return (
+                <div
+                  key={insight.id}
+                  className={cn(
+                    'bg-white border border-gray-100 rounded-xl p-4 border-l-[3px] hover:shadow-sm transition-all',
+                    priorityBorder[insight.priority] || 'border-l-indigo-400'
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {typeIcon[insight.type] || <Sparkles size={14} className="text-indigo-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-gray-900 mb-1">{insight.title}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed">{insight.description}</p>
+                      {insight.actionLabel && insight.actionPath && (
+                        <Link to={insight.actionPath} className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                          {insight.actionLabel} <ArrowRight size={10} />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Two-column */}
       <div className="flex flex-col lg:flex-row gap-6">

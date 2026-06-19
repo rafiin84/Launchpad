@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Users, Plus, AlertCircle, RefreshCw, Mail, Phone, Building2,
   Briefcase, Trash2, X, Search, UserPlus, MapPin, ChevronDown,
+  Sparkles, Link2, UserCheck, MessageSquare,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Avatar } from '../components/ui/Avatar';
@@ -12,6 +13,8 @@ import {
 } from '../services/crmFounders';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { AIBadge } from '../components/ui/AIBadge';
+import { suggestFounderConnections, type AIFounderSuggestion } from '../services/aiEngine';
 
 // ─── Form Field Component ────────────────────────────────────────────────────
 
@@ -314,6 +317,7 @@ export default function Founders() {
   const [error, setError]         = useState('');
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch]       = useState('');
+  const [founderSuggestions, setFounderSuggestions] = useState<AIFounderSuggestion[]>([]);
   const isConnected = !!loadToken();
 
   function load() {
@@ -326,6 +330,13 @@ export default function Founders() {
   }
 
   useEffect(() => { load(); }, []);
+
+  // Generate AI founder suggestions
+  useEffect(() => {
+    if (founders.length >= 2) {
+      setFounderSuggestions(suggestFounderConnections(founders));
+    }
+  }, [founders]);
 
   const filtered = search.trim()
     ? founders.filter(f => {
@@ -439,6 +450,53 @@ export default function Founders() {
         <div className="text-center py-12">
           <Search size={24} className="text-gray-200 mx-auto mb-2" />
           <p className="text-sm text-gray-500">No founders match "{search}"</p>
+        </div>
+      )}
+
+      {/* AI Founder Suggestions */}
+      {!loading && founderSuggestions.length > 0 && founders.length >= 2 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-indigo-500" />
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">AI Suggestions</h3>
+            <AIBadge />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {founderSuggestions.slice(0, 4).map((s, i) => {
+              const typeIcon = s.type === 'connect'
+                ? <Link2 size={14} className="text-indigo-500" />
+                : s.type === 'followup'
+                ? <MessageSquare size={14} className="text-amber-500" />
+                : <UserCheck size={14} className="text-emerald-500" />;
+              const typeBorder = s.type === 'connect'
+                ? 'border-l-indigo-400'
+                : s.type === 'followup'
+                ? 'border-l-amber-400'
+                : 'border-l-emerald-400';
+              return (
+                <div key={i} className={cn(
+                  'bg-white border border-gray-100 rounded-xl p-3.5 border-l-[3px] hover:shadow-sm transition-all',
+                  typeBorder
+                )}>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">{typeIcon}</div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-gray-900 mb-1">{s.title}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed">{s.description}</p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {s.founders.slice(0, 3).map((name, j) => (
+                          <span key={j} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{name}</span>
+                        ))}
+                        {s.founders.length > 3 && (
+                          <span className="text-[10px] text-gray-400">+{s.founders.length - 3} more</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

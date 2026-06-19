@@ -13,6 +13,10 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
+  Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Minus,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -20,6 +24,9 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { loadToken } from '../services/oauth';
+import { AIBadge } from '../components/ui/AIBadge';
+import { analyzePortfolio, type AIPortfolioInsight } from '../services/aiEngine';
+import { cn } from '../lib/cn';
 
 // ─── CRM Company Card ────────────────────────────────────────────────────────
 
@@ -207,6 +214,7 @@ export default function Portfolio() {
   const [modulesLoading, setModulesLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [portfolioInsights, setPortfolioInsights] = useState<AIPortfolioInsight[]>([]);
   const isConnected = !!loadToken();
 
   // Ref for the Portfolio Companies section
@@ -238,6 +246,13 @@ export default function Portfolio() {
   };
 
   useEffect(() => { loadCRMData(); }, []);
+
+  // Generate AI portfolio insights when data loads
+  useEffect(() => {
+    if (crmCompanies.length > 0) {
+      setPortfolioInsights(analyzePortfolio(crmCompanies));
+    }
+  }, [crmCompanies]);
 
   const handleDeleteCRM = async () => {
     if (!pendingDeleteId) return;
@@ -390,6 +405,47 @@ export default function Portfolio() {
                 <div className="h-2.5 bg-gray-100 rounded w-4/5" />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* AI Portfolio Analysis */}
+        {portfolioInsights.length > 0 && crmCompanies.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={14} className="text-indigo-500" />
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">AI Portfolio Analysis</h3>
+              <AIBadge />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {portfolioInsights.slice(0, 6).map((insight, i) => {
+                const typeColors: Record<string, string> = {
+                  health: 'border-l-emerald-400',
+                  diversification: 'border-l-blue-400',
+                  performance: 'border-l-indigo-400',
+                  risk: 'border-l-red-400',
+                };
+                const trendIcon = insight.trend === 'up'
+                  ? <ArrowUp size={10} className="text-emerald-500" />
+                  : insight.trend === 'down'
+                  ? <ArrowDown size={10} className="text-red-500" />
+                  : <Minus size={10} className="text-gray-400" />;
+                return (
+                  <div key={i} className={cn(
+                    'bg-white border border-gray-100 rounded-xl p-3.5 border-l-[3px] hover:shadow-sm transition-all',
+                    typeColors[insight.type] || 'border-l-gray-300'
+                  )}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h4 className="text-xs font-semibold text-gray-900">{insight.title}</h4>
+                      {insight.trend && <div className="flex-shrink-0">{trendIcon}</div>}
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed">{insight.description}</p>
+                    {insight.metric && (
+                      <p className="text-xs font-bold text-indigo-600 mt-1.5">{insight.metric}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

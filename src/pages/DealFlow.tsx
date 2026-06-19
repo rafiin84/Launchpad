@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, ArrowRight, Plus, AlertCircle, RefreshCw, DollarSign, Trash2 } from 'lucide-react';
+import { TrendingUp, ArrowRight, Plus, AlertCircle, RefreshCw, DollarSign, Trash2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchCRMDeals, deleteCRMDeal, CRM_DEAL_STAGES, type CRMDeal } from '../services/crmDeals';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { AIBadge, AIScoreRing } from '../components/ui/AIBadge';
+import { scoreDeal, type AIDealScore } from '../services/aiEngine';
 import { cn } from '../lib/cn';
 
 function formatCurrency(amount: number) {
@@ -34,8 +36,11 @@ function StageBadge({ stage }: { stage: string }) {
   );
 }
 
-function DealCard({ deal, onDelete }: { deal: CRMDeal; onDelete: (id: string) => void }) {
+function DealCard({ deal, onDelete, showAI }: { deal: CRMDeal; onDelete: (id: string) => void; showAI: boolean }) {
   const amount = parseFloat(deal.amount) || 0;
+  const [expanded, setExpanded] = useState(false);
+  const aiScore = showAI ? scoreDeal(deal) : null;
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
       <div className="flex items-start gap-4">
@@ -61,7 +66,8 @@ function DealCard({ deal, onDelete }: { deal: CRMDeal; onDelete: (id: string) =>
             </div>
           </Link>
         </div>
-        <div className="flex-shrink-0 flex items-center gap-1">
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {aiScore && <AIScoreRing score={aiScore.score} size={40} label="Score" />}
           <button
             onClick={() => onDelete(deal.id)}
             className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -84,6 +90,37 @@ function DealCard({ deal, onDelete }: { deal: CRMDeal; onDelete: (id: string) =>
           <span className="text-xs text-gray-700">{deal.nextStep}</span>
         </div>
       )}
+
+      {/* AI Score Details (expandable) */}
+      {aiScore && (
+        <div className="mt-3 pt-3 border-t border-gray-50">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+          >
+            <Sparkles size={11} /> AI Analysis
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+          {expanded && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{aiScore.recommendation}</p>
+              <p className="text-[10px] text-gray-400">Predicted: {aiScore.predictedOutcome}</p>
+              <div className="space-y-1">
+                {aiScore.factors.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span className={cn(
+                      'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      f.impact === 'positive' ? 'bg-emerald-400' : f.impact === 'negative' ? 'bg-red-400' : 'bg-gray-300'
+                    )} />
+                    <span className="text-gray-600">{f.label}</span>
+                    <span className="text-gray-400 ml-auto text-[10px] truncate max-w-[200px]">{f.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -94,6 +131,7 @@ export default function DealFlow() {
   const [error, setError] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showAI, setShowAI] = useState(true);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -141,9 +179,22 @@ export default function DealFlow() {
         title="Deal Flow"
         description="Active deals in your investment pipeline"
         action={
-          <Link to="/deals/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={15} /> Add Deal
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAI(!showAI)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all',
+                showAI
+                  ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              <Sparkles size={12} /> AI Scores
+            </button>
+            <Link to="/deals/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+              <Plus size={15} /> Add Deal
+            </Link>
+          </div>
         }
       />
 
@@ -207,7 +258,7 @@ export default function DealFlow() {
           {/* Deals list */}
           {!loading && !error && deals.length > 0 && (
             <div className="space-y-3">
-              {deals.map(deal => <DealCard key={deal.id} deal={deal} onDelete={setPendingDeleteId} />)}
+              {deals.map(deal => <DealCard key={deal.id} deal={deal} onDelete={setPendingDeleteId} showAI={showAI} />)}
             </div>
           )}
         </div>

@@ -3,8 +3,11 @@ import {
   DollarSign, Building2, Inbox, Briefcase,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
   Percent, Layers, PieChart, Target, Award,
+  Sparkles, Lightbulb, AlertTriangle, CheckCircle, Zap, ArrowRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { generateInvestorInsights, generateWeeklySummary, type AIInsight } from '../services/aiEngine';
+import { AIBadge } from '../components/ui/AIBadge';
 import { useAuth } from '../context/AuthContext';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
@@ -300,6 +303,8 @@ export default function Home() {
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingDeals, setLoadingDeals] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [weeklySummary, setWeeklySummary] = useState<ReturnType<typeof generateWeeklySummary> | null>(null);
   useEffect(() => {
     if (!isConnected) {
       setLoadingPortfolio(false);
@@ -320,6 +325,14 @@ export default function Home() {
       .catch(() => {})
       .finally(() => setLoadingApps(false));
   }, []);
+
+  useEffect(() => {
+    if (loadingPortfolio || loadingDeals || loadingApps) return;
+    const insights = generateInvestorInsights(portfolio, deals, applications);
+    setAiInsights(insights);
+    const summary = generateWeeklySummary(portfolio, deals, applications, []);
+    setWeeklySummary(summary);
+  }, [loadingPortfolio, loadingDeals, loadingApps, portfolio, deals, applications]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -520,6 +533,62 @@ export default function Home() {
         </div>
       </div>
 
+      {/* AI Insights */}
+      {aiInsights.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-indigo-500" />
+            <h2 className="text-sm font-semibold text-gray-900">AI Insights</h2>
+            <AIBadge />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {aiInsights.map(insight => {
+              const iconMap: Record<string, React.ReactNode> = {
+                AlertTriangle: <AlertTriangle size={14} className="text-red-500" />,
+                TrendingUp: <TrendingUp size={14} className="text-emerald-500" />,
+                Inbox: <Inbox size={14} className="text-blue-500" />,
+                ListChecks: <CheckCircle size={14} className="text-amber-500" />,
+                PieChart: <PieChart size={14} className="text-indigo-500" />,
+                Star: <Zap size={14} className="text-violet-500" />,
+                Trophy: <Award size={14} className="text-amber-500" />,
+                DollarSign: <DollarSign size={14} className="text-emerald-500" />,
+                FileWarning: <AlertTriangle size={14} className="text-amber-500" />,
+                ListTodo: <CheckCircle size={14} className="text-blue-500" />,
+              };
+              const priorityBorder = {
+                high: 'border-l-red-400',
+                medium: 'border-l-amber-400',
+                low: 'border-l-blue-400',
+              };
+              return (
+                <div
+                  key={insight.id}
+                  className={cn(
+                    'bg-white border border-gray-100 rounded-xl p-4 border-l-[3px] hover:shadow-sm transition-all',
+                    priorityBorder[insight.priority]
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {iconMap[insight.icon] || <Lightbulb size={14} className="text-indigo-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-gray-900 mb-1">{insight.title}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed">{insight.description}</p>
+                      {insight.actionLabel && insight.actionPath && (
+                        <Link to={insight.actionPath} className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                          {insight.actionLabel} <ArrowRight size={10} />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Two-column layout */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main */}
@@ -572,6 +641,60 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Right — AI Weekly Summary */}
+        {weeklySummary && (
+          <div className="w-full lg:w-72 flex-shrink-0">
+            <div className="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-5 sticky top-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={14} className="text-indigo-500" />
+                <h3 className="text-sm font-semibold text-gray-900">{weeklySummary.title}</h3>
+              </div>
+
+              {/* Metrics */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {weeklySummary.metrics.slice(0, 4).map(m => (
+                  <div key={m.label} className="bg-white/70 rounded-xl px-3 py-2">
+                    <p className="text-sm font-bold text-gray-900">{m.value}</p>
+                    <p className="text-[10px] text-gray-500">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Highlights */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Highlights</p>
+                <div className="space-y-1.5">
+                  {weeklySummary.highlights.slice(0, 3).map((h, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <CheckCircle size={11} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-gray-600">{h}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Items */}
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">Action Items</p>
+                <div className="space-y-1.5">
+                  {weeklySummary.actionItems.slice(0, 3).map((a, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <Zap size={11} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-gray-600">{a}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-indigo-100">
+                <div className="flex items-center gap-1">
+                  <AIBadge />
+                  <span className="text-[10px] text-gray-400">Auto-generated from your data</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

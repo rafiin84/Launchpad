@@ -3,13 +3,16 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Inbox, Search, ArrowUpRight, ChevronRight,
   AlertCircle, Plus, Building2, Trash2, RefreshCw,
-  LayoutGrid, List, Video,
+  LayoutGrid, List, Video, Sparkles, CheckCircle, XCircle,
 } from 'lucide-react';
 import { fetchCRMApplications, deleteCRMApplication, type CRMApplication } from '../services/crmApplications';
 import { loadPitchVideoUrl, hasPitchVideo, videoWasUploaded } from '../lib/pitchVideoStore';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { AIScoreRing, AIBadge } from '../components/ui/AIBadge';
+import { scoreApplication } from '../services/aiEngine';
+import { cn } from '../lib/cn';
 
 function formatCurrency(amount: number) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -276,12 +279,14 @@ function ApplicationsTable({ apps, onDelete }: { apps: CRMApplication[]; onDelet
 
 // ─── Applications Grid ────────────────────────────────────────────────────────
 
-function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete: (id: string) => void }) {
+function ApplicationsGrid({ apps, onDelete, showAI }: { apps: CRMApplication[]; onDelete: (id: string) => void; showAI: boolean }) {
   const navigate = useNavigate();
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {apps.map(app => (
+      {apps.map(app => {
+        const aiScore = showAI ? scoreApplication(app) : null;
+        return (
         <div
           key={app.id}
           className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all cursor-pointer"
@@ -295,13 +300,16 @@ function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete
               <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || '—'}</p>
               <p className="text-xs text-gray-400 truncate">{app.industry || '—'}</p>
             </div>
-            <button
-              onClick={e => { e.stopPropagation(); onDelete(app.id); }}
-              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
-              title="Delete"
-            >
-              <Trash2 size={13} />
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {aiScore && <AIScoreRing score={aiScore.score} size={38} label="Score" />}
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(app.id); }}
+                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="Delete"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between mb-2">
@@ -324,9 +332,33 @@ function ApplicationsGrid({ apps, onDelete }: { apps: CRMApplication[]; onDelete
             </p>
           )}
 
+          {/* AI Analysis */}
+          {aiScore && (
+            <div className="mt-3 pt-3 border-t border-gray-50" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Sparkles size={10} className="text-indigo-500" />
+                <span className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide">AI Analysis</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">{aiScore.recommendation}</p>
+              <div className="flex flex-wrap gap-1">
+                {aiScore.strengths.slice(0, 2).map((s, i) => (
+                  <span key={i} className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                    <CheckCircle size={8} /> {s.length > 25 ? s.slice(0, 25) + '…' : s}
+                  </span>
+                ))}
+                {aiScore.concerns.slice(0, 1).map((c, i) => (
+                  <span key={i} className="inline-flex items-center gap-0.5 text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
+                    <XCircle size={8} /> {c.length > 25 ? c.slice(0, 25) + '…' : c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <VideoPreviewMini appId={app.id} videoUrl={app.pitchVideoUrl} />
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -344,6 +376,7 @@ export default function Applications() {
   const [query, setQuery] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showAI, setShowAI] = useState(true);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -397,6 +430,17 @@ export default function Applications() {
           description="Manage your deal pipeline from first look to committee"
           action={
             <div className="hidden sm:flex items-center gap-2 ml-auto">
+              <button
+                onClick={() => setShowAI(!showAI)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all',
+                  showAI
+                    ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+              >
+                <Sparkles size={12} /> AI Scores
+              </button>
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setView('grid')}
@@ -413,7 +457,6 @@ export default function Applications() {
                   <List size={15} />
                 </button>
               </div>
-              {/* Mobile: icon only; Desktop: full label */}
               <Link
                 to="/applications/new"
                 className="inline-flex items-center justify-center gap-2 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors px-3 py-2 sm:px-4"
@@ -499,7 +542,7 @@ export default function Applications() {
         {!loading && !error && filtered.length > 0 && (
           view === 'list'
             ? <ApplicationsTable apps={filtered} onDelete={setPendingDeleteId} />
-            : <ApplicationsGrid apps={filtered} onDelete={setPendingDeleteId} />
+            : <ApplicationsGrid apps={filtered} onDelete={setPendingDeleteId} showAI={showAI} />
         )}
       </div>
     </div>

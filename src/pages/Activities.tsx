@@ -4,6 +4,7 @@ import {
   Activity, AlertCircle, RefreshCw, Building2,
   Image, X, Send, Link as LinkIcon,
   PlusCircle, DollarSign, FileText, Users, TrendingUp, MessageSquare, Upload, Clock,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +15,12 @@ import {
 } from '../services/crmActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { AIToggle, AIBadge } from '../components/ui/AIBadge';
+import { generateAIActivities, type AIActivity } from '../services/aiEngine';
+import { fetchCRMPortfolio } from '../services/crmPortfolio';
+import { fetchCRMDeals } from '../services/crmDeals';
+import { fetchCRMApplications } from '../services/crmApplications';
+import { fetchCRMFounders } from '../services/crmFounders';
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
@@ -334,12 +341,51 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
   );
 }
 
+// ─── AI Activity Card ────────────────────────────────────────────────────────
+
+function AIActivityCard({ activity }: { activity: AIActivity }) {
+  const cfg = TYPE_CONFIG[activity.activityType?.toLowerCase()] ?? { label: activity.activityType || 'AI', bg: 'bg-gray-100', text: 'text-gray-600' };
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-indigo-200 hover:shadow-sm transition-all border-l-[3px] border-l-indigo-400">
+      <div className="flex items-center justify-between px-5 pt-4 pb-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center flex-shrink-0">
+            <Sparkles size={14} className="text-indigo-500" />
+          </div>
+          <p className="text-xs font-semibold text-gray-700">{activity.companyName || 'AI Insight'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AIBadge />
+          <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
+            {cfg.label}
+          </span>
+        </div>
+      </div>
+      <div className="px-5 pt-3 pb-4">
+        <h3 className="text-sm font-bold text-gray-900 mb-1 leading-snug">{activity.title}</h3>
+        <p className="text-sm text-gray-700 leading-relaxed">{activity.content}</p>
+        {activity.tags && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {activity.tags.split(',').map(tag => tag.trim()).filter(Boolean).map(tag => (
+              <span key={tag} className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">#{tag}</span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-400 mt-2">Source: {activity.source.replace(/-/g, ' ')}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Activities() {
+  const { currentUser } = useAuth();
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [mode, setMode] = useState<'manual' | 'ai'>('manual');
+  const [aiActivities, setAiActivities] = useState<AIActivity[]>([]);
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -349,6 +395,25 @@ export default function Activities() {
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
+  };
+
+  const loadAI = async () => {
+    setLoading(true); setError('');
+    try {
+      const [acts, portfolio, deals, apps, founders] = await Promise.all([
+        fetchCRMActivities(),
+        fetchCRMPortfolio().catch(() => []),
+        fetchCRMDeals().catch(() => []),
+        fetchCRMApplications().catch(() => []),
+        fetchCRMFounders().catch(() => []),
+      ]);
+      const aiActs = generateAIActivities(portfolio, deals, apps, acts, founders, currentUser.name);
+      setAiActivities(aiActs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate AI activities');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -383,10 +448,15 @@ export default function Activities() {
 
       <div className="relative z-10 w-full max-w-5xl">
 
-      {/* Page title */}
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-900">Activities</h1>
-        <p className="text-sm text-gray-400 mt-0.5">What's happening across your portfolio network</p>
+      {/* Mode toggle */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Activities</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {mode === 'ai' ? 'AI-generated insights from your CRM data' : "What's happening across your portfolio network"}
+          </p>
+        </div>
+        <AIToggle mode={mode} onToggle={(m) => { setMode(m); if (m === 'ai') loadAI(); }} />
       </div>
 
       {/* Not connected */}
@@ -406,9 +476,6 @@ export default function Activities() {
 
       {/* LEFT — feed (same as before) */}
       <div className="flex-1 min-w-0 max-w-2xl">
-
-      {/* Composer */}
-      <Composer onPost={handlePost} />
 
       {/* Loading skeletons */}
       {loading && (
@@ -432,28 +499,52 @@ export default function Activities() {
         <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center mt-4">
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
           <p className="text-sm text-red-600 mb-3">{error}</p>
-          <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
+          <button onClick={mode === 'ai' ? loadAI : load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
             <RefreshCw size={12} /> Retry
           </button>
         </div>
       )}
 
-      {/* Empty */}
-      {!loading && !error && records.length === 0 && isConnected && (
-        <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
-          <Activity size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
-          <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
-        </div>
-      )}
+      {mode === 'manual' ? (
+        <>
+          {/* Composer */}
+          <Composer onPost={handlePost} />
 
-      {/* Feed — single column */}
-      {!loading && !error && records.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          {records.map(activity => (
-            <ActivityCard key={activity.id} activity={activity} />
-          ))}
-        </div>
+          {/* Empty */}
+          {!loading && !error && records.length === 0 && isConnected && (
+            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
+              <Activity size={28} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
+              <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
+            </div>
+          )}
+
+          {/* Feed — single column */}
+          {!loading && !error && records.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              {records.map(activity => (
+                <ActivityCard key={activity.id} activity={activity} />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* AI activities feed */}
+          {!loading && !error && aiActivities.length === 0 && (
+            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
+              <Sparkles size={28} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">No AI insights yet</p>
+              <p className="text-xs text-gray-400">AI is analyzing your CRM data to generate insights.</p>
+            </div>
+          )}
+
+          {!loading && !error && aiActivities.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              {aiActivities.map(act => <AIActivityCard key={act.id} activity={act} />)}
+            </div>
+          )}
+        </>
       )}
 
       </div>
