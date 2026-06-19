@@ -159,31 +159,32 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   }
 }
 
-export async function fetchUserPhoto(userId: string, zuidOrNull?: string): Promise<string | null> {
+/**
+ * Fetch the current user's profile photo URL via the Zoho Accounts API.
+ * Uses the AaaServer.profile.READ scope to call /oauth/user/info,
+ * which returns user data including a publicly accessible photo URL.
+ * This avoids CORS issues that plague the CRM photo endpoints.
+ */
+export async function fetchUserPhoto(): Promise<string | null> {
   const token = loadToken();
   if (!token) return null;
-  const authHeader = { 'Authorization': `Zoho-oauthtoken ${token}` };
 
-  // Try endpoints in order until one returns a valid image blob
-  const endpoints: string[] = [];
-  if (zuidOrNull) {
-    endpoints.push(`https://contacts.zoho.in/api/v1/photos/${zuidOrNull}`);
-  }
-  endpoints.push(`${ZOHO_BASE}/users/${userId}/photo`);
-
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, { headers: authHeader });
-      if (!res.ok) continue;
-      const blob = await res.blob();
-      // Accept any blob with content (image/* or application/octet-stream)
-      if (!blob.size) continue;
-      return URL.createObjectURL(blob);
-    } catch {
-      continue;
+  try {
+    // Zoho Accounts user info endpoint — returns profile data including photo URL
+    const res = await fetch('https://accounts.zoho.in/oauth/user/info', {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as Record<string, unknown>;
+    // The API returns a "picture" field with the photo URL
+    const photoUrl = (data.picture ?? data.photo_url ?? data.imageURL ?? null) as string | null;
+    if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('http')) {
+      return photoUrl;
     }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function fetchZohoOrgName(): Promise<string | null> {

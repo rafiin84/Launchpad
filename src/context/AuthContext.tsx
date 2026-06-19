@@ -117,32 +117,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         jobTitle: ((u['role'] as Record<string,string>)?.name) ?? null,
       });
 
-      // 1. Set cookie-based URL immediately (works if logged into Zoho in browser)
-      if (zuid) {
-        setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
-      }
-
-      // 2. Fetch photo via OAuth API (works everywhere with token)
+      // Fetch profile photo URL via Zoho Accounts API (works everywhere)
       try {
-        const blobUrl = await fetchUserPhoto(user.id, zuid ?? undefined);
-        if (blobUrl) {
-          setAvatarUrl(blobUrl);
-          // Cache as data URL in localStorage for instant load next time
-          try {
-            const res = await fetch(blobUrl);
-            const blob = await res.blob();
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const dataUrl = reader.result as string;
-              if (dataUrl?.startsWith('data:')) {
-                localStorage.setItem(AVATAR_CACHE_KEY, dataUrl);
-                setAvatarUrl(dataUrl);
-              }
-            };
-            reader.readAsDataURL(blob);
-          } catch { /* blob URL is fine */ }
+        const photoUrl = await fetchUserPhoto();
+        if (photoUrl) {
+          setAvatarUrl(photoUrl);
+          localStorage.setItem(AVATAR_CACHE_KEY, photoUrl);
+        } else if (zuid) {
+          // Fallback: cookie-based URL (works if logged into Zoho in browser)
+          setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
         }
-      } catch { /* OAuth fetch failed, cookie URL is already set */ }
+      } catch {
+        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
+      }
     }).catch(() => {});
   }, [isLoggedIn]);
 
