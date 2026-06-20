@@ -132,14 +132,38 @@ export const LEAD_SOURCE_OPTIONS = [
 export const SALUTATION_OPTIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'];
 
 /**
+ * Fetch available portals from Zoho CRM settings.
+ */
+async function fetchPortals(): Promise<{ id: string; name: string }[]> {
+  const token = loadToken();
+  if (!token) return [];
+
+  const res = await fetch(`${ZOHO_BASE}/settings/portals`, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+
+  if (!res.ok) return [];
+  const json = await res.json().catch(() => ({})) as { portals?: Array<{ id: string; name: string }> };
+  return json.portals ?? [];
+}
+
+/**
  * Send a portal invitation to a Contact.
  * Zoho CRM API: POST /crm/v2/Contacts/actions/portal_invite
- * Uses v2 base URL (same as all other CRM calls) to avoid CORS issues.
+ * Automatically fetches portal config and sends the invite.
  * Requires the contact to have an email address.
  */
 export async function sendPortalInvitation(contactId: string): Promise<string> {
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
+
+  // Fetch portal config
+  const portals = await fetchPortals();
+  if (portals.length === 0) {
+    throw new Error('No portal configured in your Zoho CRM. Please set up a portal first.');
+  }
+
+  const portal = portals[0];
 
   const res = await fetch(
     `${ZOHO_BASE}/${MODULE}/actions/portal_invite`,
@@ -150,7 +174,8 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        data: [{ id: contactId, type: 'invite' }],
+        data: [{ id: contactId }],
+        portal: { id: portal.id },
       }),
     },
   );
