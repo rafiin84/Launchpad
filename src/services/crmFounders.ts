@@ -134,7 +134,7 @@ export const SALUTATION_OPTIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'];
 /**
  * Fetch available portals from Zoho CRM settings.
  */
-async function fetchPortals(): Promise<{ id: string; name: string }[]> {
+async function fetchPortals(): Promise<{ name: string; active: boolean }[]> {
   const token = loadToken();
   if (!token) return [];
 
@@ -143,40 +143,65 @@ async function fetchPortals(): Promise<{ id: string; name: string }[]> {
   });
 
   if (!res.ok) return [];
-  const json = await res.json().catch(() => ({})) as { portals?: Array<{ id: string; name: string }> };
+  const json = await res.json().catch(() => ({})) as { portals?: Array<{ name: string; active: boolean }> };
   return json.portals ?? [];
 }
 
 /**
+ * Fetch user types for a given portal.
+ * GET /crm/v2/settings/portals/{portal_name}/user_type
+ */
+async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; name: string; active: boolean }[]> {
+  const token = loadToken();
+  if (!token) return [];
+
+  const res = await fetch(`${ZOHO_BASE}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+
+  if (!res.ok) return [];
+  const json = await res.json().catch(() => ({})) as { user_type?: Array<{ id: string; name: string; active: boolean }> };
+  return json.user_type ?? [];
+}
+
+/**
  * Send a portal invitation to a Contact.
- * Zoho CRM API: POST /crm/v2/Contacts/actions/portal_invite
- * Automatically fetches portal config and sends the invite.
+ * Zoho CRM API: POST /crm/v2/Contacts/{record_id}/actions/portal_invite?user_type_id={id}&type=invite
+ * Automatically fetches portal config and user type, then sends the invite.
  * Requires the contact to have an email address.
  */
 export async function sendPortalInvitation(contactId: string): Promise<string> {
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
 
-  // Fetch portal config
+  // 1. Fetch portal config
   const portals = await fetchPortals();
-  if (portals.length === 0) {
+  const activePortal = portals.find(p => p.active) ?? portals[0];
+  if (!activePortal) {
     throw new Error('No portal configured in your Zoho CRM. Please set up a portal first.');
   }
 
-  const portal = portals[0];
+  // 2. Fetch user types for this portal
+  const userTypes = await fetchPortalUserTypes(activePortal.name);
+  const activeUserType = userTypes.find(ut => ut.active) ?? userTypes[0];
+  if (!activeUserType) {
+    throw new Error('No user type configured for this portal. Please set up a user type in your portal settings.');
+  }
+
+  // 3. Send the invite — record ID in URL, params as query string
+  const params = new URLSearchParams({
+    user_type_id: activeUserType.id,
+    type: 'invite',
+    language: 'en_US',
+  });
 
   const res = await fetch(
-    `${ZOHO_BASE}/${MODULE}/actions/portal_invite`,
+    `${ZOHO_BASE}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
     {
       method: 'POST',
       headers: {
         'Authorization': `Zoho-oauthtoken ${token}`,
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        data: [{ id: contactId }],
-        portal: { id: portal.id },
-      }),
     },
   );
 
@@ -184,16 +209,16 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
 
   if (!res.ok) {
     const msg = (json as { message?: string }).message
-      || (json as { data?: Array<{ message?: string }> }).data?.[0]?.message
+      || ((json as { portal_invite?: Array<{ message?: string }> }).portal_invite?.[0]?.message)
       || `Failed to send invitation (HTTP ${res.status})`;
     throw new Error(msg);
   }
 
-  // Success response
-  const data = (json as { data?: Array<{ message?: string; code?: string }> }).data;
-  if (data?.[0]?.code && data[0].code !== 'SUCCESS') {
-    throw new Error(data[0].message || 'Invitation failed');
+  // Success response — v2 uses portal_invite array
+  const inviteResult = (json as { portal_invite?: Array<{ message?: string; code?: string; status?: string }> }).portal_invite;
+  if (inviteResult?.[0]?.status === 'error' || (inviteResult?.[0]?.code && inviteResult[0].code !== 'SUCCESS')) {
+    throw new Error(inviteResult[0].message || 'Invitation failed');
   }
 
-  return data?.[0]?.message || 'Portal invitation sent successfully';
+  return inviteResult?.[0]?.message || 'Portal invitation sent successfully';
 }
