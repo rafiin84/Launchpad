@@ -263,6 +263,48 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   }
 }
 
+// ─── Zoho Accounts user info (works for ALL Zoho users including portal) ─────
+
+export interface ZohoAccountsUser {
+  email: string;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  zuid: string;
+  picture?: string;
+}
+
+/**
+ * Fetch the authenticated user's identity from Zoho Accounts.
+ * This works for ALL Zoho users — including portal users who don't
+ * have a CRM user record. Uses the AaaServer.profile.READ scope.
+ */
+export async function fetchZohoAccountsUser(): Promise<ZohoAccountsUser | null> {
+  const token = loadToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch('https://accounts.zoho.in/oauth/user/info', {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as Record<string, unknown>;
+    const email = (data.Email ?? data.email ?? '') as string;
+    if (!email) return null;
+
+    return {
+      email,
+      first_name:   (data.First_Name ?? data.first_name ?? '') as string,
+      last_name:    (data.Last_Name ?? data.last_name ?? '') as string,
+      display_name: (data.Display_Name ?? data.display_name ?? data.full_name ?? '') as string,
+      zuid:         String(data.ZUID ?? data.zuid ?? ''),
+      picture:      (data.picture ?? data.photo_url ?? data.imageURL ?? undefined) as string | undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch the current user's profile photo URL via the Zoho Accounts API.
  * Uses the AaaServer.profile.READ scope to call /oauth/user/info,

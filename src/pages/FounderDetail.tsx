@@ -8,6 +8,8 @@ import {
 import { Avatar } from '../components/ui/Avatar';
 import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { registerPortalUser } from '../services/portalUsers';
+import type { UserRole } from '../types';
 
 export default function FounderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +25,7 @@ export default function FounderDetail() {
   // Portal invite state
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [inviteRole, setInviteRole] = useState<UserRole>('founder');
 
   useEffect(() => {
     if (!id) return;
@@ -46,12 +49,23 @@ export default function FounderDetail() {
   };
 
   const handleSendInvite = async () => {
-    if (!id || inviting) return;
+    if (!id || inviting || !founder?.email) return;
     setInviting(true);
     setInviteResult(null);
     try {
       const msg = await sendPortalInvitation(id);
-      setInviteResult({ type: 'success', message: msg });
+
+      // Register this user in the portal users registry with their assigned role
+      const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+      registerPortalUser({
+        email: founder.email,
+        role: inviteRole,
+        name: displayName,
+        contactId: id,
+        invitedAt: new Date().toISOString(),
+      });
+
+      setInviteResult({ type: 'success', message: `${msg} — User registered as ${inviteRole}.` });
     } catch (err) {
       setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
     } finally {
@@ -305,33 +319,64 @@ export default function FounderDetail() {
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Portal Access</h3>
             <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Send a portal invitation to this founder so they can log in to the Launchpad founder portal,
-              view shared updates, submit reports, and collaborate with your team.
+              Send a portal invitation so this user can log in to Launchpad.
+              Choose their role to determine which dashboard and features they'll see.
             </p>
+
             {founder.email ? (
-              <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                <Mail size={15} className="text-gray-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">Invitation will be sent to</p>
-                  <p className="text-xs text-indigo-600 truncate">{founder.email}</p>
+              <div className="space-y-3">
+                {/* Role selector */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-2">Assign Role</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setInviteRole('investor')}
+                      className={`flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all ${
+                        inviteRole === 'investor'
+                          ? 'border-black bg-black text-white'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      Investor
+                    </button>
+                    <button
+                      onClick={() => setInviteRole('founder')}
+                      className={`flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all ${
+                        inviteRole === 'founder'
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      Founder
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={handleSendInvite}
-                  disabled={inviting || inviteResult?.type === 'success'}
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 ${
-                    inviteResult?.type === 'success'
-                      ? 'bg-emerald-100 text-emerald-700 cursor-default'
-                      : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
-                  }`}
-                >
-                  {inviting ? (
-                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
-                  ) : inviteResult?.type === 'success' ? (
-                    <><CheckCircle size={12} /> Sent</>
-                  ) : (
-                    <><Send size={12} /> Send Invite</>
-                  )}
-                </button>
+
+                {/* Email + send button */}
+                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                  <Mail size={15} className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">Invitation will be sent to</p>
+                    <p className="text-xs text-indigo-600 truncate">{founder.email}</p>
+                  </div>
+                  <button
+                    onClick={handleSendInvite}
+                    disabled={inviting || inviteResult?.type === 'success'}
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 ${
+                      inviteResult?.type === 'success'
+                        ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                        : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
+                    }`}
+                  >
+                    {inviting ? (
+                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+                    ) : inviteResult?.type === 'success' ? (
+                      <><CheckCircle size={12} /> Sent</>
+                    ) : (
+                      <><Send size={12} /> Send Invite</>
+                    )}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-4 py-3">

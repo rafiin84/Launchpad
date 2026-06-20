@@ -9,6 +9,7 @@ import {
   loadCachedProfile, clearCachedProfile, clearModuleStatusCache,
   type AppUser,
 } from '../services/crmAppUsers';
+import { loadPortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
 
 export interface ZohoProfile {
   email: string | null;
@@ -31,6 +32,8 @@ interface AuthContextValue {
   zohoProfile: ZohoProfile;
   appUser: AppUser | null;
   appUserRecordId: string | null;
+  portalSession: PortalSession | null;
+  isPortalUser: boolean;
   refreshAvatar: () => void;
   /** Force-reload appUser data from CRM */
   refreshAppUser: () => void;
@@ -60,6 +63,11 @@ function getInitialState(): { role: UserRole; isLoggedIn: boolean } {
   if (token && savedRole) {
     return { role: savedRole, isLoggedIn: true };
   }
+  // Check if there's a portal session with a valid token
+  const session = loadPortalSession();
+  if (token && session) {
+    return { role: session.role, isLoggedIn: true };
+  }
   return { role: 'investor', isLoggedIn: false };
 }
 
@@ -78,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [appUserRecordId, setAppUserRecordId] = useState<string | null>(loadCachedRecordId);
+  const [portalSession, setPortalSession] = useState<PortalSession | null>(loadPortalSession);
 
   // Fetch photo from appusers record image API
   const fetchAvatarFromAppUsers = useCallback(async (recordId: string) => {
@@ -171,12 +180,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearUserName();
     clearCachedRecordId();
     clearModuleStatusCache();
+    clearPortalSession();
     // Don't clear profile cache on logout — preserve for next login
     try { localStorage.removeItem(AVATAR_CACHE_KEY); } catch { /* ok */ }
     setAvatarUrl('');
     setUserName(null);
     setAppUser(null);
     setAppUserRecordId(null);
+    setPortalSession(null);
     setIsLoggedIn(false);
   }
 
@@ -216,6 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         zohoProfile,
         appUser,
         appUserRecordId,
+        portalSession,
+        isPortalUser: portalSession?.isPortalUser ?? false,
         refreshAvatar,
         refreshAppUser,
       }}

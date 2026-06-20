@@ -188,6 +188,16 @@ function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }
             <span className="font-semibold">{isInvestor ? 'investor' : 'founder'}</span> dashboard after sign-in.
           </p>
         </div>
+
+        {/* Portal user note */}
+        <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mt-3">
+          <Users size={16} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-indigo-600 leading-relaxed">
+            <span className="font-semibold">Received a portal invitation?</span>{' '}
+            Use the same Zoho account you set up from the invitation email to sign in here.
+            You'll be automatically directed to your assigned dashboard.
+          </p>
+        </div>
       </div>
     </div>
   );
