@@ -14,10 +14,25 @@
 import {
   zohoUpsert, zohoSearch, zohoUpdate,
   zohoUploadRecordPhoto, zohoGetRecordPhoto,
-  getZohoBase,
   type ZohoRecord,
 } from './zohoApi';
 import { loadToken } from './oauth';
+
+const isDev = import.meta.env.DEV;
+
+function crmUrl(apiPath: string): string {
+  if (isDev) return `/zoho-crm-proxy${apiPath}`;
+  const token = loadToken();
+  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+}
+
+function crmHeaders(): Record<string, string> {
+  if (isDev) {
+    const token = loadToken();
+    return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
+  }
+  return {};
+}
 
 // ─── Module & field mapping ──────────────────────────────────────────────────
 
@@ -151,9 +166,8 @@ export async function isModuleAvailable(): Promise<boolean> {
 
   try {
     // Try fetching the module metadata — if it returns 200, the module exists
-    const res = await fetch(`${getZohoBase()}/settings/modules/${MODULE}`, {
-      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-    });
+    const url = crmUrl(`/crm/v2/settings/modules/${MODULE}`);
+    const res = await fetch(url, { headers: crmHeaders() });
     const available = res.ok;
     setCachedModuleStatus(available);
     return available;

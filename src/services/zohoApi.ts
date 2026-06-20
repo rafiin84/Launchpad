@@ -1,26 +1,63 @@
 // Base Zoho CRM v2 API client (browser implicit-flow).
 // Authorization uses the "Zoho-oauthtoken" header format required by Zoho.
-// Supports .in and .com datacenters.
 // In local dev, requests go through Vite proxy to bypass CORS.
+// In production (Vercel), requests go through serverless API proxy.
 
 import { loadToken, OAuthConfig } from './oauth';
 
 const isDev = import.meta.env.DEV;
 
-/** CRM API base URL (Zoho .in datacenter), with dev proxy support */
+// ─── Proxy helpers ───────────────────────────────────────────────────────────
+
+/**
+ * In dev: Vite proxy rewrites the path and forwards auth headers.
+ * In prod: Vercel serverless proxy at /api/zoho-crm-proxy forwards to zohoapis.in.
+ *
+ * For prod, we pass token as a query param so the serverless function
+ * can set the Authorization header server-side (avoiding CORS preflight).
+ */
+
+function buildCrmUrl(apiPath: string): string {
+  // apiPath like "/crm/v2/Contacts" or "/crm/v2/settings/modules"
+  if (isDev) {
+    return `/zoho-crm-proxy${apiPath}`;
+  }
+  const token = loadToken();
+  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+}
+
+function buildAccountsUrl(apiPath: string): string {
+  // apiPath like "/oauth/user/info"
+  if (isDev) {
+    return `/zoho-accounts-proxy${apiPath}`;
+  }
+  const token = loadToken();
+  return `/api/zoho-accounts-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+}
+
+/**
+ * Headers to send with requests.
+ * In dev: include Authorization header (Vite proxy forwards it).
+ * In prod: token is in query param, so no Authorization header needed
+ *          (the serverless proxy adds it server-side).
+ */
+function getHeaders(includeAuth = true): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (isDev && includeAuth) {
+    const token = loadToken();
+    if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
+    headers['Authorization'] = `Zoho-oauthtoken ${token}`;
+  }
+  return headers;
+}
+
+/** @deprecated Use buildCrmUrl(). Kept for backwards compat. */
 export function getZohoBase(): string {
   if (isDev) return '/zoho-crm-proxy/crm/v2';
   return 'https://www.zohoapis.in/crm/v2';
 }
-
-/** Zoho Accounts API base URL */
-function getAccountsUrl(): string {
-  if (isDev) return '/zoho-accounts-proxy';
-  return 'https://accounts.zoho.in';
-}
-
-/** @deprecated Use getZohoBase(). Kept for backwards compat. */
-export const ZOHO_BASE = 'https://www.zohoapis.in/crm/v2';
 
 export class ZohoApiError extends Error {
   status: number;
@@ -57,13 +94,10 @@ interface ZohoCUDResponse {
   message?: string;
 }
 
-function authHeaders(): HeadersInit {
+function ensureToken(): string {
   const token = loadToken();
   if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
-  return {
-    'Authorization': `Zoho-oauthtoken ${token}`,
-    'Content-Type': 'application/json',
-  };
+  return token;
 }
 
 function assertNoZohoError(json: ZohoListResponse | ZohoCUDResponse, httpStatus: number): void {
@@ -72,12 +106,24 @@ function assertNoZohoError(json: ZohoListResponse | ZohoCUDResponse, httpStatus:
   }
 }
 
-export async function zohoList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
-  const base = getZohoBase();
-  const qs = new URLSearchParams(params).toString();
-  const url = `${base}/${module}${qs ? `?${qs}` : ''}`;
+// ─── CRUD operations ────────────────────────────────────────────────────────
 
-  const res = await fetch(url, { headers: authHeaders() });
+export async function zohoList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
+  ensureToken();
+  const qs = new URLSearchParams(params).toString();
+  const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
+
+  // In prod, buildCrmUrl adds token as query param, so we need to append qs differently
+  let url: string;
+  if (isDev) {
+    url = `/zoho-crm-proxy${apiPath}`;
+  } else {
+    const token = loadToken()!;
+    const proxyQs = new URLSearchParams({ path: `/crm/v2/${module}`, token, ...params }).toString();
+    url = `/api/zoho-crm-proxy?${proxyQs}`;
+  }
+
+  const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 204) return [];
 
   const json: ZohoListResponse = await res.json();
@@ -88,9 +134,20 @@ export async function zohoList(module: string, params: Record<string, string> = 
 }
 
 export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
-  const base = getZohoBase();
-  const url = fields ? `${base}/${module}/${id}?fields=${encodeURIComponent(fields)}` : `${base}/${module}/${id}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  ensureToken();
+  const path = fields ? `/crm/v2/${module}/${id}?fields=${encodeURIComponent(fields)}` : `/crm/v2/${module}/${id}`;
+
+  let url: string;
+  if (isDev) {
+    url = `/zoho-crm-proxy${path}`;
+  } else {
+    const token = loadToken()!;
+    const params: Record<string, string> = { path: `/crm/v2/${module}/${id}`, token };
+    if (fields) params.fields = fields;
+    url = `/api/zoho-crm-proxy?${new URLSearchParams(params).toString()}`;
+  }
+
+  const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 404) return null;
 
   const json: ZohoListResponse = await res.json();
@@ -101,10 +158,12 @@ export async function zohoGetById(module: string, id: string, fields?: string): 
 }
 
 export async function zohoCreate(module: string, data: Record<string, unknown>): Promise<string> {
-  const base = getZohoBase();
-  const res = await fetch(`${base}/${module}`, {
+  ensureToken();
+  const url = buildCrmUrl(`/crm/v2/${module}`);
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: getHeaders(),
     body: JSON.stringify({ data: [data] }),
   });
 
@@ -123,10 +182,12 @@ export async function zohoCreate(module: string, data: Record<string, unknown>):
 }
 
 export async function zohoUpdate(module: string, id: string, data: Record<string, unknown>): Promise<void> {
-  const base = getZohoBase();
-  const res = await fetch(`${base}/${module}/${id}`, {
+  ensureToken();
+  const url = buildCrmUrl(`/crm/v2/${module}/${id}`);
+
+  const res = await fetch(url, {
     method: 'PUT',
-    headers: authHeaders(),
+    headers: getHeaders(),
     body: JSON.stringify({ data: [{ id, ...data }] }),
   });
 
@@ -143,10 +204,12 @@ export async function zohoUpdate(module: string, id: string, data: Record<string
 }
 
 export async function zohoDelete(module: string, id: string): Promise<void> {
-  const base = getZohoBase();
-  const res = await fetch(`${base}/${module}/${id}`, {
+  ensureToken();
+  const url = buildCrmUrl(`/crm/v2/${module}/${id}`);
+
+  const res = await fetch(url, {
     method: 'DELETE',
-    headers: authHeaders(),
+    headers: getHeaders(),
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
@@ -161,10 +224,12 @@ export async function zohoUpsert(
   data: Record<string, unknown>,
   duplicateCheckFields: string[],
 ): Promise<{ id: string; action: 'insert' | 'update' }> {
-  const base = getZohoBase();
-  const res = await fetch(`${base}/${module}/upsert`, {
+  ensureToken();
+  const url = buildCrmUrl(`/crm/v2/${module}/upsert`);
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: getHeaders(),
     body: JSON.stringify({
       data: [data],
       duplicate_check_fields: duplicateCheckFields,
@@ -191,9 +256,22 @@ export async function zohoUpsert(
 // ─── Search records (COQL or criteria) ───────────────────────────────────────
 
 export async function zohoSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
-  const base = getZohoBase();
-  const url = `${base}/${module}/search?criteria=${encodeURIComponent(criteria)}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  ensureToken();
+
+  let url: string;
+  if (isDev) {
+    url = `/zoho-crm-proxy/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  } else {
+    const token = loadToken()!;
+    const params = new URLSearchParams({
+      path: `/crm/v2/${module}/search`,
+      token,
+      criteria,
+    });
+    url = `/api/zoho-crm-proxy?${params.toString()}`;
+  }
+
+  const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 204) return [];
   const json: ZohoListResponse = await res.json();
   if (!res.ok && res.status !== 204) {
@@ -205,10 +283,10 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
 // ─── Record Image API ─────────────────────────────────────────────────────────
 
 export async function zohoUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
-  const token = loadToken();
-  if (!token) throw new ZohoApiError(401, 'Not connected', 'NO_TOKEN');
+  const token = ensureToken();
 
-  const base = getZohoBase();
+  // Photo upload needs FormData — use direct API in dev, proxy doesn't handle multipart
+  const base = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
   const formData = new FormData();
   formData.append('file', file, fileName);
 
@@ -228,7 +306,7 @@ export async function zohoGetRecordPhoto(module: string, recordId: string): Prom
   const token = loadToken();
   if (!token) return null;
 
-  const base = getZohoBase();
+  const base = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
   try {
     const res = await fetch(`${base}/${module}/${recordId}/photo`, {
       headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
@@ -265,9 +343,10 @@ export interface ZohoCurrentUser {
 }
 
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
-  const base = getZohoBase();
   try {
-    const res = await fetch(`${base}/users?type=CurrentUser`, { headers: authHeaders() });
+    ensureToken();
+    const url = buildCrmUrl('/crm/v2/users?type=CurrentUser');
+    const res = await fetch(url, { headers: getHeaders() });
     const json = await res.json() as { users?: ZohoCurrentUser[] };
     return json.users?.[0] ?? null;
   } catch {
@@ -290,10 +369,10 @@ export async function fetchZohoAccountsUser(): Promise<ZohoAccountsUser | null> 
   const token = loadToken();
   if (!token) return null;
 
-  const accountsBase = getAccountsUrl();
   try {
-    const res = await fetch(`${accountsBase}/oauth/user/info`, {
-      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    const url = buildAccountsUrl('/oauth/user/info');
+    const res = await fetch(url, {
+      headers: isDev ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
     });
     if (!res.ok) return null;
     const data = await res.json() as Record<string, unknown>;
@@ -317,10 +396,10 @@ export async function fetchUserPhoto(): Promise<string | null> {
   const token = loadToken();
   if (!token) return null;
 
-  const accountsBase = getAccountsUrl();
   try {
-    const res = await fetch(`${accountsBase}/oauth/user/info`, {
-      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    const url = buildAccountsUrl('/oauth/user/info');
+    const res = await fetch(url, {
+      headers: isDev ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
     });
     if (!res.ok) return null;
     const data = await res.json() as Record<string, unknown>;
@@ -335,9 +414,10 @@ export async function fetchUserPhoto(): Promise<string | null> {
 }
 
 export async function fetchZohoOrgName(): Promise<string | null> {
-  const base = getZohoBase();
   try {
-    const res = await fetch(`${base}/org`, { headers: authHeaders() });
+    ensureToken();
+    const url = buildCrmUrl('/crm/v2/org');
+    const res = await fetch(url, { headers: getHeaders() });
     const json = await res.json() as { org?: Array<{ company_name?: string }> };
     return json.org?.[0]?.company_name ?? null;
   } catch {
@@ -356,8 +436,9 @@ export interface ZohoModule {
 }
 
 export async function fetchZohoModules(): Promise<ZohoModule[]> {
-  const base = getZohoBase();
-  const res = await fetch(`${base}/settings/modules`, { headers: authHeaders() });
+  ensureToken();
+  const url = buildCrmUrl('/crm/v2/settings/modules');
+  const res = await fetch(url, { headers: getHeaders() });
   const json = await res.json() as { modules?: ZohoModule[] };
   return json.modules ?? [];
 }

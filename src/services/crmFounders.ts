@@ -1,5 +1,23 @@
-import { zohoList, zohoGetById, zohoCreate, zohoDelete, getZohoBase, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadToken } from './oauth';
+
+const isDev = import.meta.env.DEV;
+
+/** Build a URL for CRM API calls that works in both dev (Vite proxy) and prod (Vercel proxy) */
+function crmUrl(apiPath: string): string {
+  if (isDev) return `/zoho-crm-proxy${apiPath}`;
+  const token = loadToken();
+  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+}
+
+/** Headers: in dev include Authorization (Vite proxy forwards it), in prod the serverless proxy handles auth */
+function crmHeaders(): Record<string, string> {
+  if (isDev) {
+    const token = loadToken();
+    return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
+  }
+  return {};
+}
 
 // Founders are stored as Contacts in Zoho CRM
 const MODULE = 'Contacts';
@@ -138,9 +156,8 @@ async function fetchPortals(): Promise<{ name: string; active: boolean }[]> {
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${getZohoBase()}/settings/portals`, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-  });
+  const url = crmUrl('/crm/v2/settings/portals');
+  const res = await fetch(url, { headers: crmHeaders() });
 
   if (!res.ok) return [];
   const json = await res.json().catch(() => ({})) as { portals?: Array<{ name: string; active: boolean }> };
@@ -155,9 +172,8 @@ async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; n
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${getZohoBase()}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-  });
+  const url = crmUrl(`/crm/v2/settings/portals/${encodeURIComponent(portalName)}/user_type`);
+  const res = await fetch(url, { headers: crmHeaders() });
 
   if (!res.ok) return [];
   const json = await res.json().catch(() => ({})) as { user_type?: Array<{ id: string; name: string; active: boolean }> };
@@ -196,21 +212,23 @@ export async function sendPortalInvitation(contactId: string): Promise<PortalInv
 
   console.log('[Portal] Sending invite with portal:', activePortal.name, 'user_type:', activeUserType.id, activeUserType.name);
 
-  // 3. Try 'invite' first, then 'reinvite' if user was already invited
-  for (const type of ['invite', 'reinvite'] as const) {
-    const params = new URLSearchParams({
+  // 3. Try without 'type' first, then 'invite', then 'reinvite'
+  for (const type of [null, 'invite', 'reinvite'] as const) {
+    const qsParams: Record<string, string> = {
       user_type_id: activeUserType.id,
-      type,
       language: 'en_US',
-    });
+    };
+    if (type) qsParams.type = type;
 
-    const res = await fetch(
-      `${getZohoBase()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-      },
-    );
+    // Build the full CRM API path with query string
+    const invitePath = `/crm/v2/${MODULE}/${contactId}/actions/portal_invite`;
+    const fullPath = `${invitePath}?${new URLSearchParams(qsParams).toString()}`;
+
+    const url = crmUrl(fullPath);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: crmHeaders(),
+    });
 
     const json = await res.json().catch(() => ({})) as Record<string, unknown>;
     console.log(`[Portal] type=${type}:`, res.status, JSON.stringify(json));
@@ -222,10 +240,21 @@ export async function sendPortalInvitation(contactId: string): Promise<PortalInv
     const resultMessage = resultEntry?.message ?? topMessage;
     const resultCode = resultEntry?.code ?? (json as { code?: string }).code ?? '';
 
-    // If "Invalid type" with invite, try reinvite
-    if (type === 'invite' && !res.ok && resultMessage.toLowerCase().includes('invalid type')) {
-      console.log('[Portal] User already invited, retrying with reinvite...');
-      continue;
+    // If param missing or invalid type, try next variant
+    if (type !== 'reinvite' && !res.ok) {
+      const msg = resultMessage.toLowerCase();
+      if (msg.includes('invalid type') || msg.includes('required') || msg.includes('param')) {
+        console.log(`[Portal] type=${type ?? 'none'} failed, trying next variant...`);
+        continue;
+      }
+    }
+
+    // If reinvite gets INTERNAL_ERROR, still report as success (user was already invited)
+    if (type === 'reinvite' && resultCode === 'INTERNAL_ERROR') {
+      return {
+        message: 'User was already invited to the portal. They can log in with their portal credentials.',
+        wasReinvite: true,
+      };
     }
 
     if (!res.ok || resultEntry?.status === 'error' || (resultCode && resultCode !== 'SUCCESS')) {
