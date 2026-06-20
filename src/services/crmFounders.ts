@@ -168,6 +168,7 @@ async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; n
  * Send a portal invitation to a Contact.
  * Zoho CRM API: POST /crm/v2/Contacts/{record_id}/actions/portal_invite?user_type_id={id}&type=invite
  * Automatically fetches portal config and user type, then sends the invite.
+ * If the user was already invited, automatically retries with type=reinvite.
  * Requires the contact to have an email address.
  */
 export async function sendPortalInvitation(contactId: string): Promise<string> {
@@ -188,10 +189,37 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
     throw new Error('No user type configured for this portal. Please set up a user type in your portal settings.');
   }
 
-  // 3. Send the invite — record ID in URL, params as query string
+  console.log('[Portal] Sending invite with portal:', activePortal.name, 'user_type:', activeUserType.id, activeUserType.name);
+
+  // 3. Try invite first, then reinvite if already invited
+  const result = await attemptPortalInvite(token, contactId, activeUserType.id, 'invite');
+
+  // If invite fails with "already invited" type error, retry with reinvite
+  if (!result.success && result.shouldRetryAsReinvite) {
+    console.log('[Portal] User already invited, retrying with reinvite...');
+    const retryResult = await attemptPortalInvite(token, contactId, activeUserType.id, 'reinvite');
+    if (!retryResult.success) {
+      throw new Error(retryResult.errorMessage);
+    }
+    return retryResult.message;
+  }
+
+  if (!result.success) {
+    throw new Error(result.errorMessage);
+  }
+
+  return result.message;
+}
+
+async function attemptPortalInvite(
+  token: string,
+  contactId: string,
+  userTypeId: string,
+  type: 'invite' | 'reinvite',
+): Promise<{ success: boolean; message: string; errorMessage: string; shouldRetryAsReinvite: boolean }> {
   const params = new URLSearchParams({
-    user_type_id: activeUserType.id,
-    type: 'invite',
+    user_type_id: userTypeId,
+    type,
     language: 'en_US',
   });
 
@@ -206,19 +234,36 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
   );
 
   const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+  console.log('[Portal] Response:', JSON.stringify(json));
 
-  if (!res.ok) {
-    const msg = (json as { message?: string }).message
-      || ((json as { portal_invite?: Array<{ message?: string }> }).portal_invite?.[0]?.message)
-      || `Failed to send invitation (HTTP ${res.status})`;
-    throw new Error(msg);
-  }
-
-  // Success response — v2 uses portal_invite array
+  // Check for portal_invite array response
   const inviteResult = (json as { portal_invite?: Array<{ message?: string; code?: string; status?: string }> }).portal_invite;
-  if (inviteResult?.[0]?.status === 'error' || (inviteResult?.[0]?.code && inviteResult[0].code !== 'SUCCESS')) {
-    throw new Error(inviteResult[0].message || 'Invitation failed');
+  const topMessage = (json as { message?: string }).message ?? '';
+  const resultEntry = inviteResult?.[0];
+  const resultMessage = resultEntry?.message ?? topMessage;
+  const resultCode = resultEntry?.code ?? (json as { code?: string }).code ?? '';
+
+  // Detect "already invited" errors → should retry as reinvite
+  const isAlreadyInvited = type === 'invite' && (
+    resultMessage.toLowerCase().includes('already') ||
+    resultMessage.toLowerCase().includes('invalid type') ||
+    resultCode === 'ALREADY_PORTAL_USER' ||
+    resultCode === 'INVALID_DATA'
+  );
+
+  if (!res.ok || resultEntry?.status === 'error' || (resultCode && resultCode !== 'SUCCESS')) {
+    return {
+      success: false,
+      message: '',
+      errorMessage: resultMessage || `Failed to send invitation (HTTP ${res.status})`,
+      shouldRetryAsReinvite: isAlreadyInvited,
+    };
   }
 
-  return inviteResult?.[0]?.message || 'Portal invitation sent successfully';
+  return {
+    success: true,
+    message: resultMessage || 'Portal invitation sent successfully',
+    errorMessage: '',
+    shouldRetryAsReinvite: false,
+  };
 }
