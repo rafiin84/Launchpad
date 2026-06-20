@@ -1,11 +1,16 @@
 // Base Zoho CRM v2 API client (browser implicit-flow).
 // Authorization uses the "Zoho-oauthtoken" header format required by Zoho.
 // India (.in) datacenter only.
+// In local dev, requests go through Vite proxy to bypass CORS.
 
 import { loadToken, OAuthConfig } from './oauth';
 
-const CRM_BASE = 'https://www.zohoapis.in/crm/v2';
-const ACCOUNTS_BASE = 'https://accounts.zoho.in';
+const isDev = import.meta.env.DEV;
+
+// In dev: use Vite proxy prefix (same-origin, no CORS issues)
+// In prod: call Zoho APIs directly (CORS works from deployed domain)
+const CRM_BASE = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
+const ACCOUNTS_BASE = isDev ? '/zoho-accounts-proxy' : 'https://accounts.zoho.in';
 
 /** CRM API base URL (India .in datacenter) */
 export function getZohoBase(): string {
