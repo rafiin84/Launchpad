@@ -26,7 +26,6 @@ export const OAuthConfig = {
     "ZohoCRM.users.ALL",
     "ZohoCRM.org.ALL",
     "ZohoCRM.settings.ALL",
-    "ZohoCRM.settings.clientportal.ALL",
     "ZohoCRM.bulk.ALL",
     "ZohoCRM.notifications.ALL",
     "ZohoCRM.coql.READ",
