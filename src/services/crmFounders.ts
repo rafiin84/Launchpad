@@ -133,16 +133,16 @@ export const SALUTATION_OPTIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'];
 
 /**
  * Send a portal invitation to a Contact.
- * Zoho CRM API: POST /crm/v3/Contacts/{id}/actions/portal_invite
+ * Zoho CRM API: POST /crm/v2/Contacts/actions/portal_invite
+ * Uses v2 base URL (same as all other CRM calls) to avoid CORS issues.
  * Requires the contact to have an email address.
  */
 export async function sendPortalInvitation(contactId: string): Promise<string> {
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
 
-  // Use v3 endpoint for portal invite action
   const res = await fetch(
-    `https://www.zohoapis.in/crm/v3/${MODULE}/${contactId}/actions/portal_invite`,
+    `${ZOHO_BASE}/${MODULE}/actions/portal_invite`,
     {
       method: 'POST',
       headers: {
@@ -150,7 +150,7 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        data: [{ type: 'invite' }],
+        data: [{ id: contactId, type: 'invite' }],
       }),
     },
   );
