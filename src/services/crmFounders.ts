@@ -1,11 +1,6 @@
 import { zohoList, zohoGetById, zohoCreate, zohoDelete, getZohoBase, type ZohoRecord } from './zohoApi';
 import { loadToken } from './oauth';
 
-/** CRM v7 base URL for APIs that require newer endpoints (e.g. portal invite) */
-function getZohoBaseV7(): string {
-  return 'https://www.zohoapis.in/crm/v7';
-}
-
 // Founders are stored as Contacts in Zoho CRM
 const MODULE = 'Contacts';
 
@@ -143,7 +138,7 @@ async function fetchPortals(): Promise<{ name: string; active: boolean }[]> {
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${getZohoBaseV7()}/settings/portals`, {
+  const res = await fetch(`${getZohoBase()}/settings/portals`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
 
@@ -160,7 +155,7 @@ async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; n
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${getZohoBaseV7()}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
+  const res = await fetch(`${getZohoBase()}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
 
@@ -196,62 +191,22 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
 
   console.log('[Portal] Sending invite with portal:', activePortal.name, 'user_type:', activeUserType.id, activeUserType.name);
 
-  // 3. Send the invite — try multiple approaches
-  // Approach 1: JSON body format (v7+)
-  let res = await fetch(
-    `${getZohoBaseV7()}/${MODULE}/${contactId}/actions/portal_invite`,
+  // 3. Send the invite — v2 query params, no 'type' param (v2 doesn't support it)
+  const params = new URLSearchParams({
+    user_type_id: activeUserType.id,
+    language: 'en_US',
+  });
+
+  const res = await fetch(
+    `${getZohoBase()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
     {
       method: 'POST',
-      headers: {
-        'Authorization': `Zoho-oauthtoken ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        portal_invite: [{
-          user_type_id: activeUserType.id,
-          type: 'invite',
-          language: 'en_US',
-        }],
-      }),
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     },
   );
 
-  let json = await res.json().catch(() => ({})) as Record<string, unknown>;
-  console.log('[Portal] Approach 1 (v7 body):', res.status, JSON.stringify(json));
-
-  // If v7 body fails, try v7 query params without 'type'
-  if (!res.ok) {
-    const params = new URLSearchParams({
-      user_type_id: activeUserType.id,
-      language: 'en_US',
-    });
-    res = await fetch(
-      `${getZohoBaseV7()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-      },
-    );
-    json = await res.json().catch(() => ({})) as Record<string, unknown>;
-    console.log('[Portal] Approach 2 (v7 no type):', res.status, JSON.stringify(json));
-  }
-
-  // If still fails, try v2 query params without 'type'
-  if (!res.ok) {
-    const params = new URLSearchParams({
-      user_type_id: activeUserType.id,
-      language: 'en_US',
-    });
-    res = await fetch(
-      `${getZohoBase()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-      },
-    );
-    json = await res.json().catch(() => ({})) as Record<string, unknown>;
-    console.log('[Portal] Approach 3 (v2 no type):', res.status, JSON.stringify(json));
-  }
+  const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+  console.log('[Portal] Response:', res.status, JSON.stringify(json));
 
   // Parse the final response
   const inviteResult = (json as { portal_invite?: Array<{ message?: string; code?: string; status?: string }> }).portal_invite;
