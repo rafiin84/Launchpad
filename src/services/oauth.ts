@@ -15,45 +15,10 @@ let pendingToken: PendingToken | null = null;
 // Configuration
 // -----------------------------------------------------------------------------
 
-// Multi-datacenter OAuth clients
-const DC_CONFIG = {
-  in: {
-    clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
-    authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
-    accountsApi: "https://accounts.zoho.in",
-  },
-  com: {
-    clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
-    authEndpoint: "https://accounts.zoho.com/oauth/v2/auth",
-    accountsApi: "https://accounts.zoho.com",
-  },
-} as const;
-
-type ZohoDC = keyof typeof DC_CONFIG;
-const DC_STORAGE_KEY = 'lp_zoho_dc';
-
-/** Get the stored datacenter, default to 'in' */
-export function getZohoDC(): ZohoDC {
-  try {
-    const dc = localStorage.getItem(DC_STORAGE_KEY);
-    if (dc === 'com' || dc === 'in') return dc;
-  } catch { /* ok */ }
-  return 'in';
-}
-
-/** Set the datacenter for this session */
-export function setZohoDC(dc: ZohoDC) {
-  try { localStorage.setItem(DC_STORAGE_KEY, dc); } catch { /* ok */ }
-}
-
-function getDCConfig() {
-  return DC_CONFIG[getZohoDC()];
-}
-
 export const OAuthConfig = {
-  get clientId() { return getDCConfig().clientId; },
-  get authEndpoint() { return getDCConfig().authEndpoint; },
-  get accountsApi() { return getDCConfig().accountsApi; },
+  clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
+  authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
+  accountsApi: "https://accounts.zoho.in",
 
   // OAuth Scopes (same for all DCs)
   scopes: [

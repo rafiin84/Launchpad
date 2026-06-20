@@ -9,25 +9,14 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      // .com proxies MUST come before .in proxies (longer prefix first)
-      '/zoho-crm-proxy-com': {
-        target: 'https://www.zohoapis.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/zoho-crm-proxy-com/, ''),
-        secure: true,
-      },
+      // Proxy Zoho CRM API calls to bypass CORS in local dev
       '/zoho-crm-proxy': {
         target: 'https://www.zohoapis.in',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/zoho-crm-proxy/, ''),
         secure: true,
       },
-      '/zoho-accounts-proxy-com': {
-        target: 'https://accounts.zoho.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/zoho-accounts-proxy-com/, ''),
-        secure: true,
-      },
+      // Proxy Zoho Accounts API calls to bypass CORS in local dev
       '/zoho-accounts-proxy': {
         target: 'https://accounts.zoho.in',
         changeOrigin: true,

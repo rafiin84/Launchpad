@@ -3,22 +3,20 @@
 // Supports .in and .com datacenters.
 // In local dev, requests go through Vite proxy to bypass CORS.
 
-import { loadToken, getZohoDC, OAuthConfig } from './oauth';
+import { loadToken, OAuthConfig } from './oauth';
 
 const isDev = import.meta.env.DEV;
 
-/** CRM API base URL — DC-aware, with dev proxy support */
+/** CRM API base URL (Zoho .in datacenter), with dev proxy support */
 export function getZohoBase(): string {
-  const dc = getZohoDC();
-  if (isDev) return dc === 'com' ? '/zoho-crm-proxy-com/crm/v2' : '/zoho-crm-proxy/crm/v2';
-  return dc === 'com' ? 'https://www.zohoapis.com/crm/v2' : 'https://www.zohoapis.in/crm/v2';
+  if (isDev) return '/zoho-crm-proxy/crm/v2';
+  return 'https://www.zohoapis.in/crm/v2';
 }
 
 /** Zoho Accounts API base URL */
 function getAccountsUrl(): string {
-  const dc = getZohoDC();
-  if (isDev) return dc === 'com' ? '/zoho-accounts-proxy-com' : '/zoho-accounts-proxy';
-  return dc === 'com' ? 'https://accounts.zoho.com' : 'https://accounts.zoho.in';
+  if (isDev) return '/zoho-accounts-proxy';
+  return 'https://accounts.zoho.in';
 }
 
 /** @deprecated Use getZohoBase(). Kept for backwards compat. */
