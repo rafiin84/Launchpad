@@ -24,7 +24,7 @@ const DC_CONFIG = {
     crmBase: "https://www.zohoapis.in/crm/v2",
   },
   com: {
-    clientId: "1000.MNWAX1L2WRINC5QXL41DIKEQB2PE6J",
+    clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
     authEndpoint: "https://accounts.zoho.com/oauth/v2/auth",
     accountsApi: "https://accounts.zoho.com",
     crmBase: "https://www.zohoapis.com/crm/v2",
