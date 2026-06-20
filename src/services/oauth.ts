@@ -60,6 +60,9 @@ export const OAuthConfig = {
 // -----------------------------------------------------------------------------
 
 if (typeof window !== "undefined") {
+  // Clean up stale multi-DC setting from older versions
+  try { localStorage.removeItem('lp_zoho_dc'); } catch { /* ok */ }
+
   const hash = window.location.hash.substring(1);
 
   if (hash) {

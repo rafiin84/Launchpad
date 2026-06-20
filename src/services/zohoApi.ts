@@ -1,22 +1,24 @@
 // Base Zoho CRM v2 API client (browser implicit-flow).
 // Authorization uses the "Zoho-oauthtoken" header format required by Zoho.
-// Supports multiple datacenters (.in and .com).
+// India (.in) datacenter only.
 
-import { loadToken, getZohoDC, OAuthConfig } from './oauth';
+import { loadToken, OAuthConfig } from './oauth';
 
-/** Dynamic CRM base URL — resolves based on the user's selected datacenter */
+const CRM_BASE = 'https://www.zohoapis.in/crm/v2';
+const ACCOUNTS_BASE = 'https://accounts.zoho.in';
+
+/** CRM API base URL (India .in datacenter) */
 export function getZohoBase(): string {
-  const dc = getZohoDC();
-  return dc === 'com' ? 'https://www.zohoapis.com/crm/v2' : 'https://www.zohoapis.in/crm/v2';
+  return CRM_BASE;
 }
 
-/** Dynamic Zoho Accounts URL */
+/** Zoho Accounts API base URL */
 function getAccountsUrl(): string {
-  return OAuthConfig.accountsApi;
+  return ACCOUNTS_BASE;
 }
 
-/** @deprecated Use getZohoBase() for DC-aware calls. Kept for backwards compat. */
-export const ZOHO_BASE = 'https://www.zohoapis.in/crm/v2';
+/** @deprecated Use getZohoBase(). Kept for backwards compat. */
+export const ZOHO_BASE = CRM_BASE;
 
 export class ZohoApiError extends Error {
   status: number;
