@@ -171,7 +171,12 @@ async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; n
  * If the user was already invited, automatically retries with type=reinvite.
  * Requires the contact to have an email address.
  */
-export async function sendPortalInvitation(contactId: string): Promise<string> {
+export interface PortalInviteResult {
+  message: string;
+  wasReinvite: boolean;
+}
+
+export async function sendPortalInvitation(contactId: string): Promise<PortalInviteResult> {
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
 
@@ -227,7 +232,10 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
       throw new Error(resultMessage || `Failed to send invitation (HTTP ${res.status})`);
     }
 
-    return resultMessage || 'Portal invitation sent successfully';
+    return {
+      message: resultMessage || (type === 'reinvite' ? 'Portal re-invitation sent successfully' : 'Portal invitation sent successfully'),
+      wasReinvite: type === 'reinvite',
+    };
   }
 
   throw new Error('Failed to send portal invitation');

@@ -6,7 +6,7 @@ import {
   AlertCircle, ExternalLink, Globe,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
-import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder } from '../services/crmFounders';
+import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser } from '../services/portalUsers';
 import type { UserRole } from '../types';
@@ -26,6 +26,7 @@ export default function FounderDetail() {
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [inviteRole, setInviteRole] = useState<UserRole>('founder');
+  const [wasReinvite, setWasReinvite] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -53,7 +54,8 @@ export default function FounderDetail() {
     setInviting(true);
     setInviteResult(null);
     try {
-      const msg = await sendPortalInvitation(id);
+      const result = await sendPortalInvitation(id);
+      setWasReinvite(result.wasReinvite);
 
       // Register this user in the portal users registry with their assigned role
       const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
@@ -65,7 +67,10 @@ export default function FounderDetail() {
         invitedAt: new Date().toISOString(),
       });
 
-      setInviteResult({ type: 'success', message: `${msg} — User registered as ${inviteRole}.` });
+      const statusMsg = result.wasReinvite
+        ? `Re-invitation sent — User was already invited, a new invite has been sent.`
+        : `${result.message} — User registered as ${inviteRole}.`;
+      setInviteResult({ type: 'success', message: statusMsg });
     } catch (err) {
       setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
     } finally {
@@ -186,14 +191,18 @@ export default function FounderDetail() {
             disabled={inviting || inviteResult?.type === 'success'}
             className={`inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
               inviteResult?.type === 'success'
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                ? wasReinvite
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-default'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
                 : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
             }`}
           >
             {inviting ? (
               <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
             ) : inviteResult?.type === 'success' ? (
-              <><CheckCircle size={15} /> Invitation Sent</>
+              wasReinvite
+                ? <><Send size={14} /> Re-invitation Sent</>
+                : <><CheckCircle size={15} /> Invitation Sent</>
             ) : (
               <><Send size={14} /> Send Portal Invitation</>
             )}
@@ -205,11 +214,15 @@ export default function FounderDetail() {
       {inviteResult && (
         <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4 ${
           inviteResult.type === 'success'
-            ? 'bg-emerald-50 border border-emerald-100 text-emerald-700'
+            ? wasReinvite
+              ? 'bg-amber-50 border border-amber-100 text-amber-700'
+              : 'bg-emerald-50 border border-emerald-100 text-emerald-700'
             : 'bg-red-50 border border-red-100 text-red-700'
         }`}>
           {inviteResult.type === 'success'
-            ? <CheckCircle size={15} className="flex-shrink-0" />
+            ? wasReinvite
+              ? <Send size={15} className="flex-shrink-0" />
+              : <CheckCircle size={15} className="flex-shrink-0" />
             : <AlertCircle size={15} className="flex-shrink-0" />
           }
           {inviteResult.message}
@@ -364,14 +377,18 @@ export default function FounderDetail() {
                     disabled={inviting || inviteResult?.type === 'success'}
                     className={`inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 ${
                       inviteResult?.type === 'success'
-                        ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                        ? wasReinvite
+                          ? 'bg-amber-100 text-amber-700 cursor-default'
+                          : 'bg-emerald-100 text-emerald-700 cursor-default'
                         : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
                     }`}
                   >
                     {inviting ? (
                       <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
                     ) : inviteResult?.type === 'success' ? (
-                      <><CheckCircle size={12} /> Sent</>
+                      wasReinvite
+                        ? <><Send size={12} /> Re-sent</>
+                        : <><CheckCircle size={12} /> Sent</>
                     ) : (
                       <><Send size={12} /> Send Invite</>
                     )}
