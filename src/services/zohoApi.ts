@@ -77,10 +77,10 @@ function assertNoZohoError(json: ZohoListResponse | ZohoCUDResponse, httpStatus:
 
 export async function zohoList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
   const base = getZohoBase();
-  const url = new URL(`${base}/${module}`);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const qs = new URLSearchParams(params).toString();
+  const url = `${base}/${module}${qs ? `?${qs}` : ''}`;
 
-  const res = await fetch(url.toString(), { headers: authHeaders() });
+  const res = await fetch(url, { headers: authHeaders() });
   if (res.status === 204) return [];
 
   const json: ZohoListResponse = await res.json();
