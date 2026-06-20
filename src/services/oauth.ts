@@ -15,49 +15,18 @@ let pendingToken: PendingToken | null = null;
 // Configuration
 // -----------------------------------------------------------------------------
 
-// Multi-datacenter OAuth clients
-const DC_CONFIG = {
-  in: {
-    clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
-    authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
-    accountsApi: "https://accounts.zoho.in",
-    crmBase: "https://www.zohoapis.in/crm/v2",
-  },
-  com: {
-    clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
-    authEndpoint: "https://accounts.zoho.com/oauth/v2/auth",
-    accountsApi: "https://accounts.zoho.com",
-    crmBase: "https://www.zohoapis.com/crm/v2",
-  },
-} as const;
+// Zoho India (.in) datacenter
+const ZOHO_CLIENT_ID = "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY";
+const ZOHO_AUTH_ENDPOINT = "https://accounts.zoho.in/oauth/v2/auth";
+const ZOHO_ACCOUNTS_API = "https://accounts.zoho.in";
 
-type ZohoDC = keyof typeof DC_CONFIG;
-
-const DC_STORAGE_KEY = 'lp_zoho_dc';
-
-/** Get the stored datacenter, default to 'in' */
-export function getZohoDC(): ZohoDC {
-  try {
-    const dc = localStorage.getItem(DC_STORAGE_KEY);
-    if (dc === 'com' || dc === 'in') return dc;
-  } catch { /* ok */ }
-  return 'in';
-}
-
-/** Set the datacenter for this session */
-export function setZohoDC(dc: ZohoDC) {
-  try { localStorage.setItem(DC_STORAGE_KEY, dc); } catch { /* ok */ }
-}
-
-function getDCConfig() {
-  return DC_CONFIG[getZohoDC()];
-}
+/** Get the datacenter — always 'in' */
+export function getZohoDC(): 'in' { return 'in'; }
 
 export const OAuthConfig = {
-  // Dynamic — resolved from DC config at runtime
-  get clientId() { return getDCConfig().clientId; },
-  get authEndpoint() { return getDCConfig().authEndpoint; },
-  get accountsApi() { return getDCConfig().accountsApi; },
+  clientId: ZOHO_CLIENT_ID,
+  authEndpoint: ZOHO_AUTH_ENDPOINT,
+  accountsApi: ZOHO_ACCOUNTS_API,
 
   // OAuth Scopes (same for all DCs)
   scopes: [
