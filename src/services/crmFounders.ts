@@ -196,79 +196,73 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
 
   console.log('[Portal] Sending invite with portal:', activePortal.name, 'user_type:', activeUserType.id, activeUserType.name);
 
-  // 3. Try invite first, then reinvite if already invited
-  const result = await attemptPortalInvite(token, contactId, activeUserType.id, 'invite');
-
-  // If invite fails with "already invited" type error, retry with reinvite
-  if (!result.success && result.shouldRetryAsReinvite) {
-    console.log('[Portal] User already invited, retrying with reinvite...');
-    const retryResult = await attemptPortalInvite(token, contactId, activeUserType.id, 'reinvite');
-    if (!retryResult.success) {
-      throw new Error(retryResult.errorMessage);
-    }
-    return retryResult.message;
-  }
-
-  if (!result.success) {
-    throw new Error(result.errorMessage);
-  }
-
-  return result.message;
-}
-
-async function attemptPortalInvite(
-  token: string,
-  contactId: string,
-  userTypeId: string,
-  type: 'invite' | 'reinvite',
-): Promise<{ success: boolean; message: string; errorMessage: string; shouldRetryAsReinvite: boolean }> {
-  const params = new URLSearchParams({
-    user_type_id: userTypeId,
-    type,
-    language: 'en_US',
-  });
-
-  const res = await fetch(
-    `${getZohoBaseV7()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
+  // 3. Send the invite — try multiple approaches
+  // Approach 1: JSON body format (v7+)
+  let res = await fetch(
+    `${getZohoBaseV7()}/${MODULE}/${contactId}/actions/portal_invite`,
     {
       method: 'POST',
       headers: {
         'Authorization': `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        portal_invite: [{
+          user_type_id: activeUserType.id,
+          type: 'invite',
+          language: 'en_US',
+        }],
+      }),
     },
   );
 
-  const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-  console.log('[Portal] Response:', JSON.stringify(json));
+  let json = await res.json().catch(() => ({})) as Record<string, unknown>;
+  console.log('[Portal] Approach 1 (v7 body):', res.status, JSON.stringify(json));
 
-  // Check for portal_invite array response
+  // If v7 body fails, try v7 query params without 'type'
+  if (!res.ok) {
+    const params = new URLSearchParams({
+      user_type_id: activeUserType.id,
+      language: 'en_US',
+    });
+    res = await fetch(
+      `${getZohoBaseV7()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+      },
+    );
+    json = await res.json().catch(() => ({})) as Record<string, unknown>;
+    console.log('[Portal] Approach 2 (v7 no type):', res.status, JSON.stringify(json));
+  }
+
+  // If still fails, try v2 query params without 'type'
+  if (!res.ok) {
+    const params = new URLSearchParams({
+      user_type_id: activeUserType.id,
+      language: 'en_US',
+    });
+    res = await fetch(
+      `${getZohoBase()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+      },
+    );
+    json = await res.json().catch(() => ({})) as Record<string, unknown>;
+    console.log('[Portal] Approach 3 (v2 no type):', res.status, JSON.stringify(json));
+  }
+
+  // Parse the final response
   const inviteResult = (json as { portal_invite?: Array<{ message?: string; code?: string; status?: string }> }).portal_invite;
   const topMessage = (json as { message?: string }).message ?? '';
   const resultEntry = inviteResult?.[0];
   const resultMessage = resultEntry?.message ?? topMessage;
   const resultCode = resultEntry?.code ?? (json as { code?: string }).code ?? '';
 
-  // Detect "already invited" errors → should retry as reinvite
-  const isAlreadyInvited = type === 'invite' && (
-    resultMessage.toLowerCase().includes('already') ||
-    resultMessage.toLowerCase().includes('invalid type') ||
-    resultCode === 'ALREADY_PORTAL_USER' ||
-    resultCode === 'INVALID_DATA'
-  );
-
   if (!res.ok || resultEntry?.status === 'error' || (resultCode && resultCode !== 'SUCCESS')) {
-    return {
-      success: false,
-      message: '',
-      errorMessage: resultMessage || `Failed to send invitation (HTTP ${res.status})`,
-      shouldRetryAsReinvite: isAlreadyInvited,
-    };
+    throw new Error(resultMessage || `Failed to send invitation (HTTP ${res.status})`);
   }
 
-  return {
-    success: true,
-    message: resultMessage || 'Portal invitation sent successfully',
-    errorMessage: '',
-    shouldRetryAsReinvite: false,
-  };
+  return resultMessage || 'Portal invitation sent successfully';
 }
