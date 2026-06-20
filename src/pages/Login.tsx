@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
-import { redirectToZoho, savePendingRole } from '../services/oauth';
+import { redirectToZoho, savePendingRole, setZohoDC, getZohoDC } from '../services/oauth';
 
 function Logo() {
   return (
@@ -128,8 +128,15 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
 
 function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }) {
   const isInvestor = role === 'investor';
+  const [dc, setDc] = useState<'in' | 'com'>(getZohoDC());
+
+  const handleDcChange = (newDc: 'in' | 'com') => {
+    setDc(newDc);
+    setZohoDC(newDc);
+  };
 
   const handleZohoSignIn = () => {
+    setZohoDC(dc);
     savePendingRole(role);
     redirectToZoho();
   };
@@ -163,6 +170,37 @@ function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }
             ? 'Connect your Zoho CRM account to access your portfolio, deal flow, and founder network.'
             : 'Connect your Zoho CRM account to share updates, get intros, and grow with your investors.'}
         </p>
+
+        {/* Region selector */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 mb-2">Zoho Region</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleDcChange('in')}
+              className={cn(
+                'flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all',
+                dc === 'in'
+                  ? 'border-gray-900 bg-gray-900 text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              )}
+            >
+              🇮🇳 India (.in)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDcChange('com')}
+              className={cn(
+                'flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all',
+                dc === 'com'
+                  ? 'border-gray-900 bg-gray-900 text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              )}
+            >
+              🌐 Global (.com)
+            </button>
+          </div>
+        </div>
 
         {/* Zoho sign-in button */}
         <button

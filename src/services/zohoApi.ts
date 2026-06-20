@@ -1,29 +1,28 @@
 // Base Zoho CRM v2 API client (browser implicit-flow).
 // Authorization uses the "Zoho-oauthtoken" header format required by Zoho.
-// India (.in) datacenter only.
+// Supports .in and .com datacenters.
 // In local dev, requests go through Vite proxy to bypass CORS.
 
-import { loadToken, OAuthConfig } from './oauth';
+import { loadToken, getZohoDC, OAuthConfig } from './oauth';
 
 const isDev = import.meta.env.DEV;
 
-// In dev: use Vite proxy prefix (same-origin, no CORS issues)
-// In prod: call Zoho APIs directly (CORS works from deployed domain)
-const CRM_BASE = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
-const ACCOUNTS_BASE = isDev ? '/zoho-accounts-proxy' : 'https://accounts.zoho.in';
-
-/** CRM API base URL (India .in datacenter) */
+/** CRM API base URL — DC-aware, with dev proxy support */
 export function getZohoBase(): string {
-  return CRM_BASE;
+  const dc = getZohoDC();
+  if (isDev) return dc === 'com' ? '/zoho-crm-proxy-com/crm/v2' : '/zoho-crm-proxy/crm/v2';
+  return dc === 'com' ? 'https://www.zohoapis.com/crm/v2' : 'https://www.zohoapis.in/crm/v2';
 }
 
 /** Zoho Accounts API base URL */
 function getAccountsUrl(): string {
-  return ACCOUNTS_BASE;
+  const dc = getZohoDC();
+  if (isDev) return dc === 'com' ? '/zoho-accounts-proxy-com' : '/zoho-accounts-proxy';
+  return dc === 'com' ? 'https://accounts.zoho.com' : 'https://accounts.zoho.in';
 }
 
 /** @deprecated Use getZohoBase(). Kept for backwards compat. */
-export const ZOHO_BASE = CRM_BASE;
+export const ZOHO_BASE = 'https://www.zohoapis.in/crm/v2';
 
 export class ZohoApiError extends Error {
   status: number;
