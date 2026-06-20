@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
-import { redirectToZoho, savePendingRole } from '../services/oauth';
+import { redirectToZoho, savePendingRole, getZohoDC, setZohoDC } from '../services/oauth';
 
 function Logo() {
   return (
@@ -128,10 +128,17 @@ function RoleSelection({ onSelect }: { onSelect: (role: UserRole) => void }) {
 
 function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }) {
   const isInvestor = role === 'investor';
+  const [dc, setDC] = useState<'in' | 'com'>(getZohoDC);
 
   const handleZohoSignIn = () => {
+    setZohoDC(dc);
     savePendingRole(role);
     redirectToZoho();
+  };
+
+  const handleDCChange = (newDC: 'in' | 'com') => {
+    setDC(newDC);
+    setZohoDC(newDC);
   };
 
   return (
@@ -164,6 +171,35 @@ function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }
             : 'Connect your Zoho CRM account to share updates, get intros, and grow with your investors.'}
         </p>
 
+        {/* Datacenter selector */}
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-500 mb-2">Zoho Region</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleDCChange('in')}
+              className={cn(
+                'flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all',
+                dc === 'in'
+                  ? 'border-black bg-black text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+              )}
+            >
+              India (.in)
+            </button>
+            <button
+              onClick={() => handleDCChange('com')}
+              className={cn(
+                'flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all',
+                dc === 'com'
+                  ? 'border-black bg-black text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+              )}
+            >
+              Global (.com)
+            </button>
+          </div>
+        </div>
+
         {/* Zoho sign-in button */}
         <button
           onClick={handleZohoSignIn}
@@ -194,8 +230,8 @@ function ZohoAuthScreen({ role, onBack }: { role: UserRole; onBack: () => void }
           <Users size={16} className="text-indigo-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-indigo-600 leading-relaxed">
             <span className="font-semibold">Received a portal invitation?</span>{' '}
-            Use the same Zoho account you set up from the invitation email to sign in here.
-            You'll be automatically directed to your assigned dashboard.
+            Use the same Zoho account you set up from the invitation email.
+            Select <span className="font-semibold">Global (.com)</span> if your Zoho account is on zoho.com.
           </p>
         </div>
       </div>

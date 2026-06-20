@@ -14,7 +14,7 @@
 import {
   zohoUpsert, zohoSearch, zohoUpdate,
   zohoUploadRecordPhoto, zohoGetRecordPhoto,
-  ZOHO_BASE,
+  getZohoBase,
   type ZohoRecord,
 } from './zohoApi';
 import { loadToken } from './oauth';
@@ -151,7 +151,7 @@ export async function isModuleAvailable(): Promise<boolean> {
 
   try {
     // Try fetching the module metadata — if it returns 200, the module exists
-    const res = await fetch(`${ZOHO_BASE}/settings/modules/${MODULE}`, {
+    const res = await fetch(`${getZohoBase()}/settings/modules/${MODULE}`, {
       headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     });
     const available = res.ok;

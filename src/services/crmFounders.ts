@@ -1,4 +1,4 @@
-import { zohoList, zohoGetById, zohoCreate, zohoDelete, ZOHO_BASE, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoDelete, getZohoBase, type ZohoRecord } from './zohoApi';
 import { loadToken } from './oauth';
 
 // Founders are stored as Contacts in Zoho CRM
@@ -138,7 +138,7 @@ async function fetchPortals(): Promise<{ name: string; active: boolean }[]> {
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${ZOHO_BASE}/settings/portals`, {
+  const res = await fetch(`${getZohoBase()}/settings/portals`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
 
@@ -155,7 +155,7 @@ async function fetchPortalUserTypes(portalName: string): Promise<{ id: string; n
   const token = loadToken();
   if (!token) return [];
 
-  const res = await fetch(`${ZOHO_BASE}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
+  const res = await fetch(`${getZohoBase()}/settings/portals/${encodeURIComponent(portalName)}/user_type`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
 
@@ -196,7 +196,7 @@ export async function sendPortalInvitation(contactId: string): Promise<string> {
   });
 
   const res = await fetch(
-    `${ZOHO_BASE}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
+    `${getZohoBase()}/${MODULE}/${contactId}/actions/portal_invite?${params.toString()}`,
     {
       method: 'POST',
       headers: {

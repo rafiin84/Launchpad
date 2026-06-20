@@ -15,11 +15,51 @@ let pendingToken: PendingToken | null = null;
 // Configuration
 // -----------------------------------------------------------------------------
 
-export const OAuthConfig = {
-  // Zoho OAuth Client ID
-  clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
+// Multi-datacenter OAuth clients
+const DC_CONFIG = {
+  in: {
+    clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
+    authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
+    accountsApi: "https://accounts.zoho.in",
+    crmBase: "https://www.zohoapis.in/crm/v2",
+  },
+  com: {
+    clientId: "1000.MNWAX1L2WRINC5QXL41DIKEQB2PE6J",
+    authEndpoint: "https://accounts.zoho.com/oauth/v2/auth",
+    accountsApi: "https://accounts.zoho.com",
+    crmBase: "https://www.zohoapis.com/crm/v2",
+  },
+} as const;
 
-  // OAuth Scopes
+type ZohoDC = keyof typeof DC_CONFIG;
+
+const DC_STORAGE_KEY = 'lp_zoho_dc';
+
+/** Get the stored datacenter, default to 'in' */
+export function getZohoDC(): ZohoDC {
+  try {
+    const dc = localStorage.getItem(DC_STORAGE_KEY);
+    if (dc === 'com' || dc === 'in') return dc;
+  } catch { /* ok */ }
+  return 'in';
+}
+
+/** Set the datacenter for this session */
+export function setZohoDC(dc: ZohoDC) {
+  try { localStorage.setItem(DC_STORAGE_KEY, dc); } catch { /* ok */ }
+}
+
+function getDCConfig() {
+  return DC_CONFIG[getZohoDC()];
+}
+
+export const OAuthConfig = {
+  // Dynamic — resolved from DC config at runtime
+  get clientId() { return getDCConfig().clientId; },
+  get authEndpoint() { return getDCConfig().authEndpoint; },
+  get accountsApi() { return getDCConfig().accountsApi; },
+
+  // OAuth Scopes (same for all DCs)
   scopes: [
     "AaaServer.profile.READ",
     "ZohoCRM.modules.ALL",
@@ -32,9 +72,6 @@ export const OAuthConfig = {
     "ZohoCRM.Files.CREATE",
     "ZohoCRM.Files.READ",
   ],
-
-  // Change this if using another Zoho DC (.com, .eu, .com.au, etc.)
-  authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
 
   // Callback route in your application
   callbackPath: "/callback",
