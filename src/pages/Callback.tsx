@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle } from 'lucide-react';
 import { consumePendingToken, saveToken, loadToken, consumePendingRole, saveUserName } from '../services/oauth';
 import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
-import { syncAppUser, uploadAppUserPhoto } from '../services/crmAppUsers';
+import { fullProfileSync, uploadAppUserPhoto } from '../services/crmAppUsers';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 
@@ -11,46 +11,55 @@ export default function Callback() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [statusText, setStatusText] = useState('Connecting to Zoho...');
 
   useEffect(() => {
     const pending = consumePendingToken();
     if (pending) {
       saveToken(pending.token, pending.expiresAt);
       const role = (consumePendingRole() ?? 'investor') as UserRole;
-      // Fetch real name from Zoho, sync to appusers, then complete login
+
+      // Fetch user data from Zoho, sync to appusers module, then complete login
       fetchCurrentZohoUser().then(async (zohoUser) => {
         if (zohoUser?.full_name) saveUserName(zohoUser.full_name);
 
         // Sync user to appusers CRM module
-        if (zohoUser) {
+        if (zohoUser?.email) {
+          setStatusText('Syncing your profile...');
           const u = zohoUser as unknown as Record<string, unknown>;
-          try {
-            const recordId = await syncAppUser({
-              name:        zohoUser.full_name || 'User',
-              email:       zohoUser.email || '',
-              phone:       (u['phone'] as string) || '',
-              mobile:      (u['mobile'] as string) || '',
-              role,
-              zohoUserId:  zohoUser.id || '',
-              jobTitle:    ((u['role'] as Record<string,string>)?.name) || '',
-              state:       (u['state'] as string) || '',
-              country:     (u['country'] as string) || '',
-            });
 
-            // Upload Zoho profile photo to appusers record image
-            try {
-              const photoUrl = await fetchUserPhoto();
-              if (photoUrl) {
-                const photoRes = await fetch(photoUrl);
-                if (photoRes.ok) {
-                  const blob = await photoRes.blob();
-                  if (blob.size > 0 && !blob.type.includes('json')) {
-                    await uploadAppUserPhoto(recordId, blob, 'profile.jpg');
+          try {
+            const { recordId } = await fullProfileSync(
+              {
+                email:      zohoUser.email,
+                name:       zohoUser.full_name || 'User',
+                phone:      (u['phone'] as string) || '',
+                mobile:     (u['mobile'] as string) || '',
+                zohoUserId: zohoUser.id || '',
+                jobTitle:   ((u['role'] as Record<string, string>)?.name) || '',
+                state:      (u['state'] as string) || '',
+                country:    (u['country'] as string) || '',
+              },
+              role,
+            );
+
+            // Upload Zoho profile photo to appusers record (best-effort)
+            if (recordId) {
+              setStatusText('Uploading profile photo...');
+              try {
+                const photoUrl = await fetchUserPhoto();
+                if (photoUrl) {
+                  const photoRes = await fetch(photoUrl);
+                  if (photoRes.ok) {
+                    const blob = await photoRes.blob();
+                    if (blob.size > 0 && !blob.type.includes('json')) {
+                      await uploadAppUserPhoto(recordId, blob, 'profile.jpg');
+                    }
                   }
                 }
+              } catch {
+                // Photo sync is best-effort — don't block login
               }
-            } catch {
-              // Photo sync is best-effort — don't block login
             }
           } catch {
             // appusers sync is best-effort — don't block login
@@ -59,6 +68,7 @@ export default function Callback() {
 
         login(role);
         setStatus('success');
+        setStatusText('Redirecting to your dashboard...');
         setTimeout(() => navigate('/'), 1500);
       });
       return;
@@ -88,8 +98,8 @@ export default function Callback() {
       {status === 'processing' && (
         <>
           <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
-          <p className="text-sm font-medium text-gray-700">Connecting to Zoho...</p>
-          <p className="text-xs text-gray-400">Saving your access token</p>
+          <p className="text-sm font-medium text-gray-700">{statusText}</p>
+          <p className="text-xs text-gray-400">Please wait</p>
         </>
       )}
 
@@ -97,7 +107,7 @@ export default function Callback() {
         <>
           <CheckCircle size={32} className="text-emerald-500" />
           <p className="text-sm font-semibold text-gray-900">Zoho connected!</p>
-          <p className="text-xs text-gray-400">Redirecting to your dashboard...</p>
+          <p className="text-xs text-gray-400">{statusText}</p>
         </>
       )}
 

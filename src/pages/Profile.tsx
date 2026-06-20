@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/layout/PageHeader';
+import { loadCachedProfile } from '../services/crmAppUsers';
 
-/* ── localStorage helpers ───────────────────────────────────── */
-const PROFILE_KEY = 'lp_profile_extra';
-
+/* ── Profile data: CRM appUser > local cache > old localStorage ──── */
 interface ProfileExtra {
   bio: string;
   location: string;
@@ -15,32 +14,52 @@ interface ProfileExtra {
   expertise: string[];
 }
 
-function loadExtra(): ProfileExtra {
+function loadExtra(appUser: Record<string, unknown> | null): ProfileExtra {
+  // Priority: appUser from CRM > locally cached profile > old lp_profile_extra
+  if (appUser) {
+    const expertise = appUser.expertise as string[] | undefined;
+    if (appUser.bio || appUser.location || (expertise && expertise.length > 0) || appUser.linkedIn || appUser.twitter) {
+      return {
+        bio:       (appUser.bio as string) || '',
+        location:  (appUser.location as string) || '',
+        twitter:   (appUser.twitter as string) || '',
+        linkedIn:  (appUser.linkedIn as string) || '',
+        expertise: expertise || [],
+      };
+    }
+  }
+
+  // Check locally cached profile (from crmAppUsers service)
+  const cached = loadCachedProfile();
+  if (cached && (cached.bio || cached.location || cached.expertise?.length || cached.linkedIn || cached.twitter)) {
+    return {
+      bio:       cached.bio || '',
+      location:  cached.location || '',
+      twitter:   cached.twitter || '',
+      linkedIn:  cached.linkedIn || '',
+      expertise: cached.expertise || [],
+    };
+  }
+
+  // Fallback to old localStorage key
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
+    const raw = localStorage.getItem('lp_profile_extra');
     if (raw) return JSON.parse(raw);
   } catch { /* empty */ }
-  // Pre-populate with Kumar Vembu's real data on first load
-  const defaults: ProfileExtra = {
-    bio: `Kumar Vembu is a seasoned entrepreneur, engineer, and startup coach based in Chennai, India, with over 20 years of experience building technology-driven businesses. As the Founder & CEO of Launchpad, he is on a mission to connect promising founders with the right investors, tools, and networks to scale their vision.\n\nA hands-on product thinker and systems builder, Kumar co-founded Mudhal Partners to back early-stage startups across India. He has mentored 50+ startups, helping them navigate product-market fit, fundraising, and growth. His approach blends engineering rigour with entrepreneurial empathy — he's been on both sides of the table.\n\nKumar is passionate about democratising access to capital for founders across Tier 2 and Tier 3 cities in India, and believes the next wave of great Indian startups will come from beyond the metros.`,
-    location: 'Chennai, Tamil Nadu, India',
-    twitter: '',
-    linkedIn: 'https://in.linkedin.com/in/kumar-vembu-a0a45710',
-    expertise: ['Entrepreneurship', 'Product Management', 'Engineering', 'Coaching', 'Leadership', 'Fundraising', 'Strategy'],
-  };
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(defaults));
-  return defaults;
+
+  return { bio: '', location: '', twitter: '', linkedIn: '', expertise: [] };
 }
 
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
-  const { currentUser, role, logout, zohoEmail, zohoProfile } = useAuth();
+  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser } = useAuth();
   const navigate = useNavigate();
-  const [extra] = useState<ProfileExtra>(loadExtra);
+  const [extra] = useState<ProfileExtra>(() => loadExtra(appUser as unknown as Record<string, unknown> | null));
 
-  const displayEmail = zohoProfile.email || zohoEmail || currentUser.email;
-  const location = extra.location || [zohoProfile.state, zohoProfile.country].filter(Boolean).join(', ') || null;
-  const phone = zohoProfile.phone || zohoProfile.mobile || null;
+  const displayEmail = appUser?.email || zohoProfile.email || zohoEmail || currentUser.email;
+  const location = extra.location || appUser?.location || [zohoProfile.state, zohoProfile.country].filter(Boolean).join(', ') || null;
+  const phone = appUser?.phone || zohoProfile.phone || appUser?.mobile || zohoProfile.mobile || null;
+  const jobTitle = appUser?.jobTitle || zohoProfile.jobTitle || null;
 
   function handleLogout() {
     logout();
@@ -55,7 +74,7 @@ export default function Profile() {
     .toUpperCase();
 
   const hasExtra = extra.bio || extra.location || extra.expertise.length > 0
-    || extra.linkedIn || extra.twitter || phone || location || zohoProfile.jobTitle;
+    || extra.linkedIn || extra.twitter || phone || location || jobTitle;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
@@ -73,11 +92,11 @@ export default function Profile() {
         }
       />
 
-      {/* ── Main layout: fixed-width left + fluid right ────────── */}
-      <div className="flex gap-4 items-start">
+      {/* Main layout: fixed-width left + fluid right */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
 
-        {/* LEFT column — ~600px fixed, contains cover + all profile info */}
-        <div className="w-full max-w-[600px] flex-shrink-0 space-y-4">
+        {/* LEFT column */}
+        <div className="w-full lg:max-w-[600px] flex-shrink-0 space-y-4">
 
           {/* Identity card */}
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
@@ -107,7 +126,7 @@ export default function Profile() {
                   <img
                     src={currentUser.avatar}
                     alt={currentUser.name}
-                    className="relative w-full h-full object-cover object-center scale-150"
+                    className="relative w-full h-full object-cover object-center"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 )}
@@ -116,7 +135,7 @@ export default function Profile() {
               {/* Name + role */}
               <h2 className="text-lg font-bold text-gray-900">{currentUser.name}</h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {zohoProfile.jobTitle ? `${zohoProfile.jobTitle} · ` : ''}<span className="capitalize">{role}</span>
+                {jobTitle ? `${jobTitle} · ` : ''}<span className="capitalize">{role}</span>
               </p>
 
               {/* Details */}
@@ -137,10 +156,10 @@ export default function Profile() {
                     {location}
                   </div>
                 )}
-                {zohoProfile.jobTitle && (
+                {jobTitle && (
                   <div className="flex items-center gap-2.5 text-sm text-gray-600">
                     <Briefcase size={14} className="text-gray-400 flex-shrink-0" />
-                    {zohoProfile.jobTitle}
+                    {jobTitle}
                   </div>
                 )}
                 {extra.linkedIn && (
@@ -226,8 +245,8 @@ export default function Profile() {
 
         </div>
 
-        {/* RIGHT column — Current Company + Skills, fixed 300px */}
-        <div className="w-[300px] flex-shrink-0 space-y-4">
+        {/* RIGHT column */}
+        <div className="w-full lg:w-[300px] flex-shrink-0 space-y-4">
 
           {/* Current Company */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">

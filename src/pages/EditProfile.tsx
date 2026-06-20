@@ -1,16 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2,
+  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2, User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
-import { updateAppUser, uploadAppUserPhoto } from '../services/crmAppUsers';
+import { updateAppUser, uploadAppUserPhoto, loadCachedProfile, cacheProfileLocally } from '../services/crmAppUsers';
 import { saveUserName } from '../services/oauth';
 
-const PROFILE_KEY = 'lp_profile_extra';
-
-interface ProfileExtra {
+interface ProfileForm {
+  name: string;
   bio: string;
   location: string;
   twitter: string;
@@ -18,30 +17,56 @@ interface ProfileExtra {
   expertise: string[];
 }
 
-function loadExtra(): ProfileExtra {
+function loadInitialForm(currentUserName: string, appUserData: Record<string, unknown> | null): ProfileForm {
+  // Priority: appUser from CRM > locally cached profile > defaults
+  const cached = loadCachedProfile();
+  // Also read from old localStorage key for backwards compatibility
+  let oldExtra: Partial<ProfileForm> = {};
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* empty */ }
-  return { bio: '', location: '', twitter: '', linkedIn: '', expertise: [] };
-}
+    const raw = localStorage.getItem('lp_profile_extra');
+    if (raw) oldExtra = JSON.parse(raw);
+  } catch { /* ok */ }
 
-function saveExtra(data: ProfileExtra) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+  return {
+    name:      (appUserData?.name as string) || cached?.name || currentUserName || '',
+    bio:       (appUserData?.bio as string) || cached?.bio || (oldExtra.bio as string) || '',
+    location:  (appUserData?.location as string) || cached?.location || (oldExtra.location as string) || '',
+    twitter:   (appUserData?.twitter as string) || cached?.twitter || (oldExtra.twitter as string) || '',
+    linkedIn:  (appUserData?.linkedIn as string) || cached?.linkedIn || (oldExtra.linkedIn as string) || '',
+    expertise: (appUserData?.expertise as string[]) || cached?.expertise || (oldExtra.expertise as string[]) || [],
+  };
 }
 
 export default function EditProfile() {
-  const { currentUser, appUserRecordId, refreshAvatar } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState<ProfileExtra>(loadExtra);
+
+  const [form, setForm] = useState<ProfileForm>(() =>
+    loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null)
+  );
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [saveResult, setSaveResult] = useState<'success' | 'partial' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const set = (field: keyof ProfileExtra, val: string) =>
+  // If appUser loads after initial render, merge in CRM data
+  useEffect(() => {
+    if (appUser) {
+      setForm(prev => ({
+        name:      appUser.name || prev.name,
+        bio:       appUser.bio || prev.bio,
+        location:  appUser.location || prev.location,
+        twitter:   appUser.twitter || prev.twitter,
+        linkedIn:  appUser.linkedIn || prev.linkedIn,
+        expertise: appUser.expertise.length > 0 ? appUser.expertise : prev.expertise,
+      }));
+    }
+  }, [appUser]);
+
+  const set = (field: keyof ProfileForm, val: string) =>
     setForm(prev => ({ ...prev, [field]: val }));
 
   const addTag = () => {
@@ -65,44 +90,79 @@ export default function EditProfile() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveResult(null);
     try {
-      // Save locally
-      saveExtra(form);
+      // Save display name to localStorage
+      if (form.name.trim()) {
+        saveUserName(form.name.trim());
+      }
 
-      // Sync to appusers CRM module
+      // Always cache profile locally (works even without appusers module)
+      cacheProfileLocally({
+        name: form.name.trim(),
+        bio: form.bio,
+        location: form.location,
+        linkedIn: form.linkedIn,
+        twitter: form.twitter,
+        expertise: form.expertise,
+      });
+
+      // Also update old localStorage key for Profile page backwards compatibility
+      try {
+        localStorage.setItem('lp_profile_extra', JSON.stringify({
+          bio: form.bio,
+          location: form.location,
+          twitter: form.twitter,
+          linkedIn: form.linkedIn,
+          expertise: form.expertise,
+        }));
+      } catch { /* ok */ }
+
+      let crmSuccess = true;
+
+      // Sync to appusers CRM module if available
       if (appUserRecordId) {
         try {
-          await updateAppUser(appUserRecordId, {
+          const updated = await updateAppUser(appUserRecordId, {
+            name: form.name.trim(),
             bio: form.bio,
             location: form.location,
             linkedIn: form.linkedIn,
             twitter: form.twitter,
             expertise: form.expertise,
           });
-
-          // Also update the user's display name in localStorage if changed
-          if (currentUser.name) {
-            saveUserName(currentUser.name);
-          }
+          if (!updated) crmSuccess = false;
         } catch {
-          // CRM update is best-effort
+          crmSuccess = false;
         }
 
         // Upload photo if selected
         if (photoFile) {
           setUploadingPhoto(true);
           try {
-            await uploadAppUserPhoto(appUserRecordId, photoFile, photoFile.name || 'photo.jpg');
-            refreshAvatar(); // re-fetch avatar from appusers
+            const uploaded = await uploadAppUserPhoto(appUserRecordId, photoFile, photoFile.name || 'photo.jpg');
+            if (uploaded) {
+              refreshAvatar(); // re-fetch avatar from appusers
+            } else {
+              crmSuccess = false;
+            }
           } catch {
-            // Photo upload is best-effort
+            crmSuccess = false;
           } finally {
             setUploadingPhoto(false);
           }
         }
+      } else {
+        crmSuccess = false;
       }
 
-      navigate('/profile');
+      setSaveResult(crmSuccess ? 'success' : 'partial');
+
+      // Refresh appUser in context so Profile page shows latest data
+      refreshAppUser();
+
+      // Navigate after a brief delay so user sees the result
+      setTimeout(() => navigate('/profile'), 1000);
     } finally {
       setSaving(false);
     }
@@ -134,15 +194,42 @@ export default function EditProfile() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Edit Profile</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{currentUser.name}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{form.name || currentUser.name}</p>
           {photoFile && (
             <p className="text-xs text-emerald-600 mt-0.5">New photo selected — will upload on save</p>
           )}
         </div>
       </div>
 
+      {/* Save result feedback */}
+      {saveResult === 'success' && (
+        <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">
+          Profile saved successfully!
+        </div>
+      )}
+      {saveResult === 'partial' && (
+        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+          Profile saved locally. CRM sync will happen on next login.
+        </div>
+      )}
+
       {/* Form */}
       <div className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-100">
+
+        {/* Display Name */}
+        <div className="px-6 py-5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Name</label>
+          <div className="relative">
+            <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              placeholder="Your full name"
+              className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+            />
+          </div>
+        </div>
 
         {/* Bio */}
         <div className="px-6 py-5">
@@ -151,7 +238,7 @@ export default function EditProfile() {
             rows={4}
             value={form.bio}
             onChange={e => set('bio', e.target.value)}
-            placeholder="Tell others a bit about yourself…"
+            placeholder="Tell others a bit about yourself..."
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none"
           />
         </div>
@@ -248,7 +335,7 @@ export default function EditProfile() {
           className="flex-1 px-4 py-3 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {(saving || uploadingPhoto) && <Loader2 size={14} className="animate-spin" />}
-          {uploadingPhoto ? 'Uploading Photo…' : saving ? 'Saving…' : 'Save Changes'}
+          {uploadingPhoto ? 'Uploading Photo...' : saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </div>

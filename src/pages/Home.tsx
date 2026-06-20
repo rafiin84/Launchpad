@@ -360,7 +360,7 @@ export default function Home() {
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
-              className="relative w-full h-full object-cover scale-150"
+              className="relative w-full h-full object-cover"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
           )}
