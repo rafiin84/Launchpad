@@ -10,7 +10,7 @@
  * 5. Copy the generated code
  * 6. Run this in your terminal to get a refresh token:
  *
- *    curl -X POST "https://accounts.zoho.com/oauth/v2/token" \
+ *    curl -X POST "https://accounts.zoho.in/oauth/v2/token" \
  *      -d "code=YOUR_CODE" \
  *      -d "client_id=YOUR_CLIENT_ID" \
  *      -d "client_secret=YOUR_CLIENT_SECRET" \
