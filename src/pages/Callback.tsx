@@ -38,13 +38,30 @@ export default function Callback() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Determine role from CRM profile name.
+   * - "Administrator" → investor (admin has full access)
+   * - "Investor"      → investor
+   * - Anything else   → founder (portal users, unknown profiles)
+   */
+  function roleFromProfile(profileName: string | undefined): UserRole {
+    if (!profileName) return 'founder';
+    const p = profileName.toLowerCase();
+    if (p === 'administrator' || p === 'investor' || p === 'admin') return 'investor';
+    return 'founder';
+  }
+
   async function handleLogin(pendingRole: UserRole) {
     // ── Step 1: Try CRM user login (admin / staff) ──────────────────
     setStatusText('Identifying your account...');
     const zohoUser = await fetchCurrentZohoUser();
 
     if (zohoUser?.email) {
-      // CRM user — full access, sync to appusers
+      // CRM user — auto-detect role from CRM profile
+      const profileName = zohoUser.profile?.name;
+      const detectedRole = roleFromProfile(profileName);
+      console.log(`[Auth] CRM profile: "${profileName}" → role: ${detectedRole}`);
+
       setStatusText('Syncing your profile...');
       if (zohoUser.full_name) saveUserName(zohoUser.full_name);
 
@@ -61,7 +78,7 @@ export default function Callback() {
             state:      (u['state'] as string) || '',
             country:    (u['country'] as string) || '',
           },
-          pendingRole,
+          detectedRole,
         );
 
         // Upload photo to appusers (best-effort)
@@ -82,14 +99,14 @@ export default function Callback() {
         }
       } catch { /* best-effort */ }
 
-      login(pendingRole);
+      login(detectedRole);
       setStatus('success');
-      setStatusText('Redirecting to your dashboard...');
+      setStatusText(`Welcome, ${zohoUser.full_name}! Profile: ${profileName ?? 'Unknown'}`);
       setTimeout(() => navigate('/'), 1500);
       return;
     }
 
-    // ── Step 2: Not a CRM user — check if portal user ───────────────
+    // ── Step 2: Not a CRM user — check if portal user (→ founder) ──
     setStatusText('Checking portal access...');
     const accountsUser = await fetchZohoAccountsUser();
 
@@ -100,47 +117,31 @@ export default function Callback() {
 
       saveUserName(displayName);
 
-      // Look up in the portal users registry
+      // Portal users are always founders
+      const portalRole: UserRole = 'founder';
+
+      // Look up in the portal users registry for contactId
       const portalEntry = findPortalUser(accountsUser.email);
 
-      if (portalEntry) {
-        // Known portal user — use their assigned role
-        savePortalSession({
-          email: accountsUser.email,
-          name: displayName,
-          role: portalEntry.role,
-          contactId: portalEntry.contactId,
-          zuid: accountsUser.zuid,
-          isPortalUser: true,
-        });
-
-        login(portalEntry.role);
-        setStatus('success');
-        setStatusText(`Welcome, ${displayName}! Redirecting to your ${portalEntry.role} dashboard...`);
-        setTimeout(() => navigate('/'), 1500);
-        return;
-      }
-
-      // Unknown portal user — they have a Zoho account but weren't explicitly invited
-      // Use the role they selected on the login page
       savePortalSession({
         email: accountsUser.email,
         name: displayName,
-        role: pendingRole,
-        contactId: '',
+        role: portalEntry?.role ?? portalRole,
+        contactId: portalEntry?.contactId ?? '',
         zuid: accountsUser.zuid,
         isPortalUser: true,
       });
 
-      login(pendingRole);
+      const finalRole = portalEntry?.role ?? portalRole;
+      login(finalRole);
       setStatus('success');
-      setStatusText(`Welcome, ${displayName}!`);
+      setStatusText(`Welcome, ${displayName}! Redirecting to your ${finalRole} dashboard...`);
       setTimeout(() => navigate('/'), 1500);
       return;
     }
 
     // ── Step 3: Couldn't identify user at all ───────────────────────
-    // Fallback — just use the pending role
+    // Fallback — use pending role from login page
     login(pendingRole);
     setStatus('success');
     setStatusText('Redirecting...');
