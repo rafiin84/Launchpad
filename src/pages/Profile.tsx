@@ -52,7 +52,7 @@ function loadExtra(appUser: Record<string, unknown> | null): ProfileExtra {
 
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
-  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser, appUserRecordId, coverImage, setCoverImage, refreshAvatar } = useAuth();
+  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser, appUserRecordId, coverImage, setCoverImage, setProfileImage, refreshAvatar } = useAuth();
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(() => loadExtra(appUser as unknown as Record<string, unknown> | null));
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -73,12 +73,24 @@ export default function Profile() {
   /** Upload new profile photo directly from the profile page */
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !appUserRecordId) return;
+    if (!file) return;
     setUploadingAvatar(true);
     try {
-      const uploaded = await uploadAppUserPhoto(appUserRecordId, file, file.name || 'photo.jpg');
-      if (uploaded) refreshAvatar();
-    } catch { /* best-effort */ }
+      // Try CRM upload first if record ID is available
+      if (appUserRecordId) {
+        const uploaded = await uploadAppUserPhoto(appUserRecordId, file, file.name || 'photo.jpg');
+        if (uploaded) { refreshAvatar(); return; }
+      }
+      // Fallback: save locally as data URL
+      const reader = new FileReader();
+      reader.onload = () => setProfileImage(reader.result as string);
+      reader.readAsDataURL(file);
+    } catch {
+      // Last resort: save locally
+      const reader = new FileReader();
+      reader.onload = () => setProfileImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
     finally { setUploadingAvatar(false); }
     e.target.value = ''; // reset input
   }

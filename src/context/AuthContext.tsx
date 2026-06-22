@@ -36,6 +36,8 @@ interface AuthContextValue {
   isPortalUser: boolean;
   coverImage: string;
   setCoverImage: (dataUrl: string) => void;
+  /** Set avatar directly from a data URL (local fallback when CRM isn't available) */
+  setProfileImage: (dataUrl: string) => void;
   refreshAvatar: () => void;
   /** Force-reload appUser data from CRM */
   refreshAppUser: () => void;
@@ -205,6 +207,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(COVER_CACHE_KEY, dataUrl); } catch { /* ok */ }
   }, []);
 
+  /** Set avatar directly from a data URL (local fallback) */
+  const setProfileImage = useCallback((dataUrl: string) => {
+    setAvatarUrl(dataUrl);
+    try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* ok */ }
+  }, []);
+
   /** Re-fetch avatar from appusers (call after uploading a new photo) */
   const refreshAvatar = useCallback(() => {
     const rid = appUserRecordId || loadCachedRecordId();
@@ -245,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isPortalUser: portalSession?.isPortalUser ?? false,
         coverImage,
         setCoverImage,
+        setProfileImage,
         refreshAvatar,
         refreshAppUser,
       }}

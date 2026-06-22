@@ -38,7 +38,7 @@ function loadInitialForm(currentUserName: string, appUserData: Record<string, un
 }
 
 export default function EditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState<ProfileForm>(() =>
@@ -83,12 +83,18 @@ export default function EditProfile() {
   const removeTag = (tag: string) =>
     setForm(prev => ({ ...prev, expertise: prev.expertise.filter(e => e !== tag) }));
 
+  const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoFile(file);
     const url = URL.createObjectURL(file);
     setPhotoPreview(url);
+    // Also read as data URL for localStorage fallback
+    const reader = new FileReader();
+    reader.onload = () => setPhotoDataUrl(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,9 +167,12 @@ export default function EditProfile() {
             if (uploaded) {
               refreshAvatar(); // re-fetch avatar from appusers
             } else {
+              // CRM upload failed — save locally as fallback
+              if (photoDataUrl) setProfileImage(photoDataUrl);
               crmSuccess = false;
             }
           } catch {
+            if (photoDataUrl) setProfileImage(photoDataUrl);
             crmSuccess = false;
           } finally {
             setUploadingPhoto(false);
@@ -171,6 +180,10 @@ export default function EditProfile() {
         }
       } else {
         crmSuccess = false;
+        // No CRM record — save photo locally if selected
+        if (photoFile && photoDataUrl) {
+          setProfileImage(photoDataUrl);
+        }
       }
 
       // Save cover image (localStorage-based)
