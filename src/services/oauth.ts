@@ -50,7 +50,7 @@ export const OAuthConfig = {
 
 export const PortalOAuthConfig = {
   clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
-  portalId: "60074261975",
+  portalId: "50043237302",
   authEndpoint: "https://accounts.zohoportal.in/clientoauth/v2",
 
   scopes: [
