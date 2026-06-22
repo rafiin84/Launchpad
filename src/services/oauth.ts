@@ -53,15 +53,11 @@ export const PortalOAuthConfig = {
   authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
 
   scopes: [
+    "AaaServer.profile.READ",
     "ZohoCRM.modules.ALL",
     "ZohoCRM.settings.ALL",
-    "ZohoCRM.coql.READ",
     "ZohoCRM.users.ALL",
     "ZohoCRM.org.ALL",
-    "ZohoCRM.Files.CREATE",
-    "ZohoCRM.Files.READ",
-    "profile.orguserphoto.READ",
-    "ZohoSearch.securesearch.READ",
   ],
 
   callbackPath: "/portal/callback",
