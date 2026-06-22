@@ -50,8 +50,7 @@ export const OAuthConfig = {
 
 export const PortalOAuthConfig = {
   clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
-  portalDomain: "https://launchpad.zcrmportals.in",
-  portalId: "60074261975",  // ZGID from org
+  authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
 
   scopes: [
     "ZohoCRM.modules.ALL",
@@ -169,7 +168,7 @@ export function buildPortalAuthUrl(): string {
     state: `portal-${Date.now()}`,
   });
 
-  return `${PortalOAuthConfig.portalDomain}/accounts/op/${PortalOAuthConfig.portalId}/oauth/v2/auth?${params.toString()}`;
+  return `${PortalOAuthConfig.authEndpoint}?${params.toString()}`;
 }
 
 export function redirectToPortal(): void {
