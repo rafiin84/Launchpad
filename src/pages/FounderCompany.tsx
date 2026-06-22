@@ -5,6 +5,7 @@ import {
   Calendar, Shield,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { useAuth } from '../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
+  const { coverImage } = useAuth();
   const [data, setData]       = useState<CompanyData>(load);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState<CompanyData>(data);
@@ -213,10 +215,17 @@ export default function FounderCompany() {
 
       {/* ── Hero Banner ── */}
       <div className="relative w-full h-44 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 overflow-hidden">
-        {/* subtle texture overlay */}
-        <div className="absolute inset-0 opacity-20"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #6366f1 0%, transparent 50%), radial-gradient(circle at 80% 20%, #a855f7 0%, transparent 40%)' }}
-        />
+        {/* Cover image or subtle texture overlay */}
+        {coverImage ? (
+          <>
+            <img src={coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40" />
+          </>
+        ) : (
+          <div className="absolute inset-0 opacity-20"
+            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #6366f1 0%, transparent 50%), radial-gradient(circle at 80% 20%, #a855f7 0%, transparent 40%)' }}
+          />
+        )}
 
         <div className="relative h-full flex items-center justify-between px-6 sm:px-8">
           {/* Left: logo + name + tagline */}

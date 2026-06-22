@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar } from 'lucide-react';
+import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar, Camera, ImagePlus, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/layout/PageHeader';
-import { loadCachedProfile } from '../services/crmAppUsers';
+import { loadCachedProfile, uploadAppUserPhoto } from '../services/crmAppUsers';
 
 /* ── Profile data: CRM appUser > local cache > old localStorage ──── */
 interface ProfileExtra {
@@ -52,9 +52,13 @@ function loadExtra(appUser: Record<string, unknown> | null): ProfileExtra {
 
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
-  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser } = useAuth();
+  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser, appUserRecordId, coverImage, setCoverImage, refreshAvatar } = useAuth();
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(() => loadExtra(appUser as unknown as Record<string, unknown> | null));
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   const displayEmail = appUser?.email || zohoProfile.email || zohoEmail || currentUser.email;
   const location = extra.location || appUser?.location || [zohoProfile.state, zohoProfile.country].filter(Boolean).join(', ') || null;
@@ -64,6 +68,35 @@ export default function Profile() {
   function handleLogout() {
     logout();
     navigate('/login');
+  }
+
+  /** Upload new profile photo directly from the profile page */
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !appUserRecordId) return;
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await uploadAppUserPhoto(appUserRecordId, file, file.name || 'photo.jpg');
+      if (uploaded) refreshAvatar();
+    } catch { /* best-effort */ }
+    finally { setUploadingAvatar(false); }
+    e.target.value = ''; // reset input
+  }
+
+  /** Upload / change cover image (stored as data URL in localStorage) */
+  function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setCoverImage(dataUrl);
+      setUploadingCover(false);
+    };
+    reader.onerror = () => setUploadingCover(false);
+    reader.readAsDataURL(file);
+    e.target.value = ''; // reset input
   }
 
   const initials = currentUser.name
@@ -102,22 +135,38 @@ export default function Profile() {
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
 
             {/* Cover image */}
-            <div className="h-40 sm:h-52 relative overflow-hidden">
-              <img
-                src="https://plus.unsplash.com/premium_photo-1746517836275-651a195a3fe5?fm=jpg&q=80&w=1200&auto=format&fit=crop"
-                alt="cover"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                  (e.currentTarget.parentElement as HTMLElement).style.background = 'linear-gradient(135deg,#1e1b4b,#312e81)';
-                }}
-              />
+            <div className="h-40 sm:h-52 relative overflow-hidden group/cover">
+              {coverImage ? (
+                <img
+                  src={coverImage}
+                  alt="cover"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    (e.currentTarget.parentElement as HTMLElement).style.background = 'linear-gradient(135deg,#1e1b4b,#312e81)';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950" />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+
+              {/* Cover upload overlay */}
+              <button
+                type="button"
+                onClick={() => coverFileRef.current?.click()}
+                disabled={uploadingCover}
+                className="absolute bottom-3 right-3 flex items-center gap-1.5 text-xs font-medium text-white bg-black/50 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-lg opacity-0 group-hover/cover:opacity-100 transition-all hover:bg-black/70 cursor-pointer disabled:opacity-60"
+              >
+                {uploadingCover ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                {coverImage ? 'Change Cover' : 'Add Cover Image'}
+              </button>
+              <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
             </div>
 
             <div className="px-6 pb-6">
-              {/* Avatar overlapping cover */}
-              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0 relative bg-indigo-100">
+              {/* Avatar overlapping cover — with edit overlay */}
+              <div className="-mt-12 mb-4 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden flex-shrink-0 relative bg-indigo-100 group/avatar">
                 {/* Initials — always behind */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-indigo-700 font-bold text-xl">{initials}</span>
@@ -130,6 +179,18 @@ export default function Profile() {
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
                 )}
+                {/* Avatar upload overlay */}
+                <button
+                  type="button"
+                  onClick={() => avatarFileRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer rounded-full disabled:opacity-60"
+                >
+                  {uploadingAvatar
+                    ? <Loader2 size={18} className="text-white animate-spin" />
+                    : <Camera size={18} className="text-white" />}
+                </button>
+                <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               </div>
 
               {/* Name + role */}

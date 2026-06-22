@@ -20,6 +20,7 @@ function clearPreviousSession() {
   clearModuleStatusCache();
   clearPortalSession();
   try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
+  try { localStorage.removeItem('lp_cover_image'); } catch { /* ok */ }
 }
 
 export default function Callback() {

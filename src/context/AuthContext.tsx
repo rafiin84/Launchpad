@@ -34,6 +34,8 @@ interface AuthContextValue {
   appUserRecordId: string | null;
   portalSession: PortalSession | null;
   isPortalUser: boolean;
+  coverImage: string;
+  setCoverImage: (dataUrl: string) => void;
   refreshAvatar: () => void;
   /** Force-reload appUser data from CRM */
   refreshAppUser: () => void;
@@ -42,6 +44,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AVATAR_CACHE_KEY = 'lp_avatar_data';
+const COVER_CACHE_KEY  = 'lp_cover_image';
 
 function buildUser(role: UserRole, name?: string | null): User {
   const displayName = name || (role === 'investor' ? 'Investor' : 'Founder');
@@ -79,6 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize avatar from localStorage cache immediately (no flash)
   const [avatarUrl, setAvatarUrl] = useState<string>(() => {
     try { return localStorage.getItem(AVATAR_CACHE_KEY) || ''; } catch { return ''; }
+  });
+  const [coverImage, setCoverImageState] = useState<string>(() => {
+    try { return localStorage.getItem(COVER_CACHE_KEY) || ''; } catch { return ''; }
   });
   const [zohoEmail, setZohoEmail] = useState<string | null>(null);
   const [zohoProfile, setZohoProfile] = useState<ZohoProfile>({
@@ -183,13 +189,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPortalSession();
     // Don't clear profile cache on logout — preserve for next login
     try { localStorage.removeItem(AVATAR_CACHE_KEY); } catch { /* ok */ }
+    try { localStorage.removeItem(COVER_CACHE_KEY); } catch { /* ok */ }
     setAvatarUrl('');
+    setCoverImageState('');
     setUserName(null);
     setAppUser(null);
     setAppUserRecordId(null);
     setPortalSession(null);
     setIsLoggedIn(false);
   }
+
+  /** Save cover image as data URL */
+  const setCoverImage = useCallback((dataUrl: string) => {
+    setCoverImageState(dataUrl);
+    try { localStorage.setItem(COVER_CACHE_KEY, dataUrl); } catch { /* ok */ }
+  }, []);
 
   /** Re-fetch avatar from appusers (call after uploading a new photo) */
   const refreshAvatar = useCallback(() => {
@@ -229,6 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         appUserRecordId,
         portalSession,
         isPortalUser: portalSession?.isPortalUser ?? false,
+        coverImage,
+        setCoverImage,
         refreshAvatar,
         refreshAppUser,
       }}

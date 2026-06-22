@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2, User,
+  MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2, User, ImagePlus, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
@@ -38,7 +38,7 @@ function loadInitialForm(currentUserName: string, appUserData: Record<string, un
 }
 
 export default function EditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState<ProfileForm>(() =>
@@ -49,8 +49,11 @@ export default function EditProfile() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string>(coverImage || '');
   const [saveResult, setSaveResult] = useState<'success' | 'partial' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   // If appUser loads after initial render, merge in CRM data
   useEffect(() => {
@@ -86,6 +89,20 @@ export default function EditProfile() {
     setPhotoFile(file);
     const url = URL.createObjectURL(file);
     setPhotoPreview(url);
+  };
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setCoverPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeCover = () => {
+    setCoverFile(null);
+    setCoverPreview('');
   };
 
   const handleSave = async () => {
@@ -156,6 +173,14 @@ export default function EditProfile() {
         crmSuccess = false;
       }
 
+      // Save cover image (localStorage-based)
+      if (coverFile && coverPreview) {
+        setCoverImage(coverPreview);
+      } else if (!coverPreview && coverImage) {
+        // User removed the cover image
+        setCoverImage('');
+      }
+
       setSaveResult(crmSuccess ? 'success' : 'partial');
 
       // Refresh appUser in context so Profile page shows latest data
@@ -199,6 +224,48 @@ export default function EditProfile() {
             <p className="text-xs text-emerald-600 mt-0.5">New photo selected — will upload on save</p>
           )}
         </div>
+      </div>
+
+      {/* Cover image upload */}
+      <div className="mb-6">
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cover Image</label>
+        <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-gray-200 group">
+          {coverPreview ? (
+            <>
+              <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={() => coverFileRef.current?.click()}
+                  className="flex items-center gap-1 text-xs font-medium text-white bg-black/60 backdrop-blur-sm px-2.5 py-1.5 rounded-lg hover:bg-black/80 transition-colors"
+                >
+                  <ImagePlus size={12} /> Change
+                </button>
+                <button
+                  type="button"
+                  onClick={removeCover}
+                  className="flex items-center gap-1 text-xs font-medium text-white bg-red-500/80 backdrop-blur-sm px-2.5 py-1.5 rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  <X size={12} /> Remove
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => coverFileRef.current?.click()}
+              className="w-full h-full bg-gray-50 hover:bg-gray-100 transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer"
+            >
+              <ImagePlus size={20} className="text-gray-400" />
+              <span className="text-xs text-gray-500 font-medium">Click to upload a cover image</span>
+            </button>
+          )}
+          <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverSelect} />
+        </div>
+        {coverFile && (
+          <p className="text-xs text-emerald-600 mt-1.5">New cover image selected — will save on submit</p>
+        )}
       </div>
 
       {/* Save result feedback */}
