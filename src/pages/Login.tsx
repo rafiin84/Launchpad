@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
-import { redirectToZoho, savePendingRole } from '../services/oauth';
+import { redirectToZoho, redirectToPortal, savePendingRole } from '../services/oauth';
 
 function Logo() {
   return (
@@ -28,9 +28,11 @@ export default function Login() {
 
   const handleSignIn = () => {
     savePendingRole(selectedRole);
-    // Both roles use the same Zoho OAuth — Callback.tsx auto-detects
-    // CRM users (admin/investor) vs portal users (founder) after login
-    redirectToZoho();
+    if (selectedRole === 'founder') {
+      redirectToPortal();
+    } else {
+      redirectToZoho();
+    }
   };
 
   return (

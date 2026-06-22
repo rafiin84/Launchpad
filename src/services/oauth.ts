@@ -50,14 +50,17 @@ export const OAuthConfig = {
 
 export const PortalOAuthConfig = {
   clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
-  authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
+  portalId: "60074261975",
+  authEndpoint: "https://accounts.zohoportal.in/clientoauth/v2",
 
   scopes: [
-    "AaaServer.profile.READ",
     "ZohoCRM.modules.ALL",
     "ZohoCRM.settings.ALL",
+    "ZohoCRM.coql.READ",
     "ZohoCRM.users.ALL",
     "ZohoCRM.org.ALL",
+    "ZohoCRM.Files.CREATE",
+    "ZohoCRM.Files.READ",
   ],
 
   callbackPath: "/portal/callback",
@@ -164,7 +167,7 @@ export function buildPortalAuthUrl(): string {
     state: `portal-${Date.now()}`,
   });
 
-  return `${PortalOAuthConfig.authEndpoint}?${params.toString()}`;
+  return `${PortalOAuthConfig.authEndpoint}/${PortalOAuthConfig.portalId}/auth?${params.toString()}`;
 }
 
 export function redirectToPortal(): void {
