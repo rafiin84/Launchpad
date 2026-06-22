@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle } from 'lucide-react';
-import { consumePendingToken, saveToken, loadToken, consumePendingRole, saveUserName } from '../services/oauth';
+import {
+  consumePendingToken, saveToken, loadToken, consumePendingRole,
+  saveUserName, clearToken, clearRole, clearUserName,
+} from '../services/oauth';
 import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto } from '../services/zohoApi';
-import { fullProfileSync, uploadAppUserPhoto } from '../services/crmAppUsers';
-import { findPortalUser, savePortalSession } from '../services/portalUsers';
+import { fullProfileSync, uploadAppUserPhoto, clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
+import { findPortalUser, savePortalSession, clearPortalSession } from '../services/portalUsers';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
+
+/** Clear all previous user session data before a new login */
+function clearPreviousSession() {
+  clearRole();
+  clearUserName();
+  clearCachedRecordId();
+  clearCachedProfile();
+  clearModuleStatusCache();
+  clearPortalSession();
+  try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
+}
 
 export default function Callback() {
   const navigate = useNavigate();
@@ -17,6 +31,8 @@ export default function Callback() {
   useEffect(() => {
     const pending = consumePendingToken();
     if (pending) {
+      // Clear all data from previous user session before saving new token
+      clearPreviousSession();
       saveToken(pending.token, pending.expiresAt);
       const pendingRole = (consumePendingRole() ?? 'investor') as UserRole;
 
@@ -55,6 +71,8 @@ export default function Callback() {
     // ── Step 1: Try CRM user login (admin / staff) ──────────────────
     setStatusText('Identifying your account...');
     const zohoUser = await fetchCurrentZohoUser();
+
+    console.log('[Auth] fetchCurrentZohoUser result:', zohoUser ? { email: zohoUser.email, profile: zohoUser.profile, id: zohoUser.id } : null);
 
     if (zohoUser?.email) {
       // CRM user — auto-detect role from CRM profile
