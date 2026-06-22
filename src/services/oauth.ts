@@ -51,7 +51,8 @@ export const OAuthConfig = {
 export const PortalOAuthConfig = {
   clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
   portalId: "50043237302",
-  authEndpoint: "https://accounts.zohoportal.in/clientoauth/v2",
+  // authEndpoint: "https://accounts.zohoportal.in/clientoauth/v2",
+  authEndpoint: "https://launchpad.zcrmportals.in",
 
   scopes: [
     "ZohoCRM.modules.ALL",
@@ -65,7 +66,7 @@ export const PortalOAuthConfig = {
 
   callbackPath: "/portal/callback",
   responseType: "token",
-  accessType: "online",
+  accessType: "offline",
   prompt: "consent",
 };
 
@@ -113,6 +114,8 @@ export function consumePendingToken(): PendingToken | null {
   pendingToken = null;
   return token;
 }
+
+
 
 // -----------------------------------------------------------------------------
 // OAuth Helpers
@@ -167,7 +170,7 @@ export function buildPortalAuthUrl(): string {
     state: `portal-${Date.now()}`,
   });
 
-  return `${PortalOAuthConfig.authEndpoint}/${PortalOAuthConfig.portalId}/auth?${params.toString()}`;
+  return `${PortalOAuthConfig.authEndpoint}/accounts/op/${PortalOAuthConfig.portalId}/oauth/v2/auth?${params.toString()}`;
 }
 
 export function redirectToPortal(): void {
