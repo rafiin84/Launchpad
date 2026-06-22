@@ -66,55 +66,13 @@ const EMPTY: CompanyData = {
 
 const STORAGE_KEY = 'lp_founder_company';
 
-const SAMPLE: CompanyData = {
-  name: 'NexaFlow AI',
-  tagline: 'Automate workflows with AI — no code required.',
-  description: 'NexaFlow AI is a no-code workflow automation platform powered by large language models. We help operations teams at mid-market companies eliminate repetitive manual tasks, reduce errors, and reclaim 20+ hours per week. Our drag-and-drop builder connects to 150+ business tools and uses AI to suggest, generate, and optimize automations in plain English.',
-  website: 'https://nexaflow.ai',
-  industry: 'SaaS',
-  stage: 'Seed',
-  foundedYear: '2022',
-  location: 'San Francisco, CA',
-  founderNames: 'Rafi Nasser (CEO), Priya Sharma (CTO)',
-  teamSize: '14',
-  openRoles: 'Senior Full-Stack Engineer, Head of Growth, Customer Success Manager',
-  productDescription: 'NexaFlow AI lets operations teams build powerful automations using natural language. Users describe what they want ("when a new lead comes in from HubSpot, enrich it with Clearbit, score it with our AI model, then create a task in Asana") and our engine builds and runs the automation. No engineering required.',
-  mrr: '68000',
-  arr: '816000',
-  activeCustomers: '312',
-  momGrowth: '14',
-  churnRate: '1.8',
-  nps: '68',
-  keyMetric: '4.2M',
-  keyMetricLabel: 'Automations run / month',
-  totalRaised: '2800000',
-  lastRoundSize: '2500000',
-  lastRoundStage: 'Seed',
-  lastRoundDate: '2023-09',
-  preMoneyValuation: '12000000',
-  monthlyBurn: '135000',
-  runway: '18',
-  revenueModel: 'SaaS subscription — Starter at $299/mo, Growth at $799/mo, Enterprise from $2,500/mo. Annual contracts at 20% discount. Usage-based overage for automations above plan limits.',
-  tam: '$48B global workflow automation market (2027)',
-  sam: '$6.5B mid-market operations automation',
-  som: '$320M addressable in North America within 3 years',
-  targetMarket: 'Operations, RevOps, and IT teams at B2B SaaS and professional services companies with 50–500 employees. Primary buyers are Heads of Operations and VPs of Revenue Operations.',
-  keyCompetitors: 'Zapier (SMB-focused, limited AI), Make.com (technical users), Workato (enterprise, expensive). NexaFlow differentiates on AI-native UX, mid-market pricing, and real-time analytics.',
-  differentiator: 'AI-first architecture that understands business intent — not just API connectors. Our proprietary workflow graph model learns from each customer\'s data to proactively suggest next automations. Switching cost grows with usage, creating strong retention.',
-  currentAsk: '5000000',
-  useOfFunds: '45% product & engineering (3 senior hires), 35% sales & marketing (outbound motion, content, PLG), 15% customer success & onboarding, 5% G&A and legal.',
-  keyRisks: '1. Larger players (Zapier, HubSpot) adding AI features — mitigated by our 18-month head start and deeper LLM integration. 2. Enterprise sales cycle longer than expected — we\'re building a strong PLG motion to compress time-to-value. 3. LLM cost at scale — actively optimizing inference pipeline, 60% cost reduction since launch.',
-  nextMilestones: 'Q3 2025: Reach $1M ARR. Q4 2025: Launch Enterprise tier with SSO & audit logs. Q1 2026: 500 paying customers. Q2 2026: Series A raise targeting $15M at $60M post.',
-};
-
 function load(): CompanyData {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s) return { ...EMPTY, ...JSON.parse(s) };
   } catch { /* ignore */ }
-  // Pre-populate with sample data on first load
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE));
-  return SAMPLE;
+  // Start with empty company data — founders fill in their own
+  return EMPTY;
 }
 
 function save(d: CompanyData) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }

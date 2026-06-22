@@ -46,17 +46,6 @@ const DEFAULT_KPIS: KPI[] = [
 const STORAGE_KPIS       = 'lp_founder_kpis';
 const STORAGE_MILESTONES = 'lp_founder_milestones';
 
-const SAMPLE_KPIS: KPI[] = [
-  { key: 'mrr',       label: 'MRR',         value: '$68,000',  sub: 'monthly recurring revenue',          prefix: '$',  accent: true },
-  { key: 'runway',    label: 'Runway',       value: '18',       sub: 'months of cash left',                suffix: ' mo' },
-  { key: 'raised',    label: 'Total Raised', value: '$2.8M',    sub: 'capital raised to date',             prefix: '$' },
-  { key: 'burn',      label: 'Burn Rate',    value: '$135,000', sub: 'per month',                          prefix: '$' },
-  { key: 'customers', label: 'Customers',    value: '312',      sub: 'active paying customers' },
-  { key: 'growth',    label: 'MoM Growth',   value: '14',       sub: 'revenue growth month-on-month',      suffix: '%' },
-  { key: 'churn',     label: 'Churn',        value: '1.8',      sub: 'monthly churn rate',                 suffix: '%' },
-  { key: 'team',      label: 'Team Size',    value: '14',       sub: 'full-time employees' },
-];
-
 function loadKPIs(): KPI[] {
   try {
     const saved = localStorage.getItem(STORAGE_KPIS);
@@ -66,32 +55,21 @@ function loadKPIs(): KPI[] {
       return DEFAULT_KPIS.map(def => parsed.find(p => p.key === def.key) ?? def);
     }
   } catch { /* ignore */ }
-  // Pre-populate with sample data on first load
-  localStorage.setItem(STORAGE_KPIS, JSON.stringify(SAMPLE_KPIS));
-  return SAMPLE_KPIS;
+  // Start with empty KPIs — founders fill in their own data
+  return DEFAULT_KPIS;
 }
 
 function saveKPIs(kpis: KPI[]) {
   localStorage.setItem(STORAGE_KPIS, JSON.stringify(kpis));
 }
 
-const SAMPLE_MILESTONES: Milestone[] = [
-  { id: '1', text: 'Reach $1M ARR',                    done: false, dueDate: '2025-09-30' },
-  { id: '2', text: 'Launch Enterprise tier with SSO',   done: false, dueDate: '2025-12-31' },
-  { id: '3', text: 'Hire Senior Full-Stack Engineer',   done: true,  dueDate: '2025-06-01' },
-  { id: '4', text: 'Reach 500 paying customers',       done: false, dueDate: '2026-03-31' },
-  { id: '5', text: 'Close Series A — $15M target',     done: false, dueDate: '2026-06-30' },
-  { id: '6', text: 'Reduce LLM inference cost by 60%', done: true,  dueDate: '2025-05-01' },
-];
-
 function loadMilestones(): Milestone[] {
   try {
     const saved = localStorage.getItem(STORAGE_MILESTONES);
     if (saved) return JSON.parse(saved);
   } catch { /* ignore */ }
-  // Pre-populate with sample milestones on first load
-  localStorage.setItem(STORAGE_MILESTONES, JSON.stringify(SAMPLE_MILESTONES));
-  return SAMPLE_MILESTONES;
+  // Start with empty milestones — founders add their own
+  return [];
 }
 
 function saveMilestones(ms: Milestone[]) {
@@ -262,10 +240,10 @@ export default function FounderDashboard() {
   // Build 6-month trend data (simulated growth leading to current value)
   const raisedTrend = totalRaisedVal > 0
     ? [0.3, 0.45, 0.55, 0.7, 0.85, 1.0].map(f => totalRaisedVal * f)
-    : [200000, 400000, 600000, 1000000, 2000000, 2800000];
+    : [0, 0, 0, 0, 0, 0];
   const burnTrend = burnVal > 0
     ? [0.7, 0.8, 0.9, 0.95, 1.05, 1.0].map(f => burnVal * f)
-    : [80000, 95000, 110000, 120000, 140000, 135000];
+    : [0, 0, 0, 0, 0, 0];
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun'];
 
@@ -341,8 +319,40 @@ export default function FounderDashboard() {
         </button>
       </div>
 
-      {/* Setup nudge */}
-      {emptyCount > 0 && (
+      {/* Onboarding banner — shown when founder is brand new (all KPIs empty & no milestones) */}
+      {emptyCount === kpis.length && milestones.length === 0 && (
+        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-2xl px-6 py-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Rocket size={20} className="text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-gray-900 mb-1">Welcome to Launchpad!</h2>
+              <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                Get started by setting up your company profile and adding your key metrics.
+                Your investors will see this data on their dashboard.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to="/company"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Building2 size={13} /> Set Up Company Profile
+                </Link>
+                <button
+                  onClick={() => setShowKPIEditor(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Edit3 size={13} /> Add Your KPIs
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup nudge — shown when some (but not all) KPIs are missing */}
+      {emptyCount > 0 && emptyCount < kpis.length && (
         <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-indigo-500 flex-shrink-0" />
           <div className="flex-1">
