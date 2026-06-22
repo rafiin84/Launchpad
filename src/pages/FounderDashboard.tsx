@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, Users, Zap,
   Edit3, Check, X, Plus, AlertCircle,
   Clock, Target, Flame, BarChart2,
-  Sparkles, ArrowRight,
+  Sparkles, ArrowRight, Rocket, Building2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
