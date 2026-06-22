@@ -1,6 +1,6 @@
 // oauth.ts
 // Generic Zoho OAuth (Implicit Flow)
-// Reusable template for any Next.js / React application.
+// Supports both Admin/Investor (Zoho CRM) and Founder (Portal) login flows.
 
 export interface PendingToken {
   token: string;
@@ -12,7 +12,7 @@ const DEFAULT_TTL_SECONDS = 3600;
 let pendingToken: PendingToken | null = null;
 
 // -----------------------------------------------------------------------------
-// Configuration
+// Configuration — Admin / Investor (Zoho CRM OAuth)
 // -----------------------------------------------------------------------------
 
 export const OAuthConfig = {
@@ -20,7 +20,6 @@ export const OAuthConfig = {
   authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
   accountsApi: "https://accounts.zoho.in",
 
-  // OAuth Scopes (same for all DCs)
   scopes: [
     "AaaServer.profile.READ",
     "ZohoCRM.modules.ALL",
@@ -34,9 +33,7 @@ export const OAuthConfig = {
     "ZohoCRM.Files.READ",
   ],
 
-  // Callback route in your application
   callbackPath: "/callback",
-
   responseType: "token",
   accessType: "online",
   prompt: "consent",
@@ -45,6 +42,33 @@ export const OAuthConfig = {
     tokenKey: "zoho_access_token",
     expiryKey: "zoho_token_expiry",
   },
+};
+
+// -----------------------------------------------------------------------------
+// Configuration — Founder (Zoho CRM Client Portal OAuth)
+// -----------------------------------------------------------------------------
+
+export const PortalOAuthConfig = {
+  clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
+  portalDomain: "https://launchpad.zcrmportals.in",
+  portalId: "60074261975",  // ZGID from org
+
+  scopes: [
+    "ZohoCRM.modules.ALL",
+    "ZohoCRM.settings.ALL",
+    "ZohoCRM.coql.READ",
+    "ZohoCRM.users.ALL",
+    "ZohoCRM.org.ALL",
+    "ZohoCRM.Files.CREATE",
+    "ZohoCRM.Files.READ",
+    "profile.orguserphoto.READ",
+    "ZohoSearch.securesearch.READ",
+  ],
+
+  callbackPath: "/portal/callback",
+  responseType: "token",
+  accessType: "online",
+  prompt: "consent",
 };
 
 // -----------------------------------------------------------------------------
@@ -120,6 +144,39 @@ export function buildAuthUrl(): string {
 export function redirectToZoho(): void {
   if (typeof window !== "undefined") {
     window.location.href = buildAuthUrl();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Portal OAuth Helpers
+// -----------------------------------------------------------------------------
+
+export function getPortalRedirectUri(): string {
+  if (typeof window === "undefined") {
+    throw new Error("getPortalRedirectUri() can only be called in the browser.");
+  }
+  return `${window.location.origin}${PortalOAuthConfig.callbackPath}`;
+}
+
+export function buildPortalAuthUrl(): string {
+  const params = new URLSearchParams({
+    client_id: PortalOAuthConfig.clientId,
+    redirect_uri: getPortalRedirectUri(),
+    response_type: PortalOAuthConfig.responseType,
+    scope: PortalOAuthConfig.scopes.join(","),
+    access_type: PortalOAuthConfig.accessType,
+    prompt: PortalOAuthConfig.prompt,
+    state: `portal-${Date.now()}`,
+  });
+
+  return `${PortalOAuthConfig.portalDomain}/accounts/op/${PortalOAuthConfig.portalId}/oauth/v2/auth?${params.toString()}`;
+}
+
+export function redirectToPortal(): void {
+  if (typeof window !== "undefined") {
+    const url = buildPortalAuthUrl();
+    console.log('[Portal OAuth] Redirecting to:', url);
+    window.location.href = url;
   }
 }
 

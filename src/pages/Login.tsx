@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 import { cn } from '../lib/cn';
-import { redirectToZoho, savePendingRole } from '../services/oauth';
+import { redirectToZoho, redirectToPortal, savePendingRole } from '../services/oauth';
 
 function Logo() {
   return (
@@ -28,7 +28,13 @@ export default function Login() {
 
   const handleSignIn = () => {
     savePendingRole(selectedRole);
-    redirectToZoho();
+    if (selectedRole === 'founder') {
+      // Founders use the CRM Client Portal OAuth flow
+      redirectToPortal();
+    } else {
+      // Admins / Investors use the standard Zoho CRM OAuth flow
+      redirectToZoho();
+    }
   };
 
   return (
@@ -153,9 +159,9 @@ export default function Login() {
           <div className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-4">
             <ShieldCheck size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-gray-500 leading-relaxed">
-              <strong>Administrators & Investors:</strong> Your role is auto-detected from your CRM profile.
+              <strong>Administrators & Investors:</strong> Sign in with your Zoho CRM account. Role is auto-detected from your profile.
               <br />
-              <strong>Founders:</strong> Select "Founder (Portal)" and sign in with the Zoho account from your invitation email.
+              <strong>Founders:</strong> Sign in via the Launchpad Portal using the account from your invitation email.
             </p>
           </div>
         </div>

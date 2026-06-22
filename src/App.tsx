@@ -12,6 +12,7 @@ function ProtectedLayout() {
 
 import Login from './pages/Login';
 import Callback from './pages/Callback';
+import PortalCallback from './pages/PortalCallback';
 import Home from './pages/Home';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
@@ -55,6 +56,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
+          <Route path="/portal/callback" element={<PortalCallback />} />
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
