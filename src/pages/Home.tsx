@@ -347,7 +347,6 @@ export default function Home() {
   const activeDeals = deals.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').length;
 
   const recentPortfolio = portfolio.slice(0, 4);
-  const recentDeals = deals.slice(0, 4);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -605,51 +604,6 @@ export default function Home() {
         {/* Main */}
         <div className="flex-1 min-w-0 space-y-8">
 
-          {/* Recent Deals */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-900">Recent Deals</h2>
-              <Link to="/deals" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-                View all <ArrowUpRight size={12} />
-              </Link>
-            </div>
-
-            {loadingDeals ? (
-              <div className="space-y-3">
-                {[1, 2].map(i => (
-                  <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-                    <div className="h-4 bg-gray-100 rounded w-1/3 mb-2" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : recentDeals.length === 0 ? (
-              <div className="bg-white border border-dashed border-gray-100 rounded-2xl p-8 text-center">
-                <TrendingUp size={24} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-xs text-gray-400 mb-3">No deals yet</p>
-                <Link to="/deals/new" className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg">
-                  <Plus size={12} /> Add Deal
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentDeals.map(deal => (
-                  <div key={deal.id} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
-                      <TrendingUp size={14} className="text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{deal.dealName || '—'}</p>
-                      <p className="text-xs text-gray-500">{deal.stage || '—'}</p>
-                    </div>
-                    {deal.amount && parseFloat(deal.amount) > 0 && (
-                      <p className="text-sm font-bold text-gray-900 flex-shrink-0">{formatCurrency(parseFloat(deal.amount))}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right — AI Weekly Summary */}
