@@ -6,7 +6,7 @@ import {
   saveUserName, clearToken, clearRole, clearUserName,
 } from '../services/oauth';
 import { clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
-import { savePortalSession, clearPortalSession } from '../services/portalUsers';
+import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
 import { fetchZohoAccountsUser } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
@@ -56,50 +56,60 @@ export default function PortalCallback() {
     // Portal users are always founders
     setStatusText('Identifying your portal account...');
 
+    let email = '';
+    let displayName = '';
+    let contactId = '';
+    let zuid = '';
+
+    // 1. Try Zoho Accounts API for user identity
     try {
-      // Try to get user info from Zoho Accounts API
       const accountsUser = await fetchZohoAccountsUser();
-
       if (accountsUser?.email) {
-        const displayName = accountsUser.display_name
+        email = accountsUser.email;
+        displayName = accountsUser.display_name
           || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
-          || 'Founder';
-
-        saveUserName(displayName);
-
-        savePortalSession({
-          email: accountsUser.email,
-          name: displayName,
-          role: 'founder',
-          contactId: '', // Will be resolved later if needed
-          zuid: accountsUser.zuid || '',
-          isPortalUser: true,
-        });
-
-        login('founder');
-        setStatus('success');
-        setStatusText(`Welcome, ${displayName}! Redirecting to your dashboard...`);
-        setTimeout(() => navigate('/'), 1500);
-        return;
+          || '';
+        zuid = accountsUser.zuid || '';
       }
     } catch (err) {
       console.warn('[Portal Auth] Could not fetch accounts user:', err);
     }
 
-    // Fallback: no user info but token is valid — proceed as founder anyway
-    saveUserName('Founder');
+    // 2. Look up in portal user registry (set by admin during invitation)
+    //    This always has the real name from the CRM Contact record
+    if (email) {
+      const registryEntry = findPortalUser(email);
+      if (registryEntry) {
+        displayName = registryEntry.name || displayName;
+        contactId = registryEntry.contactId || '';
+      }
+    } else {
+      // No email from API — try to match the most recently invited active user
+      const allUsers = getAllPortalUsers();
+      const active = allUsers.find(u => u.active);
+      if (active) {
+        email = active.email;
+        displayName = active.name || '';
+        contactId = active.contactId || '';
+      }
+    }
+
+    // 3. Final fallback
+    if (!displayName) displayName = 'Founder';
+
+    saveUserName(displayName);
     savePortalSession({
-      email: '',
-      name: 'Founder',
+      email,
+      name: displayName,
       role: 'founder',
-      contactId: '',
-      zuid: '',
+      contactId,
+      zuid,
       isPortalUser: true,
     });
 
     login('founder');
     setStatus('success');
-    setStatusText('Welcome! Redirecting to your dashboard...');
+    setStatusText(`Welcome, ${displayName}! Redirecting to your dashboard...`);
     setTimeout(() => navigate('/'), 1500);
   }
 
