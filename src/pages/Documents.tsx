@@ -5,6 +5,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMDocuments, deleteCRMDocument, type CRMDocument } from '../services/crmDocuments';
 import { loadToken } from '../services/oauth';
+import { useAuth } from '../context/AuthContext';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   'pitch-deck':       { icon: File,           color: 'text-indigo-500 bg-indigo-50',   label: 'Pitch Deck' },
@@ -28,6 +29,7 @@ function normalizeType(t: string): string {
 }
 
 export default function Documents() {
+  const { isFounder } = useAuth();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,7 +38,8 @@ export default function Documents() {
   const isConnected = !!loadToken();
 
   const load = () => {
-    if (!isConnected) { setLoading(false); return; }
+    // Portal/founder users can't access CRM custom modules
+    if (!isConnected || isFounder) { setLoading(false); return; }
     setLoading(true);
     setError('');
     fetchCRMDocuments()
@@ -86,7 +89,7 @@ export default function Documents() {
       />
 
       {/* Not-connected banner */}
-      {!isConnected && (
+      {!isConnected && !isFounder && (
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
           <div className="flex-1">
@@ -149,11 +152,15 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && docs.length === 0 && isConnected && (
+      {!loading && !error && docs.length === 0 && (isConnected || isFounder) && (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
-          <p className="text-xs text-gray-400">Add pitch decks, financial models, and legal documents.</p>
+          <p className="text-xs text-gray-400">
+            {isFounder
+              ? 'Documents shared by your investor will appear here.'
+              : 'Add pitch decks, financial models, and legal documents.'}
+          </p>
         </div>
       )}
 
