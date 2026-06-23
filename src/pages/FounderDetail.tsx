@@ -9,6 +9,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser, findPortalUser, togglePortalUserActive } from '../services/portalUsers';
+import { addNotification } from '../services/notifications';
 import type { UserRole } from '../types';
 
 export default function FounderDetail() {
@@ -82,6 +83,17 @@ export default function FounderDetail() {
         : `${result.message} — User registered as ${inviteRole}.`;
       setInviteResult({ type: 'success', message: statusMsg });
       setAlreadyInvited(true);
+
+      // Notify about the invitation
+      addNotification({
+        type: 'invitation_sent',
+        title: 'Portal Invitation Sent',
+        message: `${displayName} (${founder.email}) was invited to the portal as ${inviteRole}.`,
+        actor: 'Admin',
+        actorRole: 'investor',
+        link: `/founders/${id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
     } catch (err) {
       setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
     } finally {
@@ -203,6 +215,17 @@ export default function FounderDetail() {
                 if (!founder.email) return;
                 const newActive = togglePortalUserActive(founder.email);
                 setPortalActive(newActive);
+
+                const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+                addNotification({
+                  type: newActive ? 'user_activated' : 'user_deactivated',
+                  title: newActive ? 'User Activated' : 'User Deactivated',
+                  message: `${founderName}'s portal access has been ${newActive ? 'activated' : 'deactivated'}.`,
+                  actor: 'Admin',
+                  actorRole: 'investor',
+                  link: `/founders/${id}`,
+                });
+                window.dispatchEvent(new Event('notifications-updated'));
               }}
               className={`inline-flex items-center gap-2.5 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
                 portalActive
@@ -337,6 +360,23 @@ export default function FounderDetail() {
               </div>
             </div>
           )}
+
+          {/* View Company Profile Card */}
+          <Link
+            to="/company"
+            className="block bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 hover:border-indigo-200 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={18} className="text-indigo-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-indigo-900">View Company Profile</p>
+                <p className="text-xs text-indigo-600 mt-0.5">See full company details, metrics, and financials</p>
+              </div>
+              <ExternalLink size={14} className="text-indigo-400 group-hover:text-indigo-600 transition-colors flex-shrink-0" />
+            </div>
+          </Link>
 
           {/* Portal Invitation Card */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">

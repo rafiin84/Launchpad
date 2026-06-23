@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
 import { updateAppUser, uploadAppUserPhoto, loadCachedProfile, cacheProfileLocally } from '../services/crmAppUsers';
 import { saveUserName } from '../services/oauth';
+import { addNotification } from '../services/notifications';
 
 interface ProfileForm {
   name: string;
@@ -195,6 +196,17 @@ export default function EditProfile() {
       }
 
       setSaveResult(crmSuccess ? 'success' : 'partial');
+
+      // Notify about profile update
+      addNotification({
+        type: 'profile_update',
+        title: 'Profile Updated',
+        message: `${form.name.trim() || 'User'} updated their profile.`,
+        actor: form.name.trim() || 'User',
+        actorRole: 'investor',
+        link: '/profile',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
 
       // Refresh appUser in context so Profile page shows latest data
       refreshAppUser();

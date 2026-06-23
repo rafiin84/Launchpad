@@ -1,7 +1,8 @@
 import React from 'react';
-import { Rocket, Bell, Search, Plus, LayoutGrid, List } from 'lucide-react';
+import { Rocket, Search, Plus, LayoutGrid, List } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../ui/Avatar';
+import { NotificationBell } from '../ui/NotificationBell';
 import { useAuth } from '../../context/AuthContext';
 
 export function MobileHeader() {
@@ -59,9 +60,7 @@ export function MobileHeader() {
         <div className="flex items-center gap-1">
           {isHome && (
             <>
-              <button className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
-                <Bell size={18} className="text-gray-600" />
-              </button>
+              <NotificationBell size={18} />
               <Link to="/profile">
                 <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
               </Link>

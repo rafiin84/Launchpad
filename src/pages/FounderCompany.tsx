@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
+import { addNotification } from '../services/notifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
-  const { coverImage } = useAuth();
+  const { coverImage, currentUser, isInvestor } = useAuth();
   const [data, setData]       = useState<CompanyData>(load);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState<CompanyData>(data);
@@ -192,6 +193,18 @@ export default function FounderCompany() {
     setData(draft);
     save(draft);
     setEditing(false);
+
+    // Notify investors about the company update
+    const companyName = draft.name || 'their company';
+    addNotification({
+      type: 'company_update',
+      title: 'Company Profile Updated',
+      message: `${currentUser.name} updated ${companyName}'s profile information.`,
+      actor: currentUser.name,
+      actorRole: 'founder',
+      link: '/company',
+    });
+    window.dispatchEvent(new Event('notifications-updated'));
   }
 
   function handleCancel() {
@@ -245,28 +258,30 @@ export default function FounderCompany() {
 
           {/* Right: action buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {editing ? (
-              <>
+            {!isInvestor && (
+              editing ? (
+                <>
+                  <button
+                    onClick={handleCancel}
+                    className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
+                  >
+                    <X size={14} /> Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all"
+                  >
+                    <Check size={14} /> Save Changes
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleCancel}
-                  className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-white bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
                 >
-                  <X size={14} /> Cancel
+                  <Edit3 size={14} /> Edit Profile
                 </button>
-                <button
-                  onClick={handleSave}
-                  className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all"
-                >
-                  <Check size={14} /> Save Changes
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setEditing(true)}
-                className="flex items-center gap-1.5 text-sm font-medium text-white bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
-              >
-                <Edit3 size={14} /> Edit Profile
-              </button>
+              )
             )}
           </div>
         </div>
@@ -310,7 +325,7 @@ export default function FounderCompany() {
       <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Empty state banner */}
-        {!hasData && !editing && (
+        {!hasData && !editing && !isInvestor && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
             <Lightbulb size={16} className="text-amber-500 flex-shrink-0" />
             <div className="flex-1">
@@ -323,6 +338,15 @@ export default function FounderCompany() {
             >
               Get Started
             </button>
+          </div>
+        )}
+        {!hasData && isInvestor && (
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
+            <Building2 size={16} className="text-gray-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-700">No company profile yet</p>
+              <p className="text-xs text-gray-500 mt-0.5">The founder hasn't completed their company profile yet.</p>
+            </div>
           </div>
         )}
 

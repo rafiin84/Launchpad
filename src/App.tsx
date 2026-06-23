@@ -42,6 +42,7 @@ import AddActivity from './pages/AddActivity';
 import ActivityDetail from './pages/ActivityDetail';
 import EditActivity from './pages/EditActivity';
 import FounderCompany from './pages/FounderCompany';
+import Notifications from './pages/Notifications';
 import Founders from './pages/Founders';
 import FounderDetail from './pages/FounderDetail';
 
@@ -82,6 +83,7 @@ export default function App() {
             <Route path="/documents/new" element={<AddDocument />} />
             <Route path="/discussions" element={<Discussions />} />
             <Route path="/discussions/new" element={<AddDiscussion />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/edit" element={<EditProfile />} />
             <Route path="/settings" element={<Settings />} />

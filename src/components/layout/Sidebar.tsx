@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Avatar } from '../ui/Avatar';
+import { NotificationBell } from '../ui/NotificationBell';
 import { useAuth } from '../../context/AuthContext';
 
 interface NavItem {
@@ -93,16 +94,19 @@ export function Sidebar() {
 
       {/* Profile + logout */}
       <div className="px-4 py-4 border-t border-gray-100 flex-shrink-0">
-        <NavLink
-          to="/profile"
-          className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors mb-2"
-        >
-          <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
-            <p className="text-xs text-gray-500 capitalize truncate">{role}</p>
-          </div>
-        </NavLink>
+        <div className="flex items-center gap-1 mb-2">
+          <NavLink
+            to="/profile"
+            className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors flex-1 min-w-0"
+          >
+            <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
+              <p className="text-xs text-gray-500 capitalize truncate">{role}</p>
+            </div>
+          </NavLink>
+          <NotificationBell />
+        </div>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
