@@ -10,9 +10,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
-  fetchCRMActivities, createCRMActivity,
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
+import { fetchSharedActivities, postSharedActivity } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
@@ -71,7 +71,7 @@ function compressImage(file: File): Promise<string> {
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
 function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
-  const { currentUser, isInvestor } = useAuth();
+  const { currentUser, isInvestor, isFounder } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded]       = useState(false);
@@ -94,7 +94,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
     setGenerating(true);
     try {
       const [acts, portfolio, deals, apps, founders] = await Promise.all([
-        fetchCRMActivities().catch(() => []),
+        fetchSharedActivities(isFounder).catch(() => []),
         fetchCRMPortfolio().catch(() => []),
         fetchCRMDeals().catch(() => []),
         fetchCRMApplications().catch(() => []),
@@ -153,12 +153,8 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? imageData : '',
       };
-      const id = await createCRMActivity(fields);
-      onPost({
-        id, ...fields,
-        imageData: imageMode === 'upload' ? imageData : '',
-        imageUrl:  imageMode === 'url'    ? imageUrl  : '',
-      });
+      const activity = await postSharedActivity(fields, isFounder);
+      onPost(activity);
       handleCancel();
     } finally { setPosting(false); }
   }
@@ -389,10 +385,9 @@ export default function Activities() {
   const isConnected = !!loadToken();
 
   const load = () => {
-    // Portal/founder users don't have access to CRM custom modules
-    if (!isConnected || isFounder) { setLoading(false); return; }
+    if (!isConnected) { setLoading(false); return; }
     setLoading(true); setError('');
-    fetchCRMActivities()
+    fetchSharedActivities(isFounder)
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
