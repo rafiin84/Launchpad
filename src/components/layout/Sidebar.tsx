@@ -37,10 +37,11 @@ const investorNav: NavItem[] = [
 ];
 
 const founderNav: NavItem[] = [
-  { label: 'Dashboard',  path: '/',           icon: Home },
-  { label: 'Activities', path: '/activities', icon: Rss },
-  { label: 'Company',    path: '/company',    icon: Building2 },
-  { label: 'Documents',  path: '/documents',  icon: FileText },
+  { label: 'Dashboard',    path: '/',                   icon: Home },
+  { label: 'Activities',   path: '/activities',          icon: Rss },
+  { label: 'Applications', path: '/applications/track',  icon: Inbox },
+  { label: 'Company',      path: '/company',             icon: Building2 },
+  { label: 'Documents',    path: '/documents',           icon: FileText },
 ];
 
 export function Sidebar() {

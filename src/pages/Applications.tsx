@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Inbox, Search, ArrowUpRight, ChevronRight,
   AlertCircle, Plus, Building2, Trash2, RefreshCw,
@@ -366,6 +367,11 @@ function ApplicationsGrid({ apps, onDelete, showAI }: { apps: CRMApplication[]; 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Applications() {
+  const { isFounder } = useAuth();
+
+  // Founders go to their application tracker
+  if (isFounder) return <Navigate to="/applications/track" replace />;
+
   const [searchParams, setSearchParams] = useSearchParams();
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
@@ -430,6 +436,12 @@ export default function Applications() {
           description="Manage your deal pipeline from first look to committee"
           action={
             <div className="flex items-center gap-2 ml-auto">
+              <Link
+                to="/applications/review"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-black text-white hover:bg-gray-800 transition-all"
+              >
+                <Inbox size={12} /> Investment Proposals
+              </Link>
               <button
                 onClick={() => setShowAI(!showAI)}
                 className={cn(

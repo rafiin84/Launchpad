@@ -27,9 +27,10 @@ export function BottomNav() {
   }, [showMore]);
 
   const founderItems = [
-    { label: 'Dashboard',  path: '/',            icon: Home },
-    { label: 'Activities', path: '/activities',   icon: Rss },
-    { label: 'Company',    path: '/company',      icon: Building2 },
+    { label: 'Dashboard',    path: '/',                    icon: Home },
+    { label: 'Activities',   path: '/activities',           icon: Rss },
+    { label: 'Applications', path: '/applications/track',   icon: Inbox },
+    { label: 'Company',      path: '/company',              icon: Building2 },
   ];
 
   const investorItems = [
@@ -40,9 +41,9 @@ export function BottomNav() {
   ];
 
   const founderMoreItems = [
-    { label: 'Documents', path: '/documents', icon: FileText, desc: 'Files and attachments' },
-    { label: 'Founders',  path: '/founders',  icon: Users,    desc: 'Portfolio founders' },
-    { label: 'Profile',   path: '/profile',   icon: User,     desc: 'Your account settings' },
+    { label: 'Documents',    path: '/documents',          icon: FileText, desc: 'Files and attachments' },
+    { label: 'Notifications', path: '/notifications',     icon: Inbox,    desc: 'Activity updates' },
+    { label: 'Profile',      path: '/profile',            icon: User,     desc: 'Your account settings' },
   ];
 
   const investorMoreItems = [

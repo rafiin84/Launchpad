@@ -43,6 +43,9 @@ import ActivityDetail from './pages/ActivityDetail';
 import EditActivity from './pages/EditActivity';
 import FounderCompany from './pages/FounderCompany';
 import Notifications from './pages/Notifications';
+import FounderApplicationForm from './pages/FounderApplicationForm';
+import FounderApplicationTracker from './pages/FounderApplicationTracker';
+import InvestorApplications from './pages/InvestorApplications';
 import Founders from './pages/Founders';
 import FounderDetail from './pages/FounderDetail';
 
@@ -69,6 +72,9 @@ export default function App() {
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/introductions" element={<Introductions />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/applications/apply" element={<FounderApplicationForm />} />
+            <Route path="/applications/track" element={<FounderApplicationTracker />} />
+            <Route path="/applications/review" element={<InvestorApplications />} />
             <Route path="/applications/new" element={<AddApplication />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/applications/:id/edit" element={<EditApplication />} />
