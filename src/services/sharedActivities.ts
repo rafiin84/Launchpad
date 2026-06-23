@@ -62,8 +62,13 @@ export async function fetchSharedActivities(isFounder: boolean): Promise<CRMActi
   const crmIds = new Set(crmActivities.map(a => a.id));
   const localOnly = localActivities.filter(a => !crmIds.has(a.id));
 
-  // Combine and sort — local items first (most recent), then CRM
-  return [...localOnly, ...crmActivities];
+  // Combine — local-only items first (most recent), then CRM
+  const merged = [...localOnly, ...crmActivities];
+
+  // Sync merged activities back to localStorage so founders can see them too
+  saveLocal(merged);
+
+  return merged;
 }
 
 /**
