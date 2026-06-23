@@ -441,14 +441,6 @@ export default function Applications() {
               >
                 <Sparkles size={12} /> AI Scores
               </button>
-              <Link
-                to="/applications/new"
-                className="inline-flex items-center justify-center gap-2 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors px-3 py-2 sm:px-4"
-                title="Add Application"
-              >
-                <Plus size={15} />
-                <span className="hidden sm:inline text-sm">Add Application</span>
-              </Link>
             </div>
           }
         />
