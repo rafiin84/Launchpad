@@ -2,16 +2,16 @@
  * investmentApplications.ts
  *
  * Hybrid service for investment applications:
- * - Investors (CRM users): read/write directly from Zoho CRM Applications module
- * - Founders (portal users): write to localStorage, synced to CRM when investor logs in
+ * - Investors (CRM users): read/write directly from Zoho CRM via client-side tokens
+ * - Founders (portal users): read/write via /api/applications serverless proxy
+ *   which uses admin refresh token to access CRM on their behalf
  *
- * All public functions are async to support CRM API calls.
+ * All public functions are async to support CRM/API calls.
  */
 
 import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
 
 const STORAGE_KEY = 'lp_investment_applications';
-const SYNC_KEY = 'lp_investment_apps_pending_sync';
 const MAX_APPLICATIONS = 200;
 const CRM_MODULE = 'Applications';
 
@@ -238,7 +238,16 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
   };
 }
 
-// ─── localStorage helpers (for founders / fallback) ────────────────────────
+// ─── localStorage helpers (for draft saving only) ──────────────────────────
+
+function loadLocalDrafts(): InvestmentApplication[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const all: InvestmentApplication[] = JSON.parse(raw);
+    return all.filter(a => a.status === 'draft');
+  } catch { return []; }
+}
 
 function loadLocal(): InvestmentApplication[] {
   try {
@@ -258,33 +267,75 @@ function generateLocalId(): string {
   return `app_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Mark an app ID as needing sync to CRM */
-function markPendingSync(localId: string) {
-  try {
-    const raw = localStorage.getItem(SYNC_KEY);
-    const ids: string[] = raw ? JSON.parse(raw) : [];
-    if (!ids.includes(localId)) ids.push(localId);
-    localStorage.setItem(SYNC_KEY, JSON.stringify(ids));
-  } catch { /* ok */ }
+// ─── Server proxy API (for founders — uses admin token server-side) ────────
+
+interface ProxyListResponse {
+  data?: ZohoRecord[];
+  info?: { more_records: boolean };
+  code?: string;
+  message?: string;
 }
 
-function clearPendingSync(localId: string) {
-  try {
-    const raw = localStorage.getItem(SYNC_KEY);
-    if (!raw) return;
-    const ids: string[] = JSON.parse(raw);
-    localStorage.setItem(SYNC_KEY, JSON.stringify(ids.filter(id => id !== localId)));
-  } catch { /* ok */ }
+interface ProxyCUDResponse {
+  data?: Array<{ code: string; status: string; message: string; details: { id: string } }>;
+  code?: string;
+  message?: string;
 }
 
-function getPendingSyncIds(): string[] {
+async function proxyGetAll(): Promise<InvestmentApplication[]> {
   try {
-    const raw = localStorage.getItem(SYNC_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    const res = await fetch('/api/applications');
+    if (res.status === 204) return [];
+    const json: ProxyListResponse = await res.json();
+    if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
+    return (json.data ?? []).map(fromCrmRecord);
+  } catch (err) {
+    console.warn('[proxyGetAll] Failed, falling back to local:', err);
+    return loadLocal();
+  }
 }
 
-// ─── CRM-backed API (for investors) ────────────────────────────────────────
+async function proxyGetById(id: string): Promise<InvestmentApplication | null> {
+  try {
+    const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`);
+    if (res.status === 204 || res.status === 404) return null;
+    const json: ProxyListResponse = await res.json();
+    if (!res.ok) return null;
+    const record = json.data?.[0];
+    return record ? fromCrmRecord(record) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function proxyCreate(payload: Record<string, unknown>): Promise<string> {
+  const res = await fetch('/api/applications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: [payload] }),
+  });
+  const json: ProxyCUDResponse = await res.json();
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') {
+    throw new Error(result?.message || json.message || 'Create failed');
+  }
+  return result.details.id;
+}
+
+async function proxyUpdate(id: string, payload: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: [{ id, ...payload }] }),
+  });
+  const json: ProxyCUDResponse = await res.json();
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') {
+    throw new Error(result?.message || json.message || 'Update failed');
+  }
+}
+
+// ─── CRM direct API (for investors with client-side tokens) ────────────────
 
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
@@ -295,8 +346,7 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
     });
     return records.map(fromCrmRecord);
   } catch {
-    // Fallback to localStorage if CRM fails
-    return loadLocal();
+    return [];
   }
 }
 
@@ -312,109 +362,48 @@ async function crmGetById(id: string): Promise<InvestmentApplication | null> {
 async function crmCreate(fields: InvestmentApplicationFields): Promise<InvestmentApplication> {
   const now = new Date().toISOString();
   const payload = toCrmPayload(fields);
-
-  try {
-    const crmId = await zohoCreate(CRM_MODULE, payload);
-    return {
-      ...fields,
-      id: crmId,
-      submittedAt: now,
-      updatedAt: now,
-    };
-  } catch (err) {
-    // Fallback: save to localStorage
-    console.warn('CRM create failed, saving locally:', err);
-    const app: InvestmentApplication = {
-      ...fields,
-      id: generateLocalId(),
-      submittedAt: now,
-      updatedAt: now,
-    };
-    const existing = loadLocal();
-    saveLocal([app, ...existing]);
-    markPendingSync(app.id);
-    return app;
-  }
+  const crmId = await zohoCreate(CRM_MODULE, payload);
+  return { ...fields, id: crmId, submittedAt: now, updatedAt: now };
 }
 
 async function crmUpdate(id: string, updates: Partial<InvestmentApplication>): Promise<InvestmentApplication | null> {
   const payload = toCrmPayload(updates);
-
-  try {
-    await zohoUpdate(CRM_MODULE, id, payload);
-    // Re-fetch to get the full updated record
-    return crmGetById(id);
-  } catch {
-    return null;
-  }
+  await zohoUpdate(CRM_MODULE, id, payload);
+  return crmGetById(id);
 }
 
 async function crmDeleteApp(id: string): Promise<void> {
   try {
     await zohoDelete(CRM_MODULE, id);
-  } catch {
-    // silent fail
-  }
-}
-
-// ─── Sync: push founder localStorage apps to CRM ──────────────────────────
-
-/**
- * Called when an investor logs in. Pushes any pending founder-submitted
- * applications from localStorage into CRM, then cleans up localStorage.
- */
-export async function syncPendingApplicationsToCRM(): Promise<number> {
-  const pendingIds = getPendingSyncIds();
-  if (pendingIds.length === 0) return 0;
-
-  const localApps = loadLocal();
-  let synced = 0;
-
-  for (const localId of pendingIds) {
-    const app = localApps.find(a => a.id === localId);
-    if (!app) {
-      clearPendingSync(localId);
-      continue;
-    }
-
-    // Skip drafts — only sync submitted+ applications
-    if (app.status === 'draft') continue;
-
-    try {
-      const payload = toCrmPayload(app);
-      const crmId = await zohoCreate(CRM_MODULE, payload);
-
-      // Replace local ID with CRM ID in localStorage
-      const idx = localApps.findIndex(a => a.id === localId);
-      if (idx !== -1) {
-        localApps[idx] = { ...localApps[idx], id: crmId };
-      }
-
-      clearPendingSync(localId);
-      synced++;
-    } catch (err) {
-      console.warn(`Failed to sync application ${localId} to CRM:`, err);
-    }
-  }
-
-  // Update localStorage with new CRM IDs
-  saveLocal(localApps);
-  return synced;
+  } catch { /* silent */ }
 }
 
 // ─── Public API (unified) ──────────────────────────────────────────────────
-// The `isInvestor` parameter determines whether to use CRM or localStorage.
-// Pages pass this from their auth context.
+// The `isInvestor` parameter determines the data path:
+//   - Investors: direct CRM API with client-side tokens
+//   - Founders: /api/applications serverless proxy (admin token server-side)
+//     + localStorage for drafts only
 
-/** Fetch all applications. Investors get CRM data; founders get localStorage. */
+/**
+ * Fetch all applications.
+ * Investors: direct CRM. Founders: server proxy + local drafts.
+ */
 export async function getApplications(isInvestor: boolean): Promise<InvestmentApplication[]> {
   if (isInvestor) {
-    // First sync any pending founder submissions
-    await syncPendingApplicationsToCRM();
     return crmGetAll();
   }
-  // Founder: localStorage only
-  const all = loadLocal();
+
+  // Founder: fetch from server proxy (CRM via admin token) + merge local drafts
+  const [serverApps, localDrafts] = await Promise.all([
+    proxyGetAll(),
+    Promise.resolve(loadLocalDrafts()),
+  ]);
+
+  // Merge: server apps + any local-only drafts (not yet in CRM)
+  const serverIds = new Set(serverApps.map(a => a.id));
+  const uniqueDrafts = localDrafts.filter(d => !serverIds.has(d.id));
+  const all = [...uniqueDrafts, ...serverApps];
+
   return all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
@@ -423,8 +412,11 @@ export async function getApplicationById(id: string, isInvestor: boolean): Promi
   if (isInvestor) {
     return crmGetById(id);
   }
-  const all = loadLocal();
-  return all.find(a => a.id === id) ?? null;
+
+  // Founder: check local drafts first, then server
+  const local = loadLocal().find(a => a.id === id);
+  if (local) return local;
+  return proxyGetById(id);
 }
 
 /** Fetch applications by status. */
@@ -438,10 +430,9 @@ export async function getApplicationsByStatus(status: ApplicationStatus, isInves
       return all.filter(a => a.status === status);
     }
   }
-  const all = loadLocal();
-  return all
-    .filter(a => a.status === status)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const all = await getApplications(false);
+  return all.filter(a => a.status === status);
 }
 
 /** Fetch applications by founder email. */
@@ -455,45 +446,59 @@ export async function getApplicationsByFounder(email: string, isInvestor: boolea
       return all.filter(a => a.founderEmail === email || a.submittedByEmail === email);
     }
   }
-  const all = loadLocal();
-  return all
-    .filter(a => a.founderEmail === email || a.submittedByEmail === email)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const all = await getApplications(false);
+  return all.filter(a => a.founderEmail === email || a.submittedByEmail === email);
 }
 
 /**
  * Create a new investment application.
- * Investors: creates directly in CRM.
- * Founders: saves to localStorage and marks for CRM sync.
+ * Investors: creates directly in CRM via client-side token.
+ * Founders: drafts saved locally; submitted apps go to CRM via server proxy.
  */
 export async function createApplication(fields: InvestmentApplicationFields, isInvestor: boolean): Promise<InvestmentApplication> {
   if (isInvestor) {
     return crmCreate(fields);
   }
 
-  // Founder: save to localStorage + mark for sync
   const now = new Date().toISOString();
-  const app: InvestmentApplication = {
-    ...fields,
-    id: generateLocalId(),
-    submittedAt: now,
-    updatedAt: now,
-  };
 
-  const existing = loadLocal();
-  saveLocal([app, ...existing]);
-
-  // Mark non-draft apps for sync to CRM
-  if (app.status !== 'draft') {
-    markPendingSync(app.id);
+  // Founder: drafts stay in localStorage only
+  if (fields.status === 'draft') {
+    const app: InvestmentApplication = {
+      ...fields,
+      id: generateLocalId(),
+      submittedAt: now,
+      updatedAt: now,
+    };
+    const existing = loadLocal();
+    saveLocal([app, ...existing]);
+    return app;
   }
 
-  return app;
+  // Founder submitting: write to CRM via server proxy
+  try {
+    const payload = toCrmPayload(fields);
+    const crmId = await proxyCreate(payload);
+    return { ...fields, id: crmId, submittedAt: now, updatedAt: now };
+  } catch (err) {
+    // Fallback: save locally if server is unreachable
+    console.warn('Server proxy create failed, saving locally:', err);
+    const app: InvestmentApplication = {
+      ...fields,
+      id: generateLocalId(),
+      submittedAt: now,
+      updatedAt: now,
+    };
+    const existing = loadLocal();
+    saveLocal([app, ...existing]);
+    return app;
+  }
 }
 
 /**
  * Update an existing application.
- * Investors: updates in CRM. Founders: updates in localStorage.
+ * Investors: updates in CRM. Founders: drafts updated locally, others via server proxy.
  */
 export async function updateApplication(
   id: string,
@@ -504,27 +509,50 @@ export async function updateApplication(
     return crmUpdate(id, updates);
   }
 
-  // Founder: update in localStorage
-  const all = loadLocal();
-  const index = all.findIndex(a => a.id === id);
-  if (index === -1) return null;
+  // Founder: check if this is a local draft
+  const localApps = loadLocal();
+  const localIdx = localApps.findIndex(a => a.id === id);
 
-  const updated: InvestmentApplication = {
-    ...all[index],
-    ...updates,
-    id,
-    updatedAt: new Date().toISOString(),
-  };
-
-  all[index] = updated;
-  saveLocal(all);
-
-  // If status changed from draft to submitted, mark for sync
-  if (updated.status !== 'draft') {
-    markPendingSync(id);
+  // If it's a local draft being submitted, create in CRM instead of updating
+  if (localIdx !== -1 && localApps[localIdx].status === 'draft' && updates.status && updates.status !== 'draft') {
+    const merged = { ...localApps[localIdx], ...updates, updatedAt: new Date().toISOString() };
+    try {
+      const payload = toCrmPayload(merged);
+      const crmId = await proxyCreate(payload);
+      // Remove from local drafts
+      localApps.splice(localIdx, 1);
+      saveLocal(localApps);
+      return { ...merged, id: crmId };
+    } catch (err) {
+      console.warn('Server proxy submit failed:', err);
+      // Update locally as fallback
+      localApps[localIdx] = { ...merged, id };
+      saveLocal(localApps);
+      return localApps[localIdx];
+    }
   }
 
-  return updated;
+  // If it's a local draft staying as draft, update locally
+  if (localIdx !== -1) {
+    const updated: InvestmentApplication = {
+      ...localApps[localIdx],
+      ...updates,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    localApps[localIdx] = updated;
+    saveLocal(localApps);
+    return updated;
+  }
+
+  // It's a CRM record — update via server proxy
+  try {
+    const payload = toCrmPayload(updates);
+    await proxyUpdate(id, payload);
+    return proxyGetById(id);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -552,9 +580,11 @@ export async function deleteApplication(id: string, isInvestor: boolean): Promis
     return crmDeleteApp(id);
   }
 
-  // Founder: remove from localStorage
+  // Founder: remove local draft if exists
   const all = loadLocal();
   const filtered = all.filter(a => a.id !== id);
-  saveLocal(filtered);
-  clearPendingSync(id);
+  if (filtered.length !== all.length) {
+    saveLocal(filtered);
+  }
+  // Note: CRM records can't be deleted by founders (no admin access)
 }
