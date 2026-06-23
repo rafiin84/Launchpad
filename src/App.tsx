@@ -24,10 +24,6 @@ import Applications from './pages/Applications';
 import ApplicationDetail from './pages/ApplicationDetail';
 import AddApplication from './pages/AddApplication';
 import EditApplication from './pages/EditApplication';
-import DealFlow from './pages/DealFlow';
-import AddDeal from './pages/AddDeal';
-import DealDetail from './pages/DealDetail';
-import EditDeal from './pages/EditDeal';
 import Portfolio from './pages/Portfolio';
 import AddPortfolioCompany from './pages/AddPortfolioCompany';
 import PortfolioCompanyDetail from './pages/PortfolioCompanyDetail';
@@ -75,10 +71,6 @@ export default function App() {
             <Route path="/applications/new" element={<AddApplication />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/applications/:id/edit" element={<EditApplication />} />
-            <Route path="/deals" element={<DealFlow />} />
-            <Route path="/deals/new" element={<AddDeal />} />
-            <Route path="/deals/:id" element={<DealDetail />} />
-            <Route path="/deals/:id/edit" element={<EditDeal />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
             <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />

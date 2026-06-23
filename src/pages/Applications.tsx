@@ -429,7 +429,7 @@ export default function Applications() {
           title="Applications"
           description="Manage your deal pipeline from first look to committee"
           action={
-            <div className="hidden sm:flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={() => setShowAI(!showAI)}
                 className={cn(

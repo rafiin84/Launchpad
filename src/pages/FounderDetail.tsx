@@ -332,39 +332,11 @@ export default function FounderDetail() {
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Portal Access</h3>
             <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Send a portal invitation so this user can log in to Launchpad.
-              Choose their role to determine which dashboard and features they'll see.
+              Send a portal invitation so this founder can log in to Launchpad.
             </p>
 
             {founder.email ? (
               <div className="space-y-3">
-                {/* Role selector */}
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-2">Assign Role</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setInviteRole('investor')}
-                      className={`flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all ${
-                        inviteRole === 'investor'
-                          ? 'border-black bg-black text-white'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
-                      }`}
-                    >
-                      Investor
-                    </button>
-                    <button
-                      onClick={() => setInviteRole('founder')}
-                      className={`flex-1 text-xs font-semibold px-3 py-2.5 rounded-xl border-2 transition-all ${
-                        inviteRole === 'founder'
-                          ? 'border-indigo-600 bg-indigo-600 text-white'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
-                      }`}
-                    >
-                      Founder
-                    </button>
-                  </div>
-                </div>
-
                 {/* Email + send button */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
                   <Mail size={15} className="text-gray-400 flex-shrink-0" />

@@ -14,6 +14,7 @@ import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortf
 import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
+import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import FounderDashboard from './FounderDashboard';
 import {
@@ -305,6 +306,7 @@ export default function Home() {
   const [loadingApps, setLoadingApps] = useState(true);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [weeklySummary, setWeeklySummary] = useState<ReturnType<typeof generateWeeklySummary> | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
   useEffect(() => {
     if (!isConnected) {
       setLoadingPortfolio(false);
@@ -324,6 +326,7 @@ export default function Home() {
       .then(setApplications)
       .catch(() => {})
       .finally(() => setLoadingApps(false));
+    fetchZohoOrgName().then(setOrgName).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -365,15 +368,23 @@ export default function Home() {
             />
           )}
         </div>
-        <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          {greeting}, {currentUser.name.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1 truncate">
-          Here's your portfolio at a glance ·{' '}
-          <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-          <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-        </p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            {greeting}, {currentUser.name.split(' ')[0]}
+          </h1>
+          {orgName && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={12} className="text-gray-500" />
+              </div>
+              <span className="text-sm font-medium text-gray-600 truncate">{orgName}</span>
+            </div>
+          )}
+          <p className="text-sm text-gray-500 mt-1 truncate">
+            Here's your portfolio at a glance ·{' '}
+            <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+            <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          </p>
         </div>
       </div>
 
