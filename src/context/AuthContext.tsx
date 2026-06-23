@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchUserPhoto } from '../services/zohoApi';
+import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName } from '../services/oauth';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser } from '../services/zohoApi';
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
@@ -115,7 +115,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return;
 
     fetchCurrentZohoUser().then(async (user) => {
-      if (!user) return;
+      if (!user) {
+        // CRM Users API failed (e.g. portal user) — try Zoho Accounts API
+        try {
+          const accountsUser = await fetchZohoAccountsUser();
+          if (accountsUser?.email) {
+            setZohoEmail(accountsUser.email);
+            const name = accountsUser.display_name
+              || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ');
+            if (name && name !== 'Founder') {
+              setUserName(name);
+              saveUserName(name);
+            }
+            setZohoProfile({
+              email: accountsUser.email,
+              phone: null, mobile: null, state: null, country: null, jobTitle: null,
+            });
+            // Try to get photo from accounts
+            if (accountsUser.picture) {
+              setAvatarUrl(accountsUser.picture);
+              try { localStorage.setItem(AVATAR_CACHE_KEY, accountsUser.picture); } catch { /* ok */ }
+            } else if (accountsUser.zuid) {
+              setAvatarUrl(`https://profile.zoho.in/file?ID=${accountsUser.zuid}&fs=medium`);
+            }
+          }
+        } catch { /* ok — truly offline */ }
+        return;
+      }
+
       const u = user as unknown as Record<string, unknown>;
       const zuid = (user.Zuid ?? user.zuid ?? null) as string | null;
       if (user.email) setZohoEmail(user.email);
@@ -169,10 +196,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [isLoggedIn, fetchAvatarFromAppUsers]);
 
-  // Derive display name: appUser name > locally cached name > Zoho name > role default
+  // Derive display name: appUser name > locally cached name > portal session name > Zoho name > role default
   const cachedProfile = loadCachedProfile();
-  const displayName = appUser?.name || cachedProfile?.name || userName;
-  const currentUser: User = { ...buildUser(role, displayName), avatar: avatarUrl };
+  const displayName = appUser?.name || cachedProfile?.name || userName || portalSession?.name;
+  const realEmail = zohoEmail || portalSession?.email || undefined;
+  const currentUser: User = {
+    ...buildUser(role, displayName),
+    avatar: avatarUrl,
+    ...(realEmail ? { email: realEmail } : {}),
+  };
 
   function login(selectedRole: UserRole) {
     saveRole(selectedRole);
