@@ -382,14 +382,15 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Activities() {
-  const { currentUser } = useAuth();
+  const { currentUser, isFounder } = useAuth();
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const isConnected = !!loadToken();
 
   const load = () => {
-    if (!isConnected) { setLoading(false); return; }
+    // Portal/founder users don't have access to CRM custom modules
+    if (!isConnected || isFounder) { setLoading(false); return; }
     setLoading(true); setError('');
     fetchCRMActivities()
       .then(setRecords)
