@@ -441,22 +441,6 @@ export default function Applications() {
               >
                 <Sparkles size={12} /> AI Scores
               </button>
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setView('grid')}
-                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                  title="Grid view"
-                >
-                  <LayoutGrid size={15} />
-                </button>
-                <button
-                  onClick={() => setView('list')}
-                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                  title="List view"
-                >
-                  <List size={15} />
-                </button>
-              </div>
               <Link
                 to="/applications/new"
                 className="inline-flex items-center justify-center gap-2 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition-colors px-3 py-2 sm:px-4"
