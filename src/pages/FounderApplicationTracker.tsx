@@ -312,7 +312,7 @@ function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplicati
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FounderApplicationTracker() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
