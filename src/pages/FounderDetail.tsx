@@ -8,7 +8,7 @@ import {
 import { Avatar } from '../components/ui/Avatar';
 import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
-import { registerPortalUser, findPortalUser } from '../services/portalUsers';
+import { registerPortalUser, findPortalUser, togglePortalUserActive } from '../services/portalUsers';
 import type { UserRole } from '../types';
 
 export default function FounderDetail() {
@@ -28,6 +28,7 @@ export default function FounderDetail() {
   const [inviteRole, setInviteRole] = useState<UserRole>('founder');
   const [wasReinvite, setWasReinvite] = useState(false);
   const [alreadyInvited, setAlreadyInvited] = useState(false);
+  const [portalActive, setPortalActive] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -35,8 +36,10 @@ export default function FounderDetail() {
     getCRMFounder(id)
       .then(f => {
         setFounder(f);
-        if (f.email && findPortalUser(f.email)) {
+        const portalEntry = f.email ? findPortalUser(f.email) : null;
+        if (portalEntry) {
           setAlreadyInvited(true);
+          setPortalActive(portalEntry.active !== false);
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
@@ -71,6 +74,7 @@ export default function FounderDetail() {
         name: displayName,
         contactId: id,
         invitedAt: new Date().toISOString(),
+        active: true,
       });
 
       const statusMsg = result.wasReinvite
@@ -191,47 +195,46 @@ export default function FounderDetail() {
           )}
         </div>
 
-        {/* Send Portal Invitation button */}
+        {/* Portal status / invite button */}
         {founder.email && (
-          <button
-            onClick={handleSendInvite}
-            disabled={inviting || inviteResult?.type === 'success'}
-            className={`inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
-              inviteResult?.type === 'success'
-                ? wasReinvite
-                  ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-default'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
-            }`}
-          >
-            {inviting ? (
-              <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
-            ) : inviteResult?.type === 'success' ? (
-              wasReinvite
-                ? <><Send size={14} /> Re-invitation Sent</>
-                : <><CheckCircle size={15} /> Invitation Sent</>
-            ) : (
-              <><Send size={14} /> Send Portal Invitation</>
-            )}
-          </button>
+          alreadyInvited ? (
+            <button
+              onClick={() => {
+                if (!founder.email) return;
+                const newActive = togglePortalUserActive(founder.email);
+                setPortalActive(newActive);
+              }}
+              className={`inline-flex items-center gap-2.5 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
+                portalActive
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}
+            >
+              <div className={`relative w-9 h-5 rounded-full transition-colors ${portalActive ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${portalActive ? 'left-[18px]' : 'left-0.5'}`} />
+              </div>
+              {portalActive ? 'Active' : 'Inactive'}
+            </button>
+          ) : (
+            <button
+              onClick={handleSendInvite}
+              disabled={inviting}
+              className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all bg-black text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {inviting ? (
+                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+              ) : (
+                <><Send size={14} /> Send Portal Invitation</>
+              )}
+            </button>
+          )
         )}
       </div>
 
-      {/* Invite result message */}
-      {inviteResult && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4 ${
-          inviteResult.type === 'success'
-            ? wasReinvite
-              ? 'bg-amber-50 border border-amber-100 text-amber-700'
-              : 'bg-emerald-50 border border-emerald-100 text-emerald-700'
-            : 'bg-red-50 border border-red-100 text-red-700'
-        }`}>
-          {inviteResult.type === 'success'
-            ? wasReinvite
-              ? <Send size={15} className="flex-shrink-0" />
-              : <CheckCircle size={15} className="flex-shrink-0" />
-            : <AlertCircle size={15} className="flex-shrink-0" />
-          }
+      {/* Invite error message */}
+      {inviteResult?.type === 'error' && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4 bg-red-50 border border-red-100 text-red-700">
+          <AlertCircle size={15} className="flex-shrink-0" />
           {inviteResult.message}
         </div>
       )}
@@ -340,20 +343,28 @@ export default function FounderDetail() {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-900">Portal Access</h3>
               {(alreadyInvited || inviteResult?.type === 'success') && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  portalActive
+                    ? 'text-emerald-700 bg-emerald-50'
+                    : 'text-red-600 bg-red-50'
+                }`}>
                   <CheckCircle size={12} />
-                  Active
+                  {portalActive ? 'Active' : 'Inactive'}
                 </span>
               )}
             </div>
 
             {(alreadyInvited || inviteResult?.type === 'success') ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 bg-emerald-50 rounded-xl px-4 py-3">
-                  <CheckCircle size={15} className="text-emerald-500 flex-shrink-0" />
+                <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${
+                  portalActive ? 'bg-emerald-50' : 'bg-red-50'
+                }`}>
+                  <CheckCircle size={15} className={`flex-shrink-0 ${portalActive ? 'text-emerald-500' : 'text-red-400'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-emerald-800">Portal invitation sent</p>
-                    <p className="text-xs text-emerald-600 truncate">{founder.email}</p>
+                    <p className={`text-sm font-medium ${portalActive ? 'text-emerald-800' : 'text-red-700'}`}>
+                      {portalActive ? 'Portal access active' : 'Portal access deactivated'}
+                    </p>
+                    <p className={`text-xs truncate ${portalActive ? 'text-emerald-600' : 'text-red-500'}`}>{founder.email}</p>
                   </div>
                 </div>
                 <button

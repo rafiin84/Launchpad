@@ -28,6 +28,7 @@ export interface PortalUserEntry {
   name: string;
   contactId: string;        // Zoho CRM Contact ID
   invitedAt: string;        // ISO timestamp
+  active: boolean;          // Whether portal access is active
 }
 
 function loadRegistry(): PortalUserEntry[] {
@@ -74,6 +75,19 @@ export function findPortalUser(email: string): PortalUserEntry | null {
  */
 export function getAllPortalUsers(): PortalUserEntry[] {
   return loadRegistry();
+}
+
+/**
+ * Toggle portal user active/inactive status.
+ * Returns the new active state.
+ */
+export function togglePortalUserActive(email: string): boolean {
+  const registry = loadRegistry();
+  const entry = registry.find(e => e.email.toLowerCase() === email.toLowerCase());
+  if (!entry) return false;
+  entry.active = !entry.active;
+  saveRegistry(registry);
+  return entry.active;
 }
 
 /**
