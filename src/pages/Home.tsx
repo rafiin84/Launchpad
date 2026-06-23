@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  DollarSign, Building2, Inbox, Briefcase,
+  DollarSign, Building2, Inbox,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
   Percent, Layers, PieChart, Target, Award,
   Sparkles, Lightbulb, AlertTriangle, CheckCircle, Zap, ArrowRight,
@@ -11,7 +11,6 @@ import { AIBadge } from '../components/ui/AIBadge';
 import { useAuth } from '../context/AuthContext';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
-import { fetchCRMDeals, type CRMDeal } from '../services/crmDeals';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
@@ -299,10 +298,9 @@ export default function Home() {
   const isConnected = !!loadToken();
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
-  const [deals, setDeals] = useState<CRMDeal[]>([]);
+  const deals: never[] = [];
   const [applications, setApplications] = useState<CRMApplication[]>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
-  const [loadingDeals, setLoadingDeals] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
 
@@ -310,7 +308,6 @@ export default function Home() {
   useEffect(() => {
     if (!isConnected) {
       setLoadingPortfolio(false);
-      setLoadingDeals(false);
       setLoadingApps(false);
       return;
     }
@@ -318,10 +315,6 @@ export default function Home() {
       .then(setPortfolio)
       .catch(() => {})
       .finally(() => setLoadingPortfolio(false));
-    fetchCRMDeals()
-      .then(setDeals)
-      .catch(() => {})
-      .finally(() => setLoadingDeals(false));
     fetchCRMApplications()
       .then(setApplications)
       .catch(() => {})
@@ -330,10 +323,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (loadingPortfolio || loadingDeals || loadingApps) return;
+    if (loadingPortfolio || loadingApps) return;
     const insights = generateInvestorInsights(portfolio, deals, applications);
     setAiInsights(insights);
-}, [loadingPortfolio, loadingDeals, loadingApps, portfolio, deals, applications]);
+  }, [loadingPortfolio, loadingApps, portfolio, deals, applications]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -342,7 +335,6 @@ export default function Home() {
     return 'Good evening';
   })();
 
-  const activeDeals = deals.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').length;
 
   const recentPortfolio = portfolio.slice(0, 4);
 
@@ -413,7 +405,6 @@ export default function Home() {
         const linkedChips = [
           { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/portfolio',   icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio, sub: 'across portfolio' },
           { label: 'Portfolio Companies', value: String(portfolio.length),          path: '/portfolio',   icon: <Building2 size={16} />,  accent: false, loading: loadingPortfolio, sub: `${activeCount} active` },
-          { label: 'Active Deals',        value: String(activeDeals),              path: '/deals',       icon: <Briefcase size={16} />,  accent: false, loading: loadingDeals,     sub: 'in pipeline' },
           { label: 'Applications',        value: String(applications.length),       path: '/applications',icon: <Inbox size={16} />,      accent: false, loading: loadingApps,      sub: 'submitted' },
         ];
 
@@ -421,7 +412,7 @@ export default function Home() {
         const staticChips: { label: string; value: string; sub: string; icon: React.ReactElement; color?: string }[] = [
           { label: 'Total Deployed',   value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'capital invested',   icon: <DollarSign size={16} /> },
           { label: 'Avg Ownership',    value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',                                 sub: 'per company',        icon: <Percent size={16} /> },
-          { label: 'Avg Deal Size',    value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per investment',     icon: <DollarSign size={16} /> },
+          { label: 'Avg Investment',   value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per company',        icon: <DollarSign size={16} /> },
           { label: 'Entry Valuations', value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                                           sub: 'combined pre-money', icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
           { label: 'Stage Mix',        value: `${seedCount}S / ${seriesACount}A`,                                                     sub: 'Seed / Series A',    icon: <Layers size={16} /> },
           { label: 'Portfolio Value',  value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'at cost basis',      icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
