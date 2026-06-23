@@ -8,7 +8,7 @@ import {
 import { Avatar } from '../components/ui/Avatar';
 import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
-import { registerPortalUser } from '../services/portalUsers';
+import { registerPortalUser, findPortalUser } from '../services/portalUsers';
 import type { UserRole } from '../types';
 
 export default function FounderDetail() {
@@ -27,12 +27,18 @@ export default function FounderDetail() {
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [inviteRole, setInviteRole] = useState<UserRole>('founder');
   const [wasReinvite, setWasReinvite] = useState(false);
+  const [alreadyInvited, setAlreadyInvited] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     getCRMFounder(id)
-      .then(setFounder)
+      .then(f => {
+        setFounder(f);
+        if (f.email && findPortalUser(f.email)) {
+          setAlreadyInvited(true);
+        }
+      })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -71,6 +77,7 @@ export default function FounderDetail() {
         ? `Re-invitation sent — User was already invited, a new invite has been sent.`
         : `${result.message} — User registered as ${inviteRole}.`;
       setInviteResult({ type: 'success', message: statusMsg });
+      setAlreadyInvited(true);
     } catch (err) {
       setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
     } finally {
@@ -330,13 +337,39 @@ export default function FounderDetail() {
 
           {/* Portal Invitation Card */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Portal Access</h3>
-            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Send a portal invitation so this founder can log in to Launchpad.
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-900">Portal Access</h3>
+              {(alreadyInvited || inviteResult?.type === 'success') && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                  <CheckCircle size={12} />
+                  Active
+                </span>
+              )}
+            </div>
 
-            {founder.email ? (
+            {(alreadyInvited || inviteResult?.type === 'success') ? (
               <div className="space-y-3">
+                <div className="flex items-center gap-3 bg-emerald-50 rounded-xl px-4 py-3">
+                  <CheckCircle size={15} className="text-emerald-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-emerald-800">Portal invitation sent</p>
+                    <p className="text-xs text-emerald-600 truncate">{founder.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSendInvite}
+                  disabled={inviting}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors px-1 py-1"
+                >
+                  <Send size={11} />
+                  {inviting ? 'Resending...' : 'Resend invitation'}
+                </button>
+              </div>
+            ) : founder.email ? (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Send a portal invitation so this founder can log in to Launchpad.
+                </p>
                 {/* Email + send button */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
                   <Mail size={15} className="text-gray-400 flex-shrink-0" />
@@ -346,21 +379,11 @@ export default function FounderDetail() {
                   </div>
                   <button
                     onClick={handleSendInvite}
-                    disabled={inviting || inviteResult?.type === 'success'}
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 ${
-                      inviteResult?.type === 'success'
-                        ? wasReinvite
-                          ? 'bg-amber-100 text-amber-700 cursor-default'
-                          : 'bg-emerald-100 text-emerald-700 cursor-default'
-                        : 'bg-black text-white hover:bg-gray-800 disabled:opacity-50'
-                    }`}
+                    disabled={inviting}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 bg-black text-white hover:bg-gray-800 disabled:opacity-50"
                   >
                     {inviting ? (
                       <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
-                    ) : inviteResult?.type === 'success' ? (
-                      wasReinvite
-                        ? <><Send size={12} /> Re-sent</>
-                        : <><CheckCircle size={12} /> Sent</>
                     ) : (
                       <><Send size={12} /> Send Invite</>
                     )}
