@@ -111,16 +111,13 @@ export function MobileHeader() {
           )}
 
           {isApplications && (
-            <>
-              <Link
-                to="/applications/new"
-                className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                title="Add Application"
-              >
-                <Plus size={18} className="text-gray-600" />
-              </Link>
-              <ViewToggle />
-            </>
+            <Link
+              to="/applications/new"
+              className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+              title="Add Application"
+            >
+              <Plus size={18} className="text-gray-600" />
+            </Link>
           )}
 
           {isFounders && (
