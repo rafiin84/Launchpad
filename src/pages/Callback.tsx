@@ -11,7 +11,8 @@ import { findPortalUser, savePortalSession, clearPortalSession } from '../servic
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
 
-/** Clear all previous user session data before a new login */
+/** Clear session data before a new login.
+ *  Preserve user-set profile data (cover image) so it persists across logins. */
 function clearPreviousSession() {
   clearRole();
   clearUserName();
@@ -20,7 +21,7 @@ function clearPreviousSession() {
   clearModuleStatusCache();
   clearPortalSession();
   try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
-  try { localStorage.removeItem('lp_cover_image'); } catch { /* ok */ }
+  // Do NOT clear cover image — it should persist across logins
 }
 
 export default function Callback() {

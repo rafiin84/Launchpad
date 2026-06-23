@@ -3,23 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
-  saveUserName, clearToken, clearRole, clearUserName,
+  saveUserName, clearRole,
 } from '../services/oauth';
-import { clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
+import { clearModuleStatusCache, loadCachedProfile } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
 import { fetchZohoAccountsUser } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
-/** Clear all previous user session data before a new portal login */
+/** Clear session data before a new portal login.
+ *  Preserve user-set profile data (name, bio, avatar, cover) so it
+ *  persists across login sessions. */
 function clearPreviousSession() {
   clearRole();
-  clearUserName();
-  clearCachedRecordId();
-  clearCachedProfile();
   clearModuleStatusCache();
   clearPortalSession();
-  try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
-  try { localStorage.removeItem('lp_cover_image'); } catch { /* ok */ }
+  // Do NOT clear: userName, cachedProfile, avatar, cover image
+  // — these are user-set and should persist across logins
 }
 
 export default function PortalCallback() {
@@ -75,26 +74,38 @@ export default function PortalCallback() {
       console.warn('[Portal Auth] Could not fetch accounts user:', err);
     }
 
-    // 2. Look up in portal user registry (set by admin during invitation)
-    //    This always has the real name from the CRM Contact record
-    if (email) {
-      const registryEntry = findPortalUser(email);
-      if (registryEntry) {
-        displayName = registryEntry.name || displayName;
-        contactId = registryEntry.contactId || '';
-      }
-    } else {
-      // No email from API — try to match the most recently invited active user
-      const allUsers = getAllPortalUsers();
-      const active = allUsers.find(u => u.active);
-      if (active) {
-        email = active.email;
-        displayName = active.name || '';
-        contactId = active.contactId || '';
-      }
+    // 2. Check locally cached profile (user-set name from Edit Profile)
+    const cachedProfile = loadCachedProfile();
+    if (cachedProfile?.name) {
+      displayName = cachedProfile.name;
     }
 
-    // 3. Final fallback
+    // 3. Look up in portal user registry (set by admin during invitation)
+    //    This has the real name from the CRM Contact record
+    if (!displayName) {
+      if (email) {
+        const registryEntry = findPortalUser(email);
+        if (registryEntry) {
+          displayName = registryEntry.name || displayName;
+          contactId = registryEntry.contactId || '';
+        }
+      } else {
+        // No email from API — try to match the most recently invited active user
+        const allUsers = getAllPortalUsers();
+        const active = allUsers.find(u => u.active);
+        if (active) {
+          email = active.email;
+          displayName = active.name || '';
+          contactId = active.contactId || '';
+        }
+      }
+    } else if (email) {
+      // Still resolve contactId even if we already have a name
+      const registryEntry = findPortalUser(email);
+      if (registryEntry) contactId = registryEntry.contactId || '';
+    }
+
+    // 4. Final fallback
     if (!displayName) displayName = 'Founder';
 
     saveUserName(displayName);
