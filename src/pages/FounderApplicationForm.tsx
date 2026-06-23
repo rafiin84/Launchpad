@@ -321,7 +321,7 @@ function ProgressStepper({
 export default function FounderApplicationForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { currentUser } = useAuth();
+  const { currentUser, isInvestor } = useAuth();
 
   const editId = searchParams.get('edit');
 
@@ -342,57 +342,59 @@ export default function FounderApplicationForm() {
 
   useEffect(() => {
     if (editId) {
-      const existing = getApplicationById(editId);
-      if (existing) {
-        let docs: { name: string; url: string }[] = [];
-        try {
-          docs = JSON.parse(existing.supportingDocs || '[]');
-        } catch {
-          docs = [];
+      (async () => {
+        const existing = await getApplicationById(editId, isInvestor);
+        if (existing) {
+          let docs: { name: string; url: string }[] = [];
+          try {
+            docs = JSON.parse(existing.supportingDocs || '[]');
+          } catch {
+            docs = [];
+          }
+          setForm({
+            companyName: existing.companyName,
+            companyWebsite: existing.companyWebsite,
+            companyIndustry: existing.companyIndustry,
+            companyStage: existing.companyStage,
+            companyLocation: existing.companyLocation,
+            foundedYear: existing.foundedYear,
+            companyDescription: existing.companyDescription,
+            founderName: existing.founderName,
+            founderEmail: existing.founderEmail,
+            founderPhone: existing.founderPhone,
+            founderLinkedin: existing.founderLinkedin,
+            founderRole: existing.founderRole,
+            coFounders: existing.coFounders,
+            problemStatement: existing.problemStatement,
+            solution: existing.solution,
+            targetMarket: existing.targetMarket,
+            businessModel: existing.businessModel,
+            competitiveAdvantage: existing.competitiveAdvantage,
+            fundingAsk: existing.fundingAsk,
+            useOfFunds: existing.useOfFunds,
+            previousFunding: existing.previousFunding,
+            currentValuation: existing.currentValuation,
+            equityOffered: existing.equityOffered,
+            currentRevenue: existing.currentRevenue,
+            mrr: existing.mrr,
+            arr: existing.arr,
+            monthlyBurn: existing.monthlyBurn,
+            runway: existing.runway,
+            activeUsers: existing.activeUsers,
+            momGrowth: existing.momGrowth,
+            churnRate: existing.churnRate,
+            nps: existing.nps,
+            keyMetric: existing.keyMetric,
+            keyMetricLabel: existing.keyMetricLabel,
+            pitchDeckUrl: existing.pitchDeckUrl,
+            pitchDeckName: existing.pitchDeckName,
+            demoVideoUrl: existing.demoVideoUrl,
+            supportingDocs: docs,
+          });
         }
-        setForm({
-          companyName: existing.companyName,
-          companyWebsite: existing.companyWebsite,
-          companyIndustry: existing.companyIndustry,
-          companyStage: existing.companyStage,
-          companyLocation: existing.companyLocation,
-          foundedYear: existing.foundedYear,
-          companyDescription: existing.companyDescription,
-          founderName: existing.founderName,
-          founderEmail: existing.founderEmail,
-          founderPhone: existing.founderPhone,
-          founderLinkedin: existing.founderLinkedin,
-          founderRole: existing.founderRole,
-          coFounders: existing.coFounders,
-          problemStatement: existing.problemStatement,
-          solution: existing.solution,
-          targetMarket: existing.targetMarket,
-          businessModel: existing.businessModel,
-          competitiveAdvantage: existing.competitiveAdvantage,
-          fundingAsk: existing.fundingAsk,
-          useOfFunds: existing.useOfFunds,
-          previousFunding: existing.previousFunding,
-          currentValuation: existing.currentValuation,
-          equityOffered: existing.equityOffered,
-          currentRevenue: existing.currentRevenue,
-          mrr: existing.mrr,
-          arr: existing.arr,
-          monthlyBurn: existing.monthlyBurn,
-          runway: existing.runway,
-          activeUsers: existing.activeUsers,
-          momGrowth: existing.momGrowth,
-          churnRate: existing.churnRate,
-          nps: existing.nps,
-          keyMetric: existing.keyMetric,
-          keyMetricLabel: existing.keyMetricLabel,
-          pitchDeckUrl: existing.pitchDeckUrl,
-          pitchDeckName: existing.pitchDeckName,
-          demoVideoUrl: existing.demoVideoUrl,
-          supportingDocs: docs,
-        });
-      }
+      })();
     }
-  }, [editId]);
+  }, [editId, isInvestor]);
 
   // ── Auto-populate founder info from auth ────────────────────────────────
 
@@ -511,9 +513,9 @@ export default function FounderApplicationForm() {
     try {
       const fields = buildFields('draft');
       if (editId) {
-        updateApplication(editId, fields);
+        await updateApplication(editId, fields, isInvestor);
       } else {
-        createApplication(fields);
+        await createApplication(fields, isInvestor);
       }
     } finally {
       setSaving(false);
@@ -528,9 +530,9 @@ export default function FounderApplicationForm() {
     try {
       const fields = buildFields('submitted');
       if (editId) {
-        updateApplication(editId, fields);
+        await updateApplication(editId, fields, isInvestor);
       } else {
-        createApplication(fields);
+        await createApplication(fields, isInvestor);
       }
 
       addNotification({

@@ -510,31 +510,31 @@ function ApplicationDetail({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvestorApplications() {
-  const { currentUser } = useAuth();
+  const { currentUser, isInvestor } = useAuth();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const all = getApplications().filter(a => a.status !== 'draft');
-      setApplications(all);
+      const all = await getApplications(isInvestor);
+      setApplications(all.filter(a => a.status !== 'draft'));
     } catch { /* ignore */ }
     setLoading(false);
-  }, []);
+  }, [isInvestor]);
 
   useEffect(() => { load(); }, [load]);
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  const handleStatusChange = (id: string, newStatus: ApplicationStatus) => {
+  const handleStatusChange = async (id: string, newStatus: ApplicationStatus) => {
     const app = applications.find(a => a.id === id);
     if (!app) return;
 
-    updateApplicationStatus(id, newStatus, currentUser.name);
+    await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
 
     const statusLabel = STATUS_CONFIG[newStatus]?.label ?? newStatus;
     addNotification({
@@ -550,8 +550,8 @@ export default function InvestorApplications() {
     load();
   };
 
-  const handleNotesChange = (id: string, notes: string) => {
-    updateApplication(id, { investorNotes: notes });
+  const handleNotesChange = async (id: string, notes: string) => {
+    await updateApplication(id, { investorNotes: notes }, isInvestor);
   };
 
   // ── Filtering ─────────────────────────────────────────────────────────────

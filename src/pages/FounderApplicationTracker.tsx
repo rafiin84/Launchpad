@@ -312,14 +312,23 @@ function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplicati
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FounderApplicationTracker() {
-  const { currentUser } = useAuth();
+  const { currentUser, isInvestor } = useAuth();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const all = getApplications(); // already sorted by updatedAt desc
-    setApplications(all);
-  }, []);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const all = await getApplications(isInvestor);
+      if (!cancelled) {
+        setApplications(all);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isInvestor]);
 
   const drafts = applications.filter(a => a.status === 'draft');
   const nonDrafts = applications.filter(a => a.status !== 'draft');
@@ -348,8 +357,16 @@ export default function FounderApplicationTracker() {
         }
       />
 
+      {/* Loading state */}
+      {loading && (
+        <div className="text-center py-20">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Loading applications...</p>
+        </div>
+      )}
+
       {/* Empty state */}
-      {isEmpty && (
+      {!loading && isEmpty && (
         <div className="text-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No applications yet</p>
@@ -363,7 +380,7 @@ export default function FounderApplicationTracker() {
         </div>
       )}
 
-      {!isEmpty && (
+      {!loading && !isEmpty && (
         <>
           {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
