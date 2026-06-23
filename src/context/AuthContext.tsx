@@ -189,11 +189,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearCachedRecordId();
     clearModuleStatusCache();
     clearPortalSession();
-    // Don't clear profile cache on logout — preserve for next login
+    // Don't clear profile cache or cover image on logout — preserve for next login
     try { localStorage.removeItem(AVATAR_CACHE_KEY); } catch { /* ok */ }
-    try { localStorage.removeItem(COVER_CACHE_KEY); } catch { /* ok */ }
     setAvatarUrl('');
-    setCoverImageState('');
     setUserName(null);
     setAppUser(null);
     setAppUserRecordId(null);
