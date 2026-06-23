@@ -223,7 +223,7 @@ function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplicati
       <div className="flex items-center gap-2">
         {isDraft ? (
           <Link
-            to={`/applications/new?edit=${app.id}`}
+            to={`/applications/apply?edit=${app.id}`}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
           >
             <FileText size={12} /> Continue Editing
@@ -340,7 +340,7 @@ export default function FounderApplicationTracker() {
         description="Track the status of your investment proposals"
         action={
           <Link
-            to="/applications/new"
+            to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
             <Plus size={14} /> New Application
@@ -355,7 +355,7 @@ export default function FounderApplicationTracker() {
           <p className="text-sm font-medium text-gray-500 mb-1">No applications yet</p>
           <p className="text-xs text-gray-400 mb-5">Submit your first investment proposal to get started</p>
           <Link
-            to="/applications/new"
+            to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
             <Plus size={14} /> New Application

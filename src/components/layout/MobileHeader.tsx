@@ -6,16 +6,18 @@ import { NotificationBell } from '../ui/NotificationBell';
 import { useAuth } from '../../context/AuthContext';
 
 export function MobileHeader() {
-  const { currentUser } = useAuth();
+  const { currentUser, isFounder } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Hide on detail / edit / new sub-pages (any path with 2+ segments)
+  // Allow specific 2-segment paths like /applications/track, /applications/review, /applications/apply
   const segments = location.pathname.split('/').filter(Boolean);
-  if (segments.length >= 2) return null;
+  const allowedTwoSegment = ['/applications/track', '/applications/review', '/applications/apply'];
+  if (segments.length >= 2 && !allowedTwoSegment.includes(location.pathname)) return null;
 
   const isHome         = location.pathname === '/' || location.pathname === '/dashboard';
-  const isApplications = location.pathname === '/applications';
+  const isApplications = location.pathname === '/applications' || location.pathname === '/applications/track' || location.pathname === '/applications/review';
   const isPortfolio    = location.pathname === '/portfolio';
   const isSearchOnly   = location.pathname === '/activities';
   const isDocuments    = location.pathname === '/documents';
@@ -111,7 +113,7 @@ export function MobileHeader() {
 
           {isApplications && (
             <Link
-              to="/applications/new"
+              to={isFounder ? "/applications/apply" : "/applications/new"}
               className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
               title="Add Application"
             >
