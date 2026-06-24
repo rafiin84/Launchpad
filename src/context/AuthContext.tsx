@@ -9,7 +9,7 @@ import {
   loadCachedProfile, clearCachedProfile, clearModuleStatusCache,
   type AppUser,
 } from '../services/crmAppUsers';
-import { loadPortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
+import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
 
 export interface ZohoProfile {
   email: string | null;
@@ -117,9 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchCurrentZohoUser().then(async (user) => {
       if (!user) {
         // CRM Users API failed (e.g. portal user) — try Zoho Accounts API
+        let resolvedEmail = '';
         try {
           const accountsUser = await fetchZohoAccountsUser();
           if (accountsUser?.email) {
+            resolvedEmail = accountsUser.email;
             setZohoEmail(accountsUser.email);
             const name = accountsUser.display_name
               || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ');
@@ -141,12 +143,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch { /* ok — truly offline */ }
 
-        // If Accounts API also failed or returned no usable name,
-        // try to look up the user in the appusers CRM module via portal session email
+        // Use portal session email as fallback
         const session = loadPortalSession();
-        if (session?.email && !appUser) {
+        const emailForLookup = resolvedEmail || session?.email || '';
+
+        // Call server-side portal-identity API to resolve real name from CRM Contact
+        // This is the most reliable source for portal users
+        if (emailForLookup) {
           try {
-            const found = await findAppUserByEmail(session.email);
+            const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(emailForLookup)}`);
+            if (res.ok) {
+              const identity = await res.json() as { name?: string; email?: string; contactId?: string };
+              if (identity.name && identity.name !== 'Founder' && identity.name !== 'Investor' && identity.name !== 'User') {
+                setUserName(identity.name);
+                saveUserName(identity.name);
+                // Also update portal session with real name
+                if (session) {
+                  savePortalSession({ ...session, name: identity.name, contactId: identity.contactId || session.contactId });
+                  setPortalSession({ ...session, name: identity.name, contactId: identity.contactId || session.contactId });
+                }
+              }
+              if (!resolvedEmail && identity.email) {
+                setZohoEmail(identity.email);
+                resolvedEmail = identity.email;
+              }
+            }
+          } catch { /* ok */ }
+        }
+
+        // Try to look up the user in the appusers CRM module via portal session email
+        if (emailForLookup && !appUser) {
+          try {
+            const found = await findAppUserByEmail(emailForLookup);
             if (found) {
               setAppUser(found);
               setAppUserRecordId(found.id);

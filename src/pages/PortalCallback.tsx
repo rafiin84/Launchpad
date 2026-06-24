@@ -60,14 +60,18 @@ export default function PortalCallback() {
     let contactId = '';
     let zuid = '';
 
-    // 1. Try Zoho Accounts API for user identity
+    // Helper: is this a real name (not a placeholder)?
+    const isReal = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
+
+    // 1. Try Zoho Accounts API for user identity (gets email + possibly name)
     try {
       const accountsUser = await fetchZohoAccountsUser();
       if (accountsUser?.email) {
         email = accountsUser.email;
-        displayName = accountsUser.display_name
+        const accountsName = accountsUser.display_name
           || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
           || '';
+        if (isReal(accountsName)) displayName = accountsName;
         zuid = accountsUser.zuid || '';
       }
     } catch (err) {
@@ -76,43 +80,58 @@ export default function PortalCallback() {
 
     // 2. Check locally cached profile (user-set name from Edit Profile)
     const cachedProfile = loadCachedProfile();
-    if (cachedProfile?.name) {
+    if (cachedProfile?.name && isReal(cachedProfile.name)) {
       displayName = cachedProfile.name;
     }
 
     // 3. Look up in portal user registry (set by admin during invitation)
-    //    This has the real name from the CRM Contact record
-    if (!displayName) {
-      if (email) {
-        const registryEntry = findPortalUser(email);
-        if (registryEntry) {
-          displayName = registryEntry.name || displayName;
-          contactId = registryEntry.contactId || '';
-        }
-      } else {
-        // No email from API — try to match the most recently invited active user
-        const allUsers = getAllPortalUsers();
-        const active = allUsers.find(u => u.active);
-        if (active) {
-          email = active.email;
-          displayName = active.name || '';
-          contactId = active.contactId || '';
-        }
-      }
-    } else if (email) {
-      // Still resolve contactId even if we already have a name
+    if (email) {
       const registryEntry = findPortalUser(email);
-      if (registryEntry) contactId = registryEntry.contactId || '';
+      if (registryEntry) {
+        if (!isReal(displayName) && isReal(registryEntry.name)) {
+          displayName = registryEntry.name;
+        }
+        contactId = registryEntry.contactId || '';
+      }
+    } else {
+      // No email from API — try to match the most recently invited active user
+      const allUsers = getAllPortalUsers();
+      const active = allUsers.find(u => u.active);
+      if (active) {
+        email = active.email;
+        if (!isReal(displayName) && isReal(active.name)) displayName = active.name;
+        contactId = active.contactId || '';
+      }
     }
 
-    // 4. Only save a real name — never save the role-default "Founder"
-    //    so the cascading logic in AuthContext can try other sources
-    if (displayName && displayName !== 'Founder' && displayName !== 'Investor') {
+    // 4. Call the server-side portal-identity API to resolve the real name
+    //    from the CRM Contact record using the admin token.
+    //    This is the most reliable source — works even when portal tokens
+    //    can't access the CRM Users or Accounts API.
+    if (email) {
+      try {
+        setStatusText('Resolving your profile...');
+        const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          const identity = await res.json() as { name?: string; email?: string; contactId?: string };
+          if (identity.name && isReal(identity.name)) {
+            displayName = identity.name;
+          }
+          if (identity.contactId) contactId = identity.contactId;
+          console.log('[Portal Auth] Resolved identity from CRM:', identity);
+        }
+      } catch (err) {
+        console.warn('[Portal Auth] portal-identity API failed:', err);
+      }
+    }
+
+    // 5. Only save a real name — never save the role-default "Founder"
+    if (isReal(displayName)) {
       saveUserName(displayName);
     }
     savePortalSession({
       email,
-      name: displayName || 'Founder',
+      name: isReal(displayName) ? displayName : 'Founder',
       role: 'founder',
       contactId,
       zuid,
@@ -121,7 +140,7 @@ export default function PortalCallback() {
 
     login('founder');
     setStatus('success');
-    setStatusText(`Welcome, ${displayName}! Redirecting to your dashboard...`);
+    setStatusText(isReal(displayName) ? `Welcome, ${displayName}! Redirecting to your dashboard...` : 'Welcome! Redirecting to your dashboard...');
     setTimeout(() => navigate('/'), 1500);
   }
 
