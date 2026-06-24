@@ -203,40 +203,9 @@ export interface PortalInviteResult {
  */
 export type PortalUserAPIStatus = 'active' | 'invited' | 'disabled';
 
-/** Map a raw Zoho portal status string to our canonical status */
-function derivePortalStatus(raw: Record<string, unknown>): PortalUserAPIStatus {
-  // Zoho may return status at different levels; check all possibilities
-  const statusStr = String(raw.status ?? raw.Status ?? raw.portal_status ?? '').toLowerCase().trim();
-
-  // Active
-  if (statusStr === 'active') return 'active';
-
-  // Disabled / Deactivated
-  if (statusStr === 'disabled' || statusStr === 'deactivated' || statusStr === 'inactive') return 'disabled';
-
-  // Yet to confirm / Invited / Pending / Reinvited
-  if (
-    statusStr === 'yet_to_confirm' ||
-    statusStr === 'yet to confirm' ||
-    statusStr === 'invited' ||
-    statusStr === 'pending' ||
-    statusStr === 'reinvited' ||
-    statusStr === 're-invited' ||
-    statusStr === 'waiting'
-  ) return 'invited';
-
-  // Fallback: check boolean `active` field
-  if (raw.active === true) return 'active';
-  if (raw.active === false) return 'disabled';
-
-  // Unknown — default to invited (safe: won't wrongly show as Active)
-  console.warn('[Portal] Unknown portal status:', statusStr, raw);
-  return 'invited';
-}
 
 export async function checkPortalStatus(contactEmail: string): Promise<PortalUserAPIStatus | null> {
-  const token = loadToken();
-  if (!token || !contactEmail) return null;
+  if (!contactEmail) return null;
 
   try {
     const allStatuses = await fetchAllPortalUserStatuses();
@@ -249,62 +218,35 @@ export async function checkPortalStatus(contactEmail: string): Promise<PortalUse
 }
 
 /**
- * Fetch all portal users across all user types and return a map of email → status.
- * This is much more efficient than checking one user at a time.
+ * Fetch all portal users and their statuses via the server-side admin API.
+ *
+ * Uses /api/portal-users which has the admin refresh token and full access
+ * to Zoho CRM portal settings — much more reliable than the client-side
+ * implicit-flow token which often lacks portal settings scopes.
  */
 export async function fetchAllPortalUserStatuses(): Promise<Map<string, PortalUserAPIStatus>> {
   const result = new Map<string, PortalUserAPIStatus>();
-  const token = loadToken();
-  if (!token) return result;
 
   try {
-    const portals = await fetchPortals();
-    const activePortal = portals.find(p => p.active) ?? portals[0];
-    if (!activePortal) {
-      console.warn('[Portal] No portal found');
+    const res = await fetch('/api/portal-users');
+    if (!res.ok) {
+      console.warn('[Portal] Server API returned', res.status);
       return result;
     }
 
-    const userTypes = await fetchPortalUserTypes(activePortal.name);
-    console.log('[Portal] Fetching users for portal:', activePortal.name, 'user_types:', userTypes.map(u => u.id));
+    const json = await res.json() as {
+      users?: Array<{ email: string; name: string; status: 'active' | 'disabled' | 'invited' }>;
+      debug?: string;
+    };
 
-    for (const ut of userTypes) {
-      const url = crmUrl(`/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type/${ut.id}/users`);
-      const res = await fetch(url, { headers: crmHeaders() });
+    console.log('[Portal] Server response:', json);
 
-      if (!res.ok) {
-        console.warn('[Portal] Failed to fetch users for user_type', ut.id, ':', res.status);
-        continue;
-      }
-
-      const json = await res.json().catch(() => ({}));
-      console.log('[Portal] Raw API response for user_type', ut.id, ':', JSON.stringify(json).slice(0, 500));
-
-      // Zoho may return users under different keys
-      const rawJson = json as Record<string, unknown>;
-      const usersArray = (
-        rawJson.users ?? rawJson.portal_users ?? rawJson.data ?? []
-      ) as Array<Record<string, unknown>>;
-
-      for (const entry of usersArray) {
-        // User data may be nested under a "user" key or flat
-        const userObj = (entry.user ?? entry) as Record<string, unknown>;
-
-        // Try multiple email field names
-        const email = String(userObj.email ?? userObj.Email ?? entry.email ?? entry.Email ?? '').trim();
-        if (!email) continue;
-
-        // Derive status — check both the outer entry AND the inner user object
-        // (Zoho sometimes puts status at different nesting levels)
-        const merged = { ...userObj, ...entry };
-        const derived = derivePortalStatus(merged);
-
-        console.log('[Portal] User:', email, '→', derived, '(raw status:', merged.status ?? merged.Status ?? 'none', ')');
-        result.set(email.toLowerCase(), derived);
-      }
+    for (const u of json.users ?? []) {
+      if (!u.email) continue;
+      result.set(u.email.toLowerCase(), u.status);
     }
 
-    console.log('[Portal] Final status map:', Object.fromEntries(result));
+    console.log('[Portal] Status map:', Object.fromEntries(result));
   } catch (err) {
     console.warn('[Portal] Failed to fetch portal user statuses:', err);
   }
