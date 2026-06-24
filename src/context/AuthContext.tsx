@@ -214,8 +214,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const u = user as unknown as Record<string, unknown>;
+      console.log('Fetched Zoho user:', u);
       const zuid = (user.Zuid ?? user.zuid ?? null) as string | null;
       if (user.email) setZohoEmail(user.email);
+
+      // Set display name from the CRM Users full_name — the authoritative
+      // source for CRM users. Without this, a CRM user who isn't in the
+      // appusers module would fall back to the generic "Founder"/"Investor".
+      if (user.full_name && user.full_name !== 'Founder' && user.full_name !== 'Investor') {
+        setUserName(user.full_name);
+        saveUserName(user.full_name);
+      }
+
       setZohoProfile({
         email:    user.email ?? null,
         phone:    (u['phone'] as string) ?? null,
