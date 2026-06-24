@@ -6,7 +6,7 @@ import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchCont
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
-  loadCachedProfile, clearCachedProfile, clearModuleStatusCache,
+  clearCachedProfile, clearModuleStatusCache,
   type AppUser,
 } from '../services/crmAppUsers';
 import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
@@ -266,14 +266,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [isLoggedIn, fetchAvatarFromAppUsers]);
 
-  // Derive display name: appUser name > locally cached name > portal session name > Zoho name > role default
-  // Filter out role-default placeholder names so they don't block the cascade
+  // Derive display name from live/session sources only.
+  // DO NOT use cachedProfile.name here — it may belong to a different user
+  // who previously logged in on the same browser. The cached profile is only
+  // safe for bio/location/expertise (non-identifying fields).
   const isRealName = (n: string | null | undefined): n is string =>
     !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
-  const cachedProfile = loadCachedProfile();
-  const displayName = (isRealName(appUser?.name) ? appUser!.name : null)
-    || (isRealName(cachedProfile?.name) ? cachedProfile!.name : null)
-    || (isRealName(userName) ? userName : null)
+  const displayName = (isRealName(userName) ? userName : null)
+    || (isRealName(appUser?.name) ? appUser!.name : null)
     || (isRealName(portalSession?.name) ? portalSession!.name : null)
     || userName || portalSession?.name;
   const realEmail = zohoEmail || portalSession?.email || appUser?.email || '';

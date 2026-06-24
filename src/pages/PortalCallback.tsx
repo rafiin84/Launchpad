@@ -5,20 +5,24 @@ import {
   consumePendingToken, saveToken, loadToken,
   saveUserName, clearRole,
 } from '../services/oauth';
-import { clearModuleStatusCache, loadCachedProfile } from '../services/crmAppUsers';
+import { clearModuleStatusCache } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
 import { fetchZohoAccountsUser, searchContactByEmail } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
-/** Clear session data before a new portal login.
- *  Preserve user-set profile data (name, bio, avatar, cover) so it
- *  persists across login sessions. */
+/** Clear ALL user-specific session data before a new portal login.
+ *  Must clear cached names/profiles to prevent a previous user's data
+ *  from leaking into the new session. Cover image is decorative and safe to keep. */
 function clearPreviousSession() {
   clearRole();
   clearModuleStatusCache();
   clearPortalSession();
-  // Do NOT clear: userName, cachedProfile, avatar, cover image
-  // — these are user-set and should persist across logins
+  // Clear user-specific data that could leak between accounts
+  try { localStorage.removeItem('lp_user_name'); } catch { /* ok */ }
+  try { localStorage.removeItem('lp_appuser_profile_cache'); } catch { /* ok */ }
+  try { localStorage.removeItem('lp_appuser_record_id'); } catch { /* ok */ }
+  try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
+  // Keep cover image — it's decorative, not user-identifying
 }
 
 export default function PortalCallback() {
@@ -78,13 +82,7 @@ export default function PortalCallback() {
       console.warn('[Portal Auth] Could not fetch accounts user:', err);
     }
 
-    // 2. Check locally cached profile (user-set name from Edit Profile)
-    const cachedProfile = loadCachedProfile();
-    if (cachedProfile?.name && isReal(cachedProfile.name)) {
-      displayName = cachedProfile.name;
-    }
-
-    // 3. Look up in portal user registry (set by admin during invitation)
+    // 2. Look up in portal user registry (set by admin during invitation)
     if (email) {
       const registryEntry = findPortalUser(email);
       if (registryEntry) {
