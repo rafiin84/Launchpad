@@ -165,7 +165,9 @@ export default function Callback() {
         return;
       }
 
-      saveUserName(displayName);
+      if (displayName && displayName !== 'User' && displayName !== 'Founder' && displayName !== 'Investor') {
+        saveUserName(displayName);
+      }
 
       // Look up in the portal users registry for contactId
       const portalEntry = findPortalUser(accountsUser.email);

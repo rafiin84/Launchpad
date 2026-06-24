@@ -1,7 +1,30 @@
+import { Component, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+          <h1 className="text-lg font-bold text-gray-900 mb-2">Something went wrong</h1>
+          <p className="text-sm text-gray-500 mb-4 text-center max-w-md">{this.state.error.message}</p>
+          <button
+            onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+            className="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800"
+          >
+            Clear session & sign in again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Redirects to /login if not authenticated
 function ProtectedLayout() {
@@ -51,6 +74,7 @@ import FounderDetail from './pages/FounderDetail';
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -97,5 +121,6 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

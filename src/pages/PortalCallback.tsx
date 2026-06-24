@@ -105,13 +105,14 @@ export default function PortalCallback() {
       if (registryEntry) contactId = registryEntry.contactId || '';
     }
 
-    // 4. Final fallback
-    if (!displayName) displayName = 'Founder';
-
-    saveUserName(displayName);
+    // 4. Only save a real name — never save the role-default "Founder"
+    //    so the cascading logic in AuthContext can try other sources
+    if (displayName && displayName !== 'Founder' && displayName !== 'Investor') {
+      saveUserName(displayName);
+    }
     savePortalSession({
       email,
-      name: displayName,
+      name: displayName || 'Founder',
       role: 'founder',
       contactId,
       zuid,

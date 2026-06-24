@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setZohoEmail(accountsUser.email);
             const name = accountsUser.display_name
               || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ');
-            if (name && name !== 'Founder') {
+            if (name && name !== 'Founder' && name !== 'Investor') {
               setUserName(name);
               saveUserName(name);
             }
@@ -140,6 +140,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch { /* ok — truly offline */ }
+
+        // If Accounts API also failed or returned no usable name,
+        // try to look up the user in the appusers CRM module via portal session email
+        const session = loadPortalSession();
+        if (session?.email && !appUser) {
+          try {
+            const found = await findAppUserByEmail(session.email);
+            if (found) {
+              setAppUser(found);
+              setAppUserRecordId(found.id);
+              if (found.name) {
+                setUserName(found.name);
+                saveUserName(found.name);
+              }
+              await fetchAvatarFromAppUsers(found.id);
+            }
+          } catch { /* ok */ }
+        }
         return;
       }
 
@@ -197,8 +215,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoggedIn, fetchAvatarFromAppUsers]);
 
   // Derive display name: appUser name > locally cached name > portal session name > Zoho name > role default
+  // Filter out role-default placeholder names so they don't block the cascade
+  const isRealName = (n: string | null | undefined): n is string =>
+    !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
   const cachedProfile = loadCachedProfile();
-  const displayName = appUser?.name || cachedProfile?.name || userName || portalSession?.name;
+  const displayName = (isRealName(appUser?.name) ? appUser!.name : null)
+    || (isRealName(cachedProfile?.name) ? cachedProfile!.name : null)
+    || (isRealName(userName) ? userName : null)
+    || (isRealName(portalSession?.name) ? portalSession!.name : null)
+    || userName || portalSession?.name;
   const realEmail = zohoEmail || portalSession?.email || undefined;
   const currentUser: User = {
     ...buildUser(role, displayName),

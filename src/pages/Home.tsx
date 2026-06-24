@@ -292,9 +292,6 @@ const STAGE_STYLES: Record<string, string> = {
 
 export default function Home() {
   const { currentUser, isFounder } = useAuth();
-
-  // Founders get their own dedicated dashboard
-  if (isFounder) return <FounderDashboard />;
   const isConnected = !!loadToken();
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
@@ -306,7 +303,7 @@ export default function Home() {
 
   const [orgName, setOrgName] = useState<string | null>(null);
   useEffect(() => {
-    if (!isConnected) {
+    if (isFounder || !isConnected) {
       setLoadingPortfolio(false);
       setLoadingApps(false);
       return;
@@ -320,13 +317,13 @@ export default function Home() {
       .catch(() => {})
       .finally(() => setLoadingApps(false));
     fetchZohoOrgName().then(setOrgName).catch(() => {});
-  }, []);
+  }, [isFounder, isConnected]);
 
   useEffect(() => {
-    if (loadingPortfolio || loadingApps) return;
+    if (isFounder || loadingPortfolio || loadingApps) return;
     const insights = generateInvestorInsights(portfolio, deals, applications);
     setAiInsights(insights);
-  }, [loadingPortfolio, loadingApps, portfolio, deals, applications]);
+  }, [isFounder, loadingPortfolio, loadingApps, portfolio, deals, applications]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -335,6 +332,8 @@ export default function Home() {
     return 'Good evening';
   })();
 
+  // Founders get their own dedicated dashboard
+  if (isFounder) return <FounderDashboard />;
 
   const recentPortfolio = portfolio.slice(0, 4);
 
