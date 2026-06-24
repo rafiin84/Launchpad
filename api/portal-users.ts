@@ -1,23 +1,87 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { crmRequest } from './_zohoAdmin';
 
 /**
- * /api/portal-users — Fetch all portal users with their real status.
+ * /api/portal-users — Fetch all portal users with their real status from Zoho CRM.
  *
  * Uses the admin token to query Zoho CRM portal settings and return
- * each portal user's email and status (active / disabled / yet_to_confirm).
+ * each portal user's email, name, and status (active / disabled / invited).
  *
  * GET /api/portal-users
  *   → { users: [{ email, name, status }] }
- *
- * This is the authoritative source for portal user statuses — client-side
- * token scopes often can't access the portal settings API.
  */
+
+const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
+const ZOHO_API_BASE = 'https://www.zohoapis.in';
+
+let cachedToken: string | null = null;
+let tokenExpiry = 0;
+
+async function getAdminToken(): Promise<string> {
+  if (cachedToken && Date.now() < tokenExpiry - 60_000) return cachedToken;
+
+  const clientId = process.env.ZOHO_CLIENT_ID;
+  const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+  const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Missing Zoho env vars (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN)');
+  }
+
+  const res = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+
+  const data = await res.json() as { access_token?: string; expires_in?: number; error?: string };
+  if (!data.access_token) throw new Error(`Token refresh failed: ${data.error || JSON.stringify(data)}`);
+
+  cachedToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedToken;
+}
+
+async function crmGet(path: string): Promise<unknown> {
+  const token = await getAdminToken();
+  const res = await fetch(`${ZOHO_API_BASE}${path}`, {
+    headers: {
+      'Authorization': `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (res.status === 204) return null;
+  return res.json().catch(() => ({}));
+}
 
 interface PortalUserResult {
   email: string;
   name: string;
-  status: 'active' | 'disabled' | 'invited'; // invited = yet to confirm
+  status: 'active' | 'disabled' | 'invited';
+}
+
+function deriveStatus(entry: Record<string, unknown>, userObj: Record<string, unknown>): 'active' | 'disabled' | 'invited' {
+  // Check string status fields (case-insensitive)
+  for (const obj of [entry, userObj]) {
+    const raw = String(obj.status ?? obj.Status ?? obj.portal_status ?? '').toLowerCase().trim();
+    if (raw === 'active') return 'active';
+    if (raw === 'disabled' || raw === 'deactivated' || raw === 'inactive') return 'disabled';
+    if (raw === 'yet_to_confirm' || raw === 'yet to confirm' || raw === 'invited' || raw === 'pending' || raw === 'reinvited') return 'invited';
+  }
+
+  // Check boolean fields
+  const isActive = entry.active ?? userObj.active;
+  const isConfirmed = entry.confirm ?? entry.confirmed ?? userObj.confirm ?? userObj.confirmed;
+
+  if (isActive === false) return 'disabled';
+  if (isActive === true && isConfirmed === false) return 'invited';
+  if (isActive === true) return 'active';
+
+  return 'invited';
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -30,8 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // 1. Get portals
-    const portalsResult = await crmRequest('GET', '/crm/v2/settings/portals');
-    const portalsData = portalsResult.data as { portals?: Array<{ name: string; active: boolean }> } | null;
+    const portalsData = await crmGet('/crm/v2/settings/portals') as { portals?: Array<{ name: string; active: boolean }> } | null;
     const portals = portalsData?.portals ?? [];
     const activePortal = portals.find(p => p.active) ?? portals[0];
 
@@ -42,60 +105,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[portal-users] Portal:', activePortal.name);
 
     // 2. Get user types
-    const utResult = await crmRequest(
-      'GET',
-      `/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type`,
-    );
-    const utData = utResult.data as { user_type?: Array<{ id: string; name: string }> } | null;
+    const utData = await crmGet(`/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type`) as { user_type?: Array<{ id: string; name: string }> } | null;
     const userTypes = utData?.user_type ?? [];
 
-    console.log('[portal-users] User types:', userTypes.map(u => ({ id: u.id, name: u.name })));
+    console.log('[portal-users] User types:', JSON.stringify(userTypes));
 
-    // 3. For each user type, fetch users
+    // 3. Fetch users for each user type
     const allUsers: PortalUserResult[] = [];
 
     for (const ut of userTypes) {
-      const usersResult = await crmRequest(
-        'GET',
-        `/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type/${ut.id}/users`,
-      );
+      const rawData = await crmGet(`/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type/${ut.id}/users`);
 
-      const rawData = usersResult.data as Record<string, unknown>;
-      console.log('[portal-users] Raw response for user_type', ut.id, ':', JSON.stringify(rawData).slice(0, 1000));
+      console.log('[portal-users] Raw response for', ut.id, ':', JSON.stringify(rawData).slice(0, 2000));
 
-      // Try multiple possible response keys
       const usersArray = (
-        rawData?.users ?? rawData?.portal_users ?? rawData?.data ?? []
+        (rawData as Record<string, unknown>)?.users ??
+        (rawData as Record<string, unknown>)?.portal_users ??
+        (rawData as Record<string, unknown>)?.data ??
+        []
       ) as Array<Record<string, unknown>>;
 
       for (const entry of usersArray) {
-        // User data may be nested or flat
         const userObj = (entry.user ?? entry) as Record<string, unknown>;
 
-        // Extract email — try multiple field names
-        const email = String(
-          userObj.email ?? userObj.Email ?? entry.email ?? entry.Email ?? ''
-        ).trim().toLowerCase();
-
+        const email = String(userObj.email ?? userObj.Email ?? entry.email ?? entry.Email ?? '').trim().toLowerCase();
         if (!email) continue;
 
-        // Extract name
-        const name = String(
-          userObj.name ?? userObj.Name ?? userObj.full_name ??
-          entry.name ?? entry.Name ?? email.split('@')[0]
-        );
-
-        // Derive status from all available fields
+        const name = String(userObj.name ?? userObj.Name ?? entry.name ?? entry.Name ?? email.split('@')[0]);
         const status = deriveStatus(entry, userObj);
 
-        console.log('[portal-users] User:', email, 'status:', status, 'raw:', {
-          'entry.status': entry.status,
-          'entry.active': entry.active,
-          'entry.confirm': entry.confirm,
-          'userObj.status': userObj.status,
-          'userObj.active': userObj.active,
-        });
-
+        console.log('[portal-users]', email, '→', status);
         allUsers.push({ email, name, status });
       }
     }
@@ -108,36 +147,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: err instanceof Error ? err.message : String(err),
     });
   }
-}
-
-/** Derive canonical status from raw Zoho response fields */
-function deriveStatus(
-  entry: Record<string, unknown>,
-  userObj: Record<string, unknown>,
-): 'active' | 'disabled' | 'invited' {
-  // Check all possible status string fields (case-insensitive)
-  for (const obj of [entry, userObj]) {
-    const raw = String(obj.status ?? obj.Status ?? obj.portal_status ?? '').toLowerCase().trim();
-
-    if (raw === 'active') return 'active';
-    if (raw === 'disabled' || raw === 'deactivated' || raw === 'inactive') return 'disabled';
-    if (
-      raw === 'yet_to_confirm' || raw === 'yet to confirm' ||
-      raw === 'invited' || raw === 'pending' ||
-      raw === 'reinvited' || raw === 're-invited' || raw === 'waiting'
-    ) return 'invited';
-  }
-
-  // Check boolean fields — Zoho may use active + confirm booleans
-  // instead of a status string
-  const isActive = entry.active ?? userObj.active;
-  const isConfirmed = entry.confirm ?? entry.confirmed ?? userObj.confirm ?? userObj.confirmed;
-
-  if (isActive === false) return 'disabled';
-  if (isActive === true && isConfirmed === false) return 'invited';
-  if (isActive === true && isConfirmed === true) return 'active';
-  if (isActive === true) return 'active'; // active but no confirm field
-
-  // Completely unknown — default to invited (safest)
-  return 'invited';
 }
