@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail } from '../services/zohoApi';
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
@@ -147,20 +147,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = loadPortalSession();
         const emailForLookup = resolvedEmail || session?.email || '';
 
-        // Call server-side portal-identity API to resolve real name from CRM Contact
-        // This is the most reliable source for portal users
+        // Resolve real name from CRM Contact — try multiple strategies
+        const isRealN = (n: string | undefined | null) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
+        let nameResolved = false;
+
         if (emailForLookup) {
+          // Strategy 1: Server-side portal-identity API (admin token)
           try {
             const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(emailForLookup)}`);
             if (res.ok) {
               const identity = await res.json() as { name?: string; email?: string; contactId?: string };
-              if (identity.name && identity.name !== 'Founder' && identity.name !== 'Investor' && identity.name !== 'User') {
-                setUserName(identity.name);
-                saveUserName(identity.name);
-                // Also update portal session with real name
+              if (isRealN(identity.name)) {
+                setUserName(identity.name!);
+                saveUserName(identity.name!);
+                nameResolved = true;
                 if (session) {
-                  savePortalSession({ ...session, name: identity.name, contactId: identity.contactId || session.contactId });
-                  setPortalSession({ ...session, name: identity.name, contactId: identity.contactId || session.contactId });
+                  savePortalSession({ ...session, name: identity.name!, contactId: identity.contactId || session.contactId });
+                  setPortalSession({ ...session, name: identity.name!, contactId: identity.contactId || session.contactId });
                 }
               }
               if (!resolvedEmail && identity.email) {
@@ -169,6 +172,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           } catch { /* ok */ }
+
+          // Strategy 2: Direct CRM Contact search via proxy (user's own token)
+          if (!nameResolved) {
+            try {
+              const contact = await searchContactByEmail(emailForLookup);
+              if (contact?.name && isRealN(contact.name)) {
+                setUserName(contact.name);
+                saveUserName(contact.name);
+                nameResolved = true;
+                if (session) {
+                  savePortalSession({ ...session, name: contact.name, contactId: contact.contactId || session.contactId });
+                  setPortalSession({ ...session, name: contact.name, contactId: contact.contactId || session.contactId });
+                }
+              }
+            } catch { /* ok */ }
+          }
         }
 
         // Try to look up the user in the appusers CRM module via portal session email

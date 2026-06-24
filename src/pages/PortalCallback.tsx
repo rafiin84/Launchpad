@@ -7,7 +7,7 @@ import {
 } from '../services/oauth';
 import { clearModuleStatusCache, loadCachedProfile } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
-import { fetchZohoAccountsUser } from '../services/zohoApi';
+import { fetchZohoAccountsUser, searchContactByEmail } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
 /** Clear session data before a new portal login.
@@ -104,13 +104,15 @@ export default function PortalCallback() {
       }
     }
 
-    // 4. Call the server-side portal-identity API to resolve the real name
-    //    from the CRM Contact record using the admin token.
-    //    This is the most reliable source — works even when portal tokens
-    //    can't access the CRM Users or Accounts API.
-    if (email) {
+    // 4. Resolve real name from CRM Contact record.
+    //    Try multiple strategies in order of reliability:
+    //    a) Server-side portal-identity API (admin token — most reliable)
+    //    b) Direct CRM Contact search via proxy (user's own token)
+    if (email && !isReal(displayName)) {
+      setStatusText('Resolving your profile...');
+
+      // 4a. Try server-side admin endpoint first
       try {
-        setStatusText('Resolving your profile...');
         const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
         if (res.ok) {
           const identity = await res.json() as { name?: string; email?: string; contactId?: string };
@@ -118,10 +120,24 @@ export default function PortalCallback() {
             displayName = identity.name;
           }
           if (identity.contactId) contactId = identity.contactId;
-          console.log('[Portal Auth] Resolved identity from CRM:', identity);
+          console.log('[Portal Auth] Resolved identity from server API:', identity);
         }
       } catch (err) {
         console.warn('[Portal Auth] portal-identity API failed:', err);
+      }
+
+      // 4b. Fallback: search CRM Contacts directly with user's own token
+      if (!isReal(displayName)) {
+        try {
+          const contact = await searchContactByEmail(email);
+          if (contact?.name && isReal(contact.name)) {
+            displayName = contact.name;
+            if (contact.contactId) contactId = contact.contactId;
+            console.log('[Portal Auth] Resolved name from CRM Contact search:', contact);
+          }
+        } catch (err) {
+          console.warn('[Portal Auth] CRM Contact search failed:', err);
+        }
       }
     }
 

@@ -5,7 +5,7 @@ import {
   consumePendingToken, saveToken, loadToken, consumePendingRole,
   saveUserName, clearToken, clearRole, clearUserName,
 } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail } from '../services/zohoApi';
 import { fullProfileSync, uploadAppUserPhoto, clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
 import { findPortalUser, savePortalSession, clearPortalSession } from '../services/portalUsers';
 import { useAuth } from '../context/AuthContext';
@@ -165,8 +165,35 @@ export default function Callback() {
         return;
       }
 
-      if (displayName && displayName !== 'User' && displayName !== 'Founder' && displayName !== 'Investor') {
-        saveUserName(displayName);
+      // Resolve real name: try CRM Contact search if Accounts API gave generic name
+      let resolvedName = displayName;
+      const isRealN = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
+
+      if (!isRealN(resolvedName)) {
+        // Try server-side portal-identity first
+        try {
+          const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(accountsUser.email)}`);
+          if (idRes.ok) {
+            const identity = await idRes.json() as { name?: string; contactId?: string };
+            if (identity.name && isRealN(identity.name)) {
+              resolvedName = identity.name;
+            }
+          }
+        } catch { /* ok */ }
+      }
+
+      if (!isRealN(resolvedName)) {
+        // Fallback: direct CRM Contact search with user's own token
+        try {
+          const contact = await searchContactByEmail(accountsUser.email);
+          if (contact?.name && isRealN(contact.name)) {
+            resolvedName = contact.name;
+          }
+        } catch { /* ok */ }
+      }
+
+      if (isRealN(resolvedName)) {
+        saveUserName(resolvedName);
       }
 
       // Look up in the portal users registry for contactId
@@ -174,7 +201,7 @@ export default function Callback() {
 
       savePortalSession({
         email: accountsUser.email,
-        name: displayName,
+        name: resolvedName,
         role: 'founder',
         contactId: portalEntry?.contactId ?? '',
         zuid: accountsUser.zuid,

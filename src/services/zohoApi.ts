@@ -413,6 +413,45 @@ export async function fetchUserPhoto(): Promise<string | null> {
   }
 }
 
+/**
+ * Search for a CRM Contact by email and return their name + id.
+ * Works with the portal user's own token via zoho-crm-proxy.
+ * This is a client-side fallback for when /api/portal-identity is unavailable.
+ */
+export async function searchContactByEmail(email: string): Promise<{ name: string; contactId: string } | null> {
+  const token = loadToken();
+  if (!token || !email) return null;
+
+  try {
+    let url: string;
+    if (isDev) {
+      url = `/zoho-crm-proxy/crm/v2/Contacts/search?email=${encodeURIComponent(email)}`;
+    } else {
+      const params = new URLSearchParams({
+        path: '/crm/v2/Contacts/search',
+        token,
+        email,
+      });
+      url = `/api/zoho-crm-proxy?${params.toString()}`;
+    }
+
+    const res = await fetch(url, { headers: getHeaders() });
+    if (!res.ok || res.status === 204) return null;
+
+    const json = await res.json() as { data?: Array<Record<string, unknown>> };
+    const contact = json.data?.[0];
+    if (!contact) return null;
+
+    const firstName = (contact.First_Name || '') as string;
+    const lastName = (contact.Last_Name || '') as string;
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+
+    return fullName ? { name: fullName, contactId: String(contact.id || '') } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchZohoOrgName(): Promise<string | null> {
   try {
     ensureToken();
