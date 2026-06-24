@@ -368,10 +368,6 @@ function ApplicationsGrid({ apps, onDelete, showAI }: { apps: CRMApplication[]; 
 
 export default function Applications() {
   const { isFounder } = useAuth();
-
-  // Founders go to their application tracker
-  if (isFounder) return <Navigate to="/applications/track" replace />;
-
   const [searchParams, setSearchParams] = useSearchParams();
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
@@ -395,7 +391,10 @@ export default function Applications() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (!isFounder) load(); }, [isFounder]);
+
+  // Founders go to their application tracker
+  if (isFounder) return <Navigate to="/applications/track" replace />;
 
   const handleDelete = async () => {
     if (!pendingDeleteId) return;
