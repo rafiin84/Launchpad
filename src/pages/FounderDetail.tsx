@@ -28,7 +28,7 @@ export default function FounderDetail() {
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [inviteRole] = useState<UserRole>('founder');
   const [portalStatus, setPortalStatus] = useState<PortalUserStatus | null>(null); // null = never invited
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDisableModal, setShowDisableModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -57,7 +57,7 @@ export default function FounderDetail() {
                 name: displayName,
                 contactId: id,
                 invitedAt: portalEntry?.invitedAt ?? new Date().toISOString(),
-                active: apiStatus !== 'deactivated',
+                active: apiStatus === 'active',
                 status: apiStatus,
               });
             }
@@ -142,18 +142,18 @@ export default function FounderDetail() {
     window.dispatchEvent(new Event('notifications-updated'));
   };
 
-  /** Deactivate the user (after confirmation) */
-  const handleDeactivate = () => {
+  /** Disable the user (after confirmation) */
+  const handleDisable = () => {
     if (!founder?.email) return;
-    setPortalUserStatus(founder.email, 'deactivated');
-    setPortalStatus('deactivated');
-    setShowDeactivateModal(false);
+    setPortalUserStatus(founder.email, 'disabled');
+    setPortalStatus('disabled');
+    setShowDisableModal(false);
 
     const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
     addNotification({
       type: 'user_deactivated',
-      title: 'User Deactivated',
-      message: `${founderName}'s portal access has been deactivated.`,
+      title: 'User Disabled',
+      message: `${founderName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
       link: `/founders/${id}`,
@@ -161,10 +161,10 @@ export default function FounderDetail() {
     window.dispatchEvent(new Event('notifications-updated'));
   };
 
-  /** Toggle handler — if currently active, show confirm dialog; if deactivated, activate directly */
+  /** Toggle handler — if currently active, show confirm dialog; if disabled, activate directly */
   const handleToggle = () => {
     if (portalStatus === 'active') {
-      setShowDeactivateModal(true);
+      setShowDisableModal(true);
     } else {
       handleActivate();
     }
@@ -230,29 +230,29 @@ export default function FounderDetail() {
         />
       )}
 
-      {/* Deactivate User Confirmation Modal */}
-      {showDeactivateModal && (
+      {/* Disable User Confirmation Modal */}
+      {showDisableModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDeactivateModal(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDisableModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
                 <AlertCircle size={20} className="text-red-500" />
               </div>
-              <h3 className="text-base font-bold text-gray-900">Deactivate User</h3>
+              <h3 className="text-base font-bold text-gray-900">Disable User</h3>
             </div>
             <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Are you sure you want to deactivate this user? They will no longer be able to access the portal.
+              Are you sure you want to disable this user? They will no longer be able to access the portal.
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
-                onClick={() => setShowDeactivateModal(false)}
+                onClick={() => setShowDisableModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
               >
                 No
               </button>
               <button
-                onClick={handleDeactivate}
+                onClick={handleDisable}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
               >
                 Yes
@@ -337,7 +337,7 @@ export default function FounderDetail() {
               </button>
             </div>
           ) : (
-            /* Active or Deactivated — show toggle */
+            /* Active or Disabled — show toggle */
             <button
               onClick={handleToggle}
               className={`inline-flex items-center gap-2.5 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
@@ -349,7 +349,7 @@ export default function FounderDetail() {
               <div className={`relative w-9 h-5 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
-              {portalStatus === 'active' ? 'Active' : 'Deactivated'}
+              {portalStatus === 'active' ? 'Active' : 'Disabled'}
             </button>
           )
         )}
@@ -493,8 +493,8 @@ export default function FounderDetail() {
                 }`}>
                   {portalStatus === 'active' && <CheckCircle size={12} />}
                   {portalStatus === 'invited' && <Clock size={12} />}
-                  {portalStatus === 'deactivated' && <XCircle size={12} />}
-                  {portalStatus === 'active' ? 'Active' : portalStatus === 'invited' ? 'Invited' : 'Deactivated'}
+                  {portalStatus === 'disabled' && <XCircle size={12} />}
+                  {portalStatus === 'active' ? 'Active' : portalStatus === 'invited' ? 'Pending Invitation' : 'Disabled'}
                 </span>
               )}
             </div>
@@ -511,7 +511,7 @@ export default function FounderDetail() {
                 }`}>
                   {portalStatus === 'active' && <CheckCircle size={15} className="flex-shrink-0 text-emerald-500" />}
                   {portalStatus === 'invited' && <Clock size={15} className="flex-shrink-0 text-amber-500" />}
-                  {portalStatus === 'deactivated' && <XCircle size={15} className="flex-shrink-0 text-red-400" />}
+                  {portalStatus === 'disabled' && <XCircle size={15} className="flex-shrink-0 text-red-400" />}
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium ${
                       portalStatus === 'active'
@@ -521,8 +521,8 @@ export default function FounderDetail() {
                         : 'text-red-700'
                     }`}>
                       {portalStatus === 'active' && 'Portal access active'}
-                      {portalStatus === 'invited' && 'Invitation sent — awaiting activation'}
-                      {portalStatus === 'deactivated' && 'Portal access deactivated'}
+                      {portalStatus === 'invited' && 'Invitation sent — pending acceptance'}
+                      {portalStatus === 'disabled' && 'Portal access disabled'}
                     </p>
                     <p className={`text-xs truncate ${
                       portalStatus === 'active'
@@ -534,7 +534,7 @@ export default function FounderDetail() {
                   </div>
                 </div>
 
-                {/* Active/Deactivate toggle */}
+                {/* Active/Disable toggle */}
                 {portalStatus !== 'invited' && (
                   <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                     <div>
@@ -546,7 +546,7 @@ export default function FounderDetail() {
                     <button
                       onClick={handleToggle}
                       className="relative"
-                      aria-label={portalStatus === 'active' ? 'Deactivate user' : 'Activate user'}
+                      aria-label={portalStatus === 'active' ? 'Disable user' : 'Activate user'}
                     >
                       <div className={`w-11 h-6 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                         <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[22px]' : 'left-0.5'}`} />

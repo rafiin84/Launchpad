@@ -22,7 +22,7 @@ import type { UserRole } from '../types';
 
 const REGISTRY_KEY = 'lp_portal_users';
 
-export type PortalUserStatus = 'invited' | 'active' | 'deactivated';
+export type PortalUserStatus = 'invited' | 'active' | 'disabled';
 
 export interface PortalUserEntry {
   email: string;
@@ -39,9 +39,13 @@ export interface PortalUserEntry {
  * handling legacy entries that only have the `active` boolean.
  */
 export function getPortalUserStatus(entry: PortalUserEntry): PortalUserStatus {
-  if (entry.status) return entry.status;
+  if (entry.status) {
+    // Migrate legacy 'deactivated' to 'disabled'
+    if ((entry.status as string) === 'deactivated') return 'disabled';
+    return entry.status;
+  }
   // Legacy fallback: entries created before `status` was added
-  return entry.active ? 'invited' : 'deactivated';
+  return entry.active ? 'invited' : 'disabled';
 }
 
 /**
@@ -51,9 +55,9 @@ export function getPortalUserStatus(entry: PortalUserEntry): PortalUserStatus {
 export function setPortalUserStatus(email: string, status: PortalUserStatus): PortalUserStatus {
   const registry = loadRegistry();
   const entry = registry.find(e => e.email.toLowerCase() === email.toLowerCase());
-  if (!entry) return 'deactivated';
+  if (!entry) return 'disabled';
   entry.status = status;
-  entry.active = status !== 'deactivated';
+  entry.active = status === 'active';
   saveRegistry(registry);
   return status;
 }

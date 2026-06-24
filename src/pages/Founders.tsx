@@ -225,9 +225,9 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   );
 }
 
-// ─── Deactivate Confirmation Modal ──────────────────────────────────────────
+// ─── Disable Confirmation Modal ─────────────────────────────────────────────
 
-function DeactivateModal({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+function DisableModal({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
@@ -236,10 +236,10 @@ function DeactivateModal({ name, onConfirm, onCancel }: { name: string; onConfir
           <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <AlertCircle size={20} className="text-red-500" />
           </div>
-          <h3 className="text-base font-bold text-gray-900">Deactivate User</h3>
+          <h3 className="text-base font-bold text-gray-900">Disable User</h3>
         </div>
         <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          Are you sure you want to deactivate this user? They will no longer be able to access the portal.
+          Are you sure you want to disable this user? They will no longer be able to access the portal.
         </p>
         <div className="flex items-center gap-3 justify-end">
           <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
@@ -256,6 +256,13 @@ function DeactivateModal({ name, onConfirm, onCancel }: { name: string; onConfir
 
 // ─── Portal Status Badge + Toggle ───────────────────────────────────────────
 
+/** Status display label matching Zoho CRM terminology */
+function statusLabel(s: PortalUserStatus): string {
+  if (s === 'active') return 'Active';
+  if (s === 'disabled') return 'Disabled';
+  return 'Pending Invitation';
+}
+
 function PortalStatusToggle({
   founder, status, onStatusChange,
 }: {
@@ -263,7 +270,7 @@ function PortalStatusToggle({
   status: PortalUserStatus | null;
   onStatusChange: (email: string, newStatus: PortalUserStatus) => void;
 }) {
-  const [showDeactivate, setShowDeactivate] = useState(false);
+  const [showDisable, setShowDisable] = useState(false);
 
   if (!status || !founder.email) return null;
 
@@ -273,9 +280,9 @@ function PortalStatusToggle({
     e.preventDefault();
     e.stopPropagation();
     if (status === 'active') {
-      setShowDeactivate(true);
-    } else {
-      // Activate
+      setShowDisable(true);
+    } else if (status === 'disabled') {
+      // Re-enable
       setPortalUserStatus(founder.email, 'active');
       onStatusChange(founder.email, 'active');
       addNotification({
@@ -290,14 +297,14 @@ function PortalStatusToggle({
     }
   };
 
-  const handleDeactivate = () => {
-    setPortalUserStatus(founder.email, 'deactivated');
-    onStatusChange(founder.email, 'deactivated');
-    setShowDeactivate(false);
+  const handleDisable = () => {
+    setPortalUserStatus(founder.email, 'disabled');
+    onStatusChange(founder.email, 'disabled');
+    setShowDisable(false);
     addNotification({
       type: 'user_deactivated',
-      title: 'User Deactivated',
-      message: `${displayName}'s portal access has been deactivated.`,
+      title: 'User Disabled',
+      message: `${displayName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
       link: `/founders/${founder.id}`,
@@ -307,11 +314,11 @@ function PortalStatusToggle({
 
   return (
     <>
-      {showDeactivate && (
-        <DeactivateModal
+      {showDisable && (
+        <DisableModal
           name={displayName}
-          onConfirm={handleDeactivate}
-          onCancel={() => setShowDeactivate(false)}
+          onConfirm={handleDisable}
+          onCancel={() => setShowDisable(false)}
         />
       )}
       <div
@@ -319,19 +326,20 @@ function PortalStatusToggle({
           'inline-flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all',
           status === 'active' && 'bg-emerald-50 text-emerald-700 border border-emerald-200',
           status === 'invited' && 'bg-amber-50 text-amber-700 border border-amber-200',
-          status === 'deactivated' && 'bg-red-50 text-red-600 border border-red-200',
+          status === 'disabled' && 'bg-red-50 text-red-600 border border-red-200',
         )}
         onClick={e => e.stopPropagation()}
       >
         {status === 'active' && <CheckCircle size={11} />}
         {status === 'invited' && <Clock size={11} />}
-        {status === 'deactivated' && <XCircle size={11} />}
-        <span>{status === 'active' ? 'Active' : status === 'invited' ? 'Invited' : 'Deactivated'}</span>
+        {status === 'disabled' && <XCircle size={11} />}
+        <span>{statusLabel(status)}</span>
+        {/* Toggle for Active / Disabled — not for Pending */}
         {status !== 'invited' && (
           <button
             onClick={handleToggle}
             className="relative ml-1"
-            aria-label={status === 'active' ? 'Deactivate user' : 'Activate user'}
+            aria-label={status === 'active' ? 'Disable user' : 'Activate user'}
           >
             <div className={`w-7 h-4 rounded-full transition-colors ${status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
               <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${status === 'active' ? 'left-[14px]' : 'left-0.5'}`} />
@@ -608,7 +616,7 @@ export default function Founders() {
               name: displayName,
               contactId: f.id,
               invitedAt: new Date().toISOString(),
-              active: apiStatus !== 'deactivated',
+              active: apiStatus === 'active',
               status: apiStatus,
             });
           }
