@@ -452,6 +452,52 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
   }
 }
 
+/**
+ * Fetch the current portal user's own Contact record from CRM.
+ * Portal tokens have ZohoCRM.modules.ALL scope and can only see their own records.
+ * Calling /crm/v2/Contacts with a portal token returns just the logged-in user's Contact.
+ * This works even when the Accounts API (/oauth/user/info) returns INVALID_OAUTHSCOPE.
+ */
+export async function fetchPortalUserContact(): Promise<{ name: string; email: string; contactId: string } | null> {
+  const token = loadToken();
+  if (!token) return null;
+
+  try {
+    let url: string;
+    if (isDev) {
+      url = `/zoho-crm-proxy/crm/v2/Contacts?fields=First_Name,Last_Name,Email&per_page=1`;
+    } else {
+      const params = new URLSearchParams({
+        path: '/crm/v2/Contacts',
+        token,
+        fields: 'First_Name,Last_Name,Email',
+        per_page: '1',
+      });
+      url = `/api/zoho-crm-proxy?${params.toString()}`;
+    }
+
+    const res = await fetch(url, { headers: getHeaders() });
+    if (!res.ok || res.status === 204) return null;
+
+    const json = await res.json() as { data?: Array<Record<string, unknown>> };
+    const contact = json.data?.[0];
+    if (!contact) return null;
+
+    const firstName = (contact.First_Name || '') as string;
+    const lastName = (contact.Last_Name || '') as string;
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+    const email = (contact.Email || '') as string;
+
+    return {
+      name: fullName || '',
+      email: email.toLowerCase(),
+      contactId: String(contact.id || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchZohoOrgName(): Promise<string | null> {
   try {
     ensureToken();

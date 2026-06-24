@@ -5,7 +5,7 @@ import {
   consumePendingToken, saveToken, loadToken, consumePendingRole,
   saveUserName, clearToken, clearRole, clearUserName,
 } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
 import { fullProfileSync, uploadAppUserPhoto, clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
 import { findPortalUser, savePortalSession, clearPortalSession } from '../services/portalUsers';
 import { useAuth } from '../context/AuthContext';
@@ -144,16 +144,41 @@ export default function Callback() {
 
     // ── Step 2: Not a CRM user — must be a portal user (founder only) ──
     setStatusText('Checking portal access...');
-    const accountsUser = await fetchZohoAccountsUser();
+    const isRealN = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
 
-    if (accountsUser?.email) {
-      const displayName = accountsUser.display_name
-        || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
-        || 'User';
+    let portalEmail = '';
+    let portalName = '';
+    let portalContactId = '';
+
+    // PRIMARY: Fetch own Contact record (works when Accounts API has INVALID_OAUTHSCOPE)
+    try {
+      const myContact = await fetchPortalUserContact();
+      if (myContact) {
+        portalEmail = myContact.email || '';
+        if (isRealN(myContact.name)) portalName = myContact.name;
+        portalContactId = myContact.contactId || '';
+        console.log('[Auth] Portal user Contact record:', myContact);
+      }
+    } catch { /* ok */ }
+
+    // FALLBACK: Zoho Accounts API
+    const accountsUser = await fetchZohoAccountsUser();
+    if (accountsUser?.email && !portalEmail) {
+      portalEmail = accountsUser.email;
+      if (!isRealN(portalName)) {
+        const accountsName = accountsUser.display_name
+          || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
+          || '';
+        if (isRealN(accountsName)) portalName = accountsName;
+      }
+    }
+
+    if (portalEmail || accountsUser?.email) {
+      const email = portalEmail || accountsUser!.email;
 
       // ── STRICT: Portal users can ONLY be founders ──
       if (pendingRole !== 'founder') {
-        console.warn(`[Auth] Portal user "${accountsUser.email}" tried to log in as investor — blocked`);
+        console.warn(`[Auth] Portal user "${email}" tried to log in as investor — blocked`);
         clearToken();
         setMismatchInfo({
           selected: 'Investor',
@@ -165,53 +190,45 @@ export default function Callback() {
         return;
       }
 
-      // Always resolve name from CRM Contact — the authoritative source.
-      let resolvedName = displayName;
-      const isRealN = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
-      let crmResolved = false;
-
-      // Try server-side portal-identity first (admin token)
-      try {
-        const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(accountsUser.email)}`);
-        if (idRes.ok) {
-          const identity = await idRes.json() as { name?: string; contactId?: string };
-          if (identity.name && isRealN(identity.name)) {
-            resolvedName = identity.name;
-            crmResolved = true;
-          }
-        }
-      } catch { /* ok */ }
-
-      // Fallback: direct CRM Contact search with user's own token
-      if (!crmResolved) {
+      // Additional name resolution if still not resolved
+      if (!isRealN(portalName)) {
         try {
-          const contact = await searchContactByEmail(accountsUser.email);
+          const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
+          if (idRes.ok) {
+            const identity = await idRes.json() as { name?: string; contactId?: string };
+            if (identity.name && isRealN(identity.name)) portalName = identity.name;
+            if (identity.contactId) portalContactId = identity.contactId;
+          }
+        } catch { /* ok */ }
+      }
+      if (!isRealN(portalName)) {
+        try {
+          const contact = await searchContactByEmail(email);
           if (contact?.name && isRealN(contact.name)) {
-            resolvedName = contact.name;
-            crmResolved = true;
+            portalName = contact.name;
+            if (contact.contactId) portalContactId = contact.contactId;
           }
         } catch { /* ok */ }
       }
 
-      if (isRealN(resolvedName)) {
-        saveUserName(resolvedName);
-      }
+      const resolvedName = isRealN(portalName) ? portalName : 'User';
+      if (isRealN(resolvedName)) saveUserName(resolvedName);
 
       // Look up in the portal users registry for contactId
-      const portalEntry = findPortalUser(accountsUser.email);
+      const portalEntry = findPortalUser(email);
 
       savePortalSession({
-        email: accountsUser.email,
+        email,
         name: resolvedName,
         role: 'founder',
-        contactId: portalEntry?.contactId ?? '',
-        zuid: accountsUser.zuid,
+        contactId: portalContactId || portalEntry?.contactId || '',
+        zuid: accountsUser?.zuid || '',
         isPortalUser: true,
       });
 
       login('founder');
       setStatus('success');
-      setStatusText(`Welcome, ${displayName}! Redirecting to your founder dashboard...`);
+      setStatusText(`Welcome, ${resolvedName}! Redirecting to your founder dashboard...`);
       setTimeout(() => navigate('/'), 1500);
       return;
     }

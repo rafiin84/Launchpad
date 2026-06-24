@@ -7,7 +7,7 @@ import {
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
-import { fetchZohoAccountsUser, searchContactByEmail } from '../services/zohoApi';
+import { fetchZohoAccountsUser, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
 /** Clear ALL user-specific session data before a new portal login.
@@ -67,32 +67,52 @@ export default function PortalCallback() {
     // Helper: is this a real name (not a placeholder)?
     const isReal = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
 
-    // 1. Try Zoho Accounts API for user identity (gets email + possibly name)
+    // ── STRATEGY 1 (BEST): Fetch portal user's own Contact record from CRM ──
+    // Portal tokens have ZohoCRM.modules.ALL scope and can only see their own
+    // Contact record. This works even when Accounts API returns INVALID_OAUTHSCOPE.
     try {
-      const accountsUser = await fetchZohoAccountsUser();
-      if (accountsUser?.email) {
-        email = accountsUser.email;
-        const accountsName = accountsUser.display_name
-          || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
-          || '';
-        if (isReal(accountsName)) displayName = accountsName;
-        zuid = accountsUser.zuid || '';
+      setStatusText('Fetching your contact record...');
+      const myContact = await fetchPortalUserContact();
+      if (myContact) {
+        if (myContact.email) email = myContact.email;
+        if (myContact.name && isReal(myContact.name)) displayName = myContact.name;
+        if (myContact.contactId) contactId = myContact.contactId;
+        console.log('[Portal Auth] Got own Contact record:', myContact);
       }
     } catch (err) {
-      console.warn('[Portal Auth] Could not fetch accounts user:', err);
+      console.warn('[Portal Auth] Could not fetch own Contact:', err);
     }
 
-    // 2. Look up in portal user registry (set by admin during invitation)
+    // ── STRATEGY 2: Zoho Accounts API (may fail with INVALID_OAUTHSCOPE) ──
+    if (!email) {
+      try {
+        const accountsUser = await fetchZohoAccountsUser();
+        if (accountsUser?.email) {
+          email = accountsUser.email;
+          if (!isReal(displayName)) {
+            const accountsName = accountsUser.display_name
+              || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ')
+              || '';
+            if (isReal(accountsName)) displayName = accountsName;
+          }
+          zuid = accountsUser.zuid || '';
+        }
+      } catch (err) {
+        console.warn('[Portal Auth] Accounts API failed (expected for portal users):', err);
+      }
+    }
+
+    // ── STRATEGY 3: Portal user registry (admin-set during invitation) ──
     if (email) {
       const registryEntry = findPortalUser(email);
       if (registryEntry) {
         if (!isReal(displayName) && isReal(registryEntry.name)) {
           displayName = registryEntry.name;
         }
-        contactId = registryEntry.contactId || '';
+        if (!contactId) contactId = registryEntry.contactId || '';
       }
     } else {
-      // No email from API — try to match the most recently invited active user
+      // No email at all — try most recently invited active user
       const allUsers = getAllPortalUsers();
       const active = allUsers.find(u => u.active);
       if (active) {
@@ -102,45 +122,31 @@ export default function PortalCallback() {
       }
     }
 
-    // 4. Always resolve the real name from CRM Contact record.
-    //    The CRM Contact name is the authoritative source — prefer it over
-    //    Zoho Accounts display_name or registry name.
-    //    Strategies in order of reliability:
-    //    a) Server-side portal-identity API (admin token — most reliable)
-    //    b) Direct CRM Contact search via proxy (user's own token)
-    if (email) {
+    // ── STRATEGY 4: Server-side admin lookup + CRM search by email ──
+    if (email && !isReal(displayName)) {
       setStatusText('Resolving your profile...');
-      let crmNameResolved = false;
 
-      // 4a. Try server-side admin endpoint first
+      // 4a. Server-side portal-identity API (admin token)
       try {
         const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
         if (res.ok) {
           const identity = await res.json() as { name?: string; email?: string; contactId?: string };
-          if (identity.name && isReal(identity.name)) {
-            displayName = identity.name;
-            crmNameResolved = true;
-          }
+          if (identity.name && isReal(identity.name)) displayName = identity.name;
           if (identity.contactId) contactId = identity.contactId;
-          console.log('[Portal Auth] Resolved identity from server API:', identity);
+          console.log('[Portal Auth] Resolved from server API:', identity);
         }
-      } catch (err) {
-        console.warn('[Portal Auth] portal-identity API failed:', err);
-      }
+      } catch { /* ok */ }
 
-      // 4b. Fallback: search CRM Contacts directly with user's own token
-      if (!crmNameResolved) {
+      // 4b. Fallback: CRM Contact search by email
+      if (!isReal(displayName)) {
         try {
           const contact = await searchContactByEmail(email);
           if (contact?.name && isReal(contact.name)) {
             displayName = contact.name;
-            crmNameResolved = true;
             if (contact.contactId) contactId = contact.contactId;
-            console.log('[Portal Auth] Resolved name from CRM Contact search:', contact);
+            console.log('[Portal Auth] Resolved from Contact search:', contact);
           }
-        } catch (err) {
-          console.warn('[Portal Auth] CRM Contact search failed:', err);
-        }
+        } catch { /* ok */ }
       }
     }
 

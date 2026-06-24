@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
@@ -120,79 +120,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchCurrentZohoUser().then(async (user) => {
       if (!user) {
-        // CRM Users API failed (e.g. portal user) — try Zoho Accounts API
-        let resolvedEmail = '';
-        try {
-          const accountsUser = await fetchZohoAccountsUser();
-          if (accountsUser?.email) {
-            resolvedEmail = accountsUser.email;
-            setZohoEmail(accountsUser.email);
-            const name = accountsUser.display_name
-              || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ');
-            if (name && name !== 'Founder' && name !== 'Investor') {
-              setUserName(name);
-              saveUserName(name);
-            }
-            setZohoProfile({
-              email: accountsUser.email,
-              phone: null, mobile: null, state: null, country: null, jobTitle: null,
-            });
-            // Try to get photo from accounts
-            if (accountsUser.picture) {
-              setAvatarUrl(accountsUser.picture);
-              try { localStorage.setItem(AVATAR_CACHE_KEY, accountsUser.picture); } catch { /* ok */ }
-            } else if (accountsUser.zuid) {
-              setAvatarUrl(`https://profile.zoho.in/file?ID=${accountsUser.zuid}&fs=medium`);
-            }
-          }
-        } catch { /* ok — truly offline */ }
-
-        // Use portal session email as fallback
-        const session = loadPortalSession();
-        const emailForLookup = resolvedEmail || session?.email || '';
-
-        // Always resolve name from CRM Contact — the authoritative source.
-        // CRM Contact name takes priority over Zoho Accounts display_name.
+        // CRM Users API failed — this is a portal user.
         const isRealN = (n: string | undefined | null) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
-        let crmNameResolved = false;
+        let resolvedEmail = '';
+        let resolvedName = '';
+        let resolvedContactId = '';
 
-        const updateNameAndSession = (name: string, cId?: string) => {
+        const session = loadPortalSession();
+
+        const updateNameAndSession = (name: string, cId?: string, em?: string) => {
+          resolvedName = name;
           setUserName(name);
           saveUserName(name);
+          if (em) {
+            resolvedEmail = em;
+            setZohoEmail(em);
+          }
           if (session) {
-            const updated = { ...session, name, contactId: cId || session.contactId };
+            const updated = { ...session, name, email: em || session.email, contactId: cId || session.contactId };
             savePortalSession(updated);
             setPortalSession(updated);
           }
         };
 
-        if (emailForLookup) {
-          // Strategy 1: Server-side portal-identity API (admin token)
+        // ── PRIMARY: Fetch portal user's own Contact record from CRM ──
+        // Portal tokens have ZohoCRM.modules.ALL and can only see their own Contact.
+        // This works even when Accounts API returns INVALID_OAUTHSCOPE.
+        try {
+          const myContact = await fetchPortalUserContact();
+          if (myContact) {
+            if (myContact.email) {
+              resolvedEmail = myContact.email;
+              setZohoEmail(myContact.email);
+              setZohoProfile({ email: myContact.email, phone: null, mobile: null, state: null, country: null, jobTitle: null });
+            }
+            if (isRealN(myContact.name)) {
+              updateNameAndSession(myContact.name, myContact.contactId, myContact.email);
+              resolvedContactId = myContact.contactId;
+            }
+          }
+        } catch { /* ok */ }
+
+        // ── FALLBACK: Zoho Accounts API (may fail with INVALID_OAUTHSCOPE) ──
+        if (!resolvedEmail) {
+          try {
+            const accountsUser = await fetchZohoAccountsUser();
+            if (accountsUser?.email) {
+              resolvedEmail = accountsUser.email;
+              setZohoEmail(accountsUser.email);
+              if (!isRealN(resolvedName)) {
+                const name = accountsUser.display_name
+                  || [accountsUser.first_name, accountsUser.last_name].filter(Boolean).join(' ');
+                if (isRealN(name)) updateNameAndSession(name, undefined, accountsUser.email);
+              }
+              setZohoProfile({ email: accountsUser.email, phone: null, mobile: null, state: null, country: null, jobTitle: null });
+              if (accountsUser.picture) {
+                setAvatarUrl(accountsUser.picture);
+                try { localStorage.setItem(AVATAR_CACHE_KEY, accountsUser.picture); } catch { /* ok */ }
+              } else if (accountsUser.zuid) {
+                setAvatarUrl(`https://profile.zoho.in/file?ID=${accountsUser.zuid}&fs=medium`);
+              }
+            }
+          } catch { /* ok */ }
+        }
+
+        // Use portal session email as last resort
+        const emailForLookup = resolvedEmail || session?.email || '';
+
+        // ── FALLBACK 2: Server-side + search if still no name ──
+        if (emailForLookup && !isRealN(resolvedName)) {
           try {
             const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(emailForLookup)}`);
             if (res.ok) {
               const identity = await res.json() as { name?: string; email?: string; contactId?: string };
-              if (isRealN(identity.name)) {
-                updateNameAndSession(identity.name!, identity.contactId);
-                crmNameResolved = true;
-              }
-              if (!resolvedEmail && identity.email) {
-                setZohoEmail(identity.email);
-                resolvedEmail = identity.email;
-              }
+              if (isRealN(identity.name)) updateNameAndSession(identity.name!, identity.contactId, identity.email);
             }
           } catch { /* ok */ }
+        }
 
-          // Strategy 2: Direct CRM Contact search via proxy (user's own token)
-          if (!crmNameResolved) {
-            try {
-              const contact = await searchContactByEmail(emailForLookup);
-              if (contact?.name && isRealN(contact.name)) {
-                updateNameAndSession(contact.name, contact.contactId);
-                crmNameResolved = true;
-              }
-            } catch { /* ok */ }
-          }
+        if (emailForLookup && !isRealN(resolvedName)) {
+          try {
+            const contact = await searchContactByEmail(emailForLookup);
+            if (contact?.name && isRealN(contact.name)) {
+              updateNameAndSession(contact.name, contact.contactId);
+            }
+          } catch { /* ok */ }
         }
 
         // Try to look up the user in the appusers CRM module via portal session email
