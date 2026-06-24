@@ -2,17 +2,20 @@ import { useState, useEffect } from 'react';
 import {
   Users, Plus, AlertCircle, RefreshCw, Mail, Phone, Building2,
   Briefcase, Trash2, X, Search, UserPlus, MapPin, ChevronDown,
-  LayoutGrid, List,
+  LayoutGrid, List, CheckCircle, Clock, XCircle,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../components/ui/Avatar';
 import {
   fetchCRMFounders, createCRMFounder, deleteCRMFounder,
+  fetchAllPortalUserStatuses,
   LEAD_SOURCE_OPTIONS, SALUTATION_OPTIONS,
-  type CRMFounder, type CRMFounderFields,
+  type CRMFounder, type CRMFounderFields, type PortalUserAPIStatus,
 } from '../services/crmFounders';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { findPortalUser, getPortalUserStatus, registerPortalUser, setPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
+import { addNotification } from '../services/notifications';
 
 // ─── Form Field Component ────────────────────────────────────────────────────
 
@@ -222,9 +225,127 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   );
 }
 
+// ─── Deactivate Confirmation Modal ──────────────────────────────────────────
+
+function DeactivateModal({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle size={20} className="text-red-500" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900">Deactivate User</h3>
+        </div>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+          Are you sure you want to deactivate this user? They will no longer be able to access the portal.
+        </p>
+        <div className="flex items-center gap-3 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
+            No
+          </button>
+          <button onClick={onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors">
+            Yes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Portal Status Badge + Toggle ───────────────────────────────────────────
+
+function PortalStatusToggle({
+  founder, status, onStatusChange,
+}: {
+  founder: CRMFounder;
+  status: PortalUserStatus | null;
+  onStatusChange: (email: string, newStatus: PortalUserStatus) => void;
+}) {
+  const [showDeactivate, setShowDeactivate] = useState(false);
+
+  if (!status || !founder.email) return null;
+
+  const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (status === 'active') {
+      setShowDeactivate(true);
+    } else {
+      // Activate
+      setPortalUserStatus(founder.email, 'active');
+      onStatusChange(founder.email, 'active');
+      addNotification({
+        type: 'user_activated',
+        title: 'User Activated',
+        message: `${displayName}'s portal access has been activated.`,
+        actor: 'Admin',
+        actorRole: 'investor',
+        link: `/founders/${founder.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+    }
+  };
+
+  const handleDeactivate = () => {
+    setPortalUserStatus(founder.email, 'deactivated');
+    onStatusChange(founder.email, 'deactivated');
+    setShowDeactivate(false);
+    addNotification({
+      type: 'user_deactivated',
+      title: 'User Deactivated',
+      message: `${displayName}'s portal access has been deactivated.`,
+      actor: 'Admin',
+      actorRole: 'investor',
+      link: `/founders/${founder.id}`,
+    });
+    window.dispatchEvent(new Event('notifications-updated'));
+  };
+
+  return (
+    <>
+      {showDeactivate && (
+        <DeactivateModal
+          name={displayName}
+          onConfirm={handleDeactivate}
+          onCancel={() => setShowDeactivate(false)}
+        />
+      )}
+      <div
+        className={cn(
+          'inline-flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all',
+          status === 'active' && 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+          status === 'invited' && 'bg-amber-50 text-amber-700 border border-amber-200',
+          status === 'deactivated' && 'bg-red-50 text-red-600 border border-red-200',
+        )}
+        onClick={e => e.stopPropagation()}
+      >
+        {status === 'active' && <CheckCircle size={11} />}
+        {status === 'invited' && <Clock size={11} />}
+        {status === 'deactivated' && <XCircle size={11} />}
+        <span>{status === 'active' ? 'Active' : status === 'invited' ? 'Invited' : 'Deactivated'}</span>
+        {status !== 'invited' && (
+          <button
+            onClick={handleToggle}
+            className="relative ml-1"
+            aria-label={status === 'active' ? 'Deactivate user' : 'Activate user'}
+          >
+            <div className={`w-7 h-4 rounded-full transition-colors ${status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${status === 'active' ? 'left-[14px]' : 'left-0.5'}`} />
+            </div>
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ─── Founder Card ────────────────────────────────────────────────────────────
 
-function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id: string) => void }) {
+function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { founder: CRMFounder; onDelete: (id: string) => void; portalStatus: PortalUserStatus | null; onStatusChange: (email: string, status: PortalUserStatus) => void }) {
   const [deleting, setDeleting] = useState(false);
   const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
   const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
@@ -298,8 +419,8 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
               )}
             </div>
 
-            {/* Tags row */}
-            <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {/* Tags row + portal status */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
               {founder.leadSource && founder.leadSource !== '-None-' && (
                 <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
                   {founder.leadSource}
@@ -307,6 +428,13 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
               )}
             </div>
           </Link>
+
+          {/* Portal status toggle */}
+          {portalStatus && (
+            <div className="mt-3 pt-3 border-t border-gray-50">
+              <PortalStatusToggle founder={founder} status={portalStatus} onStatusChange={onStatusChange} />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -315,7 +443,7 @@ function FounderCard({ founder, onDelete }: { founder: CRMFounder; onDelete: (id
 
 // ─── Founder List Row ────────────────────────────────────────────────────────
 
-function FounderRow({ founder, onDelete }: { founder: CRMFounder; onDelete: (id: string) => void }) {
+function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { founder: CRMFounder; onDelete: (id: string) => void; portalStatus: PortalUserStatus | null; onStatusChange: (email: string, status: PortalUserStatus) => void }) {
   const [deleting, setDeleting] = useState(false);
   const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
   const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
@@ -405,6 +533,15 @@ function FounderRow({ founder, onDelete }: { founder: CRMFounder; onDelete: (id:
         )}
       </div>
 
+      {/* Portal status */}
+      <div className="w-36 flex-shrink-0 hidden sm:block">
+        {portalStatus ? (
+          <PortalStatusToggle founder={founder} status={portalStatus} onStatusChange={onStatusChange} />
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </div>
+
       {/* Delete */}
       <button
         onClick={handleDelete}
@@ -427,6 +564,7 @@ export default function Founders() {
   const [error, setError]         = useState('');
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch]       = useState('');
+  const [portalStatuses, setPortalStatuses] = useState<Record<string, PortalUserStatus>>({});
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
     setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
@@ -439,11 +577,59 @@ export default function Founders() {
     return () => window.removeEventListener('open-add-founder', handler);
   }, []);
 
+  /** Load portal statuses — first from local registry, then from Zoho API */
+  function loadPortalStatuses(founderList: CRMFounder[]) {
+    // 1. Instant: load from local registry
+    const localStatuses: Record<string, PortalUserStatus> = {};
+    for (const f of founderList) {
+      if (!f.email) continue;
+      const entry = findPortalUser(f.email);
+      if (entry) {
+        localStatuses[f.email.toLowerCase()] = getPortalUserStatus(entry);
+      }
+    }
+    setPortalStatuses(localStatuses);
+
+    // 2. Async: check Zoho CRM portal API (authoritative)
+    fetchAllPortalUserStatuses()
+      .then(apiMap => {
+        if (apiMap.size === 0) return;
+        const merged = { ...localStatuses };
+        for (const f of founderList) {
+          if (!f.email) continue;
+          const apiStatus = apiMap.get(f.email.toLowerCase());
+          if (apiStatus) {
+            merged[f.email.toLowerCase()] = apiStatus;
+            // Sync back to local registry
+            const displayName = [f.firstName, f.lastName].filter(Boolean).join(' ') || 'User';
+            registerPortalUser({
+              email: f.email,
+              role: 'founder',
+              name: displayName,
+              contactId: f.id,
+              invitedAt: new Date().toISOString(),
+              active: apiStatus !== 'deactivated',
+              status: apiStatus,
+            });
+          }
+        }
+        setPortalStatuses(merged);
+      })
+      .catch(() => { /* stick with local */ });
+  }
+
+  const handleStatusChange = (email: string, newStatus: PortalUserStatus) => {
+    setPortalStatuses(prev => ({ ...prev, [email.toLowerCase()]: newStatus }));
+  };
+
   function load() {
     if (!isConnected) { setLoading(false); return; }
     setLoading(true); setError('');
     fetchCRMFounders()
-      .then(setFounders)
+      .then(list => {
+        setFounders(list);
+        loadPortalStatuses(list);
+      })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
   }
@@ -596,6 +782,7 @@ export default function Founders() {
               <div className="w-36 flex-shrink-0 hidden lg:block">Phone</div>
               <div className="w-40 flex-shrink-0 hidden xl:block">Location</div>
               <div className="w-28 flex-shrink-0 hidden xl:block">Source</div>
+              <div className="w-36 flex-shrink-0 hidden sm:block">Status</div>
               <div className="w-8" /> {/* delete spacer */}
             </div>
             {filtered.map(f => (
@@ -603,6 +790,8 @@ export default function Founders() {
                 key={f.id}
                 founder={f}
                 onDelete={(id) => setFounders(prev => prev.filter(p => p.id !== id))}
+                portalStatus={f.email ? portalStatuses[f.email.toLowerCase()] ?? null : null}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </div>
@@ -613,6 +802,8 @@ export default function Founders() {
                 key={f.id}
                 founder={f}
                 onDelete={(id) => setFounders(prev => prev.filter(p => p.id !== id))}
+                portalStatus={f.email ? portalStatuses[f.email.toLowerCase()] ?? null : null}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </div>

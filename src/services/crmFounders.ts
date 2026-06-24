@@ -203,14 +203,31 @@ export async function checkPortalStatus(contactEmail: string): Promise<PortalUse
   if (!token || !contactEmail) return null;
 
   try {
+    const allStatuses = await fetchAllPortalUserStatuses();
+    return allStatuses.get(contactEmail.toLowerCase()) ?? null;
+  } catch (err) {
+    console.warn('[Portal] Failed to check portal status:', err);
+  }
+
+  return null;
+}
+
+/**
+ * Fetch all portal users across all user types and return a map of email → status.
+ * This is much more efficient than checking one user at a time.
+ */
+export async function fetchAllPortalUserStatuses(): Promise<Map<string, PortalUserAPIStatus>> {
+  const result = new Map<string, PortalUserAPIStatus>();
+  const token = loadToken();
+  if (!token) return result;
+
+  try {
     const portals = await fetchPortals();
     const activePortal = portals.find(p => p.active) ?? portals[0];
-    if (!activePortal) return null;
+    if (!activePortal) return result;
 
     const userTypes = await fetchPortalUserTypes(activePortal.name);
-    const emailLower = contactEmail.toLowerCase();
 
-    // Check each user type for the user
     for (const ut of userTypes) {
       const url = crmUrl(`/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type/${ut.id}/users`);
       const res = await fetch(url, { headers: crmHeaders() });
@@ -222,23 +239,25 @@ export async function checkPortalStatus(contactEmail: string): Promise<PortalUse
       for (const u of users) {
         const userObj = u.user ?? u;
         const email = ((userObj as Record<string, unknown>).email as string) ?? '';
-        if (email.toLowerCase() === emailLower) {
-          const status = ((userObj as Record<string, unknown>).status as string) ?? '';
-          const isActive = (userObj as Record<string, unknown>).active;
+        if (!email) continue;
 
-          if (status.toLowerCase() === 'active' || isActive === true) return 'active';
-          if (status.toLowerCase() === 'invited' || status.toLowerCase() === 'pending') return 'invited';
-          if (status.toLowerCase() === 'deactivated' || status.toLowerCase() === 'inactive' || isActive === false) return 'deactivated';
-          // Default: if found but status unclear, treat as invited
-          return 'invited';
-        }
+        const status = ((userObj as Record<string, unknown>).status as string) ?? '';
+        const isActive = (userObj as Record<string, unknown>).active;
+
+        let derived: PortalUserAPIStatus;
+        if (status.toLowerCase() === 'active' || isActive === true) derived = 'active';
+        else if (status.toLowerCase() === 'invited' || status.toLowerCase() === 'pending') derived = 'invited';
+        else if (status.toLowerCase() === 'deactivated' || status.toLowerCase() === 'inactive' || isActive === false) derived = 'deactivated';
+        else derived = 'invited';
+
+        result.set(email.toLowerCase(), derived);
       }
     }
   } catch (err) {
-    console.warn('[Portal] Failed to check portal status:', err);
+    console.warn('[Portal] Failed to fetch portal user statuses:', err);
   }
 
-  return null;
+  return result;
 }
 
 export async function sendPortalInvitation(contactId: string): Promise<PortalInviteResult> {
