@@ -192,6 +192,55 @@ export interface PortalInviteResult {
   wasReinvite: boolean;
 }
 
+/**
+ * Check portal user status for a Contact by querying the Zoho CRM portal users API.
+ * Returns the user's portal status: 'active', 'invited', 'deactivated', or null if not found.
+ */
+export type PortalUserAPIStatus = 'active' | 'invited' | 'deactivated';
+
+export async function checkPortalStatus(contactEmail: string): Promise<PortalUserAPIStatus | null> {
+  const token = loadToken();
+  if (!token || !contactEmail) return null;
+
+  try {
+    const portals = await fetchPortals();
+    const activePortal = portals.find(p => p.active) ?? portals[0];
+    if (!activePortal) return null;
+
+    const userTypes = await fetchPortalUserTypes(activePortal.name);
+    const emailLower = contactEmail.toLowerCase();
+
+    // Check each user type for the user
+    for (const ut of userTypes) {
+      const url = crmUrl(`/crm/v2/settings/portals/${encodeURIComponent(activePortal.name)}/user_type/${ut.id}/users`);
+      const res = await fetch(url, { headers: crmHeaders() });
+      if (!res.ok) continue;
+
+      const json = await res.json().catch(() => ({})) as { users?: Array<{ user?: { email?: string; status?: string; active?: boolean } }> };
+      const users = json.users ?? [];
+
+      for (const u of users) {
+        const userObj = u.user ?? u;
+        const email = ((userObj as Record<string, unknown>).email as string) ?? '';
+        if (email.toLowerCase() === emailLower) {
+          const status = ((userObj as Record<string, unknown>).status as string) ?? '';
+          const isActive = (userObj as Record<string, unknown>).active;
+
+          if (status.toLowerCase() === 'active' || isActive === true) return 'active';
+          if (status.toLowerCase() === 'invited' || status.toLowerCase() === 'pending') return 'invited';
+          if (status.toLowerCase() === 'deactivated' || status.toLowerCase() === 'inactive' || isActive === false) return 'deactivated';
+          // Default: if found but status unclear, treat as invited
+          return 'invited';
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Portal] Failed to check portal status:', err);
+  }
+
+  return null;
+}
+
 export async function sendPortalInvitation(contactId: string): Promise<PortalInviteResult> {
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');

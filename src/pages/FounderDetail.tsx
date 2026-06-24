@@ -6,7 +6,7 @@ import {
   AlertCircle, ExternalLink, Globe, Clock, XCircle, RefreshCw,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
-import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
+import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, checkPortalStatus, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
@@ -34,11 +34,36 @@ export default function FounderDetail() {
     if (!id) return;
     setLoading(true);
     getCRMFounder(id)
-      .then(f => {
+      .then(async (f) => {
         setFounder(f);
+
+        // 1. Check local registry first (instant)
         const portalEntry = f.email ? findPortalUser(f.email) : null;
         if (portalEntry) {
           setPortalStatus(getPortalUserStatus(portalEntry));
+        }
+
+        // 2. Then check the actual Zoho CRM portal API (authoritative)
+        if (f.email) {
+          try {
+            const apiStatus = await checkPortalStatus(f.email);
+            if (apiStatus) {
+              setPortalStatus(apiStatus);
+              // Sync local registry with the authoritative API status
+              const displayName = [f.firstName, f.lastName].filter(Boolean).join(' ') || 'User';
+              registerPortalUser({
+                email: f.email,
+                role: 'founder',
+                name: displayName,
+                contactId: id,
+                invitedAt: portalEntry?.invitedAt ?? new Date().toISOString(),
+                active: apiStatus !== 'deactivated',
+                status: apiStatus,
+              });
+            }
+          } catch {
+            // API check failed — stick with local registry status
+          }
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
