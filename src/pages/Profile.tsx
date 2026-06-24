@@ -213,10 +213,12 @@ export default function Profile() {
 
               {/* Details */}
               <div className="mt-5 space-y-2.5">
+                {displayEmail && (
                 <div className="flex items-center gap-2.5 text-sm text-gray-600">
                   <Mail size={14} className="text-gray-400 flex-shrink-0" />
                   {displayEmail}
                 </div>
+                )}
                 {phone && (
                   <div className="flex items-center gap-2.5 text-sm text-gray-600">
                     <Phone size={14} className="text-gray-400 flex-shrink-0" />

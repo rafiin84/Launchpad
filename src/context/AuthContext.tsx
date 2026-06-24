@@ -48,12 +48,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const AVATAR_CACHE_KEY = 'lp_avatar_data';
 const COVER_CACHE_KEY  = 'lp_cover_image';
 
-function buildUser(role: UserRole, name?: string | null): User {
+function buildUser(role: UserRole, name?: string | null, email?: string | null): User {
   const displayName = name || (role === 'investor' ? 'Investor' : 'Founder');
   return {
     id: role === 'investor' ? 'investor-1' : 'founder-1',
     name: displayName,
-    email: `${role}@launchpad.app`,
+    email: email || '',
     avatar: '',
     role,
     bio: '',
@@ -88,7 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [coverImage, setCoverImageState] = useState<string>(() => {
     try { return localStorage.getItem(COVER_CACHE_KEY) || ''; } catch { return ''; }
   });
-  const [zohoEmail, setZohoEmail] = useState<string | null>(null);
+  // Initialize zohoEmail from portal session immediately so it's available on first render
+  const [zohoEmail, setZohoEmail] = useState<string | null>(() => {
+    const session = loadPortalSession();
+    return session?.email || null;
+  });
   const [zohoProfile, setZohoProfile] = useState<ZohoProfile>({
     email: null, phone: null, mobile: null, state: null, country: null, jobTitle: null,
   });
@@ -147,9 +151,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = loadPortalSession();
         const emailForLookup = resolvedEmail || session?.email || '';
 
-        // Resolve real name from CRM Contact — try multiple strategies
+        // Always resolve name from CRM Contact — the authoritative source.
+        // CRM Contact name takes priority over Zoho Accounts display_name.
         const isRealN = (n: string | undefined | null) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
-        let nameResolved = false;
+        let crmNameResolved = false;
+
+        const updateNameAndSession = (name: string, cId?: string) => {
+          setUserName(name);
+          saveUserName(name);
+          if (session) {
+            const updated = { ...session, name, contactId: cId || session.contactId };
+            savePortalSession(updated);
+            setPortalSession(updated);
+          }
+        };
 
         if (emailForLookup) {
           // Strategy 1: Server-side portal-identity API (admin token)
@@ -158,13 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (res.ok) {
               const identity = await res.json() as { name?: string; email?: string; contactId?: string };
               if (isRealN(identity.name)) {
-                setUserName(identity.name!);
-                saveUserName(identity.name!);
-                nameResolved = true;
-                if (session) {
-                  savePortalSession({ ...session, name: identity.name!, contactId: identity.contactId || session.contactId });
-                  setPortalSession({ ...session, name: identity.name!, contactId: identity.contactId || session.contactId });
-                }
+                updateNameAndSession(identity.name!, identity.contactId);
+                crmNameResolved = true;
               }
               if (!resolvedEmail && identity.email) {
                 setZohoEmail(identity.email);
@@ -174,17 +184,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch { /* ok */ }
 
           // Strategy 2: Direct CRM Contact search via proxy (user's own token)
-          if (!nameResolved) {
+          if (!crmNameResolved) {
             try {
               const contact = await searchContactByEmail(emailForLookup);
               if (contact?.name && isRealN(contact.name)) {
-                setUserName(contact.name);
-                saveUserName(contact.name);
-                nameResolved = true;
-                if (session) {
-                  savePortalSession({ ...session, name: contact.name, contactId: contact.contactId || session.contactId });
-                  setPortalSession({ ...session, name: contact.name, contactId: contact.contactId || session.contactId });
-                }
+                updateNameAndSession(contact.name, contact.contactId);
+                crmNameResolved = true;
               }
             } catch { /* ok */ }
           }
@@ -271,11 +276,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     || (isRealName(userName) ? userName : null)
     || (isRealName(portalSession?.name) ? portalSession!.name : null)
     || userName || portalSession?.name;
-  const realEmail = zohoEmail || portalSession?.email || undefined;
+  const realEmail = zohoEmail || portalSession?.email || appUser?.email || '';
   const currentUser: User = {
-    ...buildUser(role, displayName),
+    ...buildUser(role, displayName, realEmail),
     avatar: avatarUrl,
-    ...(realEmail ? { email: realEmail } : {}),
   };
 
   function login(selectedRole: UserRole) {

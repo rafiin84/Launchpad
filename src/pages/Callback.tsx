@@ -165,29 +165,30 @@ export default function Callback() {
         return;
       }
 
-      // Resolve real name: try CRM Contact search if Accounts API gave generic name
+      // Always resolve name from CRM Contact — the authoritative source.
       let resolvedName = displayName;
       const isRealN = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
+      let crmResolved = false;
 
-      if (!isRealN(resolvedName)) {
-        // Try server-side portal-identity first
-        try {
-          const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(accountsUser.email)}`);
-          if (idRes.ok) {
-            const identity = await idRes.json() as { name?: string; contactId?: string };
-            if (identity.name && isRealN(identity.name)) {
-              resolvedName = identity.name;
-            }
+      // Try server-side portal-identity first (admin token)
+      try {
+        const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(accountsUser.email)}`);
+        if (idRes.ok) {
+          const identity = await idRes.json() as { name?: string; contactId?: string };
+          if (identity.name && isRealN(identity.name)) {
+            resolvedName = identity.name;
+            crmResolved = true;
           }
-        } catch { /* ok */ }
-      }
+        }
+      } catch { /* ok */ }
 
-      if (!isRealN(resolvedName)) {
-        // Fallback: direct CRM Contact search with user's own token
+      // Fallback: direct CRM Contact search with user's own token
+      if (!crmResolved) {
         try {
           const contact = await searchContactByEmail(accountsUser.email);
           if (contact?.name && isRealN(contact.name)) {
             resolvedName = contact.name;
+            crmResolved = true;
           }
         } catch { /* ok */ }
       }

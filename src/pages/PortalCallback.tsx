@@ -104,12 +104,15 @@ export default function PortalCallback() {
       }
     }
 
-    // 4. Resolve real name from CRM Contact record.
-    //    Try multiple strategies in order of reliability:
+    // 4. Always resolve the real name from CRM Contact record.
+    //    The CRM Contact name is the authoritative source — prefer it over
+    //    Zoho Accounts display_name or registry name.
+    //    Strategies in order of reliability:
     //    a) Server-side portal-identity API (admin token — most reliable)
     //    b) Direct CRM Contact search via proxy (user's own token)
-    if (email && !isReal(displayName)) {
+    if (email) {
       setStatusText('Resolving your profile...');
+      let crmNameResolved = false;
 
       // 4a. Try server-side admin endpoint first
       try {
@@ -118,6 +121,7 @@ export default function PortalCallback() {
           const identity = await res.json() as { name?: string; email?: string; contactId?: string };
           if (identity.name && isReal(identity.name)) {
             displayName = identity.name;
+            crmNameResolved = true;
           }
           if (identity.contactId) contactId = identity.contactId;
           console.log('[Portal Auth] Resolved identity from server API:', identity);
@@ -127,11 +131,12 @@ export default function PortalCallback() {
       }
 
       // 4b. Fallback: search CRM Contacts directly with user's own token
-      if (!isReal(displayName)) {
+      if (!crmNameResolved) {
         try {
           const contact = await searchContactByEmail(email);
           if (contact?.name && isReal(contact.name)) {
             displayName = contact.name;
+            crmNameResolved = true;
             if (contact.contactId) contactId = contact.contactId;
             console.log('[Portal Auth] Resolved name from CRM Contact search:', contact);
           }
