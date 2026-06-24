@@ -151,8 +151,7 @@ function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
                 cornerRadius={3}
                 dataKey="value"
                 strokeWidth={0}
-                animationBegin={0}
-                animationDuration={800}
+                isAnimationActive={false}
               >
                 {displayData.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
@@ -259,8 +258,7 @@ function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
                 dataKey="amount"
                 barSize={6}
                 radius={[0, 4, 4, 0]}
-                animationBegin={0}
-                animationDuration={800}
+                isAnimationActive={false}
                 label={{ position: 'right', formatter: (v: unknown) => fmt(Number(v) || 0), fontSize: 10, fontWeight: 600, fill: '#6b7280' }}
               >
                 {chartData.map((entry, i) => (
@@ -295,7 +293,6 @@ export default function Home() {
   const isConnected = !!loadToken();
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
-  const deals: never[] = [];
   const [applications, setApplications] = useState<CRMApplication[]>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
@@ -321,9 +318,9 @@ export default function Home() {
 
   useEffect(() => {
     if (isFounder || loadingPortfolio || loadingApps) return;
-    const insights = generateInvestorInsights(portfolio, deals, applications);
+    const insights = generateInvestorInsights(portfolio, [], applications);
     setAiInsights(insights);
-  }, [isFounder, loadingPortfolio, loadingApps, portfolio, deals, applications]);
+  }, [isFounder, loadingPortfolio, loadingApps, portfolio, applications]);
 
   const greeting = (() => {
     const h = new Date().getHours();
