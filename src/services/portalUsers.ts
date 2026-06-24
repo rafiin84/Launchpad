@@ -22,6 +22,8 @@ import type { UserRole } from '../types';
 
 const REGISTRY_KEY = 'lp_portal_users';
 
+export type PortalUserStatus = 'invited' | 'active' | 'deactivated';
+
 export interface PortalUserEntry {
   email: string;
   role: UserRole;
@@ -29,6 +31,31 @@ export interface PortalUserEntry {
   contactId: string;        // Zoho CRM Contact ID
   invitedAt: string;        // ISO timestamp
   active: boolean;          // Whether portal access is active
+  status?: PortalUserStatus; // Explicit status (replaces `active` flag)
+}
+
+/**
+ * Derive the canonical status from a PortalUserEntry,
+ * handling legacy entries that only have the `active` boolean.
+ */
+export function getPortalUserStatus(entry: PortalUserEntry): PortalUserStatus {
+  if (entry.status) return entry.status;
+  // Legacy fallback: entries created before `status` was added
+  return entry.active ? 'invited' : 'deactivated';
+}
+
+/**
+ * Set an explicit status on a portal user entry.
+ * Also keeps the legacy `active` boolean in sync.
+ */
+export function setPortalUserStatus(email: string, status: PortalUserStatus): PortalUserStatus {
+  const registry = loadRegistry();
+  const entry = registry.find(e => e.email.toLowerCase() === email.toLowerCase());
+  if (!entry) return 'deactivated';
+  entry.status = status;
+  entry.active = status !== 'deactivated';
+  saveRegistry(registry);
+  return status;
 }
 
 function loadRegistry(): PortalUserEntry[] {

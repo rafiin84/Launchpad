@@ -3,12 +3,12 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Building2, MapPin, Briefcase,
   Trash2, User, Calendar, FileText, Send, CheckCircle,
-  AlertCircle, ExternalLink, Globe,
+  AlertCircle, ExternalLink, Globe, Clock, XCircle, RefreshCw,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
-import { registerPortalUser, findPortalUser, togglePortalUserActive } from '../services/portalUsers';
+import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
 import type { UserRole } from '../types';
 
@@ -26,10 +26,9 @@ export default function FounderDetail() {
   // Portal invite state
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [inviteRole, setInviteRole] = useState<UserRole>('founder');
-  const [wasReinvite, setWasReinvite] = useState(false);
-  const [alreadyInvited, setAlreadyInvited] = useState(false);
-  const [portalActive, setPortalActive] = useState(true);
+  const [inviteRole] = useState<UserRole>('founder');
+  const [portalStatus, setPortalStatus] = useState<PortalUserStatus | null>(null); // null = never invited
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -39,8 +38,7 @@ export default function FounderDetail() {
         setFounder(f);
         const portalEntry = f.email ? findPortalUser(f.email) : null;
         if (portalEntry) {
-          setAlreadyInvited(true);
-          setPortalActive(portalEntry.active !== false);
+          setPortalStatus(getPortalUserStatus(portalEntry));
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
@@ -59,16 +57,16 @@ export default function FounderDetail() {
     }
   };
 
+  /** Send (or re-send) portal invitation */
   const handleSendInvite = async () => {
     if (!id || inviting || !founder?.email) return;
     setInviting(true);
     setInviteResult(null);
     try {
       const result = await sendPortalInvitation(id);
-      setWasReinvite(result.wasReinvite);
-
-      // Register this user in the portal users registry with their assigned role
       const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+      const isResend = portalStatus !== null;
+
       registerPortalUser({
         email: founder.email,
         role: inviteRole,
@@ -76,19 +74,19 @@ export default function FounderDetail() {
         contactId: id,
         invitedAt: new Date().toISOString(),
         active: true,
+        status: 'invited',
       });
+      setPortalStatus('invited');
 
-      const statusMsg = result.wasReinvite
-        ? `Re-invitation sent — User was already invited, a new invite has been sent.`
+      const statusMsg = isResend || result.wasReinvite
+        ? 'Re-invitation sent — a new invite has been sent to the user.'
         : `${result.message} — User registered as ${inviteRole}.`;
       setInviteResult({ type: 'success', message: statusMsg });
-      setAlreadyInvited(true);
 
-      // Notify about the invitation
       addNotification({
         type: 'invitation_sent',
-        title: 'Portal Invitation Sent',
-        message: `${displayName} (${founder.email}) was invited to the portal as ${inviteRole}.`,
+        title: isResend ? 'Portal Invitation Re-sent' : 'Portal Invitation Sent',
+        message: `${displayName} (${founder.email}) was ${isResend ? 're-' : ''}invited to the portal as ${inviteRole}.`,
         actor: 'Admin',
         actorRole: 'investor',
         link: `/founders/${id}`,
@@ -98,6 +96,52 @@ export default function FounderDetail() {
       setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
     } finally {
       setInviting(false);
+    }
+  };
+
+  /** Mark the user as active (e.g. after they accepted the invitation, or admin re-activates) */
+  const handleActivate = () => {
+    if (!founder?.email) return;
+    setPortalUserStatus(founder.email, 'active');
+    setPortalStatus('active');
+
+    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+    addNotification({
+      type: 'user_activated',
+      title: 'User Activated',
+      message: `${founderName}'s portal access has been activated.`,
+      actor: 'Admin',
+      actorRole: 'investor',
+      link: `/founders/${id}`,
+    });
+    window.dispatchEvent(new Event('notifications-updated'));
+  };
+
+  /** Deactivate the user (after confirmation) */
+  const handleDeactivate = () => {
+    if (!founder?.email) return;
+    setPortalUserStatus(founder.email, 'deactivated');
+    setPortalStatus('deactivated');
+    setShowDeactivateModal(false);
+
+    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+    addNotification({
+      type: 'user_deactivated',
+      title: 'User Deactivated',
+      message: `${founderName}'s portal access has been deactivated.`,
+      actor: 'Admin',
+      actorRole: 'investor',
+      link: `/founders/${id}`,
+    });
+    window.dispatchEvent(new Event('notifications-updated'));
+  };
+
+  /** Toggle handler — if currently active, show confirm dialog; if deactivated, activate directly */
+  const handleToggle = () => {
+    if (portalStatus === 'active') {
+      setShowDeactivateModal(true);
+    } else {
+      handleActivate();
     }
   };
 
@@ -161,6 +205,38 @@ export default function FounderDetail() {
         />
       )}
 
+      {/* Deactivate User Confirmation Modal */}
+      {showDeactivateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDeactivateModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertCircle size={20} className="text-red-500" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900">Deactivate User</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              Are you sure you want to deactivate this user? They will no longer be able to access the portal.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowDeactivateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                No
+              </button>
+              <button
+                onClick={handleDeactivate}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back link */}
       <div className="pt-6 pb-4">
         <Link to="/founders" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
@@ -209,36 +285,8 @@ export default function FounderDetail() {
 
         {/* Portal status / invite button */}
         {founder.email && (
-          alreadyInvited ? (
-            <button
-              onClick={() => {
-                if (!founder.email) return;
-                const newActive = togglePortalUserActive(founder.email);
-                setPortalActive(newActive);
-
-                const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
-                addNotification({
-                  type: newActive ? 'user_activated' : 'user_deactivated',
-                  title: newActive ? 'User Activated' : 'User Deactivated',
-                  message: `${founderName}'s portal access has been ${newActive ? 'activated' : 'deactivated'}.`,
-                  actor: 'Admin',
-                  actorRole: 'investor',
-                  link: `/founders/${id}`,
-                });
-                window.dispatchEvent(new Event('notifications-updated'));
-              }}
-              className={`inline-flex items-center gap-2.5 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
-                portalActive
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-              }`}
-            >
-              <div className={`relative w-9 h-5 rounded-full transition-colors ${portalActive ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${portalActive ? 'left-[18px]' : 'left-0.5'}`} />
-              </div>
-              {portalActive ? 'Active' : 'Inactive'}
-            </button>
-          ) : (
+          portalStatus === null ? (
+            /* Never invited — show Send Portal Invitation */
             <button
               onClick={handleSendInvite}
               disabled={inviting}
@@ -249,6 +297,34 @@ export default function FounderDetail() {
               ) : (
                 <><Send size={14} /> Send Portal Invitation</>
               )}
+            </button>
+          ) : portalStatus === 'invited' ? (
+            /* Invited but not yet activated — show status badge + mark active button */
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                <Clock size={12} /> Invited
+              </span>
+              <button
+                onClick={handleActivate}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                <CheckCircle size={13} /> Mark Active
+              </button>
+            </div>
+          ) : (
+            /* Active or Deactivated — show toggle */
+            <button
+              onClick={handleToggle}
+              className={`inline-flex items-center gap-2.5 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all ${
+                portalStatus === 'active'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+              }`}
+            >
+              <div className={`relative w-9 h-5 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[18px]' : 'left-0.5'}`} />
+              </div>
+              {portalStatus === 'active' ? 'Active' : 'Deactivated'}
             </button>
           )
         )}
@@ -378,42 +454,100 @@ export default function FounderDetail() {
             </div>
           </Link>
 
-          {/* Portal Invitation Card */}
+          {/* Portal Access Card */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-900">Portal Access</h3>
-              {(alreadyInvited || inviteResult?.type === 'success') && (
+              {portalStatus && (
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                  portalActive
+                  portalStatus === 'active'
                     ? 'text-emerald-700 bg-emerald-50'
+                    : portalStatus === 'invited'
+                    ? 'text-amber-700 bg-amber-50'
                     : 'text-red-600 bg-red-50'
                 }`}>
-                  <CheckCircle size={12} />
-                  {portalActive ? 'Active' : 'Inactive'}
+                  {portalStatus === 'active' && <CheckCircle size={12} />}
+                  {portalStatus === 'invited' && <Clock size={12} />}
+                  {portalStatus === 'deactivated' && <XCircle size={12} />}
+                  {portalStatus === 'active' ? 'Active' : portalStatus === 'invited' ? 'Invited' : 'Deactivated'}
                 </span>
               )}
             </div>
 
-            {(alreadyInvited || inviteResult?.type === 'success') ? (
+            {portalStatus !== null ? (
               <div className="space-y-3">
+                {/* Status banner */}
                 <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${
-                  portalActive ? 'bg-emerald-50' : 'bg-red-50'
+                  portalStatus === 'active'
+                    ? 'bg-emerald-50'
+                    : portalStatus === 'invited'
+                    ? 'bg-amber-50'
+                    : 'bg-red-50'
                 }`}>
-                  <CheckCircle size={15} className={`flex-shrink-0 ${portalActive ? 'text-emerald-500' : 'text-red-400'}`} />
+                  {portalStatus === 'active' && <CheckCircle size={15} className="flex-shrink-0 text-emerald-500" />}
+                  {portalStatus === 'invited' && <Clock size={15} className="flex-shrink-0 text-amber-500" />}
+                  {portalStatus === 'deactivated' && <XCircle size={15} className="flex-shrink-0 text-red-400" />}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${portalActive ? 'text-emerald-800' : 'text-red-700'}`}>
-                      {portalActive ? 'Portal access active' : 'Portal access deactivated'}
+                    <p className={`text-sm font-medium ${
+                      portalStatus === 'active'
+                        ? 'text-emerald-800'
+                        : portalStatus === 'invited'
+                        ? 'text-amber-800'
+                        : 'text-red-700'
+                    }`}>
+                      {portalStatus === 'active' && 'Portal access active'}
+                      {portalStatus === 'invited' && 'Invitation sent — awaiting activation'}
+                      {portalStatus === 'deactivated' && 'Portal access deactivated'}
                     </p>
-                    <p className={`text-xs truncate ${portalActive ? 'text-emerald-600' : 'text-red-500'}`}>{founder.email}</p>
+                    <p className={`text-xs truncate ${
+                      portalStatus === 'active'
+                        ? 'text-emerald-600'
+                        : portalStatus === 'invited'
+                        ? 'text-amber-600'
+                        : 'text-red-500'
+                    }`}>{founder.email}</p>
                   </div>
                 </div>
+
+                {/* Active/Deactivate toggle */}
+                {portalStatus !== 'invited' && (
+                  <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Portal Access</p>
+                      <p className="text-xs text-gray-500">
+                        {portalStatus === 'active' ? 'User can access the portal' : 'User cannot access the portal'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleToggle}
+                      className="relative"
+                      aria-label={portalStatus === 'active' ? 'Deactivate user' : 'Activate user'}
+                    >
+                      <div className={`w-11 h-6 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[22px]' : 'left-0.5'}`} />
+                      </div>
+                    </button>
+                  </div>
+                )}
+
+                {/* Mark as Active (for invited users) */}
+                {portalStatus === 'invited' && (
+                  <button
+                    onClick={handleActivate}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                  >
+                    <CheckCircle size={13} /> Mark as Active
+                  </button>
+                )}
+
+                {/* Re-send Invitation */}
                 <button
                   onClick={handleSendInvite}
                   disabled={inviting}
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors px-1 py-1"
                 >
-                  <Send size={11} />
-                  {inviting ? 'Resending...' : 'Resend invitation'}
+                  <RefreshCw size={11} className={inviting ? 'animate-spin' : ''} />
+                  {inviting ? 'Re-sending...' : 'Re-send Invitation'}
                 </button>
               </div>
             ) : founder.email ? (
@@ -421,7 +555,6 @@ export default function FounderDetail() {
                 <p className="text-xs text-gray-500 leading-relaxed">
                   Send a portal invitation so this founder can log in to Launchpad.
                 </p>
-                {/* Email + send button */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
                   <Mail size={15} className="text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
