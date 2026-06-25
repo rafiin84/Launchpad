@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
-  saveUserName, clearRole, saveRole,
+  saveUserName, clearRole, saveRole, saveApiDomain,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
@@ -37,6 +37,11 @@ export default function PortalCallback() {
       clearPreviousSession();
       saveToken(pending.token, pending.expiresAt);
       saveRole('founder');
+      if (pending.apiDomain) {
+        saveApiDomain(pending.apiDomain);
+        console.log('[Portal Auth] Saved api_domain:', pending.apiDomain);
+      }
+      console.log('[Portal Auth] Token info - api_domain:', pending.apiDomain, 'location:', pending.location);
       handlePortalLogin(pending.token);
       return;
     }

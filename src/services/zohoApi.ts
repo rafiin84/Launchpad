@@ -3,8 +3,9 @@
 // In local dev, requests go through Vite proxy to bypass CORS.
 // In production (Vercel), requests go through serverless API proxy.
 //
-// Portal users (founders) use the CRM v6 Portal API (/crm/v6/__portal/...)
-// because portal OAuth tokens are rejected by the standard v2 REST API.
+// Portal OAuth tokens (from zcrmportals.in) cannot be used with the standard
+// CRM REST API (zohoapis.in). Portal user CRM requests are routed through a
+// server-side proxy (/api/portal-crm-proxy) that uses the admin refresh token.
 
 import { loadToken, OAuthConfig, loadRole } from './oauth';
 import { loadPortalSession } from './portalUsers';
@@ -19,30 +20,22 @@ function isPortalUser(): boolean {
 
 // ─── Proxy helpers ───────────────────────────────────────────────────────────
 
-/**
- * Rewrite a v2 module API path for portal users.
- * /crm/v2/Contacts  →  /crm/v6/__portal/Contacts
- * /crm/v2/My_Activities  →  /crm/v6/__portal/My_Activities
- * Non-module paths (settings, users, org) are NOT rewritten.
- */
-function portalApiPath(v2Path: string): string {
-  const match = v2Path.match(/^\/crm\/v2\/([A-Za-z_]+)(\/.*)?(\?.*)?$/);
-  if (!match) return v2Path;
-  const moduleName = match[1];
-  // Admin-only endpoints — can't be accessed via portal API
-  if (['users', 'settings', 'org'].includes(moduleName.toLowerCase())) return v2Path;
-  const rest = match[2] || '';
-  const qs = match[3] || '';
-  return `/crm/v6/__portal/${moduleName}${rest}${qs}`;
-}
-
 function buildCrmUrl(apiPath: string): string {
-  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
+  if (isPortalUser()) {
+    // Portal OAuth tokens (zcrmportals.in) can't call the CRM REST API directly.
+    // Route through server-side proxy that uses the admin refresh token.
+    if (isDev) {
+      // In dev, Vercel serverless functions aren't available.
+      // Fall through to Vite proxy — will fail, but caller catches errors gracefully.
+      return `/zoho-crm-proxy${apiPath}`;
+    }
+    return `/api/portal-crm-proxy?path=${encodeURIComponent(apiPath)}`;
+  }
   if (isDev) {
-    return `/zoho-crm-proxy${finalPath}`;
+    return `/zoho-crm-proxy${apiPath}`;
   }
   const token = loadToken();
-  return `/api/zoho-crm-proxy?path=${encodeURIComponent(finalPath)}&token=${encodeURIComponent(token || '')}`;
+  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
 }
 
 function buildAccountsUrl(apiPath: string): string {
@@ -275,13 +268,16 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
 export async function zohoUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
   const token = ensureToken();
 
-  const apiPath = `/crm/v2/${module}/${recordId}/photo`;
-  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
-  const base = isDev ? `/zoho-crm-proxy` : 'https://www.zohoapis.in';
+  // Portal users: photo upload not supported (would need server-side multipart proxy)
+  if (isPortalUser()) {
+    throw new ZohoApiError(403, 'Photo upload not available for portal users', 'PORTAL_UNSUPPORTED');
+  }
+
+  const base = isDev ? '/zoho-crm-proxy' : 'https://www.zohoapis.in';
   const formData = new FormData();
   formData.append('file', file, fileName);
 
-  const res = await fetch(`${base}${finalPath}`, {
+  const res = await fetch(`${base}/crm/v2/${module}/${recordId}/photo`, {
     method: 'POST',
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     body: formData,
@@ -297,11 +293,12 @@ export async function zohoGetRecordPhoto(module: string, recordId: string): Prom
   const token = loadToken();
   if (!token) return null;
 
-  const apiPath = `/crm/v2/${module}/${recordId}/photo`;
-  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
+  // Portal users: skip direct photo fetch (would need server-side proxy)
+  if (isPortalUser()) return null;
+
   const base = isDev ? '/zoho-crm-proxy' : 'https://www.zohoapis.in';
   try {
-    const res = await fetch(`${base}${finalPath}`, {
+    const res = await fetch(`${base}/crm/v2/${module}/${recordId}/photo`, {
       headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     });
 
@@ -436,15 +433,31 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
 }
 
 /**
- * Fetch the current portal user's own Contact record from CRM.
- * Portal tokens have ZohoCRM.modules.ALL scope and can only see their own records.
- * Calling /crm/v2/Contacts with a portal token returns just the logged-in user's Contact.
- * This works even when the Accounts API (/oauth/user/info) returns INVALID_OAUTHSCOPE.
+ * Fetch the current portal user's Contact record from CRM.
+ *
+ * Since portal tokens can't call the CRM API directly, this uses the
+ * server-side admin proxy. It looks up the Contact by email from the
+ * portal session (or falls back to /crm/v2/Contacts?per_page=1 for
+ * non-portal callers).
  */
 export async function fetchPortalUserContact(): Promise<{ name: string; email: string; contactId: string } | null> {
   const token = loadToken();
   if (!token) return null;
 
+  // For portal users, look up contact by email from portal session
+  if (isPortalUser()) {
+    const session = loadPortalSession();
+    const email = session?.email;
+    if (email) {
+      return searchContactByEmail(email).then(result => {
+        if (result) return { ...result, email };
+        return null;
+      }).catch(() => null);
+    }
+    return null;
+  }
+
+  // For non-portal users, fetch directly
   try {
     const url = buildCrmUrl('/crm/v2/Contacts?fields=First_Name,Last_Name,Email&per_page=1');
     const res = await fetch(url, { headers: getHeaders() });

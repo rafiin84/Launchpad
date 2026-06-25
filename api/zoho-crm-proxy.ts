@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  const { path, token, ...restParams } = req.query;
+  const { path, token, api_domain, ...restParams } = req.query;
 
   if (!token || typeof token !== 'string') {
     return res.status(400).json({ error: 'token query param is required' });
@@ -34,7 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Build the Zoho API URL: base + path + any extra query params
   // The path may already contain query params (e.g. portal_invite?user_type_id=...)
-  let url = `https://www.zohoapis.in${path}`;
+  // Portal tokens may need a different API domain (returned by OAuth callback)
+  const baseDomain = (typeof api_domain === 'string' && api_domain) ? api_domain.replace(/\/$/, '') : 'https://www.zohoapis.in';
+  let url = `${baseDomain}${path}`;
 
   // Forward remaining query params
   const extraParams = new URLSearchParams();
@@ -66,6 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    console.log(`[CRM Proxy] ${req.method} ${url} (base: ${baseDomain})`);
     const response = await fetch(url, fetchOptions);
 
     // Handle 204 No Content
@@ -74,6 +77,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.log(`[CRM Proxy] Error ${response.status}:`, JSON.stringify(data));
+    }
     return res.status(response.status).json(data);
   } catch (err) {
     return res.status(500).json({ error: 'Proxy request failed', details: String(err) });

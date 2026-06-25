@@ -5,9 +5,12 @@
 export interface PendingToken {
   token: string;
   expiresAt: number;
+  apiDomain?: string;
+  location?: string;
 }
 
 const DEFAULT_TTL_SECONDS = 3600;
+const API_DOMAIN_KEY = 'zoho_api_domain';
 
 let pendingToken: PendingToken | null = null;
 
@@ -83,6 +86,11 @@ if (typeof window !== "undefined") {
 
       const token = params.get("access_token");
 
+      // Log ALL hash parameters for debugging OAuth callback
+      const allParams: Record<string, string> = {};
+      params.forEach((v, k) => { if (k !== 'access_token') allParams[k] = v; });
+      console.log('[OAuth] Hash callback params:', JSON.stringify(allParams));
+
       if (token) {
         const expiresIn = parseInt(params.get("expires_in") ?? "", 10);
 
@@ -91,9 +99,16 @@ if (typeof window !== "undefined") {
             ? expiresIn
             : DEFAULT_TTL_SECONDS;
 
+        const apiDomain = params.get("api_domain") || undefined;
+        const location = params.get("location") || undefined;
+
+        console.log('[OAuth] Captured token. api_domain:', apiDomain, 'location:', location);
+
         pendingToken = {
           token,
           expiresAt: Date.now() + ttl * 1000,
+          apiDomain,
+          location,
         };
 
         // Remove OAuth parameters from the URL
@@ -229,6 +244,17 @@ export function clearToken(): void {
 
   localStorage.removeItem(OAuthConfig.storage.tokenKey);
   localStorage.removeItem(OAuthConfig.storage.expiryKey);
+  localStorage.removeItem(API_DOMAIN_KEY);
+}
+
+export function saveApiDomain(domain: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(API_DOMAIN_KEY, domain);
+}
+
+export function loadApiDomain(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(API_DOMAIN_KEY);
 }
 
 // -----------------------------------------------------------------------------
