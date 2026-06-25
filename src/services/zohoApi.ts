@@ -1,29 +1,48 @@
-// Base Zoho CRM v2 API client (browser implicit-flow).
+// Base Zoho CRM API client (browser implicit-flow).
 // Authorization uses the "Zoho-oauthtoken" header format required by Zoho.
 // In local dev, requests go through Vite proxy to bypass CORS.
 // In production (Vercel), requests go through serverless API proxy.
+//
+// Portal users (founders) use the CRM v6 Portal API (/crm/v6/__portal/...)
+// because portal OAuth tokens are rejected by the standard v2 REST API.
 
-import { loadToken, OAuthConfig } from './oauth';
+import { loadToken, OAuthConfig, loadRole } from './oauth';
+import { loadPortalSession } from './portalUsers';
 
 const isDev = import.meta.env.DEV;
+
+function isPortalUser(): boolean {
+  if (loadRole() === 'founder') return true;
+  const session = loadPortalSession();
+  return session?.isPortalUser === true;
+}
 
 // ─── Proxy helpers ───────────────────────────────────────────────────────────
 
 /**
- * In dev: Vite proxy rewrites the path and forwards auth headers.
- * In prod: Vercel serverless proxy at /api/zoho-crm-proxy forwards to zohoapis.in.
- *
- * For prod, we pass token as a query param so the serverless function
- * can set the Authorization header server-side (avoiding CORS preflight).
+ * Rewrite a v2 module API path for portal users.
+ * /crm/v2/Contacts  →  /crm/v6/__portal/Contacts
+ * /crm/v2/My_Activities  →  /crm/v6/__portal/My_Activities
+ * Non-module paths (settings, users, org) are NOT rewritten.
  */
+function portalApiPath(v2Path: string): string {
+  const match = v2Path.match(/^\/crm\/v2\/([A-Za-z_]+)(\/.*)?(\?.*)?$/);
+  if (!match) return v2Path;
+  const moduleName = match[1];
+  // Admin-only endpoints — can't be accessed via portal API
+  if (['users', 'settings', 'org'].includes(moduleName.toLowerCase())) return v2Path;
+  const rest = match[2] || '';
+  const qs = match[3] || '';
+  return `/crm/v6/__portal/${moduleName}${rest}${qs}`;
+}
 
 function buildCrmUrl(apiPath: string): string {
-  // apiPath like "/crm/v2/Contacts" or "/crm/v2/settings/modules"
+  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
   if (isDev) {
-    return `/zoho-crm-proxy${apiPath}`;
+    return `/zoho-crm-proxy${finalPath}`;
   }
   const token = loadToken();
-  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+  return `/api/zoho-crm-proxy?path=${encodeURIComponent(finalPath)}&token=${encodeURIComponent(token || '')}`;
 }
 
 function buildAccountsUrl(apiPath: string): string {
@@ -112,16 +131,7 @@ export async function zohoList(module: string, params: Record<string, string> = 
   ensureToken();
   const qs = new URLSearchParams(params).toString();
   const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
-
-  // In prod, buildCrmUrl adds token as query param, so we need to append qs differently
-  let url: string;
-  if (isDev) {
-    url = `/zoho-crm-proxy${apiPath}`;
-  } else {
-    const token = loadToken()!;
-    const proxyQs = new URLSearchParams({ path: `/crm/v2/${module}`, token, ...params }).toString();
-    url = `/api/zoho-crm-proxy?${proxyQs}`;
-  }
+  const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 204) return [];
@@ -135,17 +145,8 @@ export async function zohoList(module: string, params: Record<string, string> = 
 
 export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
   ensureToken();
-  const path = fields ? `/crm/v2/${module}/${id}?fields=${encodeURIComponent(fields)}` : `/crm/v2/${module}/${id}`;
-
-  let url: string;
-  if (isDev) {
-    url = `/zoho-crm-proxy${path}`;
-  } else {
-    const token = loadToken()!;
-    const params: Record<string, string> = { path: `/crm/v2/${module}/${id}`, token };
-    if (fields) params.fields = fields;
-    url = `/api/zoho-crm-proxy?${new URLSearchParams(params).toString()}`;
-  }
+  const apiPath = fields ? `/crm/v2/${module}/${id}?fields=${encodeURIComponent(fields)}` : `/crm/v2/${module}/${id}`;
+  const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 404) return null;
@@ -257,19 +258,8 @@ export async function zohoUpsert(
 
 export async function zohoSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
   ensureToken();
-
-  let url: string;
-  if (isDev) {
-    url = `/zoho-crm-proxy/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
-  } else {
-    const token = loadToken()!;
-    const params = new URLSearchParams({
-      path: `/crm/v2/${module}/search`,
-      token,
-      criteria,
-    });
-    url = `/api/zoho-crm-proxy?${params.toString()}`;
-  }
+  const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: getHeaders() });
   if (res.status === 204) return [];
@@ -285,12 +275,13 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
 export async function zohoUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
   const token = ensureToken();
 
-  // Photo upload needs FormData — use direct API in dev, proxy doesn't handle multipart
-  const base = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
+  const apiPath = `/crm/v2/${module}/${recordId}/photo`;
+  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
+  const base = isDev ? `/zoho-crm-proxy` : 'https://www.zohoapis.in';
   const formData = new FormData();
   formData.append('file', file, fileName);
 
-  const res = await fetch(`${base}/${module}/${recordId}/photo`, {
+  const res = await fetch(`${base}${finalPath}`, {
     method: 'POST',
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     body: formData,
@@ -306,9 +297,11 @@ export async function zohoGetRecordPhoto(module: string, recordId: string): Prom
   const token = loadToken();
   if (!token) return null;
 
-  const base = isDev ? '/zoho-crm-proxy/crm/v2' : 'https://www.zohoapis.in/crm/v2';
+  const apiPath = `/crm/v2/${module}/${recordId}/photo`;
+  const finalPath = isPortalUser() ? portalApiPath(apiPath) : apiPath;
+  const base = isDev ? '/zoho-crm-proxy' : 'https://www.zohoapis.in';
   try {
-    const res = await fetch(`${base}/${module}/${recordId}/photo`, {
+    const res = await fetch(`${base}${finalPath}`, {
       headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     });
 
@@ -343,6 +336,7 @@ export interface ZohoCurrentUser {
 }
 
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
+  if (isPortalUser()) return null;
   try {
     ensureToken();
     const url = buildCrmUrl('/crm/v2/users?type=CurrentUser');
@@ -423,18 +417,7 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
   if (!token || !email) return null;
 
   try {
-    let url: string;
-    if (isDev) {
-      url = `/zoho-crm-proxy/crm/v2/Contacts/search?email=${encodeURIComponent(email)}`;
-    } else {
-      const params = new URLSearchParams({
-        path: '/crm/v2/Contacts/search',
-        token,
-        email,
-      });
-      url = `/api/zoho-crm-proxy?${params.toString()}`;
-    }
-
+    const url = buildCrmUrl(`/crm/v2/Contacts/search?email=${encodeURIComponent(email)}`);
     const res = await fetch(url, { headers: getHeaders() });
     if (!res.ok || res.status === 204) return null;
 
@@ -463,19 +446,7 @@ export async function fetchPortalUserContact(): Promise<{ name: string; email: s
   if (!token) return null;
 
   try {
-    let url: string;
-    if (isDev) {
-      url = `/zoho-crm-proxy/crm/v2/Contacts?fields=First_Name,Last_Name,Email&per_page=1`;
-    } else {
-      const params = new URLSearchParams({
-        path: '/crm/v2/Contacts',
-        token,
-        fields: 'First_Name,Last_Name,Email',
-        per_page: '1',
-      });
-      url = `/api/zoho-crm-proxy?${params.toString()}`;
-    }
-
+    const url = buildCrmUrl('/crm/v2/Contacts?fields=First_Name,Last_Name,Email&per_page=1');
     const res = await fetch(url, { headers: getHeaders() });
     if (!res.ok || res.status === 204) return null;
 
@@ -499,6 +470,7 @@ export async function fetchPortalUserContact(): Promise<{ name: string; email: s
 }
 
 export async function fetchZohoOrgName(): Promise<string | null> {
+  if (isPortalUser()) return null;
   try {
     ensureToken();
     const url = buildCrmUrl('/crm/v2/org');
@@ -521,6 +493,7 @@ export interface ZohoModule {
 }
 
 export async function fetchZohoModules(): Promise<ZohoModule[]> {
+  if (isPortalUser()) return [];
   ensureToken();
   const url = buildCrmUrl('/crm/v2/settings/modules');
   const res = await fetch(url, { headers: getHeaders() });

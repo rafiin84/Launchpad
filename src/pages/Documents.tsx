@@ -38,8 +38,7 @@ export default function Documents() {
   const isConnected = !!loadToken();
 
   const load = () => {
-    // Portal/founder users can't access CRM custom modules
-    if (!isConnected || isFounder) { setLoading(false); return; }
+    if (!isConnected) { setLoading(false); return; }
     setLoading(true);
     setError('');
     fetchCRMDocuments()
@@ -152,7 +151,7 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && docs.length === 0 && (isConnected || isFounder) && (
+      {!loading && !error && docs.length === 0 && isConnected && (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>

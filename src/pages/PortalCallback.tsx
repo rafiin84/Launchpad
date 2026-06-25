@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
-  saveUserName, clearRole,
+  saveUserName, clearRole, saveRole,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
@@ -36,6 +36,7 @@ export default function PortalCallback() {
     if (pending) {
       clearPreviousSession();
       saveToken(pending.token, pending.expiresAt);
+      saveRole('founder');
       handlePortalLogin(pending.token);
       return;
     }
