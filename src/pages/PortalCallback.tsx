@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Rocket, CheckCircle, XCircle, Loader2, User } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
   saveUserName, clearRole, saveRole, saveApiDomain,
-  loadPortalLoginEmail, clearPortalLoginEmail,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
-import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers } from '../services/portalUsers';
-import { fetchZohoAccountsUser, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
+import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers, getAllPortalUsers } from '../services/portalUsers';
+import type { PortalUserEntry } from '../services/portalUsers';
+import { fetchZohoAccountsUser, fetchPortalUserContact } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
+import { cn } from '../lib/cn';
 
 /** Clear ALL user-specific session data before a new portal login.
  *  Must clear cached names/profiles to prevent a previous user's data
@@ -29,8 +30,9 @@ function clearPreviousSession() {
 export default function PortalCallback() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'select-account'>('processing');
   const [statusText, setStatusText] = useState('Connecting to Zoho Portal...');
+  const [portalUsers, setPortalUsers] = useState<PortalUserEntry[]>([]);
 
   useEffect(() => {
     const pending = consumePendingToken();
@@ -40,14 +42,11 @@ export default function PortalCallback() {
       saveRole('founder');
       if (pending.apiDomain) {
         saveApiDomain(pending.apiDomain);
-        console.log('[Portal Auth] Saved api_domain:', pending.apiDomain);
       }
-      console.log('[Portal Auth] Token info - api_domain:', pending.apiDomain, 'location:', pending.location);
-      handlePortalLogin(pending.token);
+      handlePortalLogin();
       return;
     }
 
-    // React StrictMode double-mount: token was already consumed
     const existing = loadToken();
     if (existing) {
       setStatus('success');
@@ -62,11 +61,10 @@ export default function PortalCallback() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handlePortalLogin(_token: string) {
-    // Seed the registry with known portal users from CRM
-    seedKnownPortalUsers();
+  const isReal = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
 
-    // Portal users are always founders
+  async function handlePortalLogin() {
+    seedKnownPortalUsers();
     setStatusText('Identifying your portal account...');
 
     let email = '';
@@ -74,43 +72,21 @@ export default function PortalCallback() {
     let contactId = '';
     let zuid = '';
 
-    const isReal = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
-
-    // ── STRATEGY 0 (BEST): Email captured on login page ──
-    // The user entered their email on the login page before the OAuth redirect.
-    // This is the most reliable way to identify the portal user.
-    const loginEmail = loadPortalLoginEmail();
-    if (loginEmail) {
-      email = loginEmail;
-      console.log('[Portal Auth] Using email from login page:', email);
-      clearPortalLoginEmail();
-
-      // Look up in registry for name/contactId
-      const registryEntry = findPortalUser(email);
-      if (registryEntry) {
-        if (isReal(registryEntry.name)) displayName = registryEntry.name;
-        if (registryEntry.contactId) contactId = registryEntry.contactId;
-        console.log('[Portal Auth] Found in registry:', registryEntry.name);
+    // Strategy 1: Fetch portal user's Contact record from CRM
+    try {
+      setStatusText('Fetching your contact record...');
+      const myContact = await fetchPortalUserContact();
+      if (myContact) {
+        if (myContact.email) email = myContact.email;
+        if (myContact.name && isReal(myContact.name)) displayName = myContact.name;
+        if (myContact.contactId) contactId = myContact.contactId;
+        console.log('[Portal Auth] Got Contact record:', myContact);
       }
+    } catch (err) {
+      console.warn('[Portal Auth] Could not fetch Contact:', err);
     }
 
-    // ── STRATEGY 1: Fetch portal user's Contact record from CRM ──
-    if (!email || !isReal(displayName)) {
-      try {
-        setStatusText('Fetching your contact record...');
-        const myContact = await fetchPortalUserContact();
-        if (myContact) {
-          if (!email && myContact.email) email = myContact.email;
-          if (!isReal(displayName) && myContact.name && isReal(myContact.name)) displayName = myContact.name;
-          if (!contactId && myContact.contactId) contactId = myContact.contactId;
-          console.log('[Portal Auth] Got Contact record:', myContact);
-        }
-      } catch (err) {
-        console.warn('[Portal Auth] Could not fetch Contact:', err);
-      }
-    }
-
-    // ── STRATEGY 2: Zoho Accounts API ──
+    // Strategy 2: Zoho Accounts API
     if (!email) {
       try {
         const accountsUser = await fetchZohoAccountsUser();
@@ -129,7 +105,7 @@ export default function PortalCallback() {
       }
     }
 
-    // ── STRATEGY 3: Registry lookup (if we have email but no name yet) ──
+    // Strategy 3: Registry lookup if we got email but no name
     if (email && !isReal(displayName)) {
       const registryEntry = findPortalUser(email);
       if (registryEntry) {
@@ -138,7 +114,26 @@ export default function PortalCallback() {
       }
     }
 
-    // 5. Only save a real name — never save the role-default "Founder"
+    // If we identified the user, finish login
+    if (email) {
+      finishLogin(email, displayName, contactId, zuid);
+      return;
+    }
+
+    // No API could identify the user — show account selector
+    const users = getAllPortalUsers().filter(u => u.active !== false);
+    if (users.length > 0) {
+      setPortalUsers(users);
+      setStatus('select-account');
+      setStatusText('Select your account to continue');
+    } else {
+      setStatus('error');
+      setStatusText('Could not identify your account. Please contact your administrator.');
+      setTimeout(() => navigate('/login'), 3000);
+    }
+  }
+
+  function finishLogin(email: string, displayName: string, contactId: string, zuid: string) {
     if (isReal(displayName)) {
       saveUserName(displayName);
     }
@@ -153,8 +148,12 @@ export default function PortalCallback() {
 
     login('founder');
     setStatus('success');
-    setStatusText(isReal(displayName) ? `Welcome, ${displayName}! Redirecting to your dashboard...` : 'Welcome! Redirecting to your dashboard...');
+    setStatusText(isReal(displayName) ? `Welcome, ${displayName}!` : 'Welcome!');
     setTimeout(() => navigate('/'), 1500);
+  }
+
+  function handleAccountSelect(user: PortalUserEntry) {
+    finishLogin(user.email, user.name, user.contactId || '', '');
   }
 
   return (
@@ -169,6 +168,33 @@ export default function PortalCallback() {
           <p className="text-sm font-medium text-gray-700">{statusText}</p>
           <p className="text-xs text-gray-400">Signing in via Founder Portal</p>
         </>
+      )}
+
+      {status === 'select-account' && (
+        <div className="w-full max-w-sm px-4">
+          <p className="text-sm font-semibold text-gray-900 text-center mb-1">Select Your Account</p>
+          <p className="text-xs text-gray-400 text-center mb-5">Choose your founder profile to continue</p>
+          <div className="space-y-2">
+            {portalUsers.map(user => (
+              <button
+                key={user.email}
+                onClick={() => handleAccountSelect(user)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-gray-100 bg-white',
+                  'hover:border-indigo-500 hover:bg-indigo-50/50 transition-all duration-150 text-left cursor-pointer'
+                )}
+              >
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <User size={16} className="text-indigo-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {status === 'success' && (
