@@ -6,6 +6,25 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
 
+function getVideoEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (u.hostname.includes('vimeo.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+    if (u.hostname.includes('loom.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://www.loom.com/embed/${id}`;
+    }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
 const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   win:          { label: 'Win',          bg: 'bg-emerald-50', text: 'text-emerald-700' },
   insight:      { label: 'Insight',      bg: 'bg-violet-50',  text: 'text-violet-700'  },
@@ -161,17 +180,26 @@ export default function ActivityDetail() {
             </p>
           )}
 
-          {/* Image */}
-          {(activity.imageData || activity.imageUrl) && (
-            <div className="rounded-2xl overflow-hidden mb-4">
-              <img
-                src={activity.imageData || activity.imageUrl}
-                alt=""
-                className="w-full object-cover max-h-80"
-                loading="lazy"
-              />
-            </div>
-          )}
+          {/* Image or video */}
+          {(activity.imageData || activity.imageUrl) && (() => {
+            const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
+            return (
+              <div className="rounded-2xl overflow-hidden mb-4">
+                {videoEmbed ? (
+                  <div className="aspect-video bg-black">
+                    <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  </div>
+                ) : (
+                  <img
+                    src={activity.imageData || activity.imageUrl}
+                    alt=""
+                    className="w-full object-cover max-h-80"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            );
+          })()}
 
           {/* Tags */}
           {tags.length > 0 && (

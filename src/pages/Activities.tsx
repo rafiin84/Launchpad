@@ -42,6 +42,25 @@ const ACTIVITY_TYPES = [
 
 // ─── Image compressor (same as AddActivity) ───────────────────────────────────
 
+function getVideoEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (u.hostname.includes('vimeo.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+    if (u.hostname.includes('loom.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://www.loom.com/embed/${id}`;
+    }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
@@ -241,15 +260,24 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none border-0 outline-none leading-relaxed min-h-[90px]"
       />
 
-      {/* Image preview */}
-      {(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) && (
-        <div className="relative mt-2 mb-3 rounded-xl overflow-hidden">
-          <img src={imagePreview || imageUrl} alt="preview" className="w-full max-h-56 object-cover" />
-          <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
-            <X size={13} className="text-white" />
-          </button>
-        </div>
-      )}
+      {/* Image / video preview */}
+      {(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) && (() => {
+        const videoEmbed = imageMode === 'url' ? getVideoEmbedUrl(imageUrl) : null;
+        return (
+          <div className="relative mt-2 mb-3 rounded-xl overflow-hidden">
+            {videoEmbed ? (
+              <div className="aspect-video bg-black">
+                <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+              </div>
+            ) : (
+              <img src={imagePreview || imageUrl} alt="preview" className="w-full max-h-56 object-cover" />
+            )}
+            <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+              <X size={13} className="text-white" />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Image panel */}
       {showImagePanel && !(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) && (
@@ -362,18 +390,27 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
           </p>
         )}
 
-        {/* Image — prefer full imageData (base64), fallback to imageUrl */}
-        {(activity.imageUrl || (activity.imageData && activity.imageData.startsWith('data:'))) && (
-          <div className="mt-3 rounded-xl overflow-hidden">
-            <img
-              src={activity.imageData?.startsWith('data:') ? activity.imageData : activity.imageUrl}
-              alt=""
-              className="w-full max-h-48 object-cover"
-              loading="lazy"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-        )}
+        {/* Image or video — prefer full imageData (base64), fallback to imageUrl */}
+        {(activity.imageUrl || (activity.imageData && activity.imageData.startsWith('data:'))) && (() => {
+          const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
+          return (
+            <div className="mt-3 rounded-xl overflow-hidden">
+              {videoEmbed ? (
+                <div className="aspect-video bg-black" onClick={e => e.preventDefault()}>
+                  <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              ) : (
+                <img
+                  src={activity.imageData?.startsWith('data:') ? activity.imageData : activity.imageUrl}
+                  alt=""
+                  className="w-full max-h-48 object-cover"
+                  loading="lazy"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+            </div>
+          );
+        })()}
 
         {/* Tags */}
         {tags.length > 0 && (

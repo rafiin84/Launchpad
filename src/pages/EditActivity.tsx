@@ -4,6 +4,25 @@ import { ArrowLeft, Image, X, Tag, Building2, User, Send, Upload, Loader2 } from
 import { getCRMActivity, updateCRMActivity, type CRMActivityFields } from '../services/crmActivities';
 import { cn } from '../lib/cn';
 
+function getVideoEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (u.hostname.includes('vimeo.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+    if (u.hostname.includes('loom.com')) {
+      const id = u.pathname.split('/').pop();
+      if (id) return `https://www.loom.com/embed/${id}`;
+    }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
 const ACTIVITY_TYPES = [
   { value: 'win',          label: '🏆  Win',          bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   { value: 'insight',      label: '💡  Insight',      bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
@@ -229,15 +248,24 @@ export default function EditActivity() {
               </div>
             </div>
 
-            {hasImage && (
-              <div className="relative mb-4 rounded-xl overflow-hidden border border-gray-100">
-                <img src={form.imagePreview || form.imageUrl} alt="preview" className="w-full max-h-60 object-cover" />
-                <button type="button" onClick={clearImage}
-                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors">
-                  <X size={13} className="text-white" />
-                </button>
-              </div>
-            )}
+            {hasImage && (() => {
+              const videoEmbed = imageMode === 'url' ? getVideoEmbedUrl(form.imageUrl) : null;
+              return (
+                <div className="relative mb-4 rounded-xl overflow-hidden border border-gray-100">
+                  {videoEmbed ? (
+                    <div className="aspect-video bg-black">
+                      <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                    </div>
+                  ) : (
+                    <img src={form.imagePreview || form.imageUrl} alt="preview" className="w-full max-h-60 object-cover" />
+                  )}
+                  <button type="button" onClick={clearImage}
+                    className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center transition-colors">
+                    <X size={13} className="text-white" />
+                  </button>
+                </div>
+              );
+            })()}
 
             {imageMode === 'upload' && !hasImage && (
               <button type="button" disabled={compressing}
