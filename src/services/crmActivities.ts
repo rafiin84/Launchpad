@@ -1,4 +1,4 @@
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, portalList, portalCreate, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 
 const MODULE = 'My_Activities';
 
@@ -87,23 +87,3 @@ export async function deleteCRMActivity(id: string): Promise<void> {
   return zohoDelete(MODULE, id);
 }
 
-// ─── Portal-domain variants (for portal tokens) ─────────────────────────────
-
-export async function fetchPortalActivities(): Promise<CRMActivity[]> {
-  const records = await portalList(MODULE, {
-    per_page: '200',
-    sort_by: 'Modified_Time',
-    sort_order: 'desc',
-    fields: ALL_FIELDS,
-  });
-  return records.map(fromRecord);
-}
-
-export async function createPortalActivity(fields: CRMActivityFields): Promise<string> {
-  const payload: Record<string, unknown> = {};
-  for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
-    const raw = (fields as Record<string, string>)[formKey] ?? '';
-    if (raw !== '') payload[crmKey] = raw;
-  }
-  return portalCreate(MODULE, payload);
-}
