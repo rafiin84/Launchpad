@@ -2,15 +2,16 @@
 
 import { loadToken } from './oauth';
 
-const ZOHO_CRM_BASE = 'https://www.zohoapis.in';
-const ZOHO_ACCOUNTS_BASE = 'https://accounts.zoho.in';
+const isDev = import.meta.env.DEV;
 
 function buildCrmUrl(apiPath: string): string {
-  return `${ZOHO_CRM_BASE}${apiPath}`;
+  if (isDev) return `/zoho-crm-proxy${apiPath}`;
+  return `https://www.zohoapis.in${apiPath}`;
 }
 
 function buildAccountsUrl(apiPath: string): string {
-  return `${ZOHO_ACCOUNTS_BASE}${apiPath}`;
+  if (isDev) return `/zoho-accounts-proxy${apiPath}`;
+  return `https://accounts.zoho.in${apiPath}`;
 }
 
 function authHeader(): HeadersInit {
@@ -30,7 +31,7 @@ function jsonHeaders(): HeadersInit {
 
 /** @deprecated Use buildCrmUrl(). */
 export function getZohoBase(): string {
-  return `${ZOHO_CRM_BASE}/crm/v2`;
+  return buildCrmUrl('/crm/v2');
 }
 
 export class ZohoApiError extends Error {
@@ -233,7 +234,7 @@ export async function zohoUploadRecordPhoto(module: string, recordId: string, fi
   const formData = new FormData();
   formData.append('file', file, fileName);
 
-  const res = await fetch(`${ZOHO_CRM_BASE}/crm/v2/${module}/${recordId}/photo`, {
+  const res = await fetch(`${buildCrmUrl(`/crm/v2/${module}/${recordId}/photo`)}`, {
     method: 'POST',
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     body: formData,
@@ -250,7 +251,7 @@ export async function zohoGetRecordPhoto(module: string, recordId: string): Prom
   if (!token) return null;
 
   try {
-    const res = await fetch(`${ZOHO_CRM_BASE}/crm/v2/${module}/${recordId}/photo`, {
+    const res = await fetch(`${buildCrmUrl(`/crm/v2/${module}/${recordId}/photo`)}`, {
       headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     });
 

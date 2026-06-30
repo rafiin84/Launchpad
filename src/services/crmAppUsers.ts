@@ -18,10 +18,11 @@ import {
 } from './zohoApi';
 import { loadToken } from './oauth';
 
-const ZOHO_CRM_BASE = 'https://www.zohoapis.in';
+const isDev = import.meta.env.DEV;
 
 function crmUrl(apiPath: string): string {
-  return `${ZOHO_CRM_BASE}${apiPath}`;
+  if (isDev) return `/zoho-crm-proxy${apiPath}`;
+  return `https://www.zohoapis.in${apiPath}`;
 }
 
 function crmHeaders(): Record<string, string> {
