@@ -77,14 +77,6 @@ function load(email: string): CompanyData {
   try {
     const s = localStorage.getItem(storageKey(email));
     if (s) return { ...EMPTY, ...JSON.parse(s) };
-    // Migrate legacy single-key data if it belongs to this user
-    const legacy = localStorage.getItem('lp_founder_company');
-    if (legacy) {
-      const parsed = { ...EMPTY, ...JSON.parse(legacy) };
-      localStorage.setItem(storageKey(email), legacy);
-      localStorage.removeItem('lp_founder_company');
-      return parsed;
-    }
   } catch { /* ignore */ }
   return EMPTY;
 }

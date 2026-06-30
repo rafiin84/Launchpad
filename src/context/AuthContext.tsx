@@ -55,9 +55,6 @@ function loadFounderCompanyName(email: string): string {
   try {
     const raw = localStorage.getItem(`${FOUNDER_COMPANY_PREFIX}${email.toLowerCase()}`);
     if (raw) return JSON.parse(raw)?.name || '';
-    // Fallback: check legacy single-key (pre-migration)
-    const legacy = localStorage.getItem('lp_founder_company');
-    if (legacy) return JSON.parse(legacy)?.name || '';
   } catch { /* ok */ }
   return '';
 }
