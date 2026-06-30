@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Image, X, Tag, Building2, User, Send, Upload, Loader2 } from 'lucide-react';
-import { getCRMActivity, updateCRMActivity, type CRMActivityFields } from '../services/crmActivities';
+import { getCRMActivity, updateCRMActivity, type CRMActivity, type CRMActivityFields } from '../services/crmActivities';
+import { fetchSharedActivities } from '../services/sharedActivities';
 import { cn } from '../lib/cn';
 
 function getVideoEmbedUrl(url: string): string | null {
@@ -98,24 +99,34 @@ export default function EditActivity() {
 
   useEffect(() => {
     if (!id) return;
-    getCRMActivity(id)
-      .then(activity => {
-        const hasUploadedImage = activity.imageData?.startsWith('data:');
-        setForm({
-          title:        activity.title,
-          activityType: activity.activityType || 'update',
-          content:      activity.content,
-          companyName:  activity.companyName,
-          authorName:   activity.authorName,
-          tags:         activity.tags,
-          imageUrl:     activity.imageUrl || '',
-          imageData:    activity.imageData || '',
-          imagePreview: activity.imageData || activity.imageUrl || '',
-        });
-        if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
-        setLoading(false);
-      })
-      .catch(err => { setError(err instanceof Error ? err.message : 'Failed to load'); setLoading(false); });
+    const populateForm = (activity: CRMActivity) => {
+      const hasUploadedImage = activity.imageData?.startsWith('data:');
+      setForm({
+        title:        activity.title,
+        activityType: activity.activityType || 'update',
+        content:      activity.content,
+        companyName:  activity.companyName,
+        authorName:   activity.authorName,
+        tags:         activity.tags,
+        imageUrl:     activity.imageUrl || '',
+        imageData:    activity.imageData || '',
+        imagePreview: activity.imageData || activity.imageUrl || '',
+      });
+      if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
+      setLoading(false);
+    };
+    if (id.startsWith('local_')) {
+      fetchSharedActivities()
+        .then(all => {
+          const found = all.find(a => a.id === id);
+          if (found) populateForm(found);
+          else { setError('Activity not found'); setLoading(false); }
+        })
+        .catch(err => { setError(err instanceof Error ? err.message : 'Failed to load'); setLoading(false); });
+    } else {
+      getCRMActivity(id).then(populateForm)
+        .catch(err => { setError(err instanceof Error ? err.message : 'Failed to load'); setLoading(false); });
+    }
   }, [id]);
 
   function set(field: keyof FormState) {
@@ -160,7 +171,19 @@ export default function EditActivity() {
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',
       };
-      await updateCRMActivity(id!, fields);
+      if (id!.startsWith('local_')) {
+        const STORAGE_KEY = 'lp_shared_activities';
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const all = JSON.parse(raw) as CRMActivity[];
+            const idx = all.findIndex(a => a.id === id);
+            if (idx >= 0) { all[idx] = { id: id!, ...fields }; localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); }
+          }
+        } catch { /* ok */ }
+      } else {
+        await updateCRMActivity(id!, fields);
+      }
       navigate(`/activities/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');

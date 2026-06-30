@@ -352,6 +352,9 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
 function ActivityCard({ activity }: { activity: CRMActivity }) {
+  const { currentUser, founderCompanyName } = useAuth();
+  const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
+  const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || 'General';
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
   const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;
@@ -369,7 +372,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
           <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
             <Building2 size={14} className="text-gray-400" />
           </div>
-          <p className="text-xs font-semibold text-gray-700">{activity.companyName || 'General'}</p>
+          <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
         </div>
         <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
           {cfg.label}

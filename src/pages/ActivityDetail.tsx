@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Tag, Trash2, Edit2 } from 'lucide-react';
 import { getCRMActivity, deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
+import { fetchSharedActivities } from '../services/sharedActivities';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
@@ -36,7 +37,7 @@ const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> =
 export default function ActivityDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, founderCompanyName } = useAuth();
 
   const [activity, setActivity] = useState<CRMActivity | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -46,17 +47,40 @@ export default function ActivityDetail() {
 
   useEffect(() => {
     if (!id) return;
-    getCRMActivity(id)
-      .then(setActivity)
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-      .finally(() => setLoading(false));
+    const isLocal = id.startsWith('local_');
+    if (isLocal) {
+      fetchSharedActivities()
+        .then(all => {
+          const found = all.find(a => a.id === id);
+          if (found) setActivity(found);
+          else setError('Activity not found');
+        })
+        .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+        .finally(() => setLoading(false));
+    } else {
+      getCRMActivity(id)
+        .then(setActivity)
+        .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+        .finally(() => setLoading(false));
+    }
   }, [id]);
 
   const handleDelete = async () => {
     if (!id) return;
     setDeleting(true);
     try {
-      await deleteCRMActivity(id);
+      if (id.startsWith('local_')) {
+        const STORAGE_KEY = 'lp_shared_activities';
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const all = JSON.parse(raw) as CRMActivity[];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(all.filter(a => a.id !== id)));
+          }
+        } catch { /* ok */ }
+      } else {
+        await deleteCRMActivity(id);
+      }
       navigate('/activities');
     } catch (err) {
       setDeleting(false);
@@ -149,7 +173,7 @@ export default function ActivityDetail() {
             <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
               <Building2 size={15} className="text-gray-400" />
             </div>
-            <p className="text-sm font-semibold text-gray-700">{activity.companyName || 'General'}</p>
+            <p className="text-sm font-semibold text-gray-700">{activity.companyName || (isAuthor ? founderCompanyName : '') || 'General'}</p>
           </div>
           <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
             {cfg.label}
