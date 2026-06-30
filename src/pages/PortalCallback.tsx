@@ -128,32 +128,17 @@ export default function PortalCallback() {
       }
     }
 
-    // ── STRATEGY 4: Server-side admin lookup + CRM search by email ──
+    // ── STRATEGY 4: CRM Contact search by email ──
     if (email && !isReal(displayName)) {
       setStatusText('Resolving your profile...');
-
-      // 4a. Server-side portal-identity API (admin token)
       try {
-        const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
-        if (res.ok) {
-          const identity = await res.json() as { name?: string; email?: string; contactId?: string };
-          if (identity.name && isReal(identity.name)) displayName = identity.name;
-          if (identity.contactId) contactId = identity.contactId;
-          console.log('[Portal Auth] Resolved from server API:', identity);
+        const contact = await searchContactByEmail(email);
+        if (contact?.name && isReal(contact.name)) {
+          displayName = contact.name;
+          if (contact.contactId) contactId = contact.contactId;
+          console.log('[Portal Auth] Resolved from Contact search:', contact);
         }
       } catch { /* ok */ }
-
-      // 4b. Fallback: CRM Contact search by email
-      if (!isReal(displayName)) {
-        try {
-          const contact = await searchContactByEmail(email);
-          if (contact?.name && isReal(contact.name)) {
-            displayName = contact.name;
-            if (contact.contactId) contactId = contact.contactId;
-            console.log('[Portal Auth] Resolved from Contact search:', contact);
-          }
-        } catch { /* ok */ }
-      }
     }
 
     // 5. Only save a real name — never save the role-default "Founder"

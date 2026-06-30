@@ -92,9 +92,9 @@ export async function zohoList(module: string, params: Record<string, string> = 
   return json.data ?? [];
 }
 
-export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
+export async function zohoGetById(module: string, id: string): Promise<ZohoRecord | null> {
   ensureToken();
-  const apiPath = fields ? `/crm/v2/${module}/${id}?fields=${encodeURIComponent(fields)}` : `/crm/v2/${module}/${id}`;
+  const apiPath = `/crm/v2/${module}/${id}`;
   const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: getHeaders() });
@@ -397,7 +397,7 @@ export async function fetchPortalUserContact(): Promise<{ name: string; email: s
   }
 
   try {
-    const url = buildCrmUrl('/crm/v2/Contacts?fields=First_Name,Last_Name,Email&per_page=1');
+    const url = buildCrmUrl('/crm/v2/Contacts?per_page=1');
     const res = await fetch(url, { headers: getHeaders() });
     if (!res.ok || res.status === 204) return null;
 

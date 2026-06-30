@@ -190,17 +190,7 @@ export default function Callback() {
         return;
       }
 
-      // Additional name resolution if still not resolved
-      if (!isRealN(portalName)) {
-        try {
-          const idRes = await fetch(`/api/portal-identity?email=${encodeURIComponent(email)}`);
-          if (idRes.ok) {
-            const identity = await idRes.json() as { name?: string; contactId?: string };
-            if (identity.name && isRealN(identity.name)) portalName = identity.name;
-            if (identity.contactId) portalContactId = identity.contactId;
-          }
-        } catch { /* ok */ }
-      }
+      // Additional name resolution via CRM Contact search
       if (!isRealN(portalName)) {
         try {
           const contact = await searchContactByEmail(email);
