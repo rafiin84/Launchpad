@@ -48,15 +48,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AVATAR_CACHE_KEY = 'lp_avatar_data';
 const COVER_CACHE_KEY  = 'lp_cover_image';
-const FOUNDER_COMPANY_KEY = 'lp_founder_company';
+const FOUNDER_COMPANY_PREFIX = 'lp_founder_company_';
 
-function loadFounderCompanyName(): string {
+function loadFounderCompanyName(email: string): string {
+  if (!email) return '';
   try {
-    const raw = localStorage.getItem(FOUNDER_COMPANY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parsed?.name || '';
-    }
+    const raw = localStorage.getItem(`${FOUNDER_COMPANY_PREFIX}${email.toLowerCase()}`);
+    if (raw) return JSON.parse(raw)?.name || '';
+    // Fallback: check legacy single-key (pre-migration)
+    const legacy = localStorage.getItem('lp_founder_company');
+    if (legacy) return JSON.parse(legacy)?.name || '';
   } catch { /* ok */ }
   return '';
 }
@@ -112,18 +113,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [appUserRecordId, setAppUserRecordId] = useState<string | null>(loadCachedRecordId);
   const [portalSession, setPortalSession] = useState<PortalSession | null>(loadPortalSession);
-  const [founderCompanyName, setFounderCompanyName] = useState(loadFounderCompanyName);
 
-  // Re-read founder company name when localStorage changes (e.g. after saving on Company page)
+  // Derive the current user's email for per-user lookups
+  const currentEmail = zohoEmail || portalSession?.email || '';
+  const [founderCompanyName, setFounderCompanyName] = useState(() => loadFounderCompanyName(currentEmail));
+
+  // Re-read founder company name when email changes or localStorage updates
   useEffect(() => {
-    const onStorage = () => setFounderCompanyName(loadFounderCompanyName());
+    setFounderCompanyName(loadFounderCompanyName(currentEmail));
+    const onStorage = () => setFounderCompanyName(loadFounderCompanyName(currentEmail));
     window.addEventListener('storage', onStorage);
     window.addEventListener('founder-company-updated', onStorage);
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('founder-company-updated', onStorage);
     };
-  }, []);
+  }, [currentEmail]);
 
   // Fetch photo from appusers record image API
   const fetchAvatarFromAppUsers = useCallback(async (recordId: string) => {

@@ -66,19 +66,32 @@ const EMPTY: CompanyData = {
   currentAsk: '', useOfFunds: '', keyRisks: '', nextMilestones: '',
 };
 
-const STORAGE_KEY = 'lp_founder_company';
+const STORAGE_PREFIX = 'lp_founder_company_';
 
-function load(): CompanyData {
+function storageKey(email: string): string {
+  return `${STORAGE_PREFIX}${email.toLowerCase()}`;
+}
+
+function load(email: string): CompanyData {
+  if (!email) return EMPTY;
   try {
-    const s = localStorage.getItem(STORAGE_KEY);
+    const s = localStorage.getItem(storageKey(email));
     if (s) return { ...EMPTY, ...JSON.parse(s) };
+    // Migrate legacy single-key data if it belongs to this user
+    const legacy = localStorage.getItem('lp_founder_company');
+    if (legacy) {
+      const parsed = { ...EMPTY, ...JSON.parse(legacy) };
+      localStorage.setItem(storageKey(email), legacy);
+      localStorage.removeItem('lp_founder_company');
+      return parsed;
+    }
   } catch { /* ignore */ }
-  // Start with empty company data — founders fill in their own
   return EMPTY;
 }
 
-function save(d: CompanyData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+function save(email: string, d: CompanyData) {
+  if (!email) return;
+  localStorage.setItem(storageKey(email), JSON.stringify(d));
   window.dispatchEvent(new Event('founder-company-updated'));
 }
 
@@ -179,10 +192,16 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
-  const { coverImage, currentUser, isInvestor } = useAuth();
-  const [data, setData]       = useState<CompanyData>(load);
+  const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
+  const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
+  const [data, setData]       = useState<CompanyData>(() => load(userEmail));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState<CompanyData>(data);
+
+  // Reload when user changes (different founder logs in)
+  useEffect(() => {
+    if (userEmail) setData(load(userEmail));
+  }, [userEmail]);
 
   useEffect(() => {
     if (editing) setDraft({ ...data });
@@ -194,7 +213,7 @@ export default function FounderCompany() {
 
   function handleSave() {
     setData(draft);
-    save(draft);
+    save(userEmail, draft);
     setEditing(false);
 
     // Notify investors about the company update
