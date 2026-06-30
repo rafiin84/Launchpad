@@ -18,20 +18,15 @@ import {
 } from './zohoApi';
 import { loadToken } from './oauth';
 
-const isDev = import.meta.env.DEV;
+const ZOHO_CRM_BASE = 'https://crm.zoho.in';
 
 function crmUrl(apiPath: string): string {
-  if (isDev) return `/zoho-crm-proxy${apiPath}`;
-  const token = loadToken();
-  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+  return `${ZOHO_CRM_BASE}${apiPath}`;
 }
 
 function crmHeaders(): Record<string, string> {
-  if (isDev) {
-    const token = loadToken();
-    return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
-  }
-  return {};
+  const token = loadToken();
+  return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
 }
 
 // ─── Module & field mapping ──────────────────────────────────────────────────

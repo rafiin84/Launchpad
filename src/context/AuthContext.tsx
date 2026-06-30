@@ -187,17 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Use portal session email as last resort
         const emailForLookup = resolvedEmail || session?.email || '';
 
-        // ── FALLBACK 2: Server-side + search if still no name ──
-        if (emailForLookup && !isRealN(resolvedName)) {
-          try {
-            const res = await fetch(`/api/portal-identity?email=${encodeURIComponent(emailForLookup)}`);
-            if (res.ok) {
-              const identity = await res.json() as { name?: string; email?: string; contactId?: string };
-              if (isRealN(identity.name)) updateNameAndSession(identity.name!, identity.contactId, identity.email);
-            }
-          } catch { /* ok */ }
-        }
-
+        // ── FALLBACK 2: Search CRM Contacts directly ──
         if (emailForLookup && !isRealN(resolvedName)) {
           try {
             const contact = await searchContactByEmail(emailForLookup);

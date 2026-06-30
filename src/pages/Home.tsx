@@ -27,12 +27,12 @@ const MONTHS = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', '
 const GROWTH_VALUES = [7.0, 7.1, 7.35, 7.6, 7.85, 8.05, 8.25, 8.5, 8.7, 8.9, 9.1, 9.3];
 
 const PIPELINE_STAGES_CONFIG: { id: string; label: string; color: string }[] = [
-  { id: 'New',                  label: 'New',               color: '#6b7280' },
-  { id: 'Under Review',         label: 'Under Review',      color: '#3b82f6' },
-  { id: 'Meeting Scheduled',    label: 'Meeting Scheduled', color: '#8b5cf6' },
-  { id: 'Due Diligence',        label: 'Due Diligence',     color: '#f59e0b' },
-  { id: 'IC Review',            label: 'IC Review',         color: '#10b981' },
-  { id: 'Rejected',             label: 'Rejected',          color: '#ef4444' },
+  { id: 'New',                  label: 'New',               color: '#d1d5db' },
+  { id: 'Under Review',         label: 'Under Review',      color: '#93c5fd' },
+  { id: 'Meeting Scheduled',    label: 'Meeting Scheduled', color: '#c4b5fd' },
+  { id: 'Due Diligence',        label: 'Due Diligence',     color: '#fcd34d' },
+  { id: 'IC Review',            label: 'IC Review',         color: '#6ee7b7' },
+  { id: 'Rejected',             label: 'Rejected',          color: '#fca5a5' },
 ];
 
 // ─── Portfolio Growth Chart ────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
   });
   const sorted = Object.entries(byIndustry).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const totalFunding = sorted.reduce((sum, [, v]) => sum + v, 0);
-  const colors = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ef4444'];
+  const colors = ['#a5b4fc', '#6ee7b7', '#fcd34d', '#c4b5fd', '#7dd3fc', '#fca5a5'];
   const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K` : `$${n}`;
 
   const chartData = sorted.map(([name, amount], i) => ({
