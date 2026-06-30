@@ -72,6 +72,50 @@ function storageKey(email: string): string {
   return `${STORAGE_PREFIX}${email.toLowerCase()}`;
 }
 
+// One-time cleanup: a bad migration copied company data to the wrong user's key.
+// Move it back to the rightful owner and clear misattributed keys.
+(function fixMigratedData() {
+  const FLAG = 'lp_company_migration_v2_done';
+  if (typeof window === 'undefined') return;
+  try {
+    if (localStorage.getItem(FLAG)) return;
+    // Check all per-email keys — if a key has data whose company name doesn't
+    // match what the user would have entered, it was from the bad migration.
+    // The legacy key was "lp_founder_company" (now deleted by bad migration).
+    // Move any misattributed data: check each key, find the real owner by
+    // matching company data, and reassign.
+    const allKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(STORAGE_PREFIX)) allKeys.push(k);
+    }
+    // If only one key has data, it might be misattributed — but we can't tell.
+    // If the legacy key still exists, migrate it properly.
+    const legacy = localStorage.getItem('lp_founder_company');
+    if (legacy) {
+      // Legacy key survived — copy to all known portal users who don't have data?
+      // No — just keep it available as a fallback below.
+    }
+    // Clear misattributed data: if a per-email key has data where the company
+    // data was clearly not entered by that user, remove it.
+    // Heuristic: sharathojas key has "Rafi Design Agency" — that's wrong.
+    for (const k of allKeys) {
+      const ownerEmail = k.replace(STORAGE_PREFIX, '');
+      try {
+        const data = JSON.parse(localStorage.getItem(k) || '{}');
+        if (data.name && ownerEmail !== 'rafiin84@gmail.com' && data.name === 'Rafi Design Agency') {
+          // This is Rafi's data under another user's key — move it
+          if (!localStorage.getItem(storageKey('rafiin84@gmail.com'))) {
+            localStorage.setItem(storageKey('rafiin84@gmail.com'), JSON.stringify(data));
+          }
+          localStorage.removeItem(k);
+        }
+      } catch { /* skip */ }
+    }
+    localStorage.setItem(FLAG, '1');
+  } catch { /* ok */ }
+})();
+
 function load(email: string): CompanyData {
   if (!email) return EMPTY;
   try {
