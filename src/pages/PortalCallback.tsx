@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, Loader2, User } from 'lucide-react';
 import {
@@ -12,19 +12,24 @@ import { fetchZohoAccountsUser, fetchPortalUserContact } from '../services/zohoA
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
 
-/** Clear ALL user-specific session data before a new portal login.
- *  Must clear cached names/profiles to prevent a previous user's data
- *  from leaking into the new session. Cover image is decorative and safe to keep. */
+const LAST_PORTAL_EMAIL_KEY = 'lp_last_portal_email';
+
+function saveLastPortalEmail(email: string) {
+  try { localStorage.setItem(LAST_PORTAL_EMAIL_KEY, email.toLowerCase()); } catch { /* ok */ }
+}
+
+function loadLastPortalEmail(): string {
+  try { return localStorage.getItem(LAST_PORTAL_EMAIL_KEY) || ''; } catch { return ''; }
+}
+
 function clearPreviousSession() {
   clearRole();
   clearModuleStatusCache();
   clearPortalSession();
-  // Clear user-specific data that could leak between accounts
   try { localStorage.removeItem('lp_user_name'); } catch { /* ok */ }
   try { localStorage.removeItem('lp_appuser_profile_cache'); } catch { /* ok */ }
   try { localStorage.removeItem('lp_appuser_record_id'); } catch { /* ok */ }
   try { localStorage.removeItem('lp_avatar_data'); } catch { /* ok */ }
-  // Keep cover image — it's decorative, not user-identifying
 }
 
 export default function PortalCallback() {
@@ -33,8 +38,12 @@ export default function PortalCallback() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'select-account'>('processing');
   const [statusText, setStatusText] = useState('Connecting to Zoho Portal...');
   const [portalUsers, setPortalUsers] = useState<PortalUserEntry[]>([]);
+  const started = useRef(false);
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
     const pending = consumePendingToken();
     if (pending) {
       clearPreviousSession();
@@ -50,14 +59,13 @@ export default function PortalCallback() {
     const existing = loadToken();
     if (existing) {
       setStatus('success');
-      const t = setTimeout(() => navigate('/'), 1500);
-      return () => clearTimeout(t);
+      setTimeout(() => navigate('/'), 1500);
+      return;
     }
 
     setStatus('error');
     setStatusText('No token received from portal. Please try again.');
-    const t = setTimeout(() => navigate('/login'), 3000);
-    return () => clearTimeout(t);
+    setTimeout(() => navigate('/login'), 3000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -105,7 +113,21 @@ export default function PortalCallback() {
       }
     }
 
-    // Strategy 3: Registry lookup if we got email but no name
+    // Strategy 3: Remember last logged-in portal user on this browser
+    if (!email) {
+      const lastEmail = loadLastPortalEmail();
+      if (lastEmail) {
+        const registryEntry = findPortalUser(lastEmail);
+        if (registryEntry) {
+          email = registryEntry.email;
+          if (isReal(registryEntry.name)) displayName = registryEntry.name;
+          contactId = registryEntry.contactId || '';
+          console.log('[Portal Auth] Using remembered email:', email);
+        }
+      }
+    }
+
+    // Strategy 4: Registry lookup if we got email but no name
     if (email && !isReal(displayName)) {
       const registryEntry = findPortalUser(email);
       if (registryEntry) {
@@ -120,7 +142,7 @@ export default function PortalCallback() {
       return;
     }
 
-    // No API could identify the user — show account selector
+    // No identification — show account selector (first-time only on this browser)
     const users = getAllPortalUsers().filter(u => u.active !== false);
     if (users.length > 0) {
       setPortalUsers(users);
@@ -134,6 +156,7 @@ export default function PortalCallback() {
   }
 
   function finishLogin(email: string, displayName: string, contactId: string, zuid: string) {
+    saveLastPortalEmail(email);
     if (isReal(displayName)) {
       saveUserName(displayName);
     }
