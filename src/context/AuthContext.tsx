@@ -119,8 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return;
 
     fetchCurrentZohoUser().then(async (user) => {
+      console.log('[Auth] fetchCurrentZohoUser result:', user);
       if (!user) {
-        // CRM Users API failed — this is a portal user.
+        console.log('[Auth] No CRM user returned — entering portal user flow');
         const isRealN = (n: string | undefined | null) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
         let resolvedEmail = '';
         let resolvedName = '';
@@ -148,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // This works even when Accounts API returns INVALID_OAUTHSCOPE.
         try {
           const myContact = await fetchPortalUserContact();
+          console.log('[Auth] fetchPortalUserContact result:', myContact);
           if (myContact) {
             if (myContact.email) {
               resolvedEmail = myContact.email;
@@ -159,12 +161,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               resolvedContactId = myContact.contactId;
             }
           }
-        } catch { /* ok */ }
+        } catch (err) { console.warn('[Auth] fetchPortalUserContact error:', err); }
 
         // ── FALLBACK: Zoho Accounts API (may fail with INVALID_OAUTHSCOPE) ──
         if (!resolvedEmail) {
           try {
             const accountsUser = await fetchZohoAccountsUser();
+            console.log('[Auth] fetchZohoAccountsUser result:', accountsUser);
             if (accountsUser?.email) {
               resolvedEmail = accountsUser.email;
               setZohoEmail(accountsUser.email);
@@ -188,13 +191,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const emailForLookup = resolvedEmail || session?.email || '';
 
         // ── FALLBACK 2: Search CRM Contacts directly ──
+        console.log('[Auth] Portal flow — emailForLookup:', emailForLookup, 'resolvedName:', resolvedName);
         if (emailForLookup && !isRealN(resolvedName)) {
           try {
             const contact = await searchContactByEmail(emailForLookup);
+            console.log('[Auth] searchContactByEmail result:', contact);
             if (contact?.name && isRealN(contact.name)) {
               updateNameAndSession(contact.name, contact.contactId);
             }
-          } catch { /* ok */ }
+          } catch (err) { console.warn('[Auth] searchContactByEmail error:', err); }
         }
 
         // Try to look up the user in the appusers CRM module via portal session email
@@ -227,9 +232,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Always try to resolve name from Contacts by email (First_Name + Last_Name)
+      console.log('[Auth] CRM user flow — searching Contacts for email:', user.email);
       if (user.email) {
         try {
           const contact = await searchContactByEmail(user.email);
+          console.log('[Auth] CRM user Contact search result:', contact);
           if (contact?.name && contact.name !== 'Founder' && contact.name !== 'Investor') {
             setUserName(contact.name);
             saveUserName(contact.name);

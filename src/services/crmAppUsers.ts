@@ -18,7 +18,7 @@ import {
 } from './zohoApi';
 import { loadToken } from './oauth';
 
-const ZOHO_CRM_BASE = 'https://crm.zoho.in';
+const ZOHO_CRM_BASE = 'https://www.zohoapis.in';
 
 function crmUrl(apiPath: string): string {
   return `${ZOHO_CRM_BASE}${apiPath}`;

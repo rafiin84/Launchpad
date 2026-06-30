@@ -2,7 +2,7 @@
 
 import { loadToken } from './oauth';
 
-const ZOHO_CRM_BASE = 'https://crm.zoho.in';
+const ZOHO_CRM_BASE = 'https://www.zohoapis.in';
 const ZOHO_ACCOUNTS_BASE = 'https://accounts.zoho.in';
 
 function buildCrmUrl(apiPath: string): string {
@@ -13,7 +13,13 @@ function buildAccountsUrl(apiPath: string): string {
   return `${ZOHO_ACCOUNTS_BASE}${apiPath}`;
 }
 
-function getHeaders(): HeadersInit {
+function authHeader(): HeadersInit {
+  const token = loadToken();
+  if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
+  return { 'Authorization': `Zoho-oauthtoken ${token}` };
+}
+
+function jsonHeaders(): HeadersInit {
   const token = loadToken();
   if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
   return {
@@ -82,7 +88,7 @@ export async function zohoList(module: string, params: Record<string, string> = 
   const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
   const url = buildCrmUrl(apiPath);
 
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, { headers: authHeader() });
   if (res.status === 204) return [];
 
   const json: ZohoListResponse = await res.json();
@@ -97,7 +103,7 @@ export async function zohoGetById(module: string, id: string): Promise<ZohoRecor
   const apiPath = `/crm/v2/${module}/${id}`;
   const url = buildCrmUrl(apiPath);
 
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, { headers: authHeader() });
   if (res.status === 404) return null;
 
   const json: ZohoListResponse = await res.json();
@@ -113,7 +119,7 @@ export async function zohoCreate(module: string, data: Record<string, unknown>):
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ data: [data] }),
   });
 
@@ -137,7 +143,7 @@ export async function zohoUpdate(module: string, id: string, data: Record<string
 
   const res = await fetch(url, {
     method: 'PUT',
-    headers: getHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ data: [{ id, ...data }] }),
   });
 
@@ -159,7 +165,7 @@ export async function zohoDelete(module: string, id: string): Promise<void> {
 
   const res = await fetch(url, {
     method: 'DELETE',
-    headers: getHeaders(),
+    headers: authHeader(),
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
@@ -179,7 +185,7 @@ export async function zohoUpsert(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({
       data: [data],
       duplicate_check_fields: duplicateCheckFields,
@@ -210,7 +216,7 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
   const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
   const url = buildCrmUrl(apiPath);
 
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, { headers: authHeader() });
   if (res.status === 204) return [];
   const json: ZohoListResponse = await res.json();
   if (!res.ok && res.status !== 204) {
@@ -282,7 +288,7 @@ export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   try {
     ensureToken();
     const url = buildCrmUrl('/crm/v2/users?type=CurrentUser');
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await fetch(url, { headers: authHeader() });
     const json = await res.json() as { users?: ZohoCurrentUser[] };
     return json.users?.[0] ?? null;
   } catch {
@@ -360,10 +366,13 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
 
   try {
     const url = buildCrmUrl(`/crm/v2/Contacts/search?email=${encodeURIComponent(email)}`);
-    const res = await fetch(url, { headers: getHeaders() });
+    console.log('[CRM] searchContactByEmail URL:', url);
+    const res = await fetch(url, { headers: authHeader() });
+    console.log('[CRM] searchContactByEmail response status:', res.status);
     if (!res.ok || res.status === 204) return null;
 
     const json = await res.json() as { data?: Array<Record<string, unknown>> };
+    console.log('[CRM] searchContactByEmail response data:', json);
     const contact = json.data?.[0];
     if (!contact) return null;
 
@@ -372,7 +381,8 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
     const fullName = [firstName, lastName].filter(Boolean).join(' ');
 
     return fullName ? { name: fullName, contactId: String(contact.id || '') } : null;
-  } catch {
+  } catch (err) {
+    console.error('[CRM] searchContactByEmail error:', err);
     return null;
   }
 }
@@ -398,7 +408,7 @@ export async function fetchPortalUserContact(): Promise<{ name: string; email: s
 
   try {
     const url = buildCrmUrl('/crm/v2/Contacts?per_page=1');
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await fetch(url, { headers: authHeader() });
     if (!res.ok || res.status === 204) return null;
 
     const json = await res.json() as { data?: Array<Record<string, unknown>> };
@@ -424,7 +434,7 @@ export async function fetchZohoOrgName(): Promise<string | null> {
   try {
     ensureToken();
     const url = buildCrmUrl('/crm/v2/org');
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await fetch(url, { headers: authHeader() });
     const json = await res.json() as { org?: Array<{ company_name?: string }> };
     return json.org?.[0]?.company_name ?? null;
   } catch {
@@ -445,7 +455,7 @@ export interface ZohoModule {
 export async function fetchZohoModules(): Promise<ZohoModule[]> {
   ensureToken();
   const url = buildCrmUrl('/crm/v2/settings/modules');
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, { headers: authHeader() });
   const json = await res.json() as { modules?: ZohoModule[] };
   return json.modules ?? [];
 }
