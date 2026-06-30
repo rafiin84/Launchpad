@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, CheckCircle, XCircle, Loader2, User } from 'lucide-react';
+import { Rocket, CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
   saveUserName, clearRole, saveRole, saveApiDomain,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
-import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers, getAllPortalUsers } from '../services/portalUsers';
-import type { PortalUserEntry } from '../services/portalUsers';
+import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers } from '../services/portalUsers';
 import { fetchZohoAccountsUser, fetchPortalUserContact } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
-import { cn } from '../lib/cn';
 
 const LAST_PORTAL_EMAIL_KEY = 'lp_last_portal_email';
 
@@ -35,9 +33,10 @@ function clearPreviousSession() {
 export default function PortalCallback() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'select-account'>('processing');
+  const [status, setStatus] = useState<'processing' | 'success' | 'error' | 'need-email'>('processing');
   const [statusText, setStatusText] = useState('Connecting to Zoho Portal...');
-  const [portalUsers, setPortalUsers] = useState<PortalUserEntry[]>([]);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailError, setEmailError] = useState('');
   const started = useRef(false);
 
   useEffect(() => {
@@ -88,10 +87,9 @@ export default function PortalCallback() {
         if (myContact.email) email = myContact.email;
         if (myContact.name && isReal(myContact.name)) displayName = myContact.name;
         if (myContact.contactId) contactId = myContact.contactId;
-        console.log('[Portal Auth] Got Contact record:', myContact);
       }
-    } catch (err) {
-      console.warn('[Portal Auth] Could not fetch Contact:', err);
+    } catch {
+      // Portal tokens typically can't call CRM APIs
     }
 
     // Strategy 2: Zoho Accounts API
@@ -108,51 +106,41 @@ export default function PortalCallback() {
           }
           zuid = accountsUser.zuid || '';
         }
-      } catch (err) {
-        console.warn('[Portal Auth] Accounts API failed (expected for portal users):', err);
+      } catch {
+        // Expected to fail for portal tokens
       }
     }
 
-    // Strategy 3: Remember last logged-in portal user on this browser
+    // Strategy 3: Remembered email from previous login on this browser
     if (!email) {
       const lastEmail = loadLastPortalEmail();
       if (lastEmail) {
-        const registryEntry = findPortalUser(lastEmail);
-        if (registryEntry) {
-          email = registryEntry.email;
-          if (isReal(registryEntry.name)) displayName = registryEntry.name;
-          contactId = registryEntry.contactId || '';
-          console.log('[Portal Auth] Using remembered email:', email);
+        const entry = findPortalUser(lastEmail);
+        if (entry) {
+          email = entry.email;
+          if (isReal(entry.name)) displayName = entry.name;
+          contactId = entry.contactId || '';
         }
       }
     }
 
-    // Strategy 4: Registry lookup if we got email but no name
+    // Strategy 4: Registry lookup for name if we have email
     if (email && !isReal(displayName)) {
-      const registryEntry = findPortalUser(email);
-      if (registryEntry) {
-        if (isReal(registryEntry.name)) displayName = registryEntry.name;
-        if (!contactId) contactId = registryEntry.contactId || '';
+      const entry = findPortalUser(email);
+      if (entry) {
+        if (isReal(entry.name)) displayName = entry.name;
+        if (!contactId) contactId = entry.contactId || '';
       }
     }
 
-    // If we identified the user, finish login
     if (email) {
       finishLogin(email, displayName, contactId, zuid);
       return;
     }
 
-    // No identification — show account selector (first-time only on this browser)
-    const users = getAllPortalUsers().filter(u => u.active !== false);
-    if (users.length > 0) {
-      setPortalUsers(users);
-      setStatus('select-account');
-      setStatusText('Select your account to continue');
-    } else {
-      setStatus('error');
-      setStatusText('Could not identify your account. Please contact your administrator.');
-      setTimeout(() => navigate('/login'), 3000);
-    }
+    // First-time login on this browser — ask for email (one-time only)
+    setStatus('need-email');
+    setStatusText('');
   }
 
   function finishLogin(email: string, displayName: string, contactId: string, zuid: string) {
@@ -175,8 +163,20 @@ export default function PortalCallback() {
     setTimeout(() => navigate('/'), 1500);
   }
 
-  function handleAccountSelect(user: PortalUserEntry) {
-    finishLogin(user.email, user.name, user.contactId || '', '');
+  function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const email = emailInput.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    const entry = findPortalUser(email);
+    if (entry) {
+      finishLogin(entry.email, entry.name, entry.contactId || '', '');
+    } else {
+      // Unknown email — still allow login, just no profile name
+      finishLogin(email, '', '', '');
+    }
   }
 
   return (
@@ -193,31 +193,30 @@ export default function PortalCallback() {
         </>
       )}
 
-      {status === 'select-account' && (
-        <div className="w-full max-w-sm px-4">
-          <p className="text-sm font-semibold text-gray-900 text-center mb-1">Select Your Account</p>
-          <p className="text-xs text-gray-400 text-center mb-5">Choose your founder profile to continue</p>
-          <div className="space-y-2">
-            {portalUsers.map(user => (
-              <button
-                key={user.email}
-                onClick={() => handleAccountSelect(user)}
-                className={cn(
-                  'w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-gray-100 bg-white',
-                  'hover:border-indigo-500 hover:bg-indigo-50/50 transition-all duration-150 text-left cursor-pointer'
-                )}
-              >
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                  <User size={16} className="text-indigo-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                </div>
-              </button>
-            ))}
+      {status === 'need-email' && (
+        <form onSubmit={handleEmailSubmit} className="w-full max-w-xs px-4 text-center">
+          <p className="text-sm font-semibold text-gray-900 mb-1">Confirm Your Email</p>
+          <p className="text-xs text-gray-400 mb-5">Enter the email you used to sign in</p>
+          <div className="relative mb-3">
+            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input
+              type="email"
+              value={emailInput}
+              onChange={e => { setEmailInput(e.target.value); setEmailError(''); }}
+              placeholder="you@example.com"
+              autoFocus
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
           </div>
-        </div>
+          {emailError && <p className="text-xs text-red-500 mb-2">{emailError}</p>}
+          <button
+            type="submit"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            Continue
+          </button>
+          <p className="text-[11px] text-gray-300 mt-3">This is a one-time step for this browser</p>
+        </form>
       )}
 
       {status === 'success' && (
