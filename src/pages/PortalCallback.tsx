@@ -74,6 +74,10 @@ export default function PortalCallback() {
     seedKnownPortalUsers();
     setStatusText('Identifying your portal account...');
 
+    // Clear remembered email so a different user logging in isn't
+    // silently assigned the previous user's identity.
+    try { localStorage.removeItem(LAST_PORTAL_EMAIL_KEY); } catch { /* ok */ }
+
     let email = '';
     let displayName = '';
     let contactId = '';
@@ -111,20 +115,7 @@ export default function PortalCallback() {
       }
     }
 
-    // Strategy 3: Remembered email from previous login on this browser
-    if (!email) {
-      const lastEmail = loadLastPortalEmail();
-      if (lastEmail) {
-        const entry = findPortalUser(lastEmail);
-        if (entry) {
-          email = entry.email;
-          if (isReal(entry.name)) displayName = entry.name;
-          contactId = entry.contactId || '';
-        }
-      }
-    }
-
-    // Strategy 4: Registry lookup for name if we have email
+    // Strategy 3: Registry lookup for name if we have email from API
     if (email && !isReal(displayName)) {
       const entry = findPortalUser(email);
       if (entry) {
@@ -138,7 +129,7 @@ export default function PortalCallback() {
       return;
     }
 
-    // First-time login on this browser — ask for email (one-time only)
+    // APIs couldn't identify — ask for email confirmation
     setStatus('need-email');
     setStatusText('');
   }
@@ -215,7 +206,7 @@ export default function PortalCallback() {
           >
             Continue
           </button>
-          <p className="text-[11px] text-gray-300 mt-3">This is a one-time step for this browser</p>
+          <p className="text-[11px] text-gray-300 mt-3">Confirm the email you used to sign in to the portal</p>
         </form>
       )}
 
