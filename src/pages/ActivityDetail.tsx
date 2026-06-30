@@ -173,7 +173,7 @@ export default function ActivityDetail() {
             <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
               <Building2 size={15} className="text-gray-400" />
             </div>
-            <p className="text-sm font-semibold text-gray-700">{activity.companyName || (isAuthor ? founderCompanyName : '') || 'General'}</p>
+            <p className="text-sm font-semibold text-gray-700">{activity.companyName || (isAuthor ? founderCompanyName : '') || activity.authorName || 'General'}</p>
           </div>
           <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
             {cfg.label}

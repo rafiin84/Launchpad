@@ -3,14 +3,14 @@
  *
  * Shared activity feed that works for both Investor (CRM) and Founder (Portal) users.
  *
- * - All posts are saved to localStorage so both user types can see them on the same device.
- * - Posts are ALSO saved to the CRM My_Activities module for persistence.
- * - On load, CRM + localStorage activities are merged (deduplicated by ID).
- * - If CRM is unreachable (token expired, portal scope limitation), falls back to localStorage.
+ * - Posts are saved to CRM for cross-device persistence.
+ * - Admin/investor tokens use the standard CRM API (zohoapis.in).
+ * - Portal tokens use the portal-domain CRM API (zcrmportals.in).
+ * - localStorage is a cache/fallback for offline or when both APIs fail.
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
-import { fetchCRMActivities, createCRMActivity } from './crmActivities';
+import { fetchCRMActivities, createCRMActivity, fetchPortalActivities, createPortalActivity } from './crmActivities';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -38,16 +38,23 @@ function generateLocalId(): string {
 
 /**
  * Fetch all shared activities.
- * Merges CRM + localStorage (deduped by ID). Falls back to localStorage if CRM is unreachable.
+ * Tries standard CRM first, then portal-domain CRM, then localStorage fallback.
  */
 export async function fetchSharedActivities(_isFounder?: boolean): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
 
   let crmActivities: CRMActivity[] = [];
+
+  // Try standard CRM API (works for admin/investor tokens)
   try {
     crmActivities = await fetchCRMActivities();
   } catch {
-    // CRM unavailable — fall back to local only
+    // Standard CRM failed — try portal-domain API (works for portal tokens)
+    try {
+      crmActivities = await fetchPortalActivities();
+    } catch {
+      // Both APIs failed — fall back to localStorage only
+    }
   }
 
   if (crmActivities.length === 0) return localActivities;
@@ -62,7 +69,7 @@ export async function fetchSharedActivities(_isFounder?: boolean): Promise<CRMAc
 
 /**
  * Post a new activity.
- * Saves to CRM for persistence, falls back to localStorage-only if CRM fails.
+ * Tries standard CRM, then portal-domain CRM, then localStorage-only.
  */
 export async function postSharedActivity(
   fields: CRMActivityFields,
@@ -73,7 +80,13 @@ export async function postSharedActivity(
   try {
     id = await createCRMActivity(fields);
   } catch {
-    id = generateLocalId();
+    // Standard CRM failed — try portal domain
+    try {
+      id = await createPortalActivity(fields);
+    } catch {
+      // Both failed — local-only
+      id = generateLocalId();
+    }
   }
 
   const activity: CRMActivity = { id, ...fields };

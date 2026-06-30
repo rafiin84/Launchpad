@@ -98,6 +98,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
   const [title, setTitle]             = useState('');
   const [content, setContent]         = useState('');
   const [activityType, setActivityType] = useState('update');
+  const [companyName, setCompanyName] = useState(founderCompanyName);
   const [imageData, setImageData]     = useState('');   // base64 compressed
   const [imageUrl, setImageUrl]       = useState('');   // public URL
   const [imagePreview, setImagePreview] = useState('');
@@ -106,6 +107,11 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
   const [compressing, setCompressing] = useState(false);
   const [posting, setPosting]         = useState(false);
   const [generating, setGenerating]   = useState(false);
+
+  // Keep in sync if founderCompanyName loads async
+  useEffect(() => {
+    if (founderCompanyName && !companyName) setCompanyName(founderCompanyName);
+  }, [founderCompanyName]);
 
   const canPost = title.trim() && content.trim();
 
@@ -156,6 +162,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
   function handleCancel() {
     setExpanded(false);
     setTitle(''); setContent(''); setActivityType('update');
+    setCompanyName(founderCompanyName);
     clearImage(); setShowImagePanel(false);
   }
 
@@ -167,7 +174,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         title:        title.trim(),
         activityType,
         content:      content.trim(),
-        companyName:  founderCompanyName,
+        companyName:  companyName.trim(),
         authorName:   currentUser.name,
         tags:         '',
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
@@ -222,6 +229,18 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
           <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
           <p className="text-xs text-gray-500 capitalize">{currentUser.role}</p>
         </div>
+      </div>
+
+      {/* Company name */}
+      <div className="flex items-center gap-2 mb-3">
+        <Building2 size={14} className="text-gray-300 flex-shrink-0" />
+        <input
+          type="text"
+          value={companyName}
+          onChange={e => setCompanyName(e.target.value)}
+          placeholder="Company name"
+          className="text-xs text-gray-600 placeholder-gray-300 border-0 outline-none bg-transparent flex-1"
+        />
       </div>
 
       {/* Activity type pills */}
@@ -354,7 +373,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
 function ActivityCard({ activity }: { activity: CRMActivity }) {
   const { currentUser, founderCompanyName } = useAuth();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
-  const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || 'General';
+  const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || activity.authorName || 'General';
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
   const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;

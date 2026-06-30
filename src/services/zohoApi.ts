@@ -180,6 +180,48 @@ export async function zohoDelete(module: string, id: string): Promise<void> {
   }
 }
 
+// ─── Portal-domain CRUD (for portal tokens that fail on zohoapis.in) ─────────
+
+export async function portalList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
+  ensureToken();
+  const qs = new URLSearchParams(params).toString();
+  const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
+  const url = buildPortalCrmUrl(apiPath);
+
+  const res = await fetch(url, { headers: authHeader() });
+  if (res.status === 204) return [];
+
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  assertNoZohoError(json, res.status);
+
+  return json.data ?? [];
+}
+
+export async function portalCreate(module: string, data: Record<string, unknown>): Promise<string> {
+  ensureToken();
+  const url = buildPortalCrmUrl(`/crm/v2/${module}`);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { ...jsonHeaders(), },
+    body: JSON.stringify({ data: [data] }),
+  });
+
+  const json: ZohoCUDResponse = await res.json();
+
+  if (json.code && json.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  }
+
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') {
+    throw new ZohoApiError(res.status, result?.message ?? 'Create failed', result?.code ?? '');
+  }
+
+  return result.details.id;
+}
+
 // ─── Upsert (insert-or-update) ────────────────────────────────────────────────
 
 export async function zohoUpsert(
