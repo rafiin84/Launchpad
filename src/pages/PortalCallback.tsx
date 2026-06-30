@@ -4,10 +4,11 @@ import { Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
   saveUserName, clearRole, saveRole, saveApiDomain,
+  loadPortalLoginEmail, clearPortalLoginEmail,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
-import { savePortalSession, clearPortalSession, findPortalUser, getAllPortalUsers } from '../services/portalUsers';
-import { fetchZohoAccountsUser, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
+import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers } from '../services/portalUsers';
+import { fetchZohoAccountsUser, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
 import { useAuth } from '../context/AuthContext';
 
 /** Clear ALL user-specific session data before a new portal login.
@@ -62,6 +63,9 @@ export default function PortalCallback() {
   }, []);
 
   async function handlePortalLogin(_token: string) {
+    // Seed the registry with known portal users from CRM
+    seedKnownPortalUsers();
+
     // Portal users are always founders
     setStatusText('Identifying your portal account...');
 
@@ -70,26 +74,43 @@ export default function PortalCallback() {
     let contactId = '';
     let zuid = '';
 
-    // Helper: is this a real name (not a placeholder)?
     const isReal = (n: string) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
 
-    // ── STRATEGY 1 (BEST): Fetch portal user's own Contact record from CRM ──
-    // Portal tokens have ZohoCRM.modules.ALL scope and can only see their own
-    // Contact record. This works even when Accounts API returns INVALID_OAUTHSCOPE.
-    try {
-      setStatusText('Fetching your contact record...');
-      const myContact = await fetchPortalUserContact();
-      if (myContact) {
-        if (myContact.email) email = myContact.email;
-        if (myContact.name && isReal(myContact.name)) displayName = myContact.name;
-        if (myContact.contactId) contactId = myContact.contactId;
-        console.log('[Portal Auth] Got own Contact record:', myContact);
+    // ── STRATEGY 0 (BEST): Email captured on login page ──
+    // The user entered their email on the login page before the OAuth redirect.
+    // This is the most reliable way to identify the portal user.
+    const loginEmail = loadPortalLoginEmail();
+    if (loginEmail) {
+      email = loginEmail;
+      console.log('[Portal Auth] Using email from login page:', email);
+      clearPortalLoginEmail();
+
+      // Look up in registry for name/contactId
+      const registryEntry = findPortalUser(email);
+      if (registryEntry) {
+        if (isReal(registryEntry.name)) displayName = registryEntry.name;
+        if (registryEntry.contactId) contactId = registryEntry.contactId;
+        console.log('[Portal Auth] Found in registry:', registryEntry.name);
       }
-    } catch (err) {
-      console.warn('[Portal Auth] Could not fetch own Contact:', err);
     }
 
-    // ── STRATEGY 2: Zoho Accounts API (may fail with INVALID_OAUTHSCOPE) ──
+    // ── STRATEGY 1: Fetch portal user's Contact record from CRM ──
+    if (!email || !isReal(displayName)) {
+      try {
+        setStatusText('Fetching your contact record...');
+        const myContact = await fetchPortalUserContact();
+        if (myContact) {
+          if (!email && myContact.email) email = myContact.email;
+          if (!isReal(displayName) && myContact.name && isReal(myContact.name)) displayName = myContact.name;
+          if (!contactId && myContact.contactId) contactId = myContact.contactId;
+          console.log('[Portal Auth] Got Contact record:', myContact);
+        }
+      } catch (err) {
+        console.warn('[Portal Auth] Could not fetch Contact:', err);
+      }
+    }
+
+    // ── STRATEGY 2: Zoho Accounts API ──
     if (!email) {
       try {
         const accountsUser = await fetchZohoAccountsUser();
@@ -108,37 +129,13 @@ export default function PortalCallback() {
       }
     }
 
-    // ── STRATEGY 3: Portal user registry (admin-set during invitation) ──
-    if (email) {
+    // ── STRATEGY 3: Registry lookup (if we have email but no name yet) ──
+    if (email && !isReal(displayName)) {
       const registryEntry = findPortalUser(email);
       if (registryEntry) {
-        if (!isReal(displayName) && isReal(registryEntry.name)) {
-          displayName = registryEntry.name;
-        }
+        if (isReal(registryEntry.name)) displayName = registryEntry.name;
         if (!contactId) contactId = registryEntry.contactId || '';
       }
-    } else {
-      // No email at all — try most recently invited active user
-      const allUsers = getAllPortalUsers();
-      const active = allUsers.find(u => u.active);
-      if (active) {
-        email = active.email;
-        if (!isReal(displayName) && isReal(active.name)) displayName = active.name;
-        contactId = active.contactId || '';
-      }
-    }
-
-    // ── STRATEGY 4: CRM Contact search by email ──
-    if (email && !isReal(displayName)) {
-      setStatusText('Resolving your profile...');
-      try {
-        const contact = await searchContactByEmail(email);
-        if (contact?.name && isReal(contact.name)) {
-          displayName = contact.name;
-          if (contact.contactId) contactId = contact.contactId;
-          console.log('[Portal Auth] Resolved from Contact search:', contact);
-        }
-      } catch { /* ok */ }
     }
 
     // 5. Only save a real name — never save the role-default "Founder"

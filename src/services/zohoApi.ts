@@ -1,6 +1,6 @@
 // Zoho CRM API client — calls Zoho APIs directly using the access token from localStorage.
 
-import { loadToken } from './oauth';
+import { loadToken, loadApiDomain } from './oauth';
 
 const isDev = import.meta.env.DEV;
 
@@ -12,6 +12,11 @@ function buildCrmUrl(apiPath: string): string {
 function buildAccountsUrl(apiPath: string): string {
   if (isDev) return `/zoho-accounts-proxy${apiPath}`;
   return `https://accounts.zoho.in${apiPath}`;
+}
+
+function buildPortalCrmUrl(apiPath: string): string {
+  if (isDev) return `/portal-crm-proxy${apiPath}`;
+  return `https://launchpad.zcrmportals.in${apiPath}`;
 }
 
 function authHeader(): HeadersInit {
@@ -288,10 +293,29 @@ export interface ZohoCurrentUser {
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   try {
     ensureToken();
-    const url = buildCrmUrl('/crm/v2/users?type=CurrentUser');
-    const res = await fetch(url, { headers: authHeader() });
-    const json = await res.json() as { users?: ZohoCurrentUser[] };
-    return json.users?.[0] ?? null;
+    // Try zohoapis.in v2 (admin tokens)
+    for (const ver of ['/crm/v2/', '/crm/v6/']) {
+      try {
+        const url = buildCrmUrl(`${ver}users?type=CurrentUser`);
+        const res = await fetch(url, { headers: authHeader() });
+        if (res.ok) {
+          const json = await res.json() as { users?: ZohoCurrentUser[] };
+          if (json.users?.[0]) return json.users[0];
+        }
+      } catch { /* next */ }
+    }
+    // Try portal domain (portal tokens are only valid on zcrmportals.in)
+    try {
+      const url = buildPortalCrmUrl('/crm/v6/users?type=CurrentUser');
+      console.log('[CRM] fetchCurrentZohoUser portal domain:', url);
+      const res = await fetch(url, { headers: authHeader() });
+      console.log('[CRM] fetchCurrentZohoUser portal domain status:', res.status);
+      if (res.ok) {
+        const json = await res.json() as { users?: ZohoCurrentUser[] };
+        if (json.users?.[0]) return json.users[0];
+      }
+    } catch { /* ok */ }
+    return null;
   } catch {
     return null;
   }
@@ -357,9 +381,36 @@ export async function fetchUserPhoto(): Promise<string | null> {
 }
 
 /**
+ * Search for a CRM Contact by email (v6 API — works with portal tokens).
+ */
+export async function searchContactByEmailV6(email: string): Promise<{ name: string; contactId: string } | null> {
+  const token = loadToken();
+  if (!token || !email) return null;
+
+  try {
+    const url = buildCrmUrl(`/crm/v6/Contacts/search?email=${encodeURIComponent(email)}`);
+    console.log('[CRM] searchContactByEmailV6 URL:', url);
+    const res = await fetch(url, { headers: authHeader() });
+    console.log('[CRM] searchContactByEmailV6 status:', res.status);
+    if (!res.ok || res.status === 204) return null;
+
+    const json = await res.json() as { data?: Array<Record<string, unknown>> };
+    const contact = json.data?.[0];
+    if (!contact) return null;
+
+    const firstName = (contact.First_Name || '') as string;
+    const lastName = (contact.Last_Name || '') as string;
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+    return fullName ? { name: fullName, contactId: String(contact.id || '') } : null;
+  } catch (err) {
+    console.warn('[CRM] searchContactByEmailV6 error:', err);
+    return null;
+  }
+}
+
+/**
  * Search for a CRM Contact by email and return their name + id.
- * Works with the portal user's own token via zoho-crm-proxy.
- * This is a client-side fallback for when /api/portal-identity is unavailable.
+ * Uses v2 API — works with admin tokens.
  */
 export async function searchContactByEmail(email: string): Promise<{ name: string; contactId: string } | null> {
   const token = loadToken();
@@ -388,9 +439,24 @@ export async function searchContactByEmail(email: string): Promise<{ name: strin
   }
 }
 
+function extractContact(contact: Record<string, unknown>): { name: string; email: string; contactId: string } | null {
+  const firstName = (contact.First_Name || '') as string;
+  const lastName = (contact.Last_Name || '') as string;
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
+  const contactEmail = (contact.Email || '') as string;
+  if (!fullName && !contactEmail) return null;
+  return {
+    name: fullName,
+    email: contactEmail.toLowerCase(),
+    contactId: String(contact.id || ''),
+  };
+}
+
 /**
- * Fetch the current user's Contact record from CRM by email.
- * Uses the access token directly to call the Zoho CRM API.
+ * Fetch the current user's Contact record from CRM.
+ * Portal tokens (from zcrmportals.in) are NOT recognized by www.zohoapis.in,
+ * so we must call through the portal domain itself for portal users.
+ * Tries: portal domain API → zohoapis.in v6 → zohoapis.in v2.
  */
 export async function fetchPortalUserContact(): Promise<{ name: string; email: string; contactId: string } | null> {
   const token = loadToken();
@@ -400,44 +466,94 @@ export async function fetchPortalUserContact(): Promise<{ name: string; email: s
   const session = loadPortalSession();
   const email = session?.email;
 
+  // If we already have the email from session, try search
   if (email) {
+    for (const searchFn of [searchContactByEmailV6, searchContactByEmail]) {
+      try {
+        const result = await searchFn(email);
+        if (result) return { ...result, email };
+      } catch { /* next */ }
+    }
+  }
+
+  // Strategy 1: Portal domain API — the portal's own server recognizes its tokens
+  const portalPaths = [
+    '/crm/v6/Contacts?per_page=1',
+    '/crm/v2/Contacts?per_page=1',
+    '/crm/v6/users?type=CurrentUser',
+  ];
+  for (const path of portalPaths) {
     try {
-      const result = await searchContactByEmail(email);
-      if (result) return { ...result, email };
-    } catch { /* fall through */ }
+      const url = buildPortalCrmUrl(path);
+      console.log('[CRM] Portal domain try:', url);
+      const res = await fetch(url, { headers: authHeader() });
+      console.log('[CRM] Portal domain response:', res.status);
+      if (res.ok && res.status !== 204) {
+        const json = await res.json() as Record<string, unknown>;
+
+        // Handle /users response format
+        if (path.includes('/users')) {
+          const users = (json as { users?: Array<Record<string, unknown>> }).users;
+          const user = users?.[0];
+          if (user) {
+            const firstName = (user.first_name || '') as string;
+            const lastName = (user.last_name || '') as string;
+            const fullName = (user.full_name || [firstName, lastName].filter(Boolean).join(' ')) as string;
+            const userEmail = (user.email || '') as string;
+            if (fullName || userEmail) {
+              console.log('[CRM] Got user from portal domain:', fullName, userEmail);
+              return { name: fullName, email: userEmail.toLowerCase(), contactId: String(user.id || '') };
+            }
+          }
+          continue;
+        }
+
+        // Handle /Contacts response format
+        const contacts = (json as { data?: Array<Record<string, unknown>> }).data;
+        const contact = contacts?.[0];
+        if (contact) {
+          const result = extractContact(contact);
+          if (result) {
+            console.log('[CRM] Got contact from portal domain:', result);
+            return result;
+          }
+        }
+      }
+    } catch (err) { console.warn('[CRM] Portal domain failed for', path, err); }
   }
 
-  try {
-    const url = buildCrmUrl('/crm/v2/Contacts?per_page=1');
-    const res = await fetch(url, { headers: authHeader() });
-    if (!res.ok || res.status === 204) return null;
-
-    const json = await res.json() as { data?: Array<Record<string, unknown>> };
-    const contact = json.data?.[0];
-    if (!contact) return null;
-
-    const firstName = (contact.First_Name || '') as string;
-    const lastName = (contact.Last_Name || '') as string;
-    const fullName = [firstName, lastName].filter(Boolean).join(' ');
-    const contactEmail = (contact.Email || '') as string;
-
-    return {
-      name: fullName || '',
-      email: contactEmail.toLowerCase(),
-      contactId: String(contact.id || ''),
-    };
-  } catch {
-    return null;
+  // Strategy 2: zohoapis.in v6 (in case portal token works with v6)
+  for (const ver of ['/crm/v6/', '/crm/v2/']) {
+    try {
+      const url = buildCrmUrl(`${ver}Contacts?per_page=1`);
+      const res = await fetch(url, { headers: authHeader() });
+      if (res.ok && res.status !== 204) {
+        const json = await res.json() as { data?: Array<Record<string, unknown>> };
+        const contact = json.data?.[0];
+        if (contact) {
+          const result = extractContact(contact);
+          if (result) return result;
+        }
+      }
+    } catch { /* next */ }
   }
+
+  return null;
 }
 
 export async function fetchZohoOrgName(): Promise<string | null> {
   try {
     ensureToken();
-    const url = buildCrmUrl('/crm/v2/org');
-    const res = await fetch(url, { headers: authHeader() });
-    const json = await res.json() as { org?: Array<{ company_name?: string }> };
-    return json.org?.[0]?.company_name ?? null;
+    // Try v6 first (portal tokens), then v2
+    for (const ver of ['/crm/v6/org', '/crm/v2/org']) {
+      const url = buildCrmUrl(ver);
+      const res = await fetch(url, { headers: authHeader() });
+      if (res.ok) {
+        const json = await res.json() as { org?: Array<{ company_name?: string }> };
+        if (json.org?.[0]?.company_name) return json.org[0].company_name;
+      }
+    }
+    return null;
   } catch {
     return null;
   }

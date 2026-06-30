@@ -258,6 +258,27 @@ export function loadApiDomain(): string | null {
 }
 
 // -----------------------------------------------------------------------------
+// Portal Login Email (captured on login page before OAuth redirect)
+// -----------------------------------------------------------------------------
+
+const PORTAL_LOGIN_EMAIL_KEY = 'lp_portal_login_email';
+
+export function savePortalLoginEmail(email: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PORTAL_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
+}
+
+export function loadPortalLoginEmail(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(PORTAL_LOGIN_EMAIL_KEY);
+}
+
+export function clearPortalLoginEmail(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(PORTAL_LOGIN_EMAIL_KEY);
+}
+
+// -----------------------------------------------------------------------------
 // Role Persistence
 // -----------------------------------------------------------------------------
 

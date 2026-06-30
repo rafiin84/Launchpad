@@ -23,6 +23,13 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/zoho-accounts-proxy/, ''),
         secure: true,
       },
+      // Proxy portal CRM API calls (portal tokens only work through the portal domain)
+      '/portal-crm-proxy': {
+        target: 'https://launchpad.zcrmportals.in',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/portal-crm-proxy/, ''),
+        secure: true,
+      },
     },
   },
 })

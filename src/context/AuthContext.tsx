@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
+import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName, loadPortalLoginEmail } from '../services/oauth';
+import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
@@ -187,19 +187,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch { /* ok */ }
         }
 
-        // Use portal session email as last resort
-        const emailForLookup = resolvedEmail || session?.email || '';
+        // Use portal session email, or the email captured on login page
+        const loginEmail = loadPortalLoginEmail();
+        const emailForLookup = resolvedEmail || session?.email || loginEmail || '';
 
-        // ── FALLBACK 2: Search CRM Contacts directly ──
+        // If still no name, use name from session (may have been set by PortalCallback)
+        if (!isRealN(resolvedName) && session?.name && isRealN(session.name)) {
+          updateNameAndSession(session.name, session.contactId, session.email);
+        }
+
+        // ── FALLBACK 2: Search CRM Contacts directly (v6 then v2) ──
         console.log('[Auth] Portal flow — emailForLookup:', emailForLookup, 'resolvedName:', resolvedName);
         if (emailForLookup && !isRealN(resolvedName)) {
           try {
-            const contact = await searchContactByEmail(emailForLookup);
-            console.log('[Auth] searchContactByEmail result:', contact);
+            const contact = await searchContactByEmailV6(emailForLookup);
+            console.log('[Auth] searchContactByEmailV6 result:', contact);
             if (contact?.name && isRealN(contact.name)) {
               updateNameAndSession(contact.name, contact.contactId);
             }
-          } catch (err) { console.warn('[Auth] searchContactByEmail error:', err); }
+          } catch (err) { console.warn('[Auth] searchContactByEmailV6 error:', err); }
+          if (!isRealN(resolvedName)) {
+            try {
+              const contact = await searchContactByEmail(emailForLookup);
+              console.log('[Auth] searchContactByEmail result:', contact);
+              if (contact?.name && isRealN(contact.name)) {
+                updateNameAndSession(contact.name, contact.contactId);
+              }
+            } catch (err) { console.warn('[Auth] searchContactByEmail error:', err); }
+          }
         }
 
         // Try to look up the user in the appusers CRM module via portal session email
@@ -231,17 +246,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveUserName(user.full_name);
       }
 
-      // Always try to resolve name from Contacts by email (First_Name + Last_Name)
+      // Always try to resolve name from Contacts by email (v6 first, then v2)
       console.log('[Auth] CRM user flow — searching Contacts for email:', user.email);
       if (user.email) {
+        let found = false;
         try {
-          const contact = await searchContactByEmail(user.email);
-          console.log('[Auth] CRM user Contact search result:', contact);
+          const contact = await searchContactByEmailV6(user.email);
+          console.log('[Auth] CRM user Contact search v6 result:', contact);
           if (contact?.name && contact.name !== 'Founder' && contact.name !== 'Investor') {
             setUserName(contact.name);
             saveUserName(contact.name);
+            found = true;
           }
         } catch { /* ok */ }
+        if (!found) {
+          try {
+            const contact = await searchContactByEmail(user.email);
+            console.log('[Auth] CRM user Contact search v2 result:', contact);
+            if (contact?.name && contact.name !== 'Founder' && contact.name !== 'Investor') {
+              setUserName(contact.name);
+              saveUserName(contact.name);
+            }
+          } catch { /* ok */ }
+        }
       }
 
       setZohoProfile({

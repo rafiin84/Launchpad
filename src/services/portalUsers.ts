@@ -159,3 +159,51 @@ export function loadPortalSession(): PortalSession | null {
 export function clearPortalSession() {
   try { localStorage.removeItem(PORTAL_SESSION_KEY); } catch { /* ok */ }
 }
+
+// ─── Pre-registered portal users (seeded from CRM) ─────────────────────────
+// These are the known portal users from the CRM org. When a portal user logs in
+// and API calls fail (portal tokens can't call zohoapis.in), we match by email
+// (captured on the login page) or ZUID.
+
+const KNOWN_PORTAL_USERS: Array<{ email: string; name: string; contactId: string; zuid: string }> = [
+  { email: 'devanand@gmail.com', name: 'Dev Anand', contactId: '', zuid: '50043237416' },
+  { email: 'sgharshkiran@gmail.com', name: 'Harsh Kiran', contactId: '', zuid: '50043237521' },
+  { email: 'rafiin84@gmail.com', name: 'Mohammed Rafi', contactId: '1325828000000567004', zuid: '50043289168' },
+  { email: 'sharathojas@gmail.com', name: 'Sharath Rajagopalan', contactId: '', zuid: '50043339345' },
+];
+
+/**
+ * Seed the portal users registry with known CRM portal users.
+ * Only adds users that don't already exist in the registry.
+ */
+export function seedKnownPortalUsers() {
+  const registry = loadRegistry();
+  let added = 0;
+  for (const user of KNOWN_PORTAL_USERS) {
+    const exists = registry.some(e => e.email.toLowerCase() === user.email.toLowerCase());
+    if (!exists) {
+      registry.push({
+        email: user.email,
+        role: 'founder',
+        name: user.name,
+        contactId: user.contactId,
+        invitedAt: new Date().toISOString(),
+        active: true,
+        status: 'active',
+      });
+      added++;
+    }
+  }
+  if (added > 0) saveRegistry(registry);
+}
+
+/**
+ * Find a portal user by ZUID (Zoho User ID).
+ * Used when we can't get the email from API calls but have the ZUID from somewhere.
+ */
+export function findPortalUserByZuid(zuid: string): PortalUserEntry | null {
+  if (!zuid) return null;
+  const known = KNOWN_PORTAL_USERS.find(u => u.zuid === zuid);
+  if (!known) return null;
+  return findPortalUser(known.email);
+}

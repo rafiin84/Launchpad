@@ -5,7 +5,7 @@ import {
   consumePendingToken, saveToken, loadToken, consumePendingRole,
   saveUserName, clearToken, clearRole, clearUserName,
 } from '../services/oauth';
-import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail, fetchPortalUserContact } from '../services/zohoApi';
+import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
 import { fullProfileSync, uploadAppUserPhoto, clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
 import { findPortalUser, savePortalSession, clearPortalSession } from '../services/portalUsers';
 import { useAuth } from '../context/AuthContext';
@@ -190,7 +190,16 @@ export default function Callback() {
         return;
       }
 
-      // Additional name resolution via CRM Contact search
+      // Additional name resolution via CRM Contact search (v6 then v2)
+      if (!isRealN(portalName)) {
+        try {
+          const contact = await searchContactByEmailV6(email);
+          if (contact?.name && isRealN(contact.name)) {
+            portalName = contact.name;
+            if (contact.contactId) portalContactId = contact.contactId;
+          }
+        } catch { /* ok */ }
+      }
       if (!isRealN(portalName)) {
         try {
           const contact = await searchContactByEmail(email);
