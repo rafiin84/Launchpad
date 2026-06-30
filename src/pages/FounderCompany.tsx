@@ -77,7 +77,10 @@ function load(): CompanyData {
   return EMPTY;
 }
 
-function save(d: CompanyData) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function save(d: CompanyData) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+  window.dispatchEvent(new Event('founder-company-updated'));
+}
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
 const INDUSTRIES = ['SaaS', 'Fintech', 'Healthtech', 'Edtech', 'E-commerce', 'Marketplace', 'AI/ML', 'Hardware', 'Deep Tech', 'Consumer', 'Enterprise', 'Other'];

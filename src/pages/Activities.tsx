@@ -91,7 +91,7 @@ function compressImage(file: File): Promise<string> {
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
 function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
-  const { currentUser, isInvestor, isFounder } = useAuth();
+  const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded]       = useState(false);
@@ -167,7 +167,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         title:        title.trim(),
         activityType,
         content:      content.trim(),
-        companyName:  '',
+        companyName:  founderCompanyName,
         authorName:   currentUser.name,
         tags:         '',
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',

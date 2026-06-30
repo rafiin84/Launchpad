@@ -89,9 +89,9 @@ interface FormState {
   imagePreview: string;// local preview src (blob URL or same as imageData)
 }
 
-const empty = (name: string): FormState => ({
+const empty = (name: string, companyName: string): FormState => ({
   title: '', activityType: '', content: '',
-  companyName: '', authorName: name,
+  companyName, authorName: name,
   tags: '', imageUrl: '', imageData: '', imagePreview: '',
 });
 
@@ -107,10 +107,10 @@ function validate(f: FormState): Record<string, string> {
 
 export default function AddActivity() {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, founderCompanyName } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState<FormState>(empty(currentUser.name));
+  const [form, setForm] = useState<FormState>(empty(currentUser.name, founderCompanyName));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');

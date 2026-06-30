@@ -34,6 +34,7 @@ interface AuthContextValue {
   appUserRecordId: string | null;
   portalSession: PortalSession | null;
   isPortalUser: boolean;
+  founderCompanyName: string;
   coverImage: string;
   setCoverImage: (dataUrl: string) => void;
   /** Set avatar directly from a data URL (local fallback when CRM isn't available) */
@@ -47,6 +48,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AVATAR_CACHE_KEY = 'lp_avatar_data';
 const COVER_CACHE_KEY  = 'lp_cover_image';
+const FOUNDER_COMPANY_KEY = 'lp_founder_company';
+
+function loadFounderCompanyName(): string {
+  try {
+    const raw = localStorage.getItem(FOUNDER_COMPANY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.name || '';
+    }
+  } catch { /* ok */ }
+  return '';
+}
 
 function buildUser(role: UserRole, name?: string | null, email?: string | null): User {
   const displayName = name || (role === 'investor' ? 'Investor' : 'Founder');
@@ -99,6 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [appUserRecordId, setAppUserRecordId] = useState<string | null>(loadCachedRecordId);
   const [portalSession, setPortalSession] = useState<PortalSession | null>(loadPortalSession);
+  const [founderCompanyName, setFounderCompanyName] = useState(loadFounderCompanyName);
+
+  // Re-read founder company name when localStorage changes (e.g. after saving on Company page)
+  useEffect(() => {
+    const onStorage = () => setFounderCompanyName(loadFounderCompanyName());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('founder-company-updated', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('founder-company-updated', onStorage);
+    };
+  }, []);
 
   // Fetch photo from appusers record image API
   const fetchAvatarFromAppUsers = useCallback(async (recordId: string) => {
@@ -412,6 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         appUserRecordId,
         portalSession,
         isPortalUser: portalSession?.isPortalUser ?? false,
+        founderCompanyName,
         coverImage,
         setCoverImage,
         setProfileImage,
