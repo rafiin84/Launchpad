@@ -104,9 +104,10 @@ export async function zohoList(module: string, params: Record<string, string> = 
   return json.data ?? [];
 }
 
-export async function zohoGetById(module: string, id: string): Promise<ZohoRecord | null> {
+export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
   ensureToken();
-  const apiPath = `/crm/v2/${module}/${id}`;
+  const qs = fields ? `?fields=${fields}` : '';
+  const apiPath = `/crm/v2/${module}/${id}${qs}`;
   const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: authHeader() });
