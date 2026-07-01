@@ -120,7 +120,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
     setGenerating(true);
     try {
       const [acts, portfolio, deals, apps, founders] = await Promise.all([
-        fetchSharedActivities(isFounder).catch(() => []),
+        fetchSharedActivities().catch(() => []),
         fetchCRMPortfolio().catch(() => []),
         fetchCRMDeals().catch(() => []),
         fetchCRMApplications().catch(() => []),
@@ -180,7 +180,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? imageData : '',
       };
-      const activity = await postSharedActivity(fields, isFounder);
+      const activity = await postSharedActivity(fields);
 
       // Trigger notification for the new post
       addNotification({
@@ -459,7 +459,7 @@ export default function Activities() {
   const load = () => {
     if (!isConnected) { setLoading(false); return; }
     setLoading(true); setError('');
-    fetchSharedActivities(isFounder)
+    fetchSharedActivities()
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
