@@ -3,12 +3,15 @@
  *
  * Shared activity feed for both Founders (portal) and Investors (admin).
  *
- * All CRM operations go through /api/activities (server-side).
- * The server tries: admin token → portal-domain proxy → client token proxy.
- * localStorage is used as a cache for instant display.
+ * Strategy cascade:
+ * 1. Server API (/api/activities) — passes client token; server tries admin token,
+ *    portal-domain proxy, and client-token proxy server-side
+ * 2. Direct CRM (zohoapis.in) — works for admin/investor tokens from the browser
+ * 3. localStorage — offline fallback (per-browser, not shared)
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
+import { fetchCRMActivities, createCRMActivity } from './crmActivities';
 import { loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
@@ -38,48 +41,90 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+// ─── Server API ─────────────────────────────────────────────────────────────
+
+async function fetchFromServerApi(): Promise<CRMActivity[]> {
+  const res = await fetch('/api/activities', { headers: authHeaders() });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) throw new Error('Non-JSON response');
+  const json = await res.json() as { activities?: CRMActivity[] };
+  return json.activities || [];
+}
+
+async function postToServerApi(fields: CRMActivityFields): Promise<string> {
+  const res = await fetch('/api/activities', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw new Error(`API POST ${res.status}`);
+  const json = await res.json() as { activity?: { id: string } };
+  if (!json.activity?.id) throw new Error('No activity ID');
+  return json.activity.id;
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────────
+
 export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
+  let serverActivities: CRMActivity[] = [];
 
+  // Strategy 1: Server API (handles admin token + portal proxy + client proxy)
   try {
-    const res = await fetch('/api/activities', { headers: authHeaders() });
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) throw new Error('Non-JSON response');
-    const json = await res.json() as { activities?: CRMActivity[] };
-    const serverActivities = json.activities || [];
+    serverActivities = await fetchFromServerApi();
+    console.log('[Activities] Fetched from server API:', serverActivities.length);
+  } catch (e1) {
+    console.warn('[Activities] Server API failed:', e1);
 
-    console.log('[Activities] Fetched from server:', serverActivities.length);
-
-    if (serverActivities.length === 0) return localActivities;
-
-    const serverIds = new Set(serverActivities.map(a => a.id));
-    const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
-    const merged = [...localOnly, ...serverActivities];
-
-    saveLocal(merged);
-    return merged;
-  } catch (err) {
-    console.warn('[Activities] Server fetch failed:', err);
-    return localActivities;
+    // Strategy 2: Direct CRM (works for investor/admin tokens from browser)
+    try {
+      serverActivities = await fetchCRMActivities();
+      console.log('[Activities] Fetched from direct CRM:', serverActivities.length);
+    } catch (e2) {
+      console.warn('[Activities] Direct CRM failed:', e2);
+    }
   }
+
+  // If server returned empty but we got results, check if API returned 0 records
+  // vs actual empty module — try direct CRM as backup
+  if (serverActivities.length === 0) {
+    try {
+      const directActivities = await fetchCRMActivities();
+      if (directActivities.length > 0) {
+        console.log('[Activities] Direct CRM backup found:', directActivities.length);
+        serverActivities = directActivities;
+      }
+    } catch { /* direct CRM not available (portal users) */ }
+  }
+
+  if (serverActivities.length === 0) return localActivities;
+
+  const serverIds = new Set(serverActivities.map(a => a.id));
+  const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
+  const merged = [...localOnly, ...serverActivities];
+
+  saveLocal(merged);
+  return merged;
 }
 
 export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
   let id: string | null = null;
 
+  // Strategy 1: Server API
   try {
-    const res = await fetch('/api/activities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(fields),
-    });
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const json = await res.json() as { activity?: { id: string } };
-    id = json.activity?.id || null;
-    if (id) console.log('[Activities] Posted via server, id:', id);
-  } catch (err) {
-    console.warn('[Activities] Server post failed:', err);
+    id = await postToServerApi(fields);
+    console.log('[Activities] Posted via server API, id:', id);
+  } catch (e1) {
+    console.warn('[Activities] Server API post failed:', e1);
+
+    // Strategy 2: Direct CRM (works for investors)
+    try {
+      id = await createCRMActivity(fields);
+      console.log('[Activities] Posted via direct CRM, id:', id);
+    } catch (e2) {
+      console.warn('[Activities] Direct CRM post failed:', e2);
+    }
   }
 
   const activity: CRMActivity = { id: id || generateLocalId(), ...fields };
