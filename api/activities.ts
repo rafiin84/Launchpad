@@ -1,15 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { crmRequest } from './_zohoAdmin';
 
 /**
  * /api/activities — Server-side shared activity feed.
  *
- * Uses an admin CRM token so both Founders (portal users) and Investors
- * can read/write the My_Activities module without needing direct CRM access.
+ * Strategy cascade:
+ * 1. Admin token (env vars) → zohoapis.in — guaranteed for all users
+ * 2. Client's portal token → zcrmportals.in (server-side, bypasses CORS)
  *
- * GET  /api/activities                 → { activities: CRMActivity[] }
- * POST /api/activities   body: fields  → { activity: CRMActivity }
+ * GET  /api/activities  → { activities: Activity[] }
+ * POST /api/activities  → { activity: Activity }
  */
+
+const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
+const ZOHO_API_BASE = 'https://www.zohoapis.in';
+const PORTAL_CRM_BASE = 'https://launchpad.zcrmportals.in';
 
 const MODULE = 'My_Activities';
 
@@ -57,31 +61,132 @@ function fromRecord(r: Record<string, unknown>): Activity {
   };
 }
 
+// ─── Admin token (env vars) ─────────────────────────────────────────────────
+
+let cachedAdminToken: string | null = null;
+let adminTokenExpiresAt = 0;
+
+async function getAdminToken(): Promise<string | null> {
+  const clientId = process.env.ZOHO_CLIENT_ID;
+  const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+  const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  if (cachedAdminToken && Date.now() < adminTokenExpiresAt - 60_000) {
+    return cachedAdminToken;
+  }
+
+  const params = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+  });
+
+  const res = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  const data = await res.json() as { access_token?: string; expires_in?: number };
+  if (!data.access_token) return null;
+
+  cachedAdminToken = data.access_token;
+  adminTokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedAdminToken;
+}
+
+// ─── CRM request helpers ────────────────────────────────────────────────────
+
+async function crmFetch(base: string, token: string, path: string): Promise<Activity[]> {
+  const url = `${base}${path}`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  if (res.status === 204) return [];
+  if (!res.ok) throw new Error(`CRM GET ${res.status}: ${await res.text()}`);
+  const json = await res.json() as { data?: Array<Record<string, unknown>> };
+  return (json.data || []).map(fromRecord);
+}
+
+async function crmPost(base: string, token: string, payload: Record<string, unknown>): Promise<string> {
+  const url = `${base}/crm/v2/${MODULE}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data: [payload] }),
+  });
+  if (!res.ok) throw new Error(`CRM POST ${res.status}: ${await res.text()}`);
+  const json = await res.json() as {
+    data?: Array<{ code: string; status: string; details: { id: string } }>;
+  };
+  const record = json.data?.[0];
+  if (!record || record.code !== 'SUCCESS') {
+    throw new Error(`CRM create failed: ${JSON.stringify(record)}`);
+  }
+  return record.details.id;
+}
+
+// ─── Handler ────────────────────────────────────────────────────────────────
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const clientToken = (req.headers.authorization || '').replace(/^Zoho-oauthtoken\s+/i, '');
+  const listPath = `/crm/v2/${MODULE}?per_page=200&sort_by=Modified_Time&sort_order=desc&fields=${ALL_FIELDS}`;
+
   try {
     if (req.method === 'GET') {
-      const result = await crmRequest(
-        'GET',
-        `/crm/v2/${MODULE}?per_page=200&sort_by=Modified_Time&sort_order=desc&fields=${ALL_FIELDS}`,
-      );
+      // Strategy 1: Admin token
+      const adminToken = await getAdminToken().catch(() => null);
+      if (adminToken) {
+        try {
+          const activities = await crmFetch(ZOHO_API_BASE, adminToken, listPath);
+          console.log('[activities] GET via admin token:', activities.length);
+          return res.status(200).json({ activities });
+        } catch (e) {
+          console.warn('[activities] Admin GET failed:', e);
+        }
+      }
 
-      const data = result.data as { data?: Array<Record<string, unknown>> } | null;
-      const activities = (data?.data || []).map(fromRecord);
+      // Strategy 2: Client's portal token → portal domain
+      if (clientToken) {
+        try {
+          const activities = await crmFetch(PORTAL_CRM_BASE, clientToken, listPath);
+          console.log('[activities] GET via portal proxy:', activities.length);
+          return res.status(200).json({ activities });
+        } catch (e) {
+          console.warn('[activities] Portal proxy GET failed:', e);
+        }
+      }
 
-      return res.status(200).json({ activities });
+      // Strategy 3: Client's token → standard CRM (for investors)
+      if (clientToken) {
+        try {
+          const activities = await crmFetch(ZOHO_API_BASE, clientToken, listPath);
+          console.log('[activities] GET via client token:', activities.length);
+          return res.status(200).json({ activities });
+        } catch (e) {
+          console.warn('[activities] Client CRM GET failed:', e);
+        }
+      }
+
+      return res.status(200).json({ activities: [] });
     }
 
     if (req.method === 'POST') {
       const fields = req.body;
-
       if (!fields || typeof fields !== 'object' || !fields.title) {
-        return res.status(400).json({ error: 'Activity fields required (title, content, etc.)' });
+        return res.status(400).json({ error: 'Activity fields required' });
       }
 
       const payload: Record<string, unknown> = {};
@@ -90,29 +195,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (val !== '') payload[crmKey] = val;
       }
 
-      const result = await crmRequest('POST', `/crm/v2/${MODULE}`, {
-        data: [payload],
-      });
-
-      const responseData = result.data as {
-        data?: Array<{ code: string; status: string; details: { id: string } }>;
-      };
-      const record = responseData?.data?.[0];
-
-      if (!record || record.code !== 'SUCCESS') {
-        return res.status(500).json({
-          error: 'Failed to create activity in CRM',
-          detail: record,
-        });
+      // Strategy 1: Admin token
+      const adminToken = await getAdminToken().catch(() => null);
+      if (adminToken) {
+        try {
+          const id = await crmPost(ZOHO_API_BASE, adminToken, payload);
+          console.log('[activities] POST via admin token, id:', id);
+          return res.status(200).json({ activity: { id, ...fields } });
+        } catch (e) {
+          console.warn('[activities] Admin POST failed:', e);
+        }
       }
 
-      const activity: Activity = { id: record.details.id, ...fields };
-      return res.status(200).json({ activity });
+      // Strategy 2: Client's portal token → portal domain
+      if (clientToken) {
+        try {
+          const id = await crmPost(PORTAL_CRM_BASE, clientToken, payload);
+          console.log('[activities] POST via portal proxy, id:', id);
+          return res.status(200).json({ activity: { id, ...fields } });
+        } catch (e) {
+          console.warn('[activities] Portal proxy POST failed:', e);
+        }
+      }
+
+      // Strategy 3: Client's token → standard CRM
+      if (clientToken) {
+        try {
+          const id = await crmPost(ZOHO_API_BASE, clientToken, payload);
+          console.log('[activities] POST via client token, id:', id);
+          return res.status(200).json({ activity: { id, ...fields } });
+        } catch (e) {
+          console.warn('[activities] Client CRM POST failed:', e);
+        }
+      }
+
+      return res.status(500).json({ error: 'All CRM strategies failed' });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('[/api/activities] Error:', err);
+    console.error('[activities] Error:', err);
     return res.status(500).json({
       error: 'Internal server error',
       message: err instanceof Error ? err.message : String(err),
