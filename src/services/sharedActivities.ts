@@ -14,7 +14,8 @@
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
-import { portalList, portalCreate, type ZohoRecord } from './zohoApi';
+import { type ZohoRecord } from './zohoApi';
+import { loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -91,25 +92,36 @@ async function postToApi(fields: CRMActivityFields): Promise<string> {
   return json.activity.id;
 }
 
-// ─── Portal-domain CRM ──────────────────────────────────────────────────────
+// ─── Portal proxy (server-side, bypasses CORS) ─────────────────────────────
 
-async function fetchFromPortal(): Promise<CRMActivity[]> {
-  const records = await portalList(MODULE, {
-    per_page: '200',
-    sort_by: 'Modified_Time',
-    sort_order: 'desc',
-    fields: ALL_FIELDS,
+async function fetchFromPortalProxy(): Promise<CRMActivity[]> {
+  const token = loadToken();
+  if (!token) throw new Error('No token for portal proxy');
+  const res = await fetch('/api/portal-activities', {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
-  return records.map(fromRecord);
+  if (!res.ok) throw new Error(`Portal proxy ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) throw new Error('Portal proxy returned non-JSON');
+  const json = await res.json() as { activities?: CRMActivity[] };
+  return json.activities || [];
 }
 
-async function postToPortal(fields: CRMActivityFields): Promise<string> {
-  const payload: Record<string, unknown> = {};
-  for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
-    const raw = (fields as Record<string, string>)[formKey] ?? '';
-    if (raw !== '') payload[crmKey] = raw;
-  }
-  return portalCreate(MODULE, payload);
+async function postToPortalProxy(fields: CRMActivityFields): Promise<string> {
+  const token = loadToken();
+  if (!token) throw new Error('No token for portal proxy');
+  const res = await fetch('/api/portal-activities', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Zoho-oauthtoken ${token}`,
+    },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw new Error(`Portal proxy POST ${res.status}`);
+  const json = await res.json() as { activity?: { id: string } };
+  if (!json.activity?.id) throw new Error('No activity ID from portal proxy');
+  return json.activity.id;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -132,12 +144,12 @@ export async function fetchSharedActivities(_isFounder?: boolean): Promise<CRMAc
     } catch (e2) {
       console.warn('[Activities] Standard CRM failed:', e2);
 
-      // Try portal-domain CRM (works for portal tokens)
+      // Try portal proxy (server-side, bypasses CORS for portal tokens)
       try {
-        serverActivities = await fetchFromPortal();
-        console.log('[Activities] Fetched from portal CRM:', serverActivities.length);
+        serverActivities = await fetchFromPortalProxy();
+        console.log('[Activities] Fetched from portal proxy:', serverActivities.length);
       } catch (e3) {
-        console.warn('[Activities] Portal CRM failed:', e3);
+        console.warn('[Activities] Portal proxy failed:', e3);
       }
     }
   }
@@ -172,12 +184,12 @@ export async function postSharedActivity(
     } catch (e2) {
       console.warn('[Activities] Standard CRM post failed:', e2);
 
-      // Try portal-domain CRM
+      // Try portal proxy (server-side, bypasses CORS)
       try {
-        id = await postToPortal(fields);
-        console.log('[Activities] Posted via portal CRM, id:', id);
+        id = await postToPortalProxy(fields);
+        console.log('[Activities] Posted via portal proxy, id:', id);
       } catch (e3) {
-        console.warn('[Activities] Portal CRM post failed:', e3);
+        console.warn('[Activities] Portal proxy post failed:', e3);
       }
     }
   }
