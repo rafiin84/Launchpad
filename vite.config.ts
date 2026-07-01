@@ -9,6 +9,12 @@ export default defineConfig({
   ],
   server: {
     proxy: {
+      // Proxy /api calls to the Vercel deployment (serverless functions)
+      '/api': {
+        target: 'https://launchpad-iota-ten.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
       // Proxy Zoho CRM API calls to bypass CORS in local dev
       '/zoho-crm-proxy': {
         target: 'https://www.zohoapis.in',
