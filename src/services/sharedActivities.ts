@@ -1,20 +1,50 @@
 /**
  * sharedActivities.ts
  *
- * Shared activity feed for both Founders (portal) and Investors (admin).
+ * Shared activity feed — pure client-side CRM calls.
  *
- * Strategy cascade:
- * 1. Server API (/api/activities) — passes client token; server tries admin token,
- *    portal-domain proxy, and client-token proxy server-side
- * 2. Direct CRM (zohoapis.in) — works for admin/investor tokens from the browser
- * 3. localStorage — offline fallback (per-browser, not shared)
+ * Investors (admin tokens) → zohoapis.in (via zohoList/zohoCreate)
+ * Founders (portal tokens) → zcrmportals.in (via portalList/portalCreate)
+ * Fallback → localStorage cache
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
-import { loadToken } from './oauth';
+import { portalList, portalCreate, type ZohoRecord } from './zohoApi';
 
 const STORAGE_KEY = 'lp_shared_activities';
+const MODULE = 'My_Activities';
+
+const FIELD_MAP: Record<string, string> = {
+  title:        'Name',
+  activityType: 'Activity_Type',
+  content:      'Content',
+  companyName:  'Company_Name',
+  authorName:   'Author_Name',
+  tags:         'Activity_Tags',
+  imageUrl:     'Image_URL',
+  imageData:    'Activity_Image_Data',
+};
+const ALL_FIELDS = Object.values(FIELD_MAP).join(',');
+
+function fromRecord(r: ZohoRecord): CRMActivity {
+  const str = (key: string): string => {
+    const v = r[key];
+    if (v === null || v === undefined) return '';
+    return String(v);
+  };
+  return {
+    id:           r.id,
+    title:        str(FIELD_MAP.title),
+    activityType: str(FIELD_MAP.activityType),
+    content:      str(FIELD_MAP.content),
+    companyName:  str(FIELD_MAP.companyName),
+    authorName:   str(FIELD_MAP.authorName),
+    tags:         str(FIELD_MAP.tags),
+    imageUrl:     str(FIELD_MAP.imageUrl),
+    imageData:    str(FIELD_MAP.imageData),
+  };
+}
 
 function loadLocal(): CRMActivity[] {
   try {
@@ -34,75 +64,78 @@ function generateLocalId(): string {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
-  const token = loadToken();
-  if (token) headers['Authorization'] = `Zoho-oauthtoken ${token}`;
-  return headers;
+function isPortalUser(): boolean {
+  try {
+    const raw = localStorage.getItem('lp_portal_session');
+    if (!raw) return false;
+    const session = JSON.parse(raw);
+    return session?.isPortalUser === true;
+  } catch { return false; }
 }
 
-// ─── Server API ─────────────────────────────────────────────────────────────
+// ─── Portal-domain CRM (for founders) ──────────────────────────────────────
 
-async function fetchFromServerApi(): Promise<CRMActivity[]> {
-  const res = await fetch('/api/activities', { headers: authHeaders() });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) throw new Error('Non-JSON response');
-  const json = await res.json() as { activities?: CRMActivity[] };
-  return json.activities || [];
-}
-
-async function postToServerApi(fields: CRMActivityFields): Promise<string> {
-  const res = await fetch('/api/activities', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(fields),
+async function fetchFromPortal(): Promise<CRMActivity[]> {
+  const records = await portalList(MODULE, {
+    per_page: '200',
+    sort_by: 'Modified_Time',
+    sort_order: 'desc',
+    fields: ALL_FIELDS,
   });
-  if (!res.ok) throw new Error(`API POST ${res.status}`);
-  const json = await res.json() as { activity?: { id: string } };
-  if (!json.activity?.id) throw new Error('No activity ID');
-  return json.activity.id;
+  return records.map(fromRecord);
+}
+
+async function postToPortal(fields: CRMActivityFields): Promise<string> {
+  const payload: Record<string, unknown> = {};
+  for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
+    const raw = (fields as Record<string, string>)[formKey] ?? '';
+    if (raw !== '') payload[crmKey] = raw;
+  }
+  return portalCreate(MODULE, payload);
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
-  let serverActivities: CRMActivity[] = [];
+  let activities: CRMActivity[] = [];
+  const isFounder = isPortalUser();
 
-  // Strategy 1: Server API (handles admin token + portal proxy + client proxy)
-  try {
-    serverActivities = await fetchFromServerApi();
-    console.log('[Activities] Fetched from server API:', serverActivities.length);
-  } catch (e1) {
-    console.warn('[Activities] Server API failed:', e1);
-
-    // Strategy 2: Direct CRM (works for investor/admin tokens from browser)
+  if (isFounder) {
+    // Founders: try portal domain first, then standard CRM
     try {
-      serverActivities = await fetchCRMActivities();
-      console.log('[Activities] Fetched from direct CRM:', serverActivities.length);
-    } catch (e2) {
-      console.warn('[Activities] Direct CRM failed:', e2);
+      activities = await fetchFromPortal();
+      console.log('[Activities] Fetched from portal CRM:', activities.length);
+    } catch (e1) {
+      console.warn('[Activities] Portal CRM failed:', e1);
+      try {
+        activities = await fetchCRMActivities();
+        console.log('[Activities] Fetched from standard CRM:', activities.length);
+      } catch (e2) {
+        console.warn('[Activities] Standard CRM failed:', e2);
+      }
+    }
+  } else {
+    // Investors: try standard CRM first, then portal domain
+    try {
+      activities = await fetchCRMActivities();
+      console.log('[Activities] Fetched from standard CRM:', activities.length);
+    } catch (e1) {
+      console.warn('[Activities] Standard CRM failed:', e1);
+      try {
+        activities = await fetchFromPortal();
+        console.log('[Activities] Fetched from portal CRM:', activities.length);
+      } catch (e2) {
+        console.warn('[Activities] Portal CRM failed:', e2);
+      }
     }
   }
 
-  // If server returned empty but we got results, check if API returned 0 records
-  // vs actual empty module — try direct CRM as backup
-  if (serverActivities.length === 0) {
-    try {
-      const directActivities = await fetchCRMActivities();
-      if (directActivities.length > 0) {
-        console.log('[Activities] Direct CRM backup found:', directActivities.length);
-        serverActivities = directActivities;
-      }
-    } catch { /* direct CRM not available (portal users) */ }
-  }
+  if (activities.length === 0) return localActivities;
 
-  if (serverActivities.length === 0) return localActivities;
-
-  const serverIds = new Set(serverActivities.map(a => a.id));
+  const serverIds = new Set(activities.map(a => a.id));
   const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
-  const merged = [...localOnly, ...serverActivities];
+  const merged = [...localOnly, ...activities];
 
   saveLocal(merged);
   return merged;
@@ -110,20 +143,35 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
 
 export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
   let id: string | null = null;
+  const isFounder = isPortalUser();
 
-  // Strategy 1: Server API
-  try {
-    id = await postToServerApi(fields);
-    console.log('[Activities] Posted via server API, id:', id);
-  } catch (e1) {
-    console.warn('[Activities] Server API post failed:', e1);
-
-    // Strategy 2: Direct CRM (works for investors)
+  if (isFounder) {
+    // Founders: try portal domain first, then standard CRM
+    try {
+      id = await postToPortal(fields);
+      console.log('[Activities] Posted via portal CRM, id:', id);
+    } catch (e1) {
+      console.warn('[Activities] Portal CRM post failed:', e1);
+      try {
+        id = await createCRMActivity(fields);
+        console.log('[Activities] Posted via standard CRM, id:', id);
+      } catch (e2) {
+        console.warn('[Activities] Standard CRM post failed:', e2);
+      }
+    }
+  } else {
+    // Investors: try standard CRM first, then portal domain
     try {
       id = await createCRMActivity(fields);
-      console.log('[Activities] Posted via direct CRM, id:', id);
-    } catch (e2) {
-      console.warn('[Activities] Direct CRM post failed:', e2);
+      console.log('[Activities] Posted via standard CRM, id:', id);
+    } catch (e1) {
+      console.warn('[Activities] Standard CRM post failed:', e1);
+      try {
+        id = await postToPortal(fields);
+        console.log('[Activities] Posted via portal CRM, id:', id);
+      } catch (e2) {
+        console.warn('[Activities] Portal CRM post failed:', e2);
+      }
     }
   }
 
