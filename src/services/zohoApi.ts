@@ -14,21 +14,25 @@ function buildPortalCrmUrl(apiPath: string): string {
   return `https://launchpad.zcrmportals.in${apiPath}`;
 }
 
-function authHeader(): HeadersInit {
+function plainAuthHeader(): HeadersInit {
   const token = loadToken();
   if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
   return {
     'Authorization': `Zoho-oauthtoken ${token}`,
+  };
+}
+
+function authHeader(): HeadersInit {
+  return {
+    ...plainAuthHeader(),
     'x-crmportal': 'launchpad',
   };
 }
 
 function jsonHeaders(): HeadersInit {
-  const token = loadToken();
-  if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Zoho-oauthtoken ${token}`,
+    ...plainAuthHeader(),
     'x-crmportal': 'launchpad',
   };
 }
@@ -335,11 +339,11 @@ export interface ZohoCurrentUser {
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   try {
     ensureToken();
-    // Try zohoapis.in v2 (admin tokens)
+    // Try zohoapis.in v2 (admin tokens — no x-crmportal header)
     for (const ver of ['/crm/v2/', '/crm/v6/']) {
       try {
         const url = buildCrmUrl(`${ver}users?type=CurrentUser`);
-        const res = await fetch(url, { headers: authHeader() });
+        const res = await fetch(url, { headers: plainAuthHeader() });
         if (res.ok) {
           const json = await res.json() as { users?: ZohoCurrentUser[] };
           if (json.users?.[0]) return json.users[0];
