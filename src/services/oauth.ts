@@ -78,18 +78,28 @@ export const PortalOAuthConfig = {
 // -----------------------------------------------------------------------------
 
 if (typeof window !== "undefined") {
+  const fullUrl = window.location.href;
   const hash = window.location.hash.substring(1);
+
+  // Log the raw URL for debugging (mask token if present)
+  const safeUrl = fullUrl.replace(/access_token=[^&]+/, 'access_token=***');
+  console.log('[OAuth] Page loaded. URL:', safeUrl, '| hash length:', hash.length);
 
   if (hash) {
     try {
       const params = new URLSearchParams(hash);
 
       const token = params.get("access_token");
+      const error = params.get("error");
 
       // Log ALL hash parameters for debugging OAuth callback
       const allParams: Record<string, string> = {};
       params.forEach((v, k) => { if (k !== 'access_token') allParams[k] = v; });
       console.log('[OAuth] Hash callback params:', JSON.stringify(allParams));
+
+      if (error) {
+        console.error('[OAuth] Zoho returned error:', error, '| description:', params.get("error_description"));
+      }
 
       if (token) {
         const expiresIn = parseInt(params.get("expires_in") ?? "", 10);

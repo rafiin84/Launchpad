@@ -284,6 +284,9 @@ export default function Callback() {
           <XCircle size={32} className="text-red-400" />
           <p className="text-sm font-semibold text-gray-700">No token received</p>
           <p className="text-xs text-gray-400">Redirecting back to login...</p>
+          <p className="text-[10px] text-gray-300 mt-2 max-w-xs break-all text-center">
+            Check browser console for [OAuth] logs
+          </p>
         </>
       )}
     </div>
