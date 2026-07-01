@@ -2,20 +2,15 @@
 
 import { loadToken, loadApiDomain } from './oauth';
 
-const isDev = import.meta.env.DEV;
-
 function buildCrmUrl(apiPath: string): string {
-  if (isDev) return `/zoho-crm-proxy${apiPath}`;
   return `https://www.zohoapis.in${apiPath}`;
 }
 
 function buildAccountsUrl(apiPath: string): string {
-  if (isDev) return `/zoho-accounts-proxy${apiPath}`;
   return `https://accounts.zoho.in${apiPath}`;
 }
 
 function buildPortalCrmUrl(apiPath: string): string {
-  if (isDev) return `/portal-crm-proxy${apiPath}`;
   return `https://launchpad.zcrmportals.in${apiPath}`;
 }
 
