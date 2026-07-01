@@ -17,7 +17,10 @@ function buildPortalCrmUrl(apiPath: string): string {
 function authHeader(): HeadersInit {
   const token = loadToken();
   if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
-  return { 'Authorization': `Zoho-oauthtoken ${token}` };
+  return {
+    'Authorization': `Zoho-oauthtoken ${token}`,
+    'x-crmportal': 'launchpad',
+  };
 }
 
 function jsonHeaders(): HeadersInit {
@@ -26,6 +29,7 @@ function jsonHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Zoho-oauthtoken ${token}`,
+    'x-crmportal': 'launchpad',
   };
 }
 
