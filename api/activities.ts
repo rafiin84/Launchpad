@@ -146,15 +146,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
+      const debug: string[] = [];
+      debug.push(`clientToken: ${clientToken ? 'yes (' + clientToken.substring(0, 10) + '...)' : 'none'}`);
+
       // Strategy 1: Admin token
-      const adminToken = await getAdminToken().catch(() => null);
+      const adminToken = await getAdminToken().catch((e) => { debug.push(`admin: no env vars (${(e as Error).message})`); return null; });
       if (adminToken) {
         try {
           const activities = await crmFetch(ZOHO_API_BASE, adminToken, listPath);
-          console.log('[activities] GET via admin token:', activities.length);
-          return res.status(200).json({ activities });
+          debug.push(`admin: OK (${activities.length})`);
+          return res.status(200).json({ activities, _strategy: 'admin', _debug: debug });
         } catch (e) {
-          console.warn('[activities] Admin GET failed:', e);
+          debug.push(`admin: failed (${(e as Error).message})`);
         }
       }
 
@@ -162,10 +165,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (clientToken) {
         try {
           const activities = await crmFetch(PORTAL_CRM_BASE, clientToken, listPath);
-          console.log('[activities] GET via portal proxy:', activities.length);
-          return res.status(200).json({ activities });
+          debug.push(`portal-proxy: OK (${activities.length})`);
+          return res.status(200).json({ activities, _strategy: 'portal-proxy', _debug: debug });
         } catch (e) {
-          console.warn('[activities] Portal proxy GET failed:', e);
+          debug.push(`portal-proxy: failed (${(e as Error).message})`);
         }
       }
 
@@ -173,14 +176,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (clientToken) {
         try {
           const activities = await crmFetch(ZOHO_API_BASE, clientToken, listPath);
-          console.log('[activities] GET via client token:', activities.length);
-          return res.status(200).json({ activities });
+          debug.push(`client-crm: OK (${activities.length})`);
+          return res.status(200).json({ activities, _strategy: 'client-crm', _debug: debug });
         } catch (e) {
-          console.warn('[activities] Client CRM GET failed:', e);
+          debug.push(`client-crm: failed (${(e as Error).message})`);
         }
       }
 
-      return res.status(200).json({ activities: [] });
+      return res.status(200).json({ activities: [], _strategy: 'none', _debug: debug });
     }
 
     if (req.method === 'POST') {
