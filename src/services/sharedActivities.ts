@@ -8,7 +8,7 @@
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
-import { loadRole } from './oauth';
+import { loadRole, loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -63,14 +63,45 @@ export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivit
   }
 }
 
+async function postViaApi(fields: CRMActivityFields): Promise<string> {
+  const token = loadToken();
+  const res = await fetch('/api/activities', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
+    },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`API POST ${res.status}: ${body}`);
+  }
+  const json = await res.json() as { activity?: { id: string } };
+  if (!json.activity?.id) throw new Error('No activity id in API response');
+  return json.activity.id;
+}
+
 export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
   let id: string | null = null;
+  const role = loadRole();
 
-  try {
-    id = await createCRMActivity(fields);
-    console.log('[Activities] Posted to CRM, id:', id);
-  } catch (err) {
-    console.warn('[Activities] CRM post failed:', err);
+  if (role === 'founder') {
+    try {
+      id = await createCRMActivity(fields);
+      console.log('[Activities] Posted to CRM (direct), id:', id);
+    } catch (err) {
+      console.warn('[Activities] Direct CRM post failed:', err);
+    }
+  }
+
+  if (!id) {
+    try {
+      id = await postViaApi(fields);
+      console.log('[Activities] Posted via API endpoint, id:', id);
+    } catch (err) {
+      console.warn('[Activities] API post failed:', err);
+    }
   }
 
   const activity: CRMActivity = { id: id || generateLocalId(), ...fields };
