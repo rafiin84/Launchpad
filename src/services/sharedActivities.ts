@@ -55,7 +55,8 @@ function filterByVisibility(activities: CRMActivity[], viewerRole: string | null
 
   // Founder: see own posts + investor posts (not other founders' posts)
   return activities.filter(a => {
-    if (a.authorRole === 'investor' || !a.authorRole) return true;
+    const role = a.authorRole?.toLowerCase() || '';
+    if (role === 'investor' || !role) return true;
     if (a.authorName?.trim().toLowerCase() === viewerName.trim().toLowerCase()) return true;
     return false;
   });
