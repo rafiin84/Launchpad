@@ -181,7 +181,7 @@ export default function EditActivity() {
           if (raw) {
             const all = JSON.parse(raw) as CRMActivity[];
             const idx = all.findIndex(a => a.id === id);
-            if (idx >= 0) { all[idx] = { id: id!, ...fields }; localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); }
+            if (idx >= 0) { all[idx] = { ...all[idx], ...fields }; localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); }
           }
         } catch { /* ok */ }
       } else {
