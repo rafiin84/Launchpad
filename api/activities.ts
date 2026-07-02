@@ -29,7 +29,7 @@ const FIELD_MAP: Record<string, string> = {
   imageData:    'Activity_Image_Data',
 };
 
-const ALL_FIELDS = Object.values(FIELD_MAP).join(',');
+const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',Created_Time';
 
 interface Activity {
   id: string;
@@ -42,6 +42,7 @@ interface Activity {
   tags: string;
   imageUrl: string;
   imageData: string;
+  createdTime: string;
 }
 
 function fromRecord(r: Record<string, unknown>): Activity {
@@ -61,6 +62,7 @@ function fromRecord(r: Record<string, unknown>): Activity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
+    createdTime:  str('Created_Time'),
   };
 }
 
@@ -145,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const clientToken = (req.headers.authorization || '').replace(/^Zoho-oauthtoken\s+/i, '');
-  const listPath = `/crm/v2/${MODULE}?per_page=200&sort_by=Modified_Time&sort_order=desc&fields=${ALL_FIELDS}`;
+  const listPath = `/crm/v2/${MODULE}?per_page=200&sort_by=Created_Time&sort_order=desc&fields=${ALL_FIELDS}`;
 
   try {
     if (req.method === 'GET') {

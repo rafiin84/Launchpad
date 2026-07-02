@@ -369,6 +369,56 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
   );
 }
 
+// ─── Date helpers ────────────────────────────────────────────────────────────
+
+function formatTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + formatTime(iso);
+}
+
+function getDateGroup(iso: string): string {
+  if (!iso) return 'Earlier';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'Earlier';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const actDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (actDate.getTime() === today.getTime()) return 'Today';
+  if (actDate.getTime() === yesterday.getTime()) return 'Yesterday';
+  return 'Earlier';
+}
+
+function groupAndSort(activities: CRMActivity[]): { label: string; items: CRMActivity[] }[] {
+  const sorted = [...activities].sort((a, b) => {
+    const ta = a.createdTime ? new Date(a.createdTime).getTime() : 0;
+    const tb = b.createdTime ? new Date(b.createdTime).getTime() : 0;
+    return tb - ta;
+  });
+  const groups: { label: string; items: CRMActivity[] }[] = [];
+  const order = ['Today', 'Yesterday', 'Earlier'];
+  const map = new Map<string, CRMActivity[]>();
+  for (const a of sorted) {
+    const g = getDateGroup(a.createdTime);
+    if (!map.has(g)) map.set(g, []);
+    map.get(g)!.push(a);
+  }
+  for (const label of order) {
+    const items = map.get(label);
+    if (items?.length) groups.push({ label, items });
+  }
+  return groups;
+}
+
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
 function ActivityCard({ activity }: { activity: CRMActivity }) {
@@ -380,6 +430,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
   const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;
   const tags = activity.tags ? activity.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
   const cfg = TYPE_CONFIG[activity.activityType?.toLowerCase()] ?? { label: activity.activityType || 'Activity', bg: 'bg-gray-100', text: 'text-gray-600' };
+  const timeStr = formatDateTime(activity.createdTime);
 
   return (
     <Link
@@ -404,9 +455,18 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
         {activity.title && (
           <h3 className="text-sm font-bold text-gray-900 mb-1 leading-snug">{activity.title}</h3>
         )}
-        {activity.authorName && (
-          <p className="text-xs text-gray-400 mb-2">{activity.authorName}</p>
-        )}
+        <div className="flex items-center gap-2 mb-2">
+          {activity.authorName && (
+            <p className="text-xs text-gray-400">{activity.authorName}</p>
+          )}
+          {activity.authorName && timeStr && <span className="text-xs text-gray-300">·</span>}
+          {timeStr && (
+            <p className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock size={11} className="text-gray-300" />
+              {timeStr}
+            </p>
+          )}
+        </div>
         {activity.content && (
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
             {display}{isLong && '…'}
@@ -561,11 +621,21 @@ export default function Activities() {
         </div>
       )}
 
-      {/* Feed — single column */}
+      {/* Feed — grouped by date */}
       {!loading && !error && records.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 mt-4">
-          {records.map(activity => (
-            <ActivityCard key={activity.id} activity={activity} />
+        <div className="mt-4 space-y-6">
+          {groupAndSort(records).map(group => (
+            <div key={group.label}>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{group.label}</h2>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                {group.items.map(activity => (
+                  <ActivityCard key={activity.id} activity={activity} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

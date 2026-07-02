@@ -25,9 +25,10 @@ export interface CRMActivity {
   tags: string;
   imageUrl: string;   // public URL (from URL mode)
   imageData: string;  // compressed base64 (from file upload)
+  createdTime: string; // ISO timestamp from CRM
 }
 
-export type CRMActivityFields = Omit<CRMActivity, 'id'>;
+export type CRMActivityFields = Omit<CRMActivity, 'id' | 'createdTime'>;
 
 function fromRecord(r: ZohoRecord): CRMActivity {
   const str = (key: string): string => {
@@ -46,11 +47,12 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
+    createdTime:  str('Created_Time'),
   };
 }
 
 // Explicitly list all fields — Zoho omits large textarea fields from default list responses
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data';
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Created_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
@@ -61,7 +63,7 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
   const records = await zohoList(MODULE, {
     per_page: '200',
-    sort_by: 'Modified_Time',
+    sort_by: 'Created_Time',
     sort_order: 'desc',
     fields: ALL_FIELDS,
   });

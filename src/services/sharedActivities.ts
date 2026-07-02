@@ -29,6 +29,7 @@ function fromApiRecord(r: Record<string, unknown>): CRMActivity {
     tags:         str('tags'),
     imageUrl:     str('imageUrl'),
     imageData:    str('imageData'),
+    createdTime:  str('createdTime'),
   };
 }
 
@@ -150,7 +151,7 @@ export async function postSharedActivity(fields: CRMActivityFields): Promise<CRM
     }
   }
 
-  const activity: CRMActivity = { id: id || generateLocalId(), ...fields };
+  const activity: CRMActivity = { id: id || generateLocalId(), ...fields, createdTime: new Date().toISOString() };
 
   const local = loadLocal();
   saveLocal([activity, ...local]);
