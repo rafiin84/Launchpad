@@ -7,10 +7,29 @@
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
-import { fetchCRMActivities, createCRMActivity } from './crmActivities';
 import { loadRole, loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
+
+function fromApiRecord(r: Record<string, unknown>): CRMActivity {
+  const str = (key: string): string => {
+    const v = r[key];
+    if (v === null || v === undefined) return '';
+    return String(v);
+  };
+  return {
+    id:           str('id'),
+    title:        str('title'),
+    activityType: str('activityType'),
+    content:      str('content'),
+    companyName:  str('companyName'),
+    authorName:   str('authorName'),
+    authorRole:   str('authorRole'),
+    tags:         str('tags'),
+    imageUrl:     str('imageUrl'),
+    imageData:    str('imageData'),
+  };
+}
 
 function loadLocal(): CRMActivity[] {
   try {
@@ -41,13 +60,23 @@ function filterByVisibility(activities: CRMActivity[], viewerRole: string | null
   });
 }
 
+async function fetchViaApi(): Promise<CRMActivity[]> {
+  const token = loadToken();
+  const res = await fetch('/api/activities', {
+    headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`API GET ${res.status}`);
+  const json = await res.json() as { activities?: Array<Record<string, unknown>> };
+  return (json.activities || []).map(fromApiRecord);
+}
+
 export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
   const role = loadRole();
 
   try {
-    const activities = await fetchCRMActivities();
-    console.log('[Activities] Fetched from CRM:', activities.length);
+    const activities = await fetchViaApi();
+    console.log('[Activities] Fetched via API:', activities.length);
 
     if (activities.length === 0) return filterByVisibility(localActivities, role, viewerName);
 
@@ -58,7 +87,7 @@ export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivit
     saveLocal(merged);
     return filterByVisibility(merged, role, viewerName);
   } catch (err) {
-    console.warn('[Activities] CRM fetch failed:', err);
+    console.warn('[Activities] API fetch failed:', err);
     return filterByVisibility(localActivities, role, viewerName);
   }
 }
@@ -84,24 +113,12 @@ async function postViaApi(fields: CRMActivityFields): Promise<string> {
 
 export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
   let id: string | null = null;
-  const role = loadRole();
 
-  if (role === 'founder') {
-    try {
-      id = await createCRMActivity(fields);
-      console.log('[Activities] Posted to CRM (direct), id:', id);
-    } catch (err) {
-      console.warn('[Activities] Direct CRM post failed:', err);
-    }
-  }
-
-  if (!id) {
-    try {
-      id = await postViaApi(fields);
-      console.log('[Activities] Posted via API endpoint, id:', id);
-    } catch (err) {
-      console.warn('[Activities] API post failed:', err);
-    }
+  try {
+    id = await postViaApi(fields);
+    console.log('[Activities] Posted via API, id:', id);
+  } catch (err) {
+    console.warn('[Activities] API post failed:', err);
   }
 
   const activity: CRMActivity = { id: id || generateLocalId(), ...fields };
