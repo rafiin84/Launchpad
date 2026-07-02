@@ -7,6 +7,7 @@
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
+import { fetchCRMActivities, createCRMActivity } from './crmActivities';
 import { loadRole, loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
@@ -66,30 +67,10 @@ async function fetchViaApi(): Promise<CRMActivity[]> {
     headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
   });
   if (!res.ok) throw new Error(`API GET ${res.status}`);
-  const json = await res.json() as { activities?: Array<Record<string, unknown>> };
+  const json = await res.json() as { activities?: Array<Record<string, unknown>>, _strategy?: string };
+  console.log('[Activities] API strategy:', json._strategy);
+  if (json._strategy === 'none') throw new Error('API returned no activities (no working strategy)');
   return (json.activities || []).map(fromApiRecord);
-}
-
-export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivity[]> {
-  const localActivities = loadLocal();
-  const role = loadRole();
-
-  try {
-    const activities = await fetchViaApi();
-    console.log('[Activities] Fetched via API:', activities.length);
-
-    if (activities.length === 0) return filterByVisibility(localActivities, role, viewerName);
-
-    const serverIds = new Set(activities.map(a => a.id));
-    const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
-    const merged = [...localOnly, ...activities];
-
-    saveLocal(merged);
-    return filterByVisibility(merged, role, viewerName);
-  } catch (err) {
-    console.warn('[Activities] API fetch failed:', err);
-    return filterByVisibility(localActivities, role, viewerName);
-  }
 }
 
 async function postViaApi(fields: CRMActivityFields): Promise<string> {
@@ -111,14 +92,61 @@ async function postViaApi(fields: CRMActivityFields): Promise<string> {
   return json.activity.id;
 }
 
+export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivity[]> {
+  const localActivities = loadLocal();
+  const role = loadRole();
+
+  // Try API endpoint first (has admin token on Vercel for full visibility)
+  try {
+    const activities = await fetchViaApi();
+    console.log('[Activities] Fetched via API:', activities.length);
+
+    const serverIds = new Set(activities.map(a => a.id));
+    const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
+    const merged = [...localOnly, ...activities];
+    saveLocal(merged);
+    return filterByVisibility(merged, role, viewerName);
+  } catch (err) {
+    console.warn('[Activities] API fetch failed, trying direct CRM:', err);
+  }
+
+  // Fallback: direct CRM call (works for portal users with x-crmportal)
+  try {
+    const activities = await fetchCRMActivities();
+    console.log('[Activities] Fetched from CRM (direct):', activities.length);
+
+    if (activities.length === 0) return filterByVisibility(localActivities, role, viewerName);
+
+    const serverIds = new Set(activities.map(a => a.id));
+    const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
+    const merged = [...localOnly, ...activities];
+    saveLocal(merged);
+    return filterByVisibility(merged, role, viewerName);
+  } catch (err) {
+    console.warn('[Activities] Direct CRM fetch also failed:', err);
+    return filterByVisibility(localActivities, role, viewerName);
+  }
+}
+
 export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
   let id: string | null = null;
 
+  // Try API endpoint first (admin token creates with full field access)
   try {
     id = await postViaApi(fields);
     console.log('[Activities] Posted via API, id:', id);
   } catch (err) {
-    console.warn('[Activities] API post failed:', err);
+    console.warn('[Activities] API post failed, trying direct CRM:', err);
+  }
+
+  // Fallback: direct CRM call
+  if (!id) {
+    try {
+      id = await createCRMActivity(fields);
+      console.log('[Activities] Posted to CRM (direct), id:', id);
+    } catch (err) {
+      console.warn('[Activities] Direct CRM post also failed:', err);
+    }
   }
 
   const activity: CRMActivity = { id: id || generateLocalId(), ...fields };
