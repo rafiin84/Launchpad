@@ -107,7 +107,7 @@ function validate(f: FormState): Record<string, string> {
 
 export default function AddActivity() {
   const navigate = useNavigate();
-  const { currentUser, founderCompanyName } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>(empty(currentUser.name, founderCompanyName));
@@ -173,6 +173,7 @@ export default function AddActivity() {
         content:      form.content.trim(),
         companyName:  form.companyName.trim(),
         authorName:   form.authorName.trim(),
+        authorRole:   isInvestor ? 'investor' : 'founder',
         tags:         form.tags.trim(),
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',

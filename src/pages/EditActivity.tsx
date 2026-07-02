@@ -93,6 +93,7 @@ export default function EditActivity() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
+  const [authorRole, setAuthorRole] = useState('');
   const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [compressing, setCompressing] = useState(false);
   const [isDragging, setIsDragging]   = useState(false);
@@ -113,6 +114,7 @@ export default function EditActivity() {
         imagePreview: activity.imageData || activity.imageUrl || '',
       });
       if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
+      setAuthorRole(activity.authorRole || '');
       setLoading(false);
     };
     if (id.startsWith('local_')) {
@@ -167,6 +169,7 @@ export default function EditActivity() {
         content:      form.content.trim(),
         companyName:  form.companyName.trim(),
         authorName:   form.authorName.trim(),
+        authorRole,
         tags:         form.tags.trim(),
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',

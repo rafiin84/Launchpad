@@ -23,6 +23,7 @@ const FIELD_MAP: Record<string, string> = {
   content:      'Content',
   companyName:  'Company_Name',
   authorName:   'Author_Name',
+  authorRole:   'Author_Role',
   tags:         'Activity_Tags',
   imageUrl:     'Image_URL',
   imageData:    'Activity_Image_Data',
@@ -37,6 +38,7 @@ interface Activity {
   content: string;
   companyName: string;
   authorName: string;
+  authorRole: string;
   tags: string;
   imageUrl: string;
   imageData: string;
@@ -55,6 +57,7 @@ function fromRecord(r: Record<string, unknown>): Activity {
     content:      str(FIELD_MAP.content),
     companyName:  str(FIELD_MAP.companyName),
     authorName:   str(FIELD_MAP.authorName),
+    authorRole:   str(FIELD_MAP.authorRole),
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),

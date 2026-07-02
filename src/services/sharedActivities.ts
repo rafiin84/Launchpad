@@ -1,14 +1,14 @@
 /**
  * sharedActivities.ts
  *
- * Shared activity feed — pure client-side CRM calls via zohoapis.in.
- * The x-crmportal header makes portal tokens work on the standard API,
- * so all users (founders + investors) use the same endpoint and see
- * the same data.
+ * Shared activity feed with role-based visibility:
+ * - Investor sees ALL activities (own + all founder posts)
+ * - Founder sees own posts + all investor posts (NOT other founders' posts)
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
+import { loadRole } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -30,24 +30,36 @@ function generateLocalId(): string {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function fetchSharedActivities(): Promise<CRMActivity[]> {
+function filterByVisibility(activities: CRMActivity[], viewerRole: string | null, viewerName: string): CRMActivity[] {
+  if (viewerRole === 'investor') return activities;
+
+  // Founder: see own posts + investor posts (not other founders' posts)
+  return activities.filter(a => {
+    if (a.authorRole === 'investor' || !a.authorRole) return true;
+    if (a.authorName?.trim().toLowerCase() === viewerName.trim().toLowerCase()) return true;
+    return false;
+  });
+}
+
+export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
+  const role = loadRole();
 
   try {
     const activities = await fetchCRMActivities();
     console.log('[Activities] Fetched from CRM:', activities.length);
 
-    if (activities.length === 0) return localActivities;
+    if (activities.length === 0) return filterByVisibility(localActivities, role, viewerName);
 
     const serverIds = new Set(activities.map(a => a.id));
     const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
     const merged = [...localOnly, ...activities];
 
     saveLocal(merged);
-    return merged;
+    return filterByVisibility(merged, role, viewerName);
   } catch (err) {
     console.warn('[Activities] CRM fetch failed:', err);
-    return localActivities;
+    return filterByVisibility(localActivities, role, viewerName);
   }
 }
 

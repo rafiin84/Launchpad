@@ -176,6 +176,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         content:      content.trim(),
         companyName:  companyName.trim(),
         authorName:   currentUser.name,
+        authorRole:   isInvestor ? 'investor' : 'founder',
         tags:         '',
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? imageData : '',
@@ -459,7 +460,7 @@ export default function Activities() {
   const load = () => {
     if (!isConnected) { setLoading(false); return; }
     setLoading(true); setError('');
-    fetchSharedActivities()
+    fetchSharedActivities(currentUser.name)
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
