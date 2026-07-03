@@ -109,7 +109,9 @@ export async function fetchCRMFounders(): Promise<CRMFounder[]> {
     sort_order: 'desc',
     fields: FIELDS,
   });
-  return records.map(fromRecord);
+  return records
+    .map(fromRecord)
+    .filter(f => !f.email.endsWith('@noemail.invalid') && !f.lastName.includes('(Sample)'));
 }
 
 export async function createCRMFounder(fields: CRMFounderFields): Promise<string> {
