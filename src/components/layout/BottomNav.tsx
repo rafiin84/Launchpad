@@ -36,7 +36,7 @@ export function BottomNav() {
   const investorItems = [
     { label: 'Dashboard',    path: '/',              icon: LayoutDashboard },
     { label: 'Activities',   path: '/activities',    icon: Rss },
-    { label: 'Portfolio',    path: '/portfolio',     icon: PieChart },
+    { label: 'Company',      path: '/portfolio',     icon: PieChart },
     { label: 'Applications', path: '/applications', icon: Inbox },
   ];
 
@@ -47,9 +47,10 @@ export function BottomNav() {
   ];
 
   const investorMoreItems = [
-    { label: 'Documents', path: '/documents', icon: FileText, desc: 'Files and attachments' },
-    { label: 'Founders',  path: '/founders',  icon: Users,    desc: 'Portfolio founders' },
-    { label: 'Profile',   path: '/profile',   icon: User,     desc: 'Your account settings' },
+    { label: 'Documents',  path: '/documents',  icon: FileText, desc: 'Files and attachments' },
+    { label: 'Founders',   path: '/founders',   icon: Building2, desc: 'Founder companies' },
+    { label: 'Applicants', path: '/applicants',  icon: Users,    desc: 'Applicant founders' },
+    { label: 'Profile',    path: '/profile',     icon: User,     desc: 'Your account settings' },
   ];
 
   const items = isInvestor ? investorItems : founderItems;

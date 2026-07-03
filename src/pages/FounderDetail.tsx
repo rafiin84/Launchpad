@@ -75,7 +75,7 @@ export default function FounderDetail() {
     setDeleting(true);
     try {
       await deleteCRMFounder(id);
-      navigate('/founders');
+      navigate('/applicants');
     } catch {
       setDeleting(false);
       setShowDeleteModal(false);
@@ -114,7 +114,7 @@ export default function FounderDetail() {
         message: `${displayName} (${founder.email}) was ${isResend ? 're-' : ''}invited to the portal as ${inviteRole}.`,
         actor: 'Admin',
         actorRole: 'investor',
-        link: `/founders/${id}`,
+        link: `/applicants/${id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
     } catch (err) {
@@ -137,7 +137,7 @@ export default function FounderDetail() {
       message: `${founderName}'s portal access has been activated.`,
       actor: 'Admin',
       actorRole: 'investor',
-      link: `/founders/${id}`,
+      link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));
   };
@@ -156,7 +156,7 @@ export default function FounderDetail() {
       message: `${founderName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
-      link: `/founders/${id}`,
+      link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));
   };
@@ -199,8 +199,8 @@ export default function FounderDetail() {
   if (error || !founder) {
     return (
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        <Link to="/founders" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
-          <ArrowLeft size={15} /> Founders
+        <Link to="/applicants" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
+          <ArrowLeft size={15} /> Applicants
         </Link>
         <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
@@ -264,8 +264,8 @@ export default function FounderDetail() {
 
       {/* Back link */}
       <div className="pt-6 pb-4">
-        <Link to="/founders" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
-          <ArrowLeft size={15} /> Founders
+        <Link to="/applicants" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+          <ArrowLeft size={15} /> Applicants
         </Link>
       </div>
 

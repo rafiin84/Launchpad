@@ -69,8 +69,9 @@ import Notifications from './pages/Notifications';
 import FounderApplicationForm from './pages/FounderApplicationForm';
 import FounderApplicationTracker from './pages/FounderApplicationTracker';
 import InvestorApplications from './pages/InvestorApplications';
-import Founders from './pages/Founders';
-import FounderDetail from './pages/FounderDetail';
+import Applicants from './pages/Founders';
+import ApplicantDetail from './pages/FounderDetail';
+import InvestorFounders from './pages/InvestorFounders';
 
 export default function App() {
   return (
@@ -106,8 +107,9 @@ export default function App() {
             <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
             <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
             <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
-            <Route path="/founders" element={<Founders />} />
-            <Route path="/founders/:id" element={<FounderDetail />} />
+            <Route path="/founders" element={<InvestorFounders />} />
+            <Route path="/applicants" element={<Applicants />} />
+            <Route path="/applicants/:id" element={<ApplicantDetail />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/new" element={<AddDocument />} />

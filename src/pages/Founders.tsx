@@ -33,7 +33,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent";
 const selectCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none bg-white";
 
-// ─── Add Founder Modal ───────────────────────────────────────────────────────
+// ─── Invite Applicant Modal ───────────────────────────────────────────────────────
 
 function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (f: CRMFounder) => void }) {
   const [form, setForm] = useState<CRMFounderFields>({
@@ -91,7 +91,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
               <UserPlus size={16} className="text-indigo-600" />
             </div>
-            <h2 className="text-base font-bold text-gray-900">Add Founder</h2>
+            <h2 className="text-base font-bold text-gray-900">Invite Applicant</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <X size={16} className="text-gray-400" />
@@ -217,7 +217,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             disabled={!canSave || saving}
             className="px-5 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            <UserPlus size={14} /> {saving ? 'Adding…' : 'Add Founder'}
+            <UserPlus size={14} /> {saving ? 'Adding…' : 'Invite Applicant'}
           </button>
         </div>
       </div>
@@ -291,7 +291,7 @@ function PortalStatusToggle({
         message: `${displayName}'s portal access has been activated.`,
         actor: 'Admin',
         actorRole: 'investor',
-        link: `/founders/${founder.id}`,
+        link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
     }
@@ -307,7 +307,7 @@ function PortalStatusToggle({
       message: `${displayName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
-      link: `/founders/${founder.id}`,
+      link: `/applicants/${founder.id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));
   };
@@ -373,13 +373,13 @@ function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { foun
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
       <div className="flex items-start gap-4">
-        <Link to={`/founders/${founder.id}`}>
+        <Link to={`/applicants/${founder.id}`}>
           <Avatar name={displayName} size="lg" />
         </Link>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <Link to={`/founders/${founder.id}`} className="hover:text-indigo-600 transition-colors">
+            <Link to={`/applicants/${founder.id}`} className="hover:text-indigo-600 transition-colors">
               <h3 className="text-sm font-bold text-gray-900 truncate">{fullName}</h3>
             </Link>
             <button
@@ -392,7 +392,7 @@ function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { foun
             </button>
           </div>
 
-          <Link to={`/founders/${founder.id}`} className="block">
+          <Link to={`/applicants/${founder.id}`} className="block">
             {founder.title && (
               <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                 <Briefcase size={11} className="text-gray-400" />
@@ -470,12 +470,12 @@ function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { found
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
-      <Link to={`/founders/${founder.id}`}>
+      <Link to={`/applicants/${founder.id}`}>
         <Avatar name={displayName} size="sm" />
       </Link>
 
       {/* Name + title */}
-      <Link to={`/founders/${founder.id}`} className="w-48 min-w-0 flex-shrink-0 hover:text-indigo-600 transition-colors">
+      <Link to={`/applicants/${founder.id}`} className="w-48 min-w-0 flex-shrink-0 hover:text-indigo-600 transition-colors">
         <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
         {founder.title && (
           <p className="text-xs text-gray-400 truncate">{founder.title}</p>
@@ -664,9 +664,9 @@ export default function Founders() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Founders</h1>
+          <h1 className="text-xl font-bold text-gray-900">Applicants</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            Manage your portfolio founders
+            Manage your applicant founders
             {!loading && founders.length > 0 && (
               <span className="ml-1.5 text-gray-300">· {founders.length} total</span>
             )}
@@ -694,7 +694,7 @@ export default function Founders() {
             disabled={!isConnected}
             className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <Plus size={15} /> Add Founder
+            <Plus size={15} /> Invite Applicant
           </button>
         </div>
       </div>
@@ -758,13 +758,13 @@ export default function Founders() {
       {!loading && !error && founders.length === 0 && isConnected && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl bg-white">
           <Users size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No founders yet</p>
-          <p className="text-xs text-gray-400 mb-4">Add founders to manage your portfolio network.</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">No applicants yet</p>
+          <p className="text-xs text-gray-400 mb-4">Invite applicants to manage your network.</p>
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
-            <Plus size={14} /> Add First Founder
+            <Plus size={14} /> Invite First Applicant
           </button>
         </div>
       )}
@@ -773,7 +773,7 @@ export default function Founders() {
       {!loading && !error && founders.length > 0 && filtered.length === 0 && (
         <div className="text-center py-12">
           <Search size={24} className="text-gray-200 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">No founders match "{search}"</p>
+          <p className="text-sm text-gray-500">No applicants match "{search}"</p>
         </div>
       )}
 

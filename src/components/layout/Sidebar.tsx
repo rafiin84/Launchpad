@@ -28,12 +28,13 @@ interface NavItem {
 }
 
 const investorNav: NavItem[] = [
-  { label: 'Dashboard',    path: '/',            icon: LayoutDashboard },
-  { label: 'Activities',   path: '/activities',  icon: Rss },
-  { label: 'Portfolio',    path: '/portfolio',   icon: PieChart },
-  { label: 'Applications', path: '/applications',icon: Inbox },
-  { label: 'Founders',     path: '/founders',    icon: Users },
-  { label: 'Documents',    path: '/documents',   icon: FileText },
+  { label: 'Dashboard',    path: '/',             icon: LayoutDashboard },
+  { label: 'Activities',   path: '/activities',   icon: Rss },
+  { label: 'Company',      path: '/portfolio',    icon: PieChart },
+  { label: 'Applications', path: '/applications', icon: Inbox },
+  { label: 'Founders',     path: '/founders',     icon: Building2 },
+  { label: 'Applicants',   path: '/applicants',   icon: Users },
+  { label: 'Documents',    path: '/documents',    icon: FileText },
 ];
 
 const founderNav: NavItem[] = [
