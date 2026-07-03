@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * Stores company data as a CRM Note record with a unique title per founder.
  *
  * GET  /api/company?email=founder@example.com    → { data: CompanyData }
+ * GET  /api/company?all=true                     → { profiles: [{email, data}] }
  * POST /api/company   body: { email, data }      → { success: true }
  */
 
@@ -81,9 +82,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
-      const { email } = req.query;
+      const { email, all } = req.query;
+
+      if (all === 'true') {
+        const searchResult = await crmRequest('POST', '/crm/v2/coql', {
+          select_query: `select Note_Title, Note_Content from Notes where Note_Title like '${NOTE_PREFIX}%' limit 100`,
+        });
+        const data = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
+        const profiles: Array<{ email: string; data: unknown }> = [];
+        for (const note of data?.data ?? []) {
+          if (!note.Note_Title || !note.Note_Content) continue;
+          const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
+          try {
+            profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
+          } catch { /* skip malformed */ }
+        }
+        return res.status(200).json({ profiles });
+      }
+
       if (!email || typeof email !== 'string') {
-        return res.status(400).json({ error: 'email query param is required' });
+        return res.status(400).json({ error: 'email query param is required (or use all=true)' });
       }
 
       const title = noteTitle(email);

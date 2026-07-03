@@ -2,134 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
-  Calendar, Shield,
+  Calendar, Shield, Loader2, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
-import { addNotification } from '../services/notifications';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface CompanyData {
-  // Overview
-  name: string;
-  tagline: string;
-  description: string;
-  website: string;
-  industry: string;
-  stage: string;
-  foundedYear: string;
-  location: string;
-  // Team
-  founderNames: string;
-  teamSize: string;
-  openRoles: string;
-  // Product & Traction
-  productDescription: string;
-  mrr: string;
-  arr: string;
-  activeCustomers: string;
-  momGrowth: string;
-  churnRate: string;
-  nps: string;
-  keyMetric: string;
-  keyMetricLabel: string;
-  // Financials
-  totalRaised: string;
-  lastRoundSize: string;
-  lastRoundStage: string;
-  lastRoundDate: string;
-  preMoneyValuation: string;
-  monthlyBurn: string;
-  runway: string;
-  revenueModel: string;
-  // Market
-  tam: string;
-  sam: string;
-  som: string;
-  targetMarket: string;
-  keyCompetitors: string;
-  differentiator: string;
-  // Investor relations
-  currentAsk: string;
-  useOfFunds: string;
-  keyRisks: string;
-  nextMilestones: string;
-}
-
-const EMPTY: CompanyData = {
-  name: '', tagline: '', description: '', website: '', industry: '', stage: '', foundedYear: '', location: '',
-  founderNames: '', teamSize: '', openRoles: '',
-  productDescription: '', mrr: '', arr: '', activeCustomers: '', momGrowth: '', churnRate: '', nps: '', keyMetric: '', keyMetricLabel: '',
-  totalRaised: '', lastRoundSize: '', lastRoundStage: '', lastRoundDate: '', preMoneyValuation: '', monthlyBurn: '', runway: '', revenueModel: '',
-  tam: '', sam: '', som: '', targetMarket: '', keyCompetitors: '', differentiator: '',
-  currentAsk: '', useOfFunds: '', keyRisks: '', nextMilestones: '',
-};
-
-const STORAGE_PREFIX = 'lp_founder_company_';
-
-function storageKey(email: string): string {
-  return `${STORAGE_PREFIX}${email.toLowerCase()}`;
-}
-
-// One-time cleanup: a bad migration copied company data to the wrong user's key.
-// Move it back to the rightful owner and clear misattributed keys.
-(function fixMigratedData() {
-  const FLAG = 'lp_company_migration_v2_done';
-  if (typeof window === 'undefined') return;
-  try {
-    if (localStorage.getItem(FLAG)) return;
-    // Check all per-email keys — if a key has data whose company name doesn't
-    // match what the user would have entered, it was from the bad migration.
-    // The legacy key was "lp_founder_company" (now deleted by bad migration).
-    // Move any misattributed data: check each key, find the real owner by
-    // matching company data, and reassign.
-    const allKeys: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith(STORAGE_PREFIX)) allKeys.push(k);
-    }
-    // If only one key has data, it might be misattributed — but we can't tell.
-    // If the legacy key still exists, migrate it properly.
-    const legacy = localStorage.getItem('lp_founder_company');
-    if (legacy) {
-      // Legacy key survived — copy to all known portal users who don't have data?
-      // No — just keep it available as a fallback below.
-    }
-    // Clear misattributed data: if a per-email key has data where the company
-    // data was clearly not entered by that user, remove it.
-    // Heuristic: sharathojas key has "Rafi Design Agency" — that's wrong.
-    for (const k of allKeys) {
-      const ownerEmail = k.replace(STORAGE_PREFIX, '');
-      try {
-        const data = JSON.parse(localStorage.getItem(k) || '{}');
-        if (data.name && ownerEmail !== 'rafiin84@gmail.com' && data.name === 'Rafi Design Agency') {
-          // This is Rafi's data under another user's key — move it
-          if (!localStorage.getItem(storageKey('rafiin84@gmail.com'))) {
-            localStorage.setItem(storageKey('rafiin84@gmail.com'), JSON.stringify(data));
-          }
-          localStorage.removeItem(k);
-        }
-      } catch { /* skip */ }
-    }
-    localStorage.setItem(FLAG, '1');
-  } catch { /* ok */ }
-})();
-
-function load(email: string): CompanyData {
-  if (!email) return EMPTY;
-  try {
-    const s = localStorage.getItem(storageKey(email));
-    if (s) return { ...EMPTY, ...JSON.parse(s) };
-  } catch { /* ignore */ }
-  return EMPTY;
-}
-
-function save(email: string, d: CompanyData) {
-  if (!email) return;
-  localStorage.setItem(storageKey(email), JSON.stringify(d));
-  window.dispatchEvent(new Event('founder-company-updated'));
-}
+import {
+  type CompanyData, EMPTY,
+  fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
+} from '../services/companyProfile';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
 const INDUSTRIES = ['SaaS', 'Fintech', 'Healthtech', 'Edtech', 'E-commerce', 'Marketplace', 'AI/ML', 'Hardware', 'Deep Tech', 'Consumer', 'Enterprise', 'Other'];
@@ -230,14 +110,32 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 export default function FounderCompany() {
   const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
-  const [data, setData]       = useState<CompanyData>(() => load(userEmail));
+  const [data, setData]       = useState<CompanyData>(EMPTY);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState<CompanyData>(data);
+  const [draft, setDraft]     = useState<CompanyData>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [saveResult, setSaveResult] = useState<'success' | 'partial' | 'error' | null>(null);
+  const [allProfiles, setAllProfiles] = useState<Array<{ email: string; data: CompanyData }>>([]);
+  const [selectedProfile, setSelectedProfile] = useState(0);
 
-  // Reload when user changes (different founder logs in)
   useEffect(() => {
-    if (userEmail) setData(load(userEmail));
-  }, [userEmail]);
+    setLoading(true);
+    if (isInvestor) {
+      fetchAllCompanyProfiles()
+        .then(profiles => {
+          setAllProfiles(profiles);
+          if (profiles.length > 0) setData(profiles[0].data);
+        })
+        .finally(() => setLoading(false));
+    } else if (userEmail) {
+      fetchCompanyProfile(userEmail)
+        .then(setData)
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [userEmail, isInvestor]);
 
   useEffect(() => {
     if (editing) setDraft({ ...data });
@@ -247,27 +145,30 @@ export default function FounderCompany() {
     setDraft(prev => ({ ...prev, [field]: val }));
   }
 
-  function handleSave() {
-    setData(draft);
-    save(userEmail, draft);
-    setEditing(false);
-
-    // Notify investors about the company update
-    const companyName = draft.name || 'their company';
-    addNotification({
-      type: 'company_update',
-      title: 'Company Profile Updated',
-      message: `${currentUser.name} updated ${companyName}'s profile information.`,
-      actor: currentUser.name,
-      actorRole: 'founder',
-      link: '/company',
-    });
-    window.dispatchEvent(new Event('notifications-updated'));
+  async function handleSave() {
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const result = await saveCompanyProfile(userEmail, draft);
+      setData(draft);
+      setEditing(false);
+      setSaveResult(result.crmSynced ? 'success' : 'partial');
+      setTimeout(() => setSaveResult(null), 5000);
+    } catch {
+      setSaveResult('error');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleCancel() {
     setDraft(data);
     setEditing(false);
+  }
+
+  function selectInvestorProfile(idx: number) {
+    setSelectedProfile(idx);
+    if (allProfiles[idx]) setData(allProfiles[idx].data);
   }
 
   const d = editing ? draft : data;
@@ -321,15 +222,18 @@ export default function FounderCompany() {
                 <>
                   <button
                     onClick={handleCancel}
-                    className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
+                    disabled={saving}
+                    className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
                   >
                     <X size={14} /> Cancel
                   </button>
                   <button
                     onClick={handleSave}
-                    className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all"
+                    disabled={saving}
+                    className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all disabled:opacity-50"
                   >
-                    <Check size={14} /> Save Changes
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </>
               ) : (
@@ -382,8 +286,56 @@ export default function FounderCompany() {
       {/* ── Page body ── */}
       <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-gray-400" />
+            <span className="ml-3 text-sm text-gray-500">Loading company profile...</span>
+          </div>
+        )}
+
+        {/* Save result banners */}
+        {saveResult === 'success' && (
+          <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700 flex items-center gap-2">
+            <CheckCircle size={16} className="flex-shrink-0" />
+            Company profile saved and synced to CRM successfully!
+          </div>
+        )}
+        {saveResult === 'partial' && (
+          <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700 flex items-center gap-2">
+            <AlertCircle size={16} className="flex-shrink-0" />
+            Profile saved locally. CRM sync will retry on next save.
+          </div>
+        )}
+        {saveResult === 'error' && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} className="flex-shrink-0" />
+            Failed to save profile. Please try again.
+          </div>
+        )}
+
+        {/* Investor: profile selector when multiple founders exist */}
+        {isInvestor && allProfiles.length > 1 && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            {allProfiles.map((p, i) => (
+              <button
+                key={p.email}
+                onClick={() => selectInvestorProfile(i)}
+                className={cn(
+                  'text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+                  selectedProfile === i
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                )}
+              >
+                {p.data.name || p.email}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Empty state banner */}
-        {!hasData && !editing && !isInvestor && (
+        {!loading && !hasData && !editing && !isInvestor && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
             <Lightbulb size={16} className="text-amber-500 flex-shrink-0" />
             <div className="flex-1">
@@ -398,7 +350,7 @@ export default function FounderCompany() {
             </button>
           </div>
         )}
-        {!hasData && isInvestor && (
+        {!loading && !hasData && isInvestor && (
           <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
             <Building2 size={16} className="text-gray-400 flex-shrink-0" />
             <div className="flex-1">
