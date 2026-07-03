@@ -3,7 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 /**
  * /api/company — Server-side storage for founder company profiles.
  *
- * Stores company data as a CRM Note record with a unique title per founder.
+ * Stores company profile JSON in the Contact's Description field in Zoho CRM.
+ * Each founder is already a Contact — we find them by email and read/write Description.
  *
  * GET  /api/company?email=founder@example.com    → { data: CompanyData }
  * GET  /api/company?all=true                     → { profiles: [{email, data}] }
@@ -46,10 +47,10 @@ async function getAdminToken(): Promise<string> {
   return cachedToken;
 }
 
-async function crmRequest(
+async function crmFetch(
   method: string,
   path: string,
-  body?: Record<string, unknown>,
+  body?: unknown,
 ): Promise<{ status: number; data: unknown }> {
   const token = await getAdminToken();
   const opts: RequestInit = {
@@ -67,10 +68,59 @@ async function crmRequest(
   return { status: res.status, data: json };
 }
 
-const NOTE_PREFIX = 'LP_Company_Profile::';
+const PROFILE_MARKER = '<!--LP_COMPANY_PROFILE-->';
 
-function noteTitle(email: string): string {
-  return `${NOTE_PREFIX}${email.toLowerCase()}`;
+interface ContactRecord {
+  id: string;
+  Email?: string;
+  Description?: string;
+}
+
+function extractProfileJson(description: string | undefined): Record<string, unknown> | null {
+  if (!description) return null;
+  const idx = description.indexOf(PROFILE_MARKER);
+  if (idx === -1) return null;
+  const jsonStr = description.substring(idx + PROFILE_MARKER.length);
+  try {
+    return JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function buildDescription(companyData: unknown): string {
+  return `${PROFILE_MARKER}${JSON.stringify(companyData)}`;
+}
+
+async function findContactByEmail(email: string): Promise<ContactRecord | null> {
+  const result = await crmFetch(
+    'GET',
+    `/crm/v2/Contacts/search?email=${encodeURIComponent(email)}&fields=Email,Description`,
+  );
+  const contacts = (result.data as { data?: ContactRecord[] })?.data;
+  return contacts?.[0] ?? null;
+}
+
+async function findAllContactsWithProfiles(): Promise<ContactRecord[]> {
+  const allWithProfiles: ContactRecord[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore && page <= 5) {
+    const result = await crmFetch(
+      'GET',
+      `/crm/v2/Contacts?fields=Email,Description&per_page=200&page=${page}&sort_by=Modified_Time&sort_order=desc`,
+    );
+    const body = result.data as { data?: ContactRecord[]; info?: { more_records?: boolean } };
+    const contacts = body?.data ?? [];
+    for (const c of contacts) {
+      if (c.Description?.includes(PROFILE_MARKER)) allWithProfiles.push(c);
+    }
+    hasMore = body?.info?.more_records ?? false;
+    page++;
+  }
+
+  return allWithProfiles;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -85,75 +135,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { email, all } = req.query;
 
       if (all === 'true') {
+        const contacts = await findAllContactsWithProfiles();
         const profiles: Array<{ email: string; data: unknown }> = [];
-
-        // Try COQL first
-        try {
-          const searchResult = await crmRequest('POST', '/crm/v2/coql', {
-            select_query: `select Note_Title, Note_Content from Notes where Note_Title like '${NOTE_PREFIX}%' limit 100`,
-          });
-          console.log('[/api/company] COQL all result status:', searchResult.status);
-          const respData = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
-          for (const note of respData?.data ?? []) {
-            if (!note.Note_Title || !note.Note_Content) continue;
-            const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
-            try {
-              profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
-            } catch { /* skip malformed */ }
-          }
-        } catch (e) {
-          console.warn('[/api/company] COQL all failed:', e);
+        for (const c of contacts) {
+          if (!c.Email) continue;
+          const parsed = extractProfileJson(c.Description);
+          if (parsed) profiles.push({ email: c.Email, data: parsed });
         }
-
-        // Fallback: search via word criteria if COQL returned nothing
-        if (profiles.length === 0) {
-          try {
-            const searchResult = await crmRequest(
-              'GET',
-              `/crm/v2/Notes/search?word=${encodeURIComponent(NOTE_PREFIX)}&per_page=100`,
-            );
-            const respData = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
-            for (const note of respData?.data ?? []) {
-              if (!note.Note_Title?.startsWith(NOTE_PREFIX) || !note.Note_Content) continue;
-              const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
-              try {
-                profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
-              } catch { /* skip malformed */ }
-            }
-          } catch (e) {
-            console.warn('[/api/company] Search fallback also failed:', e);
-          }
-        }
-
+        console.log('[company] GET all → found', profiles.length, 'profiles');
         return res.status(200).json({ profiles });
       }
 
       if (!email || typeof email !== 'string') {
-        return res.status(400).json({ error: 'email query param is required (or use all=true)' });
+        return res.status(400).json({ error: 'email query param required (or use all=true)' });
       }
 
-      const title = noteTitle(email);
-      console.log('[/api/company] GET email:', email, 'title:', title);
+      console.log('[company] GET email:', email);
+      const contact = await findContactByEmail(email);
 
-      const searchResult = await crmRequest('POST', '/crm/v2/coql', {
-        select_query: `select Note_Title, Note_Content from Notes where Note_Title = '${title}' limit 1`,
-      });
-      console.log('[/api/company] COQL status:', searchResult.status);
-
-      const data = searchResult.data as { data?: Array<{ Note_Content?: string; id?: string }> } | null;
-      const note = data?.data?.[0];
-
-      if (note?.Note_Content) {
-        try {
-          const parsed = JSON.parse(note.Note_Content);
-          console.log('[/api/company] Found profile for', email, '- name:', (parsed as Record<string,string>).name);
-          return res.status(200).json({ data: parsed, noteId: note.id });
-        } catch {
-          return res.status(200).json({ data: null });
+      if (contact) {
+        const parsed = extractProfileJson(contact.Description);
+        if (parsed) {
+          console.log('[company] Found profile for', email);
+          return res.status(200).json({ data: parsed, contactId: contact.id });
         }
       }
 
-      console.log('[/api/company] No profile found for', email);
+      console.log('[company] No profile found for', email);
       return res.status(200).json({ data: null });
     }
 
@@ -167,35 +175,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'data object is required in request body' });
       }
 
-      const title = noteTitle(email);
-      const jsonContent = JSON.stringify(companyData);
-
-      const searchResult = await crmRequest('POST', '/crm/v2/coql', {
-        select_query: `select id from Notes where Note_Title = '${title}' limit 1`,
-      });
-
-      const existing = (searchResult.data as { data?: Array<{ id: string }> })?.data?.[0];
-
-      if (existing) {
-        console.log('[/api/company] Updating existing note:', existing.id, 'for', email);
-        const updateResult = await crmRequest('PUT', `/crm/v2/Notes/${existing.id}`, {
-          data: [{ id: existing.id, Note_Title: title, Note_Content: jsonContent }],
-        });
-        console.log('[/api/company] Update result:', updateResult.status);
-      } else {
-        console.log('[/api/company] Creating new note for', email);
-        const createResult = await crmRequest('POST', '/crm/v2/Notes', {
-          data: [{ Note_Title: title, Note_Content: jsonContent }],
-        });
-        console.log('[/api/company] Create result:', createResult.status, JSON.stringify(createResult.data));
+      const contact = await findContactByEmail(email);
+      if (!contact) {
+        console.error('[company] No Contact found for', email);
+        return res.status(404).json({ error: `No Contact record found for ${email}` });
       }
 
-      return res.status(200).json({ success: true });
+      const newDescription = buildDescription(companyData);
+      console.log('[company] Updating Contact', contact.id, 'for', email);
+
+      const result = await crmFetch('PUT', `/crm/v2/Contacts/${contact.id}`, {
+        data: [{ id: contact.id, Description: newDescription }],
+      });
+      console.log('[company] Update status:', result.status);
+
+      const resultData = result.data as { data?: Array<{ code?: string; message?: string; status?: string }> };
+      const entry = resultData?.data?.[0];
+
+      if (result.status >= 400 || entry?.status === 'error') {
+        console.error('[company] Update failed:', JSON.stringify(result.data));
+        return res.status(500).json({
+          error: 'CRM update failed',
+          detail: entry?.message || result.data,
+        });
+      }
+
+      console.log('[company] Updated successfully:', entry?.code);
+      return res.status(200).json({ success: true, contactId: contact.id });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('[/api/company] Error:', err);
+    console.error('[company] Error:', err);
     return res.status(500).json({
       error: 'Internal server error',
       message: err instanceof Error ? err.message : String(err),
