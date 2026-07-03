@@ -132,7 +132,28 @@ export async function createCRMFounder(fields: CRMFounderFields): Promise<string
   if (fields.mailingStreet)  payload.Mailing_Street  = fields.mailingStreet;
   if (fields.mailingZip)     payload.Mailing_Zip     = fields.mailingZip;
   if (fields.description)    payload.Description     = fields.description;
-  return zohoCreate(MODULE, payload);
+  const contactId = await zohoCreate(MODULE, payload);
+
+  // Also create a record in the Founders module so investors can see this founder's profile
+  if (fields.email) {
+    const founderName = [fields.firstName, fields.lastName].filter(Boolean).join(' ');
+    const location = [fields.mailingCity, fields.mailingState, fields.mailingCountry].filter(Boolean).join(', ');
+    fetch('/api/company', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: fields.email,
+        data: {
+          name: fields.company || founderName,
+          founderNames: founderName,
+          description: fields.description || '',
+          location,
+        },
+      }),
+    }).catch(err => console.warn('[CRMFounders] Failed to sync to Founders module:', err));
+  }
+
+  return contactId;
 }
 
 export async function deleteCRMFounder(id: string): Promise<void> {
