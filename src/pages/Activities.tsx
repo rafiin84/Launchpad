@@ -16,7 +16,6 @@ import { fetchSharedActivities, postSharedActivity } from '../services/sharedAct
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
-import { addNotification } from '../services/notifications';
 import { fetchCRMPortfolio } from '../services/crmPortfolio';
 import { fetchCRMDeals } from '../services/crmDeals';
 import { fetchCRMApplications } from '../services/crmApplications';
@@ -182,17 +181,6 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
         imageData:    imageMode === 'upload' ? imageData : '',
       };
       const activity = await postSharedActivity(fields);
-
-      // Trigger notification for the new post
-      addNotification({
-        type: 'activity_post',
-        title: 'New Activity Post',
-        message: `${currentUser.name} posted: ${title.trim()}`,
-        actor: currentUser.name,
-        actorRole: isFounder ? 'founder' : 'investor',
-        link: '/activities',
-      });
-      window.dispatchEvent(new Event('notifications-updated'));
 
       onPost(activity);
       handleCancel();
