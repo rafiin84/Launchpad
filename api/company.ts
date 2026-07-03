@@ -3,8 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 /**
  * /api/company — Server-side storage for founder company profiles.
  *
- * Stores company profile JSON in the Contact's Description field in Zoho CRM.
- * Each founder is already a Contact — we find them by email and read/write Description.
+ * Uses the custom "Founders" module in Zoho CRM.
+ * Each founder has one record keyed by Email.
  *
  * GET  /api/company?email=founder@example.com    → { data: CompanyData }
  * GET  /api/company?all=true                     → { profiles: [{email, data}] }
@@ -13,6 +13,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
 const ZOHO_API_BASE = 'https://www.zohoapis.in';
+const MODULE = 'Founders';
 
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
@@ -25,7 +26,7 @@ async function getAdminToken(): Promise<string> {
   const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing Zoho env vars (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN)');
+    throw new Error('Missing Zoho env vars');
   }
 
   const res = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
@@ -68,59 +69,93 @@ async function crmFetch(
   return { status: res.status, data: json };
 }
 
-const PROFILE_MARKER = '<!--LP_COMPANY_PROFILE-->';
+// CRM field API names → client-side CompanyData keys
+const FIELD_MAP: Record<string, string> = {
+  Email: 'email',
+  Company_Name: 'name',
+  Tagline: 'tagline',
+  Description: 'description',
+  Website: 'website',
+  Industry: 'industry',
+  Stage: 'stage',
+  Founded_Year: 'foundedYear',
+  Location: 'location',
+  Founder_Names: 'founderNames',
+  Team_Size: 'teamSize',
+  Open_Roles: 'openRoles',
+  Product_Description: 'productDescription',
+  MRR: 'mrr',
+  ARR: 'arr',
+  Active_Customers: 'activeCustomers',
+  MoM_Growth: 'momGrowth',
+  Churn_Rate: 'churnRate',
+  NPS: 'nps',
+  Key_Metric: 'keyMetric',
+  Key_Metric_Label: 'keyMetricLabel',
+  Total_Raised: 'totalRaised',
+  Last_Round_Size: 'lastRoundSize',
+  Last_Round_Stage: 'lastRoundStage',
+  Last_Round_Date: 'lastRoundDate',
+  Pre_Money_Valuation: 'preMoneyValuation',
+  Monthly_Burn: 'monthlyBurn',
+  Runway: 'runway',
+  Revenue_Model: 'revenueModel',
+  TAM: 'tam',
+  SAM: 'sam',
+  SOM: 'som',
+  Target_Market: 'targetMarket',
+  Key_Competitors: 'keyCompetitors',
+  Differentiator: 'differentiator',
+  Current_Ask: 'currentAsk',
+  Use_of_Funds: 'useOfFunds',
+  Key_Risks: 'keyRisks',
+  Next_Milestones: 'nextMilestones',
+};
 
-interface ContactRecord {
-  id: string;
-  Email?: string;
-  Description?: string;
+// Reverse map: client key → CRM field
+const REVERSE_MAP: Record<string, string> = {};
+for (const [crm, client] of Object.entries(FIELD_MAP)) {
+  REVERSE_MAP[client] = crm;
 }
 
-function extractProfileJson(description: string | undefined): Record<string, unknown> | null {
-  if (!description) return null;
-  const idx = description.indexOf(PROFILE_MARKER);
-  if (idx === -1) return null;
-  const jsonStr = description.substring(idx + PROFILE_MARKER.length);
-  try {
-    return JSON.parse(jsonStr) as Record<string, unknown>;
-  } catch {
-    return null;
+const CRM_FIELDS = Object.keys(FIELD_MAP).join(',');
+
+function recordToProfile(record: Record<string, unknown>): Record<string, string> {
+  const profile: Record<string, string> = {};
+  for (const [crmKey, clientKey] of Object.entries(FIELD_MAP)) {
+    profile[clientKey] = record[crmKey] != null ? String(record[crmKey]) : '';
   }
+  return profile;
 }
 
-function buildDescription(companyData: unknown): string {
-  return `${PROFILE_MARKER}${JSON.stringify(companyData)}`;
+function profileToRecord(data: Record<string, unknown>): Record<string, unknown> {
+  const record: Record<string, unknown> = {};
+  for (const [clientKey, value] of Object.entries(data)) {
+    const crmKey = REVERSE_MAP[clientKey];
+    if (crmKey && value !== undefined && value !== null) {
+      record[crmKey] = String(value);
+    }
+  }
+  return record;
 }
 
-async function findContactByEmail(email: string): Promise<ContactRecord | null> {
+async function findByEmail(email: string): Promise<{ id: string; record: Record<string, unknown> } | null> {
   const result = await crmFetch(
     'GET',
-    `/crm/v2/Contacts/search?email=${encodeURIComponent(email)}&fields=Email,Description`,
+    `/crm/v2/${MODULE}/search?email=${encodeURIComponent(email)}&fields=${CRM_FIELDS}`,
   );
-  const contacts = (result.data as { data?: ContactRecord[] })?.data;
-  return contacts?.[0] ?? null;
+  const records = (result.data as { data?: Array<Record<string, unknown>> })?.data;
+  if (records?.[0]) return { id: records[0].id as string, record: records[0] };
+  return null;
 }
 
-async function findAllContactsWithProfiles(): Promise<ContactRecord[]> {
-  const allWithProfiles: ContactRecord[] = [];
-  let page = 1;
-  let hasMore = true;
-
-  while (hasMore && page <= 5) {
-    const result = await crmFetch(
-      'GET',
-      `/crm/v2/Contacts?fields=Email,Description&per_page=200&page=${page}&sort_by=Modified_Time&sort_order=desc`,
-    );
-    const body = result.data as { data?: ContactRecord[]; info?: { more_records?: boolean } };
-    const contacts = body?.data ?? [];
-    for (const c of contacts) {
-      if (c.Description?.includes(PROFILE_MARKER)) allWithProfiles.push(c);
-    }
-    hasMore = body?.info?.more_records ?? false;
-    page++;
-  }
-
-  return allWithProfiles;
+async function findAll(): Promise<Array<{ id: string; record: Record<string, unknown> }>> {
+  const result = await crmFetch(
+    'GET',
+    `/crm/v2/${MODULE}?fields=${CRM_FIELDS}&per_page=200&sort_by=Modified_Time&sort_order=desc`,
+  );
+  const records = (result.data as { data?: Array<Record<string, unknown>> })?.data ?? [];
+  return records.map(r => ({ id: r.id as string, record: r }));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -135,14 +170,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { email, all } = req.query;
 
       if (all === 'true') {
-        const contacts = await findAllContactsWithProfiles();
-        const profiles: Array<{ email: string; data: unknown }> = [];
-        for (const c of contacts) {
-          if (!c.Email) continue;
-          const parsed = extractProfileJson(c.Description);
-          if (parsed) profiles.push({ email: c.Email, data: parsed });
-        }
-        console.log('[company] GET all → found', profiles.length, 'profiles');
+        const records = await findAll();
+        const profiles = records
+          .map(r => {
+            const profile = recordToProfile(r.record);
+            return { email: profile.email || (r.record.Email as string) || '', data: profile };
+          })
+          .filter(p => p.email);
+        console.log('[company] GET all →', profiles.length, 'profiles');
         return res.status(200).json({ profiles });
       }
 
@@ -150,18 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'email query param required (or use all=true)' });
       }
 
-      console.log('[company] GET email:', email);
-      const contact = await findContactByEmail(email);
-
-      if (contact) {
-        const parsed = extractProfileJson(contact.Description);
-        if (parsed) {
-          console.log('[company] Found profile for', email);
-          return res.status(200).json({ data: parsed, contactId: contact.id });
-        }
+      const found = await findByEmail(email);
+      if (found) {
+        const profile = recordToProfile(found.record);
+        console.log('[company] Found profile for', email, '→', profile.name);
+        return res.status(200).json({ data: profile, recordId: found.id });
       }
 
-      console.log('[company] No profile found for', email);
+      console.log('[company] No profile for', email);
       return res.status(200).json({ data: null });
     }
 
@@ -169,39 +200,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { email, data: companyData } = req.body || {};
 
       if (!email || typeof email !== 'string') {
-        return res.status(400).json({ error: 'email is required in request body' });
+        return res.status(400).json({ error: 'email is required' });
       }
       if (!companyData || typeof companyData !== 'object') {
-        return res.status(400).json({ error: 'data object is required in request body' });
+        return res.status(400).json({ error: 'data object is required' });
       }
 
-      const contact = await findContactByEmail(email);
-      if (!contact) {
-        console.error('[company] No Contact found for', email);
-        return res.status(404).json({ error: `No Contact record found for ${email}` });
-      }
+      const crmRecord = profileToRecord(companyData as Record<string, unknown>);
+      crmRecord.Email = email;
+      crmRecord.Name = (companyData as Record<string, string>).name || email;
 
-      const newDescription = buildDescription(companyData);
-      console.log('[company] Updating Contact', contact.id, 'for', email);
+      const existing = await findByEmail(email);
 
-      const result = await crmFetch('PUT', `/crm/v2/Contacts/${contact.id}`, {
-        data: [{ id: contact.id, Description: newDescription }],
-      });
-      console.log('[company] Update status:', result.status);
-
-      const resultData = result.data as { data?: Array<{ code?: string; message?: string; status?: string }> };
-      const entry = resultData?.data?.[0];
-
-      if (result.status >= 400 || entry?.status === 'error') {
-        console.error('[company] Update failed:', JSON.stringify(result.data));
-        return res.status(500).json({
-          error: 'CRM update failed',
-          detail: entry?.message || result.data,
+      if (existing) {
+        console.log('[company] Updating record', existing.id, 'for', email);
+        const result = await crmFetch('PUT', `/crm/v2/${MODULE}/${existing.id}`, {
+          data: [{ id: existing.id, ...crmRecord }],
         });
+        const entry = (result.data as { data?: Array<{ code?: string; status?: string; message?: string }> })?.data?.[0];
+        if (result.status >= 400 || entry?.status === 'error') {
+          console.error('[company] Update failed:', JSON.stringify(result.data));
+          return res.status(500).json({ error: 'CRM update failed', detail: entry?.message || result.data });
+        }
+        console.log('[company] Updated:', entry?.code);
+      } else {
+        console.log('[company] Creating record for', email);
+        const result = await crmFetch('POST', `/crm/v2/${MODULE}`, {
+          data: [crmRecord],
+        });
+        const entry = (result.data as { data?: Array<{ code?: string; status?: string; message?: string }> })?.data?.[0];
+        if (result.status >= 400 || entry?.status === 'error') {
+          console.error('[company] Create failed:', JSON.stringify(result.data));
+          return res.status(500).json({ error: 'CRM create failed', detail: entry?.message || result.data });
+        }
+        console.log('[company] Created:', entry?.code);
       }
 
-      console.log('[company] Updated successfully:', entry?.code);
-      return res.status(200).json({ success: true, contactId: contact.id });
+      return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
