@@ -12,6 +12,7 @@ import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import { generateFounderInsights, type AIInsight } from '../services/aiEngine';
 import { AIBadge } from '../components/ui/AIBadge';
+import { fetchCompanyProfile, type CompanyData } from '../services/companyProfile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,33 +47,22 @@ const DEFAULT_KPIS: KPI[] = [
 const STORAGE_KPIS       = 'lp_founder_kpis';
 const STORAGE_MILESTONES = 'lp_founder_milestones';
 
+function companyToKpiMap(c: CompanyData): Record<string, string> {
+  return {
+    mrr: c.mrr || '', runway: c.runway || '', raised: c.totalRaised || '',
+    burn: c.monthlyBurn || '', customers: c.activeCustomers || '',
+    growth: c.momGrowth || '', churn: c.churnRate || '', team: c.teamSize || '',
+  };
+}
+
 function loadKPIs(): KPI[] {
   try {
     const saved = localStorage.getItem(STORAGE_KPIS);
     if (saved) {
       const parsed: KPI[] = JSON.parse(saved);
-      // Merge in case new keys were added
       return DEFAULT_KPIS.map(def => parsed.find(p => p.key === def.key) ?? def);
     }
   } catch { /* ignore */ }
-
-  // Fallback: try to populate from saved company profile data
-  try {
-    const company = localStorage.getItem('lp_founder_company');
-    if (company) {
-      const c = JSON.parse(company) as Record<string, string>;
-      const companyKpiMap: Record<string, string> = {
-        mrr: c.mrr || '', runway: c.runway || '', raised: c.totalRaised || '',
-        burn: c.monthlyBurn || '', customers: c.activeCustomers || '',
-        growth: c.momGrowth || '', churn: c.churnRate || '', team: c.teamSize || '',
-      };
-      const hasAny = Object.values(companyKpiMap).some(v => !!v);
-      if (hasAny) {
-        return DEFAULT_KPIS.map(def => ({ ...def, value: companyKpiMap[def.key] || '' }));
-      }
-    }
-  } catch { /* ignore */ }
-
   return DEFAULT_KPIS;
 }
 
@@ -214,8 +204,9 @@ function RunwayGauge({ months, maxMonths = 24 }: { months: number; maxMonths?: n
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function FounderDashboard() {
-  const { currentUser } = useAuth();
+  const { currentUser, zohoEmail, portalSession } = useAuth();
   const isConnected = !!loadToken();
+  const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
 
   const [kpis, setKPIs]           = useState<KPI[]>(loadKPIs);
   const [milestones, setMilestones] = useState<Milestone[]>(loadMilestones);
@@ -226,21 +217,49 @@ export default function FounderDashboard() {
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
 
   useEffect(() => {
-    // Try locally-saved company name first (always available, cross-browser resilient)
-    try {
-      const saved = localStorage.getItem('lp_founder_company');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.name) setCompanyName(parsed.name);
-      }
-    } catch { /* ignore */ }
+    // Fetch company profile from CRM → populate company name + KPIs
+    if (userEmail) {
+      fetchCompanyProfile(userEmail).then(profile => {
+        if (profile.name) setCompanyName(profile.name);
 
-    // Then try CRM org API (may fail for portal users)
+        // Auto-populate KPIs from company profile if KPIs haven't been manually set
+        const savedKpis = localStorage.getItem(STORAGE_KPIS);
+        if (!savedKpis) {
+          const map = companyToKpiMap(profile);
+          const hasAny = Object.values(map).some(v => !!v);
+          if (hasAny) {
+            const populated = DEFAULT_KPIS.map(def => ({ ...def, value: map[def.key] || '' }));
+            setKPIs(populated);
+          }
+        }
+      }).catch(() => {});
+    }
+
+    // Also try CRM org API for company name fallback
     if (!isConnected) return;
     fetchZohoOrgName().then(org => {
-      if (org) setCompanyName(org);
+      if (org && !companyName) setCompanyName(org);
     }).catch(() => {});
-  }, [isConnected]);
+  }, [isConnected, userEmail]);
+
+  // Refresh KPIs when company profile is updated from /company page
+  useEffect(() => {
+    function handleCompanyUpdate() {
+      if (!userEmail) return;
+      fetchCompanyProfile(userEmail).then(profile => {
+        if (profile.name) setCompanyName(profile.name);
+        const map = companyToKpiMap(profile);
+        const hasAny = Object.values(map).some(v => !!v);
+        if (hasAny) {
+          const populated = DEFAULT_KPIS.map(def => ({ ...def, value: map[def.key] || '' }));
+          setKPIs(populated);
+          saveKPIs(populated);
+        }
+      }).catch(() => {});
+    }
+    window.addEventListener('founder-company-updated', handleCompanyUpdate);
+    return () => window.removeEventListener('founder-company-updated', handleCompanyUpdate);
+  }, [userEmail]);
 
   useEffect(() => {
     const insights = generateFounderInsights(
