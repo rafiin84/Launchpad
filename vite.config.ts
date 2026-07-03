@@ -7,4 +7,13 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://launchpad-iota-ten.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })
