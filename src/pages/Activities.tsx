@@ -41,13 +41,20 @@ const ACTIVITY_TYPES = [
 
 // ─── Image compressor (same as AddActivity) ───────────────────────────────────
 
+function extractYouTubeId(u: URL): string | null {
+  if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
+  if (!u.hostname.includes('youtube.com')) return null;
+  if (u.searchParams.get('v')) return u.searchParams.get('v');
+  const parts = u.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'embed') return parts[1] || null;
+  return null;
+}
+
 function getVideoEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-      if (id) return `https://www.youtube.com/embed/${id}`;
-    }
+    const ytId = extractYouTubeId(u);
+    if (ytId) return `https://www.youtube.com/embed/${ytId}`;
     if (u.hostname.includes('vimeo.com')) {
       const id = u.pathname.split('/').pop();
       if (id) return `https://player.vimeo.com/video/${id}`;
@@ -56,6 +63,15 @@ function getVideoEmbedUrl(url: string): string | null {
       const id = u.pathname.split('/').pop();
       if (id) return `https://www.loom.com/embed/${id}`;
     }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
+function getVideoThumbnail(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const ytId = extractYouTubeId(u);
+    if (ytId) return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   } catch { /* not a valid URL */ }
   return null;
 }
@@ -278,7 +294,7 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
                 <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
               </div>
             ) : (
-              <img src={imagePreview || imageUrl} alt="preview" className="w-full max-h-56 object-cover" />
+              <img src={imagePreview || getVideoThumbnail(imageUrl) || imageUrl} alt="preview" className="w-full max-h-56 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             )}
             <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
               <X size={13} className="text-white" />
@@ -472,7 +488,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
                 </div>
               ) : (
                 <img
-                  src={activity.imageData?.startsWith('data:') ? activity.imageData : activity.imageUrl}
+                  src={activity.imageData?.startsWith('data:') ? activity.imageData : (getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl)}
                   alt=""
                   className="w-full max-h-48 object-cover"
                   loading="lazy"

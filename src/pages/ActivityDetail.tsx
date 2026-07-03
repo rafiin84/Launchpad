@@ -7,13 +7,20 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
 
+function extractYouTubeId(u: URL): string | null {
+  if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
+  if (!u.hostname.includes('youtube.com')) return null;
+  if (u.searchParams.get('v')) return u.searchParams.get('v');
+  const parts = u.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'embed') return parts[1] || null;
+  return null;
+}
+
 function getVideoEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-      if (id) return `https://www.youtube.com/embed/${id}`;
-    }
+    const ytId = extractYouTubeId(u);
+    if (ytId) return `https://www.youtube.com/embed/${ytId}`;
     if (u.hostname.includes('vimeo.com')) {
       const id = u.pathname.split('/').pop();
       if (id) return `https://player.vimeo.com/video/${id}`;
@@ -22,6 +29,15 @@ function getVideoEmbedUrl(url: string): string | null {
       const id = u.pathname.split('/').pop();
       if (id) return `https://www.loom.com/embed/${id}`;
     }
+  } catch { /* not a valid URL */ }
+  return null;
+}
+
+function getVideoThumbnail(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const ytId = extractYouTubeId(u);
+    if (ytId) return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   } catch { /* not a valid URL */ }
   return null;
 }
@@ -215,10 +231,11 @@ export default function ActivityDetail() {
                   </div>
                 ) : (
                   <img
-                    src={activity.imageData || activity.imageUrl}
+                    src={activity.imageData || getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl}
                     alt=""
                     className="w-full object-cover max-h-80"
                     loading="lazy"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 )}
               </div>

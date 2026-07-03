@@ -23,13 +23,20 @@ const ACTIVITY_TYPES = [
 // ─── Canvas image compressor ──────────────────────────────────────────────────
 // Resizes to max 600px wide/tall and reduces JPEG quality until base64 < 28000 chars
 
+function extractYouTubeId(u: URL): string | null {
+  if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
+  if (!u.hostname.includes('youtube.com')) return null;
+  if (u.searchParams.get('v')) return u.searchParams.get('v');
+  const parts = u.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'embed') return parts[1] || null;
+  return null;
+}
+
 function getVideoEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-      const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-      if (id) return `https://www.youtube.com/embed/${id}`;
-    }
+    const ytId = extractYouTubeId(u);
+    if (ytId) return `https://www.youtube.com/embed/${ytId}`;
     if (u.hostname.includes('vimeo.com')) {
       const id = u.pathname.split('/').pop();
       if (id) return `https://player.vimeo.com/video/${id}`;
@@ -292,7 +299,7 @@ export default function AddActivity() {
                       <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                     </div>
                   ) : (
-                    <img src={form.imagePreview || form.imageUrl} alt="preview" className="w-full max-h-60 object-cover" />
+                    <img src={form.imagePreview || form.imageUrl} alt="preview" className="w-full max-h-60 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   )}
                   <button
                     type="button"
