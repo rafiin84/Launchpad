@@ -464,7 +464,7 @@ export default function FounderDetail() {
 
           {/* View Company Profile Card */}
           <Link
-            to="/company"
+            to={`/company?email=${encodeURIComponent(founder.email)}`}
             className="block bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 hover:border-indigo-200 transition-all group"
           >
             <div className="flex items-center gap-3">

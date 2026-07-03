@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
@@ -109,6 +110,8 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 
 export default function FounderCompany() {
   const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
+  const [searchParams] = useSearchParams();
+  const queryEmail = searchParams.get('email');
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
   const [data, setData]       = useState<CompanyData>(EMPTY);
   const [editing, setEditing] = useState(false);
@@ -121,7 +124,11 @@ export default function FounderCompany() {
 
   useEffect(() => {
     setLoading(true);
-    if (isInvestor) {
+    if (isInvestor && queryEmail) {
+      fetchCompanyProfile(queryEmail)
+        .then(setData)
+        .finally(() => setLoading(false));
+    } else if (isInvestor) {
       fetchAllCompanyProfiles()
         .then(profiles => {
           setAllProfiles(profiles);
@@ -135,7 +142,7 @@ export default function FounderCompany() {
     } else {
       setLoading(false);
     }
-  }, [userEmail, isInvestor]);
+  }, [userEmail, isInvestor, queryEmail]);
 
   useEffect(() => {
     if (editing) setDraft({ ...data });
