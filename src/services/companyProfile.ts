@@ -77,20 +77,42 @@ function saveLocal(email: string, d: CompanyData) {
 }
 
 export async function fetchCompanyProfile(email: string): Promise<CompanyData> {
+  let crmData: CompanyData | null = null;
+
   try {
     const res = await fetch(`/api/company?email=${encodeURIComponent(email)}`);
     if (res.ok) {
       const json = await res.json() as { data?: Record<string, unknown> };
       if (json.data) {
-        const merged = { ...EMPTY, ...(json.data as Partial<CompanyData>) };
-        saveLocal(email, merged);
-        return merged;
+        crmData = { ...EMPTY, ...(json.data as Partial<CompanyData>) };
+        saveLocal(email, crmData);
       }
     }
   } catch (err) {
     console.warn('[CompanyProfile] API fetch failed, using localStorage:', err);
   }
-  return loadLocal(email);
+
+  if (crmData) return crmData;
+
+  // CRM has no data — check localStorage for pre-existing data to auto-sync
+  const local = loadLocal(email);
+  if (local.name) {
+    console.log('[CompanyProfile] Auto-syncing local data to CRM for', email);
+    syncToCrm(email, local);
+  }
+  return local;
+}
+
+function syncToCrm(email: string, data: CompanyData) {
+  fetch('/api/company', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, data }),
+  }).then(res => {
+    console.log('[CompanyProfile] Auto-sync result:', res.ok ? 'success' : res.status);
+  }).catch(err => {
+    console.warn('[CompanyProfile] Auto-sync failed:', err);
+  });
 }
 
 export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; data: CompanyData }>> {

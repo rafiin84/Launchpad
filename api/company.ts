@@ -85,18 +85,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { email, all } = req.query;
 
       if (all === 'true') {
-        const searchResult = await crmRequest('POST', '/crm/v2/coql', {
-          select_query: `select Note_Title, Note_Content from Notes where Note_Title like '${NOTE_PREFIX}%' limit 100`,
-        });
-        const data = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
         const profiles: Array<{ email: string; data: unknown }> = [];
-        for (const note of data?.data ?? []) {
-          if (!note.Note_Title || !note.Note_Content) continue;
-          const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
-          try {
-            profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
-          } catch { /* skip malformed */ }
+
+        // Try COQL first
+        try {
+          const searchResult = await crmRequest('POST', '/crm/v2/coql', {
+            select_query: `select Note_Title, Note_Content from Notes where Note_Title like '${NOTE_PREFIX}%' limit 100`,
+          });
+          console.log('[/api/company] COQL all result status:', searchResult.status);
+          const respData = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
+          for (const note of respData?.data ?? []) {
+            if (!note.Note_Title || !note.Note_Content) continue;
+            const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
+            try {
+              profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
+            } catch { /* skip malformed */ }
+          }
+        } catch (e) {
+          console.warn('[/api/company] COQL all failed:', e);
         }
+
+        // Fallback: search via word criteria if COQL returned nothing
+        if (profiles.length === 0) {
+          try {
+            const searchResult = await crmRequest(
+              'GET',
+              `/crm/v2/Notes/search?word=${encodeURIComponent(NOTE_PREFIX)}&per_page=100`,
+            );
+            const respData = searchResult.data as { data?: Array<{ Note_Title?: string; Note_Content?: string }> } | null;
+            for (const note of respData?.data ?? []) {
+              if (!note.Note_Title?.startsWith(NOTE_PREFIX) || !note.Note_Content) continue;
+              const ownerEmail = note.Note_Title.replace(NOTE_PREFIX, '');
+              try {
+                profiles.push({ email: ownerEmail, data: JSON.parse(note.Note_Content) });
+              } catch { /* skip malformed */ }
+            }
+          } catch (e) {
+            console.warn('[/api/company] Search fallback also failed:', e);
+          }
+        }
+
         return res.status(200).json({ profiles });
       }
 
@@ -105,9 +133,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const title = noteTitle(email);
+      console.log('[/api/company] GET email:', email, 'title:', title);
+
       const searchResult = await crmRequest('POST', '/crm/v2/coql', {
         select_query: `select Note_Title, Note_Content from Notes where Note_Title = '${title}' limit 1`,
       });
+      console.log('[/api/company] COQL status:', searchResult.status);
 
       const data = searchResult.data as { data?: Array<{ Note_Content?: string; id?: string }> } | null;
       const note = data?.data?.[0];
@@ -115,12 +146,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (note?.Note_Content) {
         try {
           const parsed = JSON.parse(note.Note_Content);
+          console.log('[/api/company] Found profile for', email, '- name:', (parsed as Record<string,string>).name);
           return res.status(200).json({ data: parsed, noteId: note.id });
         } catch {
           return res.status(200).json({ data: null });
         }
       }
 
+      console.log('[/api/company] No profile found for', email);
       return res.status(200).json({ data: null });
     }
 
@@ -144,13 +177,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const existing = (searchResult.data as { data?: Array<{ id: string }> })?.data?.[0];
 
       if (existing) {
-        await crmRequest('PUT', `/crm/v2/Notes/${existing.id}`, {
+        console.log('[/api/company] Updating existing note:', existing.id, 'for', email);
+        const updateResult = await crmRequest('PUT', `/crm/v2/Notes/${existing.id}`, {
           data: [{ id: existing.id, Note_Title: title, Note_Content: jsonContent }],
         });
+        console.log('[/api/company] Update result:', updateResult.status);
       } else {
-        await crmRequest('POST', '/crm/v2/Notes', {
+        console.log('[/api/company] Creating new note for', email);
+        const createResult = await crmRequest('POST', '/crm/v2/Notes', {
           data: [{ Note_Title: title, Note_Content: jsonContent }],
         });
+        console.log('[/api/company] Create result:', createResult.status, JSON.stringify(createResult.data));
       }
 
       return res.status(200).json({ success: true });
