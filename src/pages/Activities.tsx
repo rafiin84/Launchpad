@@ -12,7 +12,7 @@ import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
-import { fetchSharedActivities, postSharedActivity } from '../services/sharedActivities';
+import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
@@ -105,7 +105,7 @@ function compressImage(file: File): Promise<string> {
 
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
-function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
+function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -199,6 +199,9 @@ function Composer({ onPost }: { onPost: (activity: CRMActivity) => void }) {
       const activity = await postSharedActivity(fields);
 
       onPost(activity);
+      if (!activity.synced) {
+        onSyncWarning?.('Activity saved locally but failed to sync to CRM. It will retry automatically.');
+      }
       handleCancel();
     } finally { setPosting(false); }
   }
@@ -519,6 +522,7 @@ export default function Activities() {
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [syncWarning, setSyncWarning] = useState('');
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -530,7 +534,14 @@ export default function Activities() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    if (isConnected) {
+      syncUnsyncedActivities().then(count => {
+        if (count > 0) load();
+      }).catch(() => {});
+    }
+  }, []);
 
   const handlePost = (activity: CRMActivity) => {
     setRecords(prev => [activity, ...prev]);
@@ -613,8 +624,17 @@ export default function Activities() {
         </div>
       )}
 
+      {/* Sync warning */}
+      {syncWarning && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-700 flex-1">{syncWarning}</p>
+          <button onClick={() => setSyncWarning('')} className="text-amber-400 hover:text-amber-600"><X size={14} /></button>
+        </div>
+      )}
+
       {/* Composer */}
-      <Composer onPost={handlePost} />
+      <Composer onPost={handlePost} onSyncWarning={setSyncWarning} />
 
       {/* Empty */}
       {!loading && !error && records.length === 0 && isConnected && (

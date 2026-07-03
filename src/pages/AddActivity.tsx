@@ -185,7 +185,12 @@ export default function AddActivity() {
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',
       };
-      await postSharedActivity(fields);
+      const result = await postSharedActivity(fields);
+      if (!result.synced) {
+        setSaveError('Activity saved locally but failed to sync to CRM. Check your connection and try again.');
+        setSaving(false);
+        return;
+      }
       navigate('/activities');
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save activity');

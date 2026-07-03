@@ -130,14 +130,16 @@ export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivit
   }
 }
 
-export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity> {
+export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity & { synced: boolean }> {
   let id: string | null = null;
+  let lastError: string | null = null;
 
   // Try API endpoint first (admin token creates with full field access)
   try {
     id = await postViaApi(fields);
     console.log('[Activities] Posted via API, id:', id);
   } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
     console.warn('[Activities] API post failed, trying direct CRM:', err);
   }
 
@@ -147,14 +149,51 @@ export async function postSharedActivity(fields: CRMActivityFields): Promise<CRM
       id = await createCRMActivity(fields);
       console.log('[Activities] Posted to CRM (direct), id:', id);
     } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
       console.warn('[Activities] Direct CRM post also failed:', err);
     }
   }
 
-  const activity: CRMActivity = { id: id || generateLocalId(), ...fields, createdTime: new Date().toISOString() };
+  const synced = !!id;
+  if (!synced) console.error('[Activities] Activity NOT synced to CRM:', lastError);
+
+  const activity: CRMActivity & { synced: boolean } = {
+    id: id || generateLocalId(), ...fields, createdTime: new Date().toISOString(), synced,
+  };
 
   const local = loadLocal();
   saveLocal([activity, ...local]);
 
   return activity;
+}
+
+export async function syncUnsyncedActivities(): Promise<number> {
+  const local = loadLocal();
+  const unsynced = local.filter(a => a.id.startsWith('local_'));
+  if (!unsynced.length) return 0;
+
+  let synced = 0;
+  for (const activity of unsynced) {
+    const fields: CRMActivityFields = {
+      title: activity.title, activityType: activity.activityType,
+      content: activity.content, companyName: activity.companyName,
+      authorName: activity.authorName, authorRole: activity.authorRole,
+      tags: activity.tags, imageUrl: activity.imageUrl, imageData: activity.imageData,
+    };
+
+    let newId: string | null = null;
+    try { newId = await postViaApi(fields); } catch { /* continue */ }
+    if (!newId) {
+      try { newId = await createCRMActivity(fields); } catch { /* continue */ }
+    }
+
+    if (newId) {
+      activity.id = newId;
+      synced++;
+    }
+  }
+
+  if (synced > 0) saveLocal(local);
+  console.log(`[Activities] Synced ${synced}/${unsynced.length} local activities`);
+  return synced;
 }
