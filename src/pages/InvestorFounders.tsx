@@ -1,20 +1,79 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Building2, Globe, MapPin,
+  Building2, Globe, MapPin, List, LayoutGrid,
   Loader2, Search, Users, ExternalLink, Mail, Phone, Link as LinkIcon,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 
-function FounderCard({ company }: { company: CRMPortfolioRecord }) {
-  const initials = (company.founderName || 'F')
-    .split(' ')
-    .map(w => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+type ViewMode = 'list' | 'grid';
 
+function Initials({ name }: { name: string }) {
+  const initials = (name || 'F').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return (
+    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+      <span className="text-white text-xs font-bold">{initials}</span>
+    </div>
+  );
+}
+
+function FounderRow({ company }: { company: CRMPortfolioRecord }) {
+  return (
+    <Link
+      to={`/founders/${company.id}`}
+      className="flex items-center gap-4 px-4 py-3 bg-white hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors group"
+    >
+      <Initials name={company.founderName} />
+      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-x-6 gap-y-0.5 items-center">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+            {company.founderName || 'Unknown Founder'}
+          </h3>
+          {company.companyName && (
+            <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+              <Building2 size={10} className="text-gray-400 flex-shrink-0" /> {company.companyName}
+            </p>
+          )}
+        </div>
+        <div className="hidden sm:flex items-center gap-3 min-w-0">
+          {company.industry && (
+            <span className="text-xs text-gray-500 truncate">{company.industry}</span>
+          )}
+          {company.stage && (
+            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-semibold flex-shrink-0">
+              {company.stage}
+            </span>
+          )}
+          {company.status && (
+            <span className={cn(
+              'text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0',
+              company.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'
+            )}>
+              {company.status}
+            </span>
+          )}
+          {company.location && (
+            <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0">
+              <MapPin size={9} /> {company.location}
+            </span>
+          )}
+        </div>
+        <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+          {company.founderEmail && (
+            <span className="text-[10px] text-gray-400 flex items-center gap-1">
+              <Mail size={9} /> {company.founderEmail}
+            </span>
+          )}
+        </div>
+      </div>
+      <ChevronRight size={14} className="text-gray-300 group-hover:text-indigo-400 transition-colors flex-shrink-0" />
+    </Link>
+  );
+}
+
+function FounderCard({ company }: { company: CRMPortfolioRecord }) {
   return (
     <Link
       to={`/founders/${company.id}`}
@@ -22,7 +81,9 @@ function FounderCard({ company }: { company: CRMPortfolioRecord }) {
     >
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <span className="text-white text-sm font-bold">{initials}</span>
+          <span className="text-white text-sm font-bold">
+            {(company.founderName || 'F').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+          </span>
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
@@ -41,7 +102,6 @@ function FounderCard({ company }: { company: CRMPortfolioRecord }) {
         <ExternalLink size={14} className="text-gray-300 group-hover:text-indigo-400 transition-colors flex-shrink-0 mt-1" />
       </div>
 
-      {/* Tags */}
       <div className="flex flex-wrap gap-1.5 mt-3">
         {company.stage && (
           <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-semibold">
@@ -68,7 +128,6 @@ function FounderCard({ company }: { company: CRMPortfolioRecord }) {
         )}
       </div>
 
-      {/* Contact info */}
       <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-50">
         {company.founderEmail && (
           <p className="text-[10px] text-gray-400 flex items-center gap-1">
@@ -94,6 +153,7 @@ export default function InvestorFounders() {
   const [companies, setCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<ViewMode>('list');
 
   useEffect(() => {
     fetchCRMPortfolio()
@@ -127,6 +187,28 @@ export default function InvestorFounders() {
             )}
           </p>
         </div>
+        {!loading && companies.length > 0 && (
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setView('list')}
+              className={cn(
+                'p-1.5 rounded-md transition-all',
+                view === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+              )}
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={cn(
+                'p-1.5 rounded-md transition-all',
+                view === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+              )}
+            >
+              <LayoutGrid size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Search */}
@@ -168,8 +250,17 @@ export default function InvestorFounders() {
         </div>
       )}
 
-      {/* Founders grid */}
-      {filtered.length > 0 && (
+      {/* List view */}
+      {filtered.length > 0 && view === 'list' && (
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+          {filtered.map(c => (
+            <FounderRow key={c.id} company={c} />
+          ))}
+        </div>
+      )}
+
+      {/* Grid view */}
+      {filtered.length > 0 && view === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(c => (
             <FounderCard key={c.id} company={c} />
