@@ -72,6 +72,7 @@ import InvestorApplications from './pages/InvestorApplications';
 import Applicants from './pages/Founders';
 import ApplicantDetail from './pages/FounderDetail';
 import InvestorFounders from './pages/InvestorFounders';
+import FounderDetailPage from './pages/FounderDetailPage';
 
 export default function App() {
   return (
@@ -108,6 +109,7 @@ export default function App() {
             <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
             <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
             <Route path="/founders" element={<InvestorFounders />} />
+            <Route path="/founders/:id" element={<FounderDetailPage />} />
             <Route path="/applicants" element={<Applicants />} />
             <Route path="/applicants/:id" element={<ApplicantDetail />} />
             <Route path="/funds" element={<Funds />} />
