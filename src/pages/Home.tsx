@@ -23,9 +23,6 @@ import {
 
 // ─── Chart constants ───────────────────────────────────────────────────────────
 
-const MONTHS = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-const GROWTH_VALUES = [7.0, 7.1, 7.35, 7.6, 7.85, 8.05, 8.25, 8.5, 8.7, 8.9, 9.1, 9.3];
-
 const PIPELINE_STAGES_CONFIG: { id: string; label: string; color: string }[] = [
   { id: 'New',                  label: 'New',               color: '#d1d5db' },
   { id: 'Under Review',         label: 'Under Review',      color: '#93c5fd' },
@@ -38,53 +35,11 @@ const PIPELINE_STAGES_CONFIG: { id: string; label: string; color: string }[] = [
 // ─── Portfolio Growth Chart ────────────────────────────────────────────────────
 
 function PortfolioGrowthChart() {
-  const W = 460, H = 160;
-  const pad = { top: 18, right: 12, bottom: 32, left: 44 };
-  const chartW = W - pad.left - pad.right;
-  const chartH = H - pad.top - pad.bottom;
-  const minVal = 6.8, maxVal = 9.6;
-
-  const xs = GROWTH_VALUES.map((_, i) => pad.left + (i / (GROWTH_VALUES.length - 1)) * chartW);
-  const ys = GROWTH_VALUES.map(v => pad.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH);
-  const linePath = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L${xs[xs.length - 1].toFixed(1)},${(pad.top + chartH).toFixed(1)} L${xs[0].toFixed(1)},${(pad.top + chartH).toFixed(1)} Z`;
-  const yTicks = [7.0, 7.5, 8.0, 8.5, 9.0];
-
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Portfolio Value Over Time</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Jul 2024 – Jun 2025</p>
-        </div>
-        <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-lg">
-          <ArrowUpRight size={12} />+32.9%
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="pgGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-        {yTicks.map(v => {
-          const y = pad.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH;
-          return (
-            <g key={v}>
-              <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="#f3f4f6" strokeWidth="1" />
-              <text x={pad.left - 5} y={y + 3.5} textAnchor="end" fontSize="8.5" fill="#9ca3af">${v}M</text>
-            </g>
-          );
-        })}
-        {MONTHS.map((m, i) => i % 2 === 0
-          ? <text key={i} x={xs[i]} y={H - 5} textAnchor="middle" fontSize="8.5" fill="#9ca3af">{m}</text>
-          : null
-        )}
-        <path d={areaPath} fill="url(#pgGrad)" />
-        <path d={linePath} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="3.5" fill="white" stroke="#6366f1" strokeWidth="2" />
-      </svg>
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 min-h-[200px]">
+      <TrendingUp size={28} className="text-gray-200" />
+      <p className="text-sm font-medium text-gray-500">Portfolio Value Over Time</p>
+      <p className="text-xs text-gray-400">Add portfolio companies with valuation data to track growth over time.</p>
     </div>
   );
 }

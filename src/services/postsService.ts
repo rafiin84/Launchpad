@@ -1,9 +1,8 @@
 import type { Post, PostType, PostVisibility } from '../types';
-import { mockPosts } from '../data/mockData';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-let posts = [...mockPosts];
+let posts: Post[] = [];
 
 export const postsService = {
   async getFeed(options?: { type?: PostType; visibility?: PostVisibility }): Promise<Post[]> {

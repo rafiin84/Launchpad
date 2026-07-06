@@ -1,10 +1,9 @@
 import type { Deal, Application, DealStage } from '../types';
-import { mockDeals, mockApplications } from '../data/mockData';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-let deals = [...mockDeals];
-let applications = [...mockApplications];
+let deals: Deal[] = [];
+let applications: Application[] = [];
 
 export const dealsService = {
   async getAll(): Promise<Deal[]> {

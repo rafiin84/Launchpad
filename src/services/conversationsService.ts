@@ -1,9 +1,8 @@
 import type { Conversation, Message } from '../types';
-import { mockConversations } from '../data/mockData';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-let conversations = [...mockConversations];
+let conversations: Conversation[] = [];
 
 export const conversationsService = {
   async getAll(): Promise<Conversation[]> {
