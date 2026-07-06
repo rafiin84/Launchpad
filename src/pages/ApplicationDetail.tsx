@@ -192,6 +192,7 @@ export default function ApplicationDetail() {
   const [showMessage, setShowMessage] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const loadApp = useCallback(async () => {
     if (!id) return;
@@ -218,6 +219,7 @@ export default function ApplicationDetail() {
   const handleStatusChange = async (newStatus: ApplicationStatus) => {
     if (!app || !id) return;
     setActionLoading(newStatus);
+    setActionError('');
 
     try {
       if (newStatus === 'approved') {
@@ -252,7 +254,9 @@ export default function ApplicationDetail() {
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update status';
       console.error('Failed to update status:', err);
+      setActionError(msg);
     }
     setActionLoading(null);
   };
@@ -317,14 +321,14 @@ export default function ApplicationDetail() {
     </div>
   );
 
-  const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; borderColor: string }[] = [
-    { label: 'Approve',          status: 'approved',            icon: CheckCircle2,  color: 'text-green-600',   hoverBg: 'hover:bg-green-50',  borderColor: 'border-green-200' },
-    { label: 'Hold',             status: 'on_hold',             icon: Pause,         color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50',  borderColor: 'border-slate-200' },
-    { label: 'Reject',           status: 'rejected',            icon: XCircle,       color: 'text-red-600',     hoverBg: 'hover:bg-red-50',    borderColor: 'border-red-200' },
-    { label: 'Request Info',     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50',  borderColor: 'border-amber-200' },
-    { label: 'Request Docs',     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50', borderColor: 'border-yellow-200' },
-    { label: 'Schedule Meeting', status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50', borderColor: 'border-violet-200' },
-    { label: 'Shortlist',        status: 'shortlisted',         icon: Star,          color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50', borderColor: 'border-purple-200' },
+  const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string }[] = [
+    { label: 'Approve',          status: 'approved',            icon: CheckCircle2,  color: 'text-green-600',   hoverBg: 'hover:bg-green-50',  activeBg: 'bg-green-50',  borderColor: 'border-green-300' },
+    { label: 'Hold',             status: 'on_hold',             icon: Pause,         color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50',  activeBg: 'bg-slate-100', borderColor: 'border-slate-300' },
+    { label: 'Reject',           status: 'rejected',            icon: XCircle,       color: 'text-red-600',     hoverBg: 'hover:bg-red-50',    activeBg: 'bg-red-50',    borderColor: 'border-red-300' },
+    { label: 'Request Info',     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
+    { label: 'Request Docs',     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
+    { label: 'Schedule Meeting', status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
+    { label: 'Shortlist',        status: 'shortlisted',         icon: Star,          color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50', activeBg: 'bg-purple-50', borderColor: 'border-purple-300' },
   ];
 
   let supportingDocs: { name: string; url: string }[] = [];
@@ -386,6 +390,11 @@ export default function ApplicationDetail() {
 
           {/* Actions */}
           <Section title="Actions">
+            {actionError && (
+              <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-medium">
+                {actionError}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 mb-3">
               {actions.map(a => {
                 const Icon = a.icon;
@@ -399,7 +408,7 @@ export default function ApplicationDetail() {
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
                       isActive
-                        ? `${a.color} ${a.borderColor} bg-opacity-10`
+                        ? `${a.color} ${a.activeBg} ${a.borderColor}`
                         : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
                       isLoading && 'opacity-50 cursor-wait'
                     )}
