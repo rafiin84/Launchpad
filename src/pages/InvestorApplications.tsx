@@ -1,21 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Inbox, Search, Building2, MessageSquare, Star,
-  Calendar, FileSearch, XCircle, ChevronDown,
-  ChevronUp, ExternalLink, FileText, Play, StickyNote,
-  TrendingUp, Users, BarChart3, Clock, CheckCircle2,
-  Pause, FileUp, Send,
+  Inbox, Search, Building2, Star,
+  XCircle, ExternalLink,
+  BarChart3, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   getApplications,
-  updateApplicationStatus,
-  updateApplication,
-  approveApplication,
   type InvestmentApplication,
   type ApplicationStatus,
 } from '../services/investmentApplications';
-import { addNotification } from '../services/notifications';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 
@@ -104,469 +99,15 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'rejected',          label: 'Rejected' },
 ];
 
-// ─── Video embed helper ───────────────────────────────────────────────────────
-
-function VideoEmbed({ url }: { url: string }) {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    // YouTube
-    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-      const ytId = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v');
-      if (ytId) {
-        return (
-          <div className="rounded-xl overflow-hidden bg-black aspect-video">
-            <iframe
-              src={`https://www.youtube.com/embed/${ytId}`}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        );
-      }
-    }
-    // Vimeo
-    if (u.hostname.includes('vimeo.com')) {
-      const vimeoId = u.pathname.split('/').pop();
-      if (vimeoId) {
-        return (
-          <div className="rounded-xl overflow-hidden bg-black aspect-video">
-            <iframe
-              src={`https://player.vimeo.com/video/${vimeoId}`}
-              className="w-full h-full"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        );
-      }
-    }
-    // Loom
-    if (u.hostname.includes('loom.com')) {
-      const loomId = u.pathname.split('/').pop();
-      if (loomId) {
-        return (
-          <div className="rounded-xl overflow-hidden bg-black aspect-video">
-            <iframe
-              src={`https://www.loom.com/embed/${loomId}`}
-              className="w-full h-full"
-              allowFullScreen
-            />
-          </div>
-        );
-      }
-    }
-  } catch { /* not a valid URL */ }
-  // Fallback link
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-      <Play size={12} /> Watch Demo Video <ExternalLink size={10} />
-    </a>
-  );
-}
-
-// ─── Detail Panel ─────────────────────────────────────────────────────────────
-
-function ApplicationDetail({
-  app,
-  onAction,
-  onNotesChange,
-  onSendMessage,
-}: {
-  app: InvestmentApplication;
-  onAction: (id: string, status: ApplicationStatus) => void;
-  onNotesChange: (id: string, notes: string) => void;
-  onSendMessage: (id: string, message: string) => void;
-}) {
-  const [notes, setNotes] = useState(app.investorNotes || '');
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [messageText, setMessageText] = useState('');
-  const [showMessage, setShowMessage] = useState(false);
-  const [sendingMessage, setSendingMessage] = useState(false);
-
-  const handleSaveNotes = async () => {
-    setSavingNotes(true);
-    onNotesChange(app.id, notes);
-    setTimeout(() => setSavingNotes(false), 400);
-  };
-
-  const handleSendMessage = async () => {
-    if (!messageText.trim()) return;
-    setSendingMessage(true);
-    onSendMessage(app.id, messageText.trim());
-    setTimeout(() => {
-      setSendingMessage(false);
-      setMessageText('');
-      setShowMessage(false);
-    }, 400);
-  };
-
-  const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string }[] = [
-    { label: 'Approve',            status: 'approved',            icon: CheckCircle2,   color: 'text-green-600',   hoverBg: 'hover:bg-green-50' },
-    { label: 'Hold',               status: 'on_hold',             icon: Pause,          color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50' },
-    { label: 'Reject',             status: 'rejected',            icon: XCircle,        color: 'text-red-600',     hoverBg: 'hover:bg-red-50' },
-    { label: 'Request Info',       status: 'more_info_requested', icon: MessageSquare,  color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50' },
-    { label: 'Request Docs',       status: 'documents_requested', icon: FileUp,         color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50' },
-    { label: 'Schedule Meeting',   status: 'meeting_scheduled',   icon: Calendar,       color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50' },
-    { label: 'Shortlist',          status: 'shortlisted',         icon: Star,           color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50' },
-  ];
-
-  // Parse supporting docs
-  let supportingDocs: { name: string; url: string }[] = [];
-  try {
-    if (app.supportingDocs) supportingDocs = JSON.parse(app.supportingDocs);
-  } catch { /* ignore */ }
-
-  const financials = [
-    { label: 'Current Revenue', value: app.currentRevenue },
-    { label: 'MRR',             value: app.mrr },
-    { label: 'ARR',             value: app.arr },
-    { label: 'Monthly Burn',    value: app.monthlyBurn },
-    { label: 'Runway',          value: app.runway },
-    { label: 'Active Users',    value: app.activeUsers },
-    { label: 'MoM Growth',      value: app.momGrowth },
-    { label: 'Churn Rate',      value: app.churnRate },
-    { label: 'NPS',             value: app.nps },
-  ].filter(f => f.value);
-
-  return (
-    <div className="border-t border-gray-100 bg-gray-50/40 px-5 py-6 space-y-6">
-      {/* Action Buttons */}
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Actions</p>
-        <div className="flex flex-wrap gap-2">
-          {actions.map(a => {
-            const Icon = a.icon;
-            const isActive = app.status === a.status;
-            return (
-              <button
-                key={a.status}
-                onClick={() => onAction(app.id, a.status)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
-                  isActive
-                    ? `${a.color} border-current opacity-100`
-                    : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`
-                )}
-              >
-                <Icon size={12} /> {a.label}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setShowMessage(!showMessage)}
-            className={cn(
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
-              showMessage
-                ? 'text-blue-600 border-blue-300 bg-blue-50'
-                : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
-            )}
-          >
-            <Send size={12} /> Send Message
-          </button>
-        </div>
-        {showMessage && (
-          <div className="mt-3 bg-white border border-blue-100 rounded-xl p-3">
-            <textarea
-              value={messageText}
-              onChange={e => setMessageText(e.target.value)}
-              placeholder="Type a message to the founder..."
-              className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
-              rows={3}
-            />
-            <div className="flex justify-end mt-2">
-              <button
-                onClick={handleSendMessage}
-                disabled={sendingMessage || !messageText.trim()}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Send size={11} /> {sendingMessage ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Company & Founder Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Company Details</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-2">
-            {app.companyWebsite && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Website</span>
-                <a href={app.companyWebsite} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5">
-                  {app.companyWebsite.replace(/^https?:\/\//, '')} <ExternalLink size={10} />
-                </a>
-              </div>
-            )}
-            {app.companyIndustry && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Industry</span>
-                <span className="text-xs font-medium text-gray-900">{app.companyIndustry}</span>
-              </div>
-            )}
-            {app.companyStage && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Stage</span>
-                <StageBadge stage={app.companyStage} />
-              </div>
-            )}
-            {app.companyLocation && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Location</span>
-                <span className="text-xs font-medium text-gray-900">{app.companyLocation}</span>
-              </div>
-            )}
-            {app.foundedYear && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Founded</span>
-                <span className="text-xs font-medium text-gray-900">{app.foundedYear}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Founder Details</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-2">
-            {app.founderName && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Name</span>
-                <span className="text-xs font-medium text-gray-900">{app.founderName}</span>
-              </div>
-            )}
-            {app.founderEmail && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Email</span>
-                <span className="text-xs font-medium text-gray-900">{app.founderEmail}</span>
-              </div>
-            )}
-            {app.founderPhone && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Phone</span>
-                <span className="text-xs font-medium text-gray-900">{app.founderPhone}</span>
-              </div>
-            )}
-            {app.founderRole && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Role</span>
-                <span className="text-xs font-medium text-gray-900">{app.founderRole}</span>
-              </div>
-            )}
-            {app.founderLinkedin && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">LinkedIn</span>
-                <a href={app.founderLinkedin} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5">
-                  Profile <ExternalLink size={10} />
-                </a>
-              </div>
-            )}
-            {app.coFounders && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Co-Founders</span>
-                <span className="text-xs font-medium text-gray-900">{app.coFounders}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Business Overview */}
-      {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage) && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Business Overview</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-            {app.problemStatement && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">Problem</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{app.problemStatement}</p>
-              </div>
-            )}
-            {app.solution && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">Solution</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{app.solution}</p>
-              </div>
-            )}
-            {app.targetMarket && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">Target Market</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{app.targetMarket}</p>
-              </div>
-            )}
-            {app.businessModel && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">Business Model</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{app.businessModel}</p>
-              </div>
-            )}
-            {app.competitiveAdvantage && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">Competitive Advantage</p>
-                <p className="text-xs text-gray-600 leading-relaxed">{app.competitiveAdvantage}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Funding Details */}
-      {(app.fundingAsk || app.useOfFunds || app.previousFunding || app.currentValuation || app.equityOffered) && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Funding</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {app.fundingAsk && (
-              <div>
-                <p className="text-xs text-gray-500">Funding Ask</p>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(app.fundingAsk))}</p>
-              </div>
-            )}
-            {app.currentValuation && (
-              <div>
-                <p className="text-xs text-gray-500">Valuation</p>
-                <p className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(app.currentValuation))}</p>
-              </div>
-            )}
-            {app.equityOffered && (
-              <div>
-                <p className="text-xs text-gray-500">Equity Offered</p>
-                <p className="text-sm font-semibold text-gray-900">{app.equityOffered}%</p>
-              </div>
-            )}
-            {app.previousFunding && (
-              <div className="col-span-2 sm:col-span-3">
-                <p className="text-xs text-gray-500">Previous Funding</p>
-                <p className="text-xs text-gray-700 leading-relaxed">{app.previousFunding}</p>
-              </div>
-            )}
-            {app.useOfFunds && (
-              <div className="col-span-2 sm:col-span-3">
-                <p className="text-xs text-gray-500">Use of Funds</p>
-                <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Financial Metrics */}
-      {financials.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Financial Metrics</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {financials.map(f => (
-              <div key={f.label}>
-                <p className="text-xs text-gray-500">{f.label}</p>
-                <p className="text-sm font-semibold text-gray-900">{f.value}</p>
-              </div>
-            ))}
-            {app.keyMetric && (
-              <div>
-                <p className="text-xs text-gray-500">{app.keyMetricLabel || 'Key Metric'}</p>
-                <p className="text-sm font-semibold text-gray-900">{app.keyMetric}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Pitch Deck */}
-      {app.pitchDeckUrl && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Pitch Deck</p>
-          {app.pitchDeckUrl.startsWith('data:') ? (
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-              <iframe
-                src={app.pitchDeckUrl}
-                className="w-full"
-                style={{ height: '500px' }}
-                title="Pitch Deck"
-              />
-            </div>
-          ) : (
-            <a
-              href={app.pitchDeckUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-white border border-gray-100 rounded-2xl px-4 py-3"
-            >
-              <FileText size={14} />
-              {app.pitchDeckName || 'View Pitch Deck'}
-              <ExternalLink size={10} />
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* Demo Video */}
-      {app.demoVideoUrl && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Demo Video</p>
-          <VideoEmbed url={app.demoVideoUrl} />
-        </div>
-      )}
-
-      {/* Supporting Documents */}
-      {supportingDocs.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Supporting Documents</p>
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-2">
-            {supportingDocs.map((doc, i) => (
-              <a
-                key={i}
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-indigo-600 transition-colors py-1"
-              >
-                <FileText size={12} className="text-gray-400 flex-shrink-0" />
-                {doc.name}
-                <ExternalLink size={10} className="text-gray-300 ml-auto flex-shrink-0" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Investor Notes */}
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-          <StickyNote size={12} /> Investor Notes
-        </p>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4">
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Write private notes about this application..."
-            className="w-full text-xs text-gray-700 leading-relaxed border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y min-h-[80px]"
-            rows={4}
-          />
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={handleSaveNotes}
-              disabled={savingNotes}
-              className="text-xs font-semibold text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {savingNotes ? 'Saving...' : 'Save Notes'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvestorApplications() {
-  const { currentUser, isInvestor } = useAuth();
+  const { isInvestor } = useAuth();
+  const navigate = useNavigate();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -578,63 +119,6 @@ export default function InvestorApplications() {
   }, [isInvestor]);
 
   useEffect(() => { load(); }, [load]);
-
-  // ── Action handler ────────────────────────────────────────────────────────
-
-  const handleStatusChange = async (id: string, newStatus: ApplicationStatus) => {
-    const app = applications.find(a => a.id === id);
-    if (!app) return;
-
-    if (newStatus === 'approved') {
-      await approveApplication(id, currentUser.name, isInvestor);
-    } else {
-      await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
-    }
-
-    const statusLabel = STATUS_CONFIG[newStatus]?.label ?? newStatus;
-    addNotification({
-      type: 'company_update',
-      title: `Application ${statusLabel}`,
-      message: `${app.companyName} has been marked as "${statusLabel}" by ${currentUser.name}.`,
-      actor: currentUser.name,
-      actorRole: 'investor',
-      link: '/applications/review',
-    });
-
-    window.dispatchEvent(new Event('notifications-updated'));
-    load();
-  };
-
-  const handleNotesChange = async (id: string, notes: string) => {
-    await updateApplication(id, { investorNotes: notes }, isInvestor);
-  };
-
-  const handleSendMessage = async (id: string, message: string) => {
-    const app = applications.find(a => a.id === id);
-    if (!app) return;
-    const existing = app.investorNotes || '';
-    const timestamp = new Date().toLocaleString();
-    const newNotes = existing
-      ? `${existing}\n\n[${timestamp}] ${currentUser.name}: ${message}`
-      : `[${timestamp}] ${currentUser.name}: ${message}`;
-    await updateApplication(id, {
-      investorNotes: newNotes,
-      reviewedBy: currentUser.name,
-      reviewedAt: new Date().toISOString(),
-    }, isInvestor);
-
-    addNotification({
-      type: 'company_update',
-      title: 'Message from Investor',
-      message: `${currentUser.name} sent a message regarding ${app.companyName}: "${message.slice(0, 80)}${message.length > 80 ? '...' : ''}"`,
-      actor: currentUser.name,
-      actorRole: 'investor',
-      link: '/applications/track',
-    });
-
-    window.dispatchEvent(new Event('notifications-updated'));
-    load();
-  };
 
   // ── Filtering ─────────────────────────────────────────────────────────────
 
@@ -757,80 +241,60 @@ export default function InvestorApplications() {
       {/* Application Cards */}
       {!loading && filtered.length > 0 && (
         <div className="space-y-3">
-          {filtered.map(app => {
-            const isExpanded = expandedId === app.id;
-            return (
-              <div key={app.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 transition-all">
-                {/* Card header — clickable */}
-                <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer"
-                  onClick={() => setExpandedId(isExpanded ? null : app.id)}
-                >
-                  {/* Logo placeholder */}
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
-                    <Building2 size={16} className="text-gray-400" />
-                  </div>
+          {filtered.map(app => (
+            <div
+              key={app.id}
+              className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 transition-all cursor-pointer"
+              onClick={() => navigate(`/applications/${app.id}`)}
+            >
+              <div className="flex items-center gap-4 px-5 py-4">
+                <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                  <Building2 size={16} className="text-gray-400" />
+                </div>
 
-                  {/* Main info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || 'Untitled'}</p>
-                      <StageBadge stage={app.companyStage} />
-                      <StatusBadge status={app.status} />
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span>{app.companyIndustry || 'No industry'}</span>
-                      {app.companyLocation && (
-                        <>
-                          <span className="text-gray-300">|</span>
-                          <span>{app.companyLocation}</span>
-                        </>
-                      )}
-                      {app.founderName && (
-                        <>
-                          <span className="text-gray-300">|</span>
-                          <span>{app.founderName}</span>
-                        </>
-                      )}
-                      {app.founderEmail && (
-                        <>
-                          <span className="text-gray-300">|</span>
-                          <span className="truncate">{app.founderEmail}</span>
-                        </>
-                      )}
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || 'Untitled'}</p>
+                    <StageBadge stage={app.companyStage} />
+                    <StatusBadge status={app.status} />
                   </div>
-
-                  {/* Right side */}
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    {app.fundingAsk && (
-                      <span className="text-sm font-semibold text-gray-900">
-                        {formatCurrency(parseFloat(app.fundingAsk))}
-                      </span>
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <span>{app.companyIndustry || 'No industry'}</span>
+                    {app.companyLocation && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <span>{app.companyLocation}</span>
+                      </>
                     )}
-                    {app.submittedAt && (
-                      <span className="text-xs text-gray-400 hidden sm:inline">{relativeTime(app.submittedAt)}</span>
+                    {app.founderName && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <span>{app.founderName}</span>
+                      </>
                     )}
-                    {isExpanded ? (
-                      <ChevronUp size={16} className="text-gray-400" />
-                    ) : (
-                      <ChevronDown size={16} className="text-gray-400" />
+                    {app.founderEmail && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <span className="truncate">{app.founderEmail}</span>
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* Expanded detail */}
-                {isExpanded && (
-                  <ApplicationDetail
-                    app={app}
-                    onAction={handleStatusChange}
-                    onNotesChange={handleNotesChange}
-                    onSendMessage={handleSendMessage}
-                  />
-                )}
+                <div className="flex items-center gap-4 flex-shrink-0">
+                  {app.fundingAsk && (
+                    <span className="text-sm font-semibold text-gray-900">
+                      {formatCurrency(parseFloat(app.fundingAsk))}
+                    </span>
+                  )}
+                  {app.submittedAt && (
+                    <span className="text-xs text-gray-400 hidden sm:inline">{relativeTime(app.submittedAt)}</span>
+                  )}
+                  <ExternalLink size={14} className="text-gray-300" />
+                </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>
