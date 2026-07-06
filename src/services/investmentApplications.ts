@@ -338,6 +338,16 @@ async function proxyUpdate(id: string, payload: Record<string, unknown>): Promis
   }
 }
 
+async function proxyDelete(id: string): Promise<void> {
+  const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string };
+    throw new Error(json.message || `Delete failed: ${res.status}`);
+  }
+}
+
 // ─── CRM direct API (for investors with client-side tokens) ────────────────
 
 async function crmGetAll(): Promise<InvestmentApplication[]> {
@@ -389,9 +399,10 @@ async function crmDeleteApp(id: string): Promise<void> {
 
 /**
  * Fetch all applications.
- * Investors: direct CRM. Founders: server proxy + local drafts.
+ * Investors: direct CRM (all applications).
+ * Founders: server proxy filtered to the founder's own email + local drafts.
  */
-export async function getApplications(isInvestor: boolean): Promise<InvestmentApplication[]> {
+export async function getApplications(isInvestor: boolean, founderEmail?: string): Promise<InvestmentApplication[]> {
   if (isInvestor) {
     return crmGetAll();
   }
@@ -402,12 +413,38 @@ export async function getApplications(isInvestor: boolean): Promise<InvestmentAp
     Promise.resolve(loadLocalDrafts()),
   ]);
 
+  // Filter to only this founder's applications
+  const email = founderEmail?.toLowerCase();
+  const myServerApps = email
+    ? serverApps.filter(a =>
+        a.founderEmail?.toLowerCase() === email ||
+        a.submittedByEmail?.toLowerCase() === email
+      )
+    : serverApps;
+
+  const myLocalDrafts = email
+    ? localDrafts.filter(d =>
+        d.founderEmail?.toLowerCase() === email ||
+        d.submittedByEmail?.toLowerCase() === email ||
+        !d.founderEmail // drafts with no email yet belong to current user
+      )
+    : localDrafts;
+
   // Merge: server apps + any local-only drafts (not yet in CRM)
-  const serverIds = new Set(serverApps.map(a => a.id));
-  const uniqueDrafts = localDrafts.filter(d => !serverIds.has(d.id));
-  const all = [...uniqueDrafts, ...serverApps];
+  const serverIds = new Set(myServerApps.map(a => a.id));
+  const uniqueDrafts = myLocalDrafts.filter(d => !serverIds.has(d.id));
+  const all = [...uniqueDrafts, ...myServerApps];
 
   return all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
+/**
+ * Check if a founder can submit a new application.
+ * Returns true if no active application exists (only rejected/draft or none).
+ */
+export function canApplyAgain(applications: InvestmentApplication[]): boolean {
+  const TERMINAL_STATUSES: ApplicationStatus[] = ['rejected', 'draft'];
+  return applications.every(a => TERMINAL_STATUSES.includes(a.status));
 }
 
 /** Fetch a single application by ID. */
@@ -638,5 +675,9 @@ export async function deleteApplication(id: string, isInvestor: boolean): Promis
   if (filtered.length !== all.length) {
     saveLocal(filtered);
   }
-  // Note: CRM records can't be deleted by founders (no admin access)
+
+  // Also delete from CRM via server proxy
+  try {
+    await proxyDelete(id);
+  } catch { /* silent — may not exist in CRM */ }
 }

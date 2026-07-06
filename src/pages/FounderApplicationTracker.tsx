@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   getApplications,
+  canApplyAgain,
   type InvestmentApplication,
   type ApplicationStatus,
 } from '../services/investmentApplications';
@@ -357,14 +358,14 @@ export default function FounderApplicationTracker() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const all = await getApplications(isInvestor);
+      const all = await getApplications(isInvestor, currentUser?.email);
       if (!cancelled) {
         setApplications(all);
         setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [isInvestor]);
+  }, [isInvestor, currentUser?.email]);
 
   const drafts = applications.filter(a => a.status === 'draft');
   const nonDrafts = applications.filter(a => a.status !== 'draft');
@@ -377,19 +378,22 @@ export default function FounderApplicationTracker() {
   const rejected = nonDrafts.filter(a => a.status === 'rejected').length;
 
   const isEmpty = applications.length === 0;
+  const allowNewApplication = canApplyAgain(applications);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <PageHeader
-        title="My Applications"
-        description="Track the status of your investment proposals"
+        title="My Application"
+        description="Track the status of your investment proposal"
         action={
-          <Link
-            to="/applications/apply"
-            className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
-          >
-            <Plus size={14} /> New Application
-          </Link>
+          allowNewApplication ? (
+            <Link
+              to="/applications/apply"
+              className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
+            >
+              <Plus size={14} /> {applications.some(a => a.status === 'rejected') ? 'Re-Apply' : 'New Application'}
+            </Link>
+          ) : null
         }
       />
 
@@ -405,13 +409,13 @@ export default function FounderApplicationTracker() {
       {!loading && isEmpty && (
         <div className="text-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No applications yet</p>
-          <p className="text-xs text-gray-400 mb-5">Submit your first investment proposal to get started</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">No application yet</p>
+          <p className="text-xs text-gray-400 mb-5">Submit your investment proposal to get started</p>
           <Link
             to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
-            <Plus size={14} /> New Application
+            <Plus size={14} /> Apply Now
           </Link>
         </div>
       )}

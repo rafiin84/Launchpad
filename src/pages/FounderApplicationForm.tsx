@@ -24,6 +24,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   createApplication,
   getApplicationById,
+  getApplications,
+  canApplyAgain,
   updateApplication,
   type InvestmentApplicationFields,
 } from '../services/investmentApplications';
@@ -330,6 +332,19 @@ export default function FounderApplicationForm() {
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+
+  // Check if user already has an active application (not editing a draft)
+  useEffect(() => {
+    if (editId || isInvestor) return;
+    const email = currentUser?.email;
+    if (!email) return;
+    getApplications(false, email).then(apps => {
+      if (!canApplyAgain(apps)) {
+        setBlocked(true);
+      }
+    }).catch(() => {});
+  }, [editId, isInvestor, currentUser?.email]);
 
   // Refs for file inputs
   const pitchDeckRef = useRef<HTMLInputElement>(null);
@@ -892,6 +907,27 @@ export default function FounderApplicationForm() {
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isLastStep = step === STEPS.length - 1;
+
+  if (blocked) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+          <FileText className="w-6 h-6 text-amber-500" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Application Already Submitted</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          You already have an active application. Only one application can be active at a time.
+          You can track its progress on the Applications page.
+        </p>
+        <button
+          onClick={() => navigate('/applications')}
+          className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-gray-800 transition-colors"
+        >
+          View My Application
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
