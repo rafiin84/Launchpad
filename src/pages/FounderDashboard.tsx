@@ -502,7 +502,7 @@ export default function FounderDashboard() {
               <span className="text-lg font-bold text-gray-900">
                 {totalRaisedVal > 0
                   ? totalRaisedVal >= 1_000_000 ? `$${(totalRaisedVal/1_000_000).toFixed(1)}M` : `$${(totalRaisedVal/1_000).toFixed(0)}K`
-                  : '$2.8M'}
+                  : '—'}
               </span>
             </div>
             <p className="text-xs text-gray-400 mb-3">Cumulative capital raised · last 6 months</p>
@@ -521,7 +521,7 @@ export default function FounderDashboard() {
               <span className="text-lg font-bold text-gray-900">
                 {burnVal > 0
                   ? burnVal >= 1_000_000 ? `$${(burnVal/1_000_000).toFixed(1)}M/mo` : `$${(burnVal/1_000).toFixed(0)}K/mo`
-                  : '$135K/mo'}
+                  : '—'}
               </span>
             </div>
             <p className="text-xs text-gray-400 mb-3">Monthly cash burn · last 6 months</p>
@@ -538,14 +538,15 @@ export default function FounderDashboard() {
                 <BarChart2 size={14} className="text-emerald-500" /> Runway
               </h2>
               <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full',
-                (runwayVal || 18) >= 12 ? 'bg-emerald-50 text-emerald-700' :
-                (runwayVal || 18) >= 6  ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+                runwayVal === 0 ? 'bg-gray-100 text-gray-500' :
+                runwayVal >= 12 ? 'bg-emerald-50 text-emerald-700' :
+                runwayVal >= 6  ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
               )}>
-                {(runwayVal || 18) >= 12 ? 'Healthy' : (runwayVal || 18) >= 6 ? 'Watch' : 'Critical'}
+                {runwayVal === 0 ? 'Not set' : runwayVal >= 12 ? 'Healthy' : runwayVal >= 6 ? 'Watch' : 'Critical'}
               </span>
             </div>
             <p className="text-xs text-gray-400 mb-3">Months of cash remaining at current burn</p>
-            <RunwayGauge months={runwayVal || 18} maxMonths={24} />
+            <RunwayGauge months={runwayVal} maxMonths={24} />
           </div>
 
         </div>
