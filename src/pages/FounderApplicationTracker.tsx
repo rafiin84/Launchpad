@@ -84,7 +84,7 @@ function progressPercent(status: ApplicationStatus): number {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
-  const cfg = STATUS_CONFIG[status];
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.submitted;
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
       {cfg.label}
@@ -130,7 +130,7 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
       <div className="flex items-center gap-1 min-w-[640px]">
         {allStages.map((stage, i) => {
           const count = counts[stage.status] || 0;
-          const cfg = STATUS_CONFIG[stage.status];
+          const cfg = STATUS_CONFIG[stage.status] ?? STATUS_CONFIG.submitted;
           const hasApps = count > 0;
           return (
             <div key={stage.status} className="flex items-center flex-1">
@@ -165,7 +165,7 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
 const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
 
 function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void }) {
-  const cfg = STATUS_CONFIG[app.status];
+  const cfg = STATUS_CONFIG[app.status] ?? STATUS_CONFIG.submitted;
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
   const needsAction = ACTION_REQUIRED.includes(app.status);
