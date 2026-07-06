@@ -440,11 +440,17 @@ export async function getApplications(isInvestor: boolean, founderEmail?: string
 
 /**
  * Check if a founder can submit a new application.
- * Returns true if no active application exists (only rejected/draft or none).
+ * Rules:
+ *  - First application: always allowed
+ *  - If rejected: one re-apply allowed
+ *  - If approved/active: no new application
+ *  - Max 1 re-apply total (2 submitted apps max)
  */
 export function canApplyAgain(applications: InvestmentApplication[]): boolean {
-  const TERMINAL_STATUSES: ApplicationStatus[] = ['rejected', 'draft'];
-  return applications.every(a => TERMINAL_STATUSES.includes(a.status));
+  const submitted = applications.filter(a => a.status !== 'draft');
+  if (submitted.length === 0) return true;
+  if (submitted.length === 1 && submitted[0].status === 'rejected') return true;
+  return false;
 }
 
 /** Fetch a single application by ID. */
