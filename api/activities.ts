@@ -202,6 +202,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const val = (fields as Record<string, string>)[formKey] ?? '';
         if (val !== '') payload[crmKey] = val;
       }
+      if (!payload.Author_Role) payload.Author_Role = 'investor';
+      if (!payload.Author_Name) payload.Author_Name = (fields as Record<string, string>).authorName || 'Unknown';
 
       // Strategy 1: Admin token
       const adminToken = await getAdminToken().catch(() => null);
