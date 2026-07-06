@@ -248,7 +248,16 @@ function loadLocalDrafts(): InvestmentApplication[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const all: InvestmentApplication[] = JSON.parse(raw);
-    return all.filter(a => a.status === 'draft');
+    const drafts = all.filter(a => a.status === 'draft');
+    // Keep only the most recent draft
+    if (drafts.length > 1) {
+      drafts.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      const keep = drafts[0];
+      const removeIds = new Set(drafts.slice(1).map(d => d.id));
+      saveLocal(all.filter(a => !removeIds.has(a.id)));
+      return [keep];
+    }
+    return drafts;
   } catch { return []; }
 }
 
@@ -509,15 +518,26 @@ export async function createApplication(fields: InvestmentApplicationFields, isI
 
   const now = new Date().toISOString();
 
-  // Founder: drafts stay in localStorage only
+  // Founder: drafts stay in localStorage only — max one draft per user
   if (fields.status === 'draft') {
+    const existing = loadLocal();
+    const existingDraft = existing.find(a => a.status === 'draft');
+    if (existingDraft) {
+      const updated: InvestmentApplication = {
+        ...existingDraft,
+        ...fields,
+        id: existingDraft.id,
+        updatedAt: now,
+      };
+      saveLocal(existing.map(a => a.id === existingDraft.id ? updated : a));
+      return updated;
+    }
     const app: InvestmentApplication = {
       ...fields,
       id: generateLocalId(),
       submittedAt: now,
       updatedAt: now,
     };
-    const existing = loadLocal();
     saveLocal([app, ...existing]);
     return app;
   }

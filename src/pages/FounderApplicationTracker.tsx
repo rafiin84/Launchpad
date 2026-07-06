@@ -378,7 +378,8 @@ export default function FounderApplicationTracker() {
   const rejected = nonDrafts.filter(a => a.status === 'rejected').length;
 
   const isEmpty = applications.length === 0;
-  const allowNewApplication = canApplyAgain(applications);
+  const hasDraft = drafts.length > 0;
+  const allowNewApplication = canApplyAgain(applications) && !hasDraft;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
