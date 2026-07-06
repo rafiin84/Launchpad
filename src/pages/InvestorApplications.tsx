@@ -666,8 +666,8 @@ export default function InvestorApplications() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="w-full">
         <PageHeader
-          title="Investment Applications"
-          description="Review and evaluate startup investment proposals"
+          title="Applications"
+          description="Review and manage founder applications"
         />
       </div>
 
