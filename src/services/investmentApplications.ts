@@ -162,6 +162,20 @@ const CURRENCY_FIELDS = new Set([
 /** Integer fields in CRM */
 const INTEGER_FIELDS = new Set(['foundedYear']);
 
+/** Datetime fields in CRM — Zoho requires YYYY-MM-DDTHH:mm:ss+HH:mm (no ms, no Z) */
+const DATETIME_FIELDS = new Set(['reviewedAt']);
+
+function toZohoDatetime(isoStr: string): string {
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr;
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(offset) % 60).padStart(2, '0');
+  const local = new Date(d.getTime() + offset * 60000);
+  return local.toISOString().replace(/\.\d{3}Z$/, '') + `${sign}${hh}:${mm}`;
+}
+
 function toCrmPayload(app: Partial<InvestmentApplication>): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
@@ -175,6 +189,8 @@ function toCrmPayload(app: Partial<InvestmentApplication>): Record<string, unkno
     } else if (INTEGER_FIELDS.has(appKey)) {
       const n = parseInt(strVal, 10);
       if (!isNaN(n)) payload[crmKey] = n;
+    } else if (DATETIME_FIELDS.has(appKey)) {
+      payload[crmKey] = toZohoDatetime(strVal);
     } else {
       payload[crmKey] = strVal;
     }
