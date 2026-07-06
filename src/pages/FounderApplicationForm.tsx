@@ -27,6 +27,7 @@ import {
   updateApplication,
   type InvestmentApplicationFields,
 } from '../services/investmentApplications';
+import { fetchCompanyProfile, EMPTY, type CompanyData } from '../services/companyProfile';
 import { addNotification } from '../services/notifications';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -407,6 +408,44 @@ export default function FounderApplicationForm() {
       }));
     }
   }, [currentUser, editId]);
+
+  // ── Auto-fill from company profile ─────────────────────────────────────
+
+  useEffect(() => {
+    if (editId) return;
+    const email = currentUser?.email;
+    if (!email) return;
+    fetchCompanyProfile(email).then((profile: CompanyData) => {
+      if (!profile || profile === EMPTY) return;
+      setForm((prev) => ({
+        ...prev,
+        companyName: prev.companyName || profile.name || '',
+        companyWebsite: prev.companyWebsite || profile.website || '',
+        companyIndustry: prev.companyIndustry || profile.industry || '',
+        companyStage: prev.companyStage || profile.stage || '',
+        companyLocation: prev.companyLocation || profile.location || '',
+        foundedYear: prev.foundedYear || profile.foundedYear || '',
+        companyDescription: prev.companyDescription || profile.description || '',
+        founderName: prev.founderName || profile.founderNames || currentUser?.name || '',
+        targetMarket: prev.targetMarket || profile.targetMarket || '',
+        businessModel: prev.businessModel || profile.revenueModel || '',
+        competitiveAdvantage: prev.competitiveAdvantage || profile.differentiator || '',
+        fundingAsk: prev.fundingAsk || profile.currentAsk || '',
+        useOfFunds: prev.useOfFunds || profile.useOfFunds || '',
+        previousFunding: prev.previousFunding || profile.totalRaised || '',
+        currentValuation: prev.currentValuation || profile.preMoneyValuation || '',
+        currentRevenue: prev.currentRevenue || profile.arr || '',
+        mrr: prev.mrr || profile.mrr || '',
+        arr: prev.arr || profile.arr || '',
+        monthlyBurn: prev.monthlyBurn || profile.monthlyBurn || '',
+        runway: prev.runway || profile.runway || '',
+        activeUsers: prev.activeUsers || profile.activeCustomers || '',
+        momGrowth: prev.momGrowth || profile.momGrowth || '',
+        churnRate: prev.churnRate || profile.churnRate || '',
+        nps: prev.nps || profile.nps || '',
+      }));
+    }).catch(() => {});
+  }, [currentUser?.email, editId]);
 
   // ── Field updater ───────────────────────────────────────────────────────
 

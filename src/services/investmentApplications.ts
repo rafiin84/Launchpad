@@ -23,9 +23,12 @@ export type ApplicationStatus =
   | 'under_review'
   | 'interested'
   | 'more_info_requested'
+  | 'documents_requested'
   | 'shortlisted'
   | 'meeting_scheduled'
   | 'due_diligence'
+  | 'on_hold'
+  | 'approved'
   | 'invested'
   | 'rejected';
 
@@ -572,6 +575,55 @@ export async function updateApplicationStatus(
   }
 
   return updateApplication(id, updates, isInvestor);
+}
+
+/**
+ * Approve an application: set status to 'approved' and create a Portfolio record
+ * so the founder appears on the Founders page.
+ */
+export async function approveApplication(
+  id: string,
+  reviewerName: string,
+  isInvestor: boolean,
+): Promise<InvestmentApplication | null> {
+  const app = await getApplicationById(id, isInvestor);
+  if (!app) return null;
+
+  // 1. Update status to approved
+  const updated = await updateApplicationStatus(id, 'approved', reviewerName, isInvestor);
+
+  // 2. Create a Portfolio record from the application data
+  if (isInvestor) {
+    try {
+      const { createCRMPortfolioRecord } = await import('./crmPortfolio');
+      await createCRMPortfolioRecord({
+        companyName: app.companyName,
+        website: app.companyWebsite,
+        location: app.companyLocation,
+        industry: app.companyIndustry,
+        stage: app.companyStage,
+        foundedYear: app.foundedYear,
+        teamSize: '',
+        shortDescription: app.companyDescription?.slice(0, 200) || '',
+        fullDescription: app.companyDescription,
+        tags: app.companyIndustry,
+        investmentAmount: app.fundingAsk,
+        investmentDate: new Date().toISOString().split('T')[0],
+        preMoneyValuation: app.currentValuation,
+        ownershipPct: app.equityOffered,
+        status: 'Active',
+        notes: `Approved from application. Reviewed by ${reviewerName}.`,
+        founderName: app.founderName,
+        founderEmail: app.founderEmail,
+        founderLinkedin: app.founderLinkedin,
+        founderPhone: app.founderPhone,
+      });
+    } catch (err) {
+      console.error('[approveApplication] Failed to create portfolio record:', err);
+    }
+  }
+
+  return updated;
 }
 
 /** Delete an application. */

@@ -44,26 +44,28 @@ function formatCurrency(raw: string): string {
 // ─── Status config ──────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; bg: string; text: string }> = {
-  draft:              { label: 'Draft',             color: '#6b7280', bg: 'bg-gray-100',    text: 'text-gray-600' },
-  submitted:          { label: 'Submitted',         color: '#3b82f6', bg: 'bg-blue-50',     text: 'text-blue-600' },
-  under_review:       { label: 'Under Review',      color: '#6366f1', bg: 'bg-indigo-50',   text: 'text-indigo-600' },
-  interested:         { label: 'Interested',        color: '#10b981', bg: 'bg-emerald-50',  text: 'text-emerald-600' },
-  more_info_requested:{ label: 'More Info',         color: '#f59e0b', bg: 'bg-amber-50',    text: 'text-amber-600' },
-  shortlisted:        { label: 'Shortlisted',       color: '#a855f7', bg: 'bg-purple-50',   text: 'text-purple-600' },
-  meeting_scheduled:  { label: 'Meeting Scheduled', color: '#8b5cf6', bg: 'bg-violet-50',   text: 'text-violet-600' },
-  due_diligence:      { label: 'Due Diligence',     color: '#f97316', bg: 'bg-orange-50',   text: 'text-orange-600' },
-  invested:           { label: 'Invested',          color: '#22c55e', bg: 'bg-green-50',    text: 'text-green-600' },
-  rejected:           { label: 'Rejected',          color: '#ef4444', bg: 'bg-red-50',      text: 'text-red-600' },
+  draft:               { label: 'Draft',              color: '#6b7280', bg: 'bg-gray-100',    text: 'text-gray-600' },
+  submitted:           { label: 'Submitted',          color: '#3b82f6', bg: 'bg-blue-50',     text: 'text-blue-600' },
+  under_review:        { label: 'Under Review',       color: '#6366f1', bg: 'bg-indigo-50',   text: 'text-indigo-600' },
+  interested:          { label: 'Interested',         color: '#10b981', bg: 'bg-emerald-50',  text: 'text-emerald-600' },
+  more_info_requested: { label: 'More Info Requested',color: '#f59e0b', bg: 'bg-amber-50',    text: 'text-amber-600' },
+  documents_requested: { label: 'Docs Requested',     color: '#eab308', bg: 'bg-yellow-50',   text: 'text-yellow-600' },
+  shortlisted:         { label: 'Shortlisted',        color: '#a855f7', bg: 'bg-purple-50',   text: 'text-purple-600' },
+  meeting_scheduled:   { label: 'Meeting Scheduled',  color: '#8b5cf6', bg: 'bg-violet-50',   text: 'text-violet-600' },
+  due_diligence:       { label: 'Due Diligence',      color: '#f97316', bg: 'bg-orange-50',   text: 'text-orange-600' },
+  on_hold:             { label: 'On Hold',            color: '#475569', bg: 'bg-slate-100',   text: 'text-slate-600' },
+  approved:            { label: 'Approved',           color: '#22c55e', bg: 'bg-green-50',    text: 'text-green-600' },
+  invested:            { label: 'Invested',           color: '#15803d', bg: 'bg-green-100',   text: 'text-green-700' },
+  rejected:            { label: 'Rejected',           color: '#ef4444', bg: 'bg-red-50',      text: 'text-red-600' },
 };
 
 const PIPELINE_STAGES: ApplicationStatus[] = [
   'submitted',
   'under_review',
-  'interested',
   'shortlisted',
   'meeting_scheduled',
   'due_diligence',
-  'invested',
+  'approved',
 ];
 
 function stageIndex(status: ApplicationStatus): number {
@@ -113,11 +115,11 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
   const allStages: { status: ApplicationStatus; label: string }[] = [
     { status: 'submitted', label: 'Submitted' },
     { status: 'under_review', label: 'Under Review' },
-    { status: 'interested', label: 'Interested' },
     { status: 'shortlisted', label: 'Shortlisted' },
     { status: 'meeting_scheduled', label: 'Meeting' },
     { status: 'due_diligence', label: 'Due Diligence' },
-    { status: 'invested', label: 'Invested' },
+    { status: 'approved', label: 'Approved' },
+    { status: 'on_hold', label: 'On Hold' },
     { status: 'rejected', label: 'Rejected' },
   ];
 
@@ -159,16 +161,50 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
   );
 }
 
+const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
+
 function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void }) {
   const cfg = STATUS_CONFIG[app.status];
   const isDraft = app.status === 'draft';
+  const isApproved = app.status === 'approved' || app.status === 'invested';
+  const needsAction = ACTION_REQUIRED.includes(app.status);
   const progress = progressPercent(app.status);
 
   return (
     <div className={cn(
       'bg-white border rounded-2xl p-5 transition-all',
-      isDraft ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100',
+      isDraft ? 'border-amber-200 bg-amber-50/30' :
+      isApproved ? 'border-green-200 bg-green-50/30' :
+      needsAction ? 'border-amber-200 bg-amber-50/20' :
+      app.status === 'on_hold' ? 'border-slate-200 bg-slate-50/30' :
+      app.status === 'rejected' ? 'border-red-200 bg-red-50/20' :
+      'border-gray-100',
     )}>
+      {/* Action required banner */}
+      {needsAction && (
+        <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mb-3">
+          <Clock size={12} />
+          {app.status === 'more_info_requested' ? 'Investor has requested more information' : 'Investor has requested documents'}
+        </div>
+      )}
+      {isApproved && (
+        <div className="flex items-center gap-2 text-xs font-medium text-green-700 bg-green-100 rounded-lg px-3 py-1.5 mb-3">
+          <CheckCircle size={12} />
+          Your application has been approved! You are now a Founder.
+        </div>
+      )}
+      {app.status === 'on_hold' && (
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 mb-3">
+          <Clock size={12} />
+          Your application is currently on hold.
+        </div>
+      )}
+      {app.status === 'rejected' && (
+        <div className="flex items-center gap-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-1.5 mb-3">
+          <XCircle size={12} />
+          Your application has been declined.
+        </div>
+      )}
       {/* Top row */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -334,10 +370,10 @@ export default function FounderApplicationTracker() {
   const nonDrafts = applications.filter(a => a.status !== 'draft');
 
   // Stats
-  const inProgressStatuses: ApplicationStatus[] = ['under_review', 'interested', 'shortlisted', 'meeting_scheduled', 'due_diligence'];
+  const inProgressStatuses: ApplicationStatus[] = ['under_review', 'interested', 'shortlisted', 'meeting_scheduled', 'due_diligence', 'more_info_requested', 'documents_requested'];
   const totalSubmitted = nonDrafts.length;
   const inProgress = nonDrafts.filter(a => inProgressStatuses.includes(a.status)).length;
-  const approved = nonDrafts.filter(a => a.status === 'invested').length;
+  const approved = nonDrafts.filter(a => a.status === 'approved' || a.status === 'invested').length;
   const rejected = nonDrafts.filter(a => a.status === 'rejected').length;
 
   const isEmpty = applications.length === 0;

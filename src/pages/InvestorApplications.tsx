@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Inbox, Search, Building2, Heart, MessageSquare, Star,
-  Calendar, FileSearch, DollarSign, XCircle, ChevronDown,
+  Inbox, Search, Building2, MessageSquare, Star,
+  Calendar, FileSearch, XCircle, ChevronDown,
   ChevronUp, ExternalLink, FileText, Play, StickyNote,
-  TrendingUp, Users, BarChart3, Clock,
+  TrendingUp, Users, BarChart3, Clock, CheckCircle2,
+  Pause, FileUp, Send,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   getApplications,
   updateApplicationStatus,
   updateApplication,
+  approveApplication,
   type InvestmentApplication,
   type ApplicationStatus,
 } from '../services/investmentApplications';
@@ -44,16 +46,19 @@ function relativeTime(iso: string): string {
 // ─── Status & stage styling ───────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; bg: string }> = {
-  draft:               { label: 'Draft',            color: 'text-gray-600',    bg: 'bg-gray-100' },
-  submitted:           { label: 'Submitted',        color: 'text-blue-600',    bg: 'bg-blue-50' },
-  under_review:        { label: 'Under Review',     color: 'text-indigo-600',  bg: 'bg-indigo-50' },
-  interested:          { label: 'Interested',       color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  more_info_requested: { label: 'More Info',        color: 'text-amber-600',   bg: 'bg-amber-50' },
-  shortlisted:         { label: 'Shortlisted',      color: 'text-purple-600',  bg: 'bg-purple-50' },
-  meeting_scheduled:   { label: 'Meeting',          color: 'text-violet-600',  bg: 'bg-violet-50' },
-  due_diligence:       { label: 'Due Diligence',    color: 'text-orange-600',  bg: 'bg-orange-50' },
-  invested:            { label: 'Invested',         color: 'text-green-600',   bg: 'bg-green-50' },
-  rejected:            { label: 'Rejected',         color: 'text-red-600',     bg: 'bg-red-50' },
+  draft:                { label: 'Draft',              color: 'text-gray-600',    bg: 'bg-gray-100' },
+  submitted:            { label: 'Submitted',          color: 'text-blue-600',    bg: 'bg-blue-50' },
+  under_review:         { label: 'Under Review',       color: 'text-indigo-600',  bg: 'bg-indigo-50' },
+  interested:           { label: 'Interested',         color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  more_info_requested:  { label: 'More Info',          color: 'text-amber-600',   bg: 'bg-amber-50' },
+  documents_requested:  { label: 'Docs Requested',     color: 'text-yellow-600',  bg: 'bg-yellow-50' },
+  shortlisted:          { label: 'Shortlisted',        color: 'text-purple-600',  bg: 'bg-purple-50' },
+  meeting_scheduled:    { label: 'Meeting',            color: 'text-violet-600',  bg: 'bg-violet-50' },
+  due_diligence:        { label: 'Due Diligence',      color: 'text-orange-600',  bg: 'bg-orange-50' },
+  on_hold:              { label: 'On Hold',            color: 'text-slate-600',   bg: 'bg-slate-100' },
+  approved:             { label: 'Approved',           color: 'text-green-600',   bg: 'bg-green-50' },
+  invested:             { label: 'Invested',           color: 'text-green-700',   bg: 'bg-green-100' },
+  rejected:             { label: 'Rejected',           color: 'text-red-600',     bg: 'bg-red-50' },
 };
 
 const STAGE_COLORS: Record<string, { color: string; bg: string }> = {
@@ -92,11 +97,10 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all',               label: 'All' },
   { id: 'submitted',         label: 'Submitted' },
   { id: 'under_review',      label: 'Under Review' },
-  { id: 'interested',        label: 'Interested' },
   { id: 'shortlisted',       label: 'Shortlisted' },
   { id: 'meeting_scheduled', label: 'Meeting' },
-  { id: 'due_diligence',     label: 'Due Diligence' },
-  { id: 'invested',          label: 'Invested' },
+  { id: 'on_hold',           label: 'On Hold' },
+  { id: 'approved',          label: 'Approved' },
   { id: 'rejected',          label: 'Rejected' },
 ];
 
@@ -168,13 +172,18 @@ function ApplicationDetail({
   app,
   onAction,
   onNotesChange,
+  onSendMessage,
 }: {
   app: InvestmentApplication;
   onAction: (id: string, status: ApplicationStatus) => void;
   onNotesChange: (id: string, notes: string) => void;
+  onSendMessage: (id: string, message: string) => void;
 }) {
   const [notes, setNotes] = useState(app.investorNotes || '');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [showMessage, setShowMessage] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const handleSaveNotes = async () => {
     setSavingNotes(true);
@@ -182,14 +191,25 @@ function ApplicationDetail({
     setTimeout(() => setSavingNotes(false), 400);
   };
 
+  const handleSendMessage = async () => {
+    if (!messageText.trim()) return;
+    setSendingMessage(true);
+    onSendMessage(app.id, messageText.trim());
+    setTimeout(() => {
+      setSendingMessage(false);
+      setMessageText('');
+      setShowMessage(false);
+    }, 400);
+  };
+
   const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string }[] = [
-    { label: 'Interested',        status: 'interested',          icon: Heart,          color: 'text-emerald-600', hoverBg: 'hover:bg-emerald-50' },
-    { label: 'Request Info',      status: 'more_info_requested', icon: MessageSquare,  color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50' },
-    { label: 'Shortlist',         status: 'shortlisted',         icon: Star,           color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50' },
-    { label: 'Schedule Meeting',  status: 'meeting_scheduled',   icon: Calendar,       color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50' },
-    { label: 'Due Diligence',     status: 'due_diligence',       icon: FileSearch,     color: 'text-orange-600',  hoverBg: 'hover:bg-orange-50' },
-    { label: 'Invest',            status: 'invested',            icon: DollarSign,     color: 'text-green-600',   hoverBg: 'hover:bg-green-50' },
-    { label: 'Reject',            status: 'rejected',            icon: XCircle,        color: 'text-red-600',     hoverBg: 'hover:bg-red-50' },
+    { label: 'Approve',            status: 'approved',            icon: CheckCircle2,   color: 'text-green-600',   hoverBg: 'hover:bg-green-50' },
+    { label: 'Hold',               status: 'on_hold',             icon: Pause,          color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50' },
+    { label: 'Reject',             status: 'rejected',            icon: XCircle,        color: 'text-red-600',     hoverBg: 'hover:bg-red-50' },
+    { label: 'Request Info',       status: 'more_info_requested', icon: MessageSquare,  color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50' },
+    { label: 'Request Docs',       status: 'documents_requested', icon: FileUp,         color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50' },
+    { label: 'Schedule Meeting',   status: 'meeting_scheduled',   icon: Calendar,       color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50' },
+    { label: 'Shortlist',          status: 'shortlisted',         icon: Star,           color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50' },
   ];
 
   // Parse supporting docs
@@ -234,7 +254,38 @@ function ApplicationDetail({
               </button>
             );
           })}
+          <button
+            onClick={() => setShowMessage(!showMessage)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all',
+              showMessage
+                ? 'text-blue-600 border-blue-300 bg-blue-50'
+                : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
+            )}
+          >
+            <Send size={12} /> Send Message
+          </button>
         </div>
+        {showMessage && (
+          <div className="mt-3 bg-white border border-blue-100 rounded-xl p-3">
+            <textarea
+              value={messageText}
+              onChange={e => setMessageText(e.target.value)}
+              placeholder="Type a message to the founder..."
+              className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
+              rows={3}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handleSendMessage}
+                disabled={sendingMessage || !messageText.trim()}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Send size={11} /> {sendingMessage ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Company & Founder Info */}
@@ -534,7 +585,11 @@ export default function InvestorApplications() {
     const app = applications.find(a => a.id === id);
     if (!app) return;
 
-    await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
+    if (newStatus === 'approved') {
+      await approveApplication(id, currentUser.name, isInvestor);
+    } else {
+      await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
+    }
 
     const statusLabel = STATUS_CONFIG[newStatus]?.label ?? newStatus;
     addNotification({
@@ -543,7 +598,7 @@ export default function InvestorApplications() {
       message: `${app.companyName} has been marked as "${statusLabel}" by ${currentUser.name}.`,
       actor: currentUser.name,
       actorRole: 'investor',
-      link: '/investor-applications',
+      link: '/applications/review',
     });
 
     window.dispatchEvent(new Event('notifications-updated'));
@@ -552,6 +607,33 @@ export default function InvestorApplications() {
 
   const handleNotesChange = async (id: string, notes: string) => {
     await updateApplication(id, { investorNotes: notes }, isInvestor);
+  };
+
+  const handleSendMessage = async (id: string, message: string) => {
+    const app = applications.find(a => a.id === id);
+    if (!app) return;
+    const existing = app.investorNotes || '';
+    const timestamp = new Date().toLocaleString();
+    const newNotes = existing
+      ? `${existing}\n\n[${timestamp}] ${currentUser.name}: ${message}`
+      : `[${timestamp}] ${currentUser.name}: ${message}`;
+    await updateApplication(id, {
+      investorNotes: newNotes,
+      reviewedBy: currentUser.name,
+      reviewedAt: new Date().toISOString(),
+    }, isInvestor);
+
+    addNotification({
+      type: 'company_update',
+      title: 'Message from Investor',
+      message: `${currentUser.name} sent a message regarding ${app.companyName}: "${message.slice(0, 80)}${message.length > 80 ? '...' : ''}"`,
+      actor: currentUser.name,
+      actorRole: 'investor',
+      link: '/applications/track',
+    });
+
+    window.dispatchEvent(new Event('notifications-updated'));
+    load();
   };
 
   // ── Filtering ─────────────────────────────────────────────────────────────
@@ -574,10 +656,10 @@ export default function InvestorApplications() {
   // ── Stats ─────────────────────────────────────────────────────────────────
 
   const stats = [
-    { label: 'Total Applications', value: applications.length,                                  icon: BarChart3,   color: 'text-blue-600',   bg: 'bg-blue-50' },
-    { label: 'Under Review',       value: applications.filter(a => a.status === 'under_review').length, icon: Clock,       color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Shortlisted',        value: applications.filter(a => a.status === 'shortlisted').length,  icon: Star,        color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Invested',           value: applications.filter(a => a.status === 'invested').length,     icon: TrendingUp,  color: 'text-green-600',  bg: 'bg-green-50' },
+    { label: 'Total',       value: applications.length,                                                                                             icon: BarChart3,    color: 'text-blue-600',   bg: 'bg-blue-50' },
+    { label: 'Shortlisted', value: applications.filter(a => a.status === 'shortlisted').length,                                                     icon: Star,         color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Approved',    value: applications.filter(a => a.status === 'approved' || a.status === 'invested').length,                              icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50' },
+    { label: 'Rejected',    value: applications.filter(a => a.status === 'rejected').length,                                                        icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
   ];
 
   return (
@@ -743,6 +825,7 @@ export default function InvestorApplications() {
                     app={app}
                     onAction={handleStatusChange}
                     onNotesChange={handleNotesChange}
+                    onSendMessage={handleSendMessage}
                   />
                 )}
               </div>
