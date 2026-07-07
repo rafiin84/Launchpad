@@ -53,7 +53,7 @@ const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> =
 export default function ActivityDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser, founderCompanyName } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor } = useAuth();
 
   const [activity, setActivity] = useState<CRMActivity | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -65,7 +65,7 @@ export default function ActivityDetail() {
     if (!id) return;
     const isLocal = id.startsWith('local_');
     if (isLocal) {
-      fetchSharedActivities()
+      fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
         .then(all => {
           const found = all.find(a => a.id === id);
           if (found) setActivity(found);

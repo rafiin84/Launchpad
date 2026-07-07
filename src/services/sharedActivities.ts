@@ -54,10 +54,10 @@ function generateLocalId(): string {
 function filterByVisibility(activities: CRMActivity[], viewerRole: string | null, viewerName: string): CRMActivity[] {
   if (viewerRole === 'investor') return activities;
 
-  // Founder: see own posts + investor posts (not other founders' posts)
+  // Founder/portal user: see own posts + investor posts only
   return activities.filter(a => {
     const role = a.authorRole?.toLowerCase() || '';
-    if (role === 'investor' || !role) return true;
+    if (role === 'investor') return true;
     if (a.authorName?.trim().toLowerCase() === viewerName.trim().toLowerCase()) return true;
     return false;
   });
@@ -94,9 +94,9 @@ async function postViaApi(fields: CRMActivityFields): Promise<string> {
   return json.activity.id;
 }
 
-export async function fetchSharedActivities(viewerName = ''): Promise<CRMActivity[]> {
+export async function fetchSharedActivities(viewerName = '', viewerRole?: string | null): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
-  const role = loadRole();
+  const role = viewerRole ?? loadRole();
 
   // Try API endpoint first (has admin token on Vercel for full visibility)
   try {

@@ -135,7 +135,7 @@ function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) =
     setGenerating(true);
     try {
       const [acts, portfolio, deals, apps, founders] = await Promise.all([
-        fetchSharedActivities().catch(() => []),
+        fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder').catch(() => []),
         fetchCRMPortfolio().catch(() => []),
         fetchCRMDeals().catch(() => []),
         fetchCRMApplications().catch(() => []),
@@ -518,17 +518,18 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Activities() {
-  const { currentUser, isFounder } = useAuth();
+  const { currentUser, isFounder, isInvestor } = useAuth();
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [syncWarning, setSyncWarning] = useState('');
   const isConnected = !!loadToken();
+  const viewerRole = isInvestor ? 'investor' : 'founder';
 
   const load = () => {
     if (!isConnected) { setLoading(false); return; }
     setLoading(true); setError('');
-    fetchSharedActivities(currentUser.name)
+    fetchSharedActivities(currentUser.name, viewerRole)
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));

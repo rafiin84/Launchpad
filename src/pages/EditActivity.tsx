@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Image, X, Tag, Building2, User, Send, Upload, Loader2 } from 'lucide-react';
 import { getCRMActivity, updateCRMActivity, type CRMActivity, type CRMActivityFields } from '../services/crmActivities';
 import { fetchSharedActivities } from '../services/sharedActivities';
+import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
 
 function getVideoEmbedUrl(url: string): string | null {
@@ -87,6 +88,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 export default function EditActivity() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser, isInvestor } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm]         = useState<FormState>({ title: '', activityType: 'update', content: '', companyName: '', authorName: '', tags: '', imageUrl: '', imageData: '', imagePreview: '' });
@@ -118,7 +120,7 @@ export default function EditActivity() {
       setLoading(false);
     };
     if (id.startsWith('local_')) {
-      fetchSharedActivities()
+      fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
         .then(all => {
           const found = all.find(a => a.id === id);
           if (found) populateForm(found);
