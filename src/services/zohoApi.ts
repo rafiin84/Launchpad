@@ -166,6 +166,7 @@ export async function zohoUpdate(module: string, id: string, data: Record<string
   });
 
   const json: ZohoCUDResponse = await res.json();
+  console.log('[CRM] zohoUpdate response:', JSON.stringify(json));
 
   if (json.code && json.code !== 'SUCCESS') {
     throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
@@ -173,7 +174,8 @@ export async function zohoUpdate(module: string, id: string, data: Record<string
 
   const result = json.data?.[0];
   if (!result || result.code !== 'SUCCESS') {
-    throw new ZohoApiError(res.status, result?.message ?? 'Update failed', result?.code ?? '');
+    const detail = result?.details ? JSON.stringify(result.details) : '';
+    throw new ZohoApiError(res.status, `${result?.message ?? 'Update failed'}${detail ? ': ' + detail : ''}`, result?.code ?? '');
   }
 }
 

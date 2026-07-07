@@ -425,6 +425,7 @@ async function crmCreate(fields: InvestmentApplicationFields): Promise<Investmen
 
 async function crmUpdate(id: string, updates: Partial<InvestmentApplication>): Promise<InvestmentApplication | null> {
   const payload = toCrmPayload(updates);
+  console.log('[CRM] crmUpdate payload:', JSON.stringify(payload));
   await zohoUpdate(CRM_MODULE, id, payload);
   return crmGetById(id);
 }
