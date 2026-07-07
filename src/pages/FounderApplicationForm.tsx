@@ -557,6 +557,7 @@ export default function FounderApplicationForm() {
       investorNotes: '',
       reviewedBy: '',
       reviewedAt: '',
+      requestedDocuments: '',
     };
   }
 
