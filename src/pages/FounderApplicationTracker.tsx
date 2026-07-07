@@ -230,6 +230,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication; onUploaded: () => void }) {
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<string | null>(null);
 
@@ -237,7 +238,8 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
 
   const handleFileSelect = (docType: string) => {
     setUploadTarget(docType);
-    fileInputRef.current?.click();
+    setUploadError(null);
+    setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,6 +247,7 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
     if (!file || !uploadTarget) return;
 
     setUploading(uploadTarget);
+    setUploadError(null);
     try {
       const updatedDocs = requestedDocs.map(d =>
         d.type === uploadTarget
@@ -257,6 +260,7 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
       onUploaded();
     } catch (err) {
       console.error('Upload failed:', err);
+      setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
     }
     setUploading(null);
     setUploadTarget(null);
@@ -277,6 +281,11 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
           {uploadedDocs.length}/{requestedDocs.length} uploaded
         </span>
       </div>
+      {uploadError && (
+        <div className="mb-2 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+          {uploadError}
+        </div>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -293,7 +302,7 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
             </div>
             <button
               onClick={() => handleFileSelect(doc.type)}
-              disabled={uploading === doc.type}
+              disabled={!!uploading}
               className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-yellow-500 hover:bg-yellow-600 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
             >
               <Upload size={11} />

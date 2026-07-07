@@ -3,7 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, ExternalLink, FileText, Play, StickyNote,
   CheckCircle2, Pause, XCircle, MessageSquare, FileUp, Calendar,
-  Star, Send, Inbox, X, Check, Clock,
+  Star, Send, Inbox, X, Check, Clock, AlertTriangle, Info,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -334,6 +334,119 @@ function RequestDocsModal({
   );
 }
 
+// ─── Action Confirm Modal ────────────────────────────────────────────────────
+
+const ACTION_CONFIRM_CONFIG: Record<string, {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmColor: string;
+  icon: React.ElementType;
+  iconColor: string;
+  iconBg: string;
+}> = {
+  approved: {
+    title: 'Approve Application',
+    description: 'This will approve the application and create a portfolio record for this company. The founder will be notified immediately.',
+    confirmLabel: 'Approve Application',
+    confirmColor: 'bg-green-600 hover:bg-green-700',
+    icon: CheckCircle2,
+    iconColor: 'text-green-600',
+    iconBg: 'bg-green-50',
+  },
+  on_hold: {
+    title: 'Put On Hold',
+    description: 'This will place the application on hold. The founder will be notified that their application is being paused temporarily.',
+    confirmLabel: 'Put On Hold',
+    confirmColor: 'bg-slate-600 hover:bg-slate-700',
+    icon: Pause,
+    iconColor: 'text-slate-600',
+    iconBg: 'bg-slate-100',
+  },
+  rejected: {
+    title: 'Reject Application',
+    description: 'This will reject the application. The founder will be notified that their application was not selected to move forward. This action cannot be easily undone.',
+    confirmLabel: 'Reject Application',
+    confirmColor: 'bg-red-600 hover:bg-red-700',
+    icon: XCircle,
+    iconColor: 'text-red-600',
+    iconBg: 'bg-red-50',
+  },
+  more_info_requested: {
+    title: 'Request More Information',
+    description: 'The founder will be notified to provide additional information about their application. You can also send a specific message using the "Send Message" button.',
+    confirmLabel: 'Request Info',
+    confirmColor: 'bg-amber-600 hover:bg-amber-700',
+    icon: Info,
+    iconColor: 'text-amber-600',
+    iconBg: 'bg-amber-50',
+  },
+  meeting_scheduled: {
+    title: 'Schedule Meeting',
+    description: 'This will mark the application as "Meeting Scheduled" and notify the founder. Please coordinate the actual meeting details separately.',
+    confirmLabel: 'Schedule Meeting',
+    confirmColor: 'bg-violet-600 hover:bg-violet-700',
+    icon: Calendar,
+    iconColor: 'text-violet-600',
+    iconBg: 'bg-violet-50',
+  },
+  shortlisted: {
+    title: 'Shortlist Application',
+    description: 'This will shortlist the application for further evaluation. The founder will be notified that their application has been selected for deeper review.',
+    confirmLabel: 'Shortlist',
+    confirmColor: 'bg-purple-600 hover:bg-purple-700',
+    icon: Star,
+    iconColor: 'text-purple-600',
+    iconBg: 'bg-purple-50',
+  },
+};
+
+function ActionConfirmModal({
+  status,
+  companyName,
+  onConfirm,
+  onClose,
+}: {
+  status: ApplicationStatus;
+  companyName: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const config = ACTION_CONFIRM_CONFIG[status];
+  if (!config) return null;
+
+  const Icon = config.icon;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="px-6 pt-6 pb-4">
+          <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center mb-4', config.iconBg)}>
+            <Icon size={22} className={config.iconColor} />
+          </div>
+          <h3 className="text-base font-bold text-gray-900 mb-1">{config.title}</h3>
+          <p className="text-xs text-gray-500 mb-1 font-medium">{companyName}</p>
+          <p className="text-xs text-gray-500 leading-relaxed mt-3">{config.description}</p>
+        </div>
+        <div className="flex gap-2 px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={cn('flex-1 text-xs font-semibold text-white px-4 py-2.5 rounded-xl transition-colors', config.confirmColor)}
+          >
+            {config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ApplicationDetail() {
@@ -352,6 +465,7 @@ export default function ApplicationDetail() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null);
 
   const loadApp = useCallback(async () => {
     if (!id) return;
@@ -550,6 +664,19 @@ export default function ApplicationDetail() {
         />
       )}
 
+      {confirmAction && (
+        <ActionConfirmModal
+          status={confirmAction}
+          companyName={app.companyName || 'this application'}
+          onConfirm={() => {
+            const action = confirmAction;
+            setConfirmAction(null);
+            handleStatusChange(action);
+          }}
+          onClose={() => setConfirmAction(null)}
+        />
+      )}
+
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6">
         <ArrowLeft size={15} /> Back to Applications
       </Link>
@@ -602,7 +729,7 @@ export default function ApplicationDetail() {
                 const isLoading = actionLoading === a.status;
                 const onClick = a.status === 'documents_requested'
                   ? () => setShowDocsModal(true)
-                  : () => handleStatusChange(a.status);
+                  : () => setConfirmAction(a.status);
                 return (
                   <button
                     key={a.status}
