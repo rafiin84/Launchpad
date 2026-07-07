@@ -273,7 +273,12 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: `[${uploadTarget}] ${file.name}`, fileData: base64, mimeType: file.type }),
       });
-      const uploadJson = await uploadRes.json();
+      const responseText = await uploadRes.text();
+      let uploadJson: any;
+      try { uploadJson = JSON.parse(responseText); } catch {
+        throw new Error(uploadRes.status === 413 ? 'File too large. Max size is 10MB.' : `Upload failed (${uploadRes.status}): ${responseText.slice(0, 100)}`);
+      }
+      if (!uploadRes.ok) throw new Error(uploadJson?.error || `Upload failed (${uploadRes.status})`);
       const attachmentId = uploadJson?.data?.[0]?.details?.id || '';
 
       const updatedDocs = localDocs.map(d =>

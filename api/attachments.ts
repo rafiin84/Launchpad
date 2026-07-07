@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminAccessToken } from './_zohoAdmin';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 const ZOHO_API_BASE = 'https://www.zohoapis.in';
 const CRM_MODULE = 'Applications';
 
