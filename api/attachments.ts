@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminAccessToken } from './_zohoAdmin';
 import https from 'https';
 
 export const config = {
@@ -10,8 +9,47 @@ export const config = {
   },
 };
 
+const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
 const ZOHO_API_BASE = 'https://www.zohoapis.in';
 const CRM_MODULE = 'Applications';
+
+let cachedToken: string | null = null;
+let tokenExpiry = 0;
+
+async function getAdminToken(): Promise<string> {
+  if (cachedToken && Date.now() < tokenExpiry - 60_000) return cachedToken;
+
+  const clientId = process.env.ZOHO_CLIENT_ID;
+  const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+  const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Missing ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, or ZOHO_REFRESH_TOKEN env vars');
+  }
+
+  const params = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+  });
+
+  const res = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+
+  const data = await res.json() as { access_token?: string; expires_in?: number; error?: string };
+
+  if (!data.access_token) {
+    throw new Error(`Token refresh failed: ${data.error || JSON.stringify(data)}`);
+  }
+
+  cachedToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedToken;
+}
 
 function uploadToCRM(
   token: string,
@@ -70,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const token = await getAdminAccessToken();
+    const token = await getAdminToken();
     const { id: recordId, attachmentId } = req.query;
 
     if (!recordId || typeof recordId !== 'string') {
