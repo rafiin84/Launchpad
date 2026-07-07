@@ -544,100 +544,134 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
         )}
       </div>
 
-      {/* Investor messages — always visible */}
-      {!isDraft && app.investorNotes && (
-        <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
-      )}
+      {/* Expanded details — two-column layout: left = company profile, right = messages/meeting/docs */}
+      {expanded && !isDraft && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left column — company profile */}
+            <div className="lg:col-span-2 space-y-3">
+              {app.companyDescription && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{app.companyDescription}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                {app.companyStage && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Stage</p>
+                    <p className="text-xs text-gray-700">{app.companyStage}</p>
+                  </div>
+                )}
+                {app.companyLocation && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Location</p>
+                    <p className="text-xs text-gray-700">{app.companyLocation}</p>
+                  </div>
+                )}
+                {app.currentRevenue && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Revenue</p>
+                    <p className="text-xs text-gray-700">{formatCurrency(app.currentRevenue)}</p>
+                  </div>
+                )}
+                {app.equityOffered && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Equity Offered</p>
+                    <p className="text-xs text-gray-700">{app.equityOffered}%</p>
+                  </div>
+                )}
+              </div>
+              {app.problemStatement && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Problem</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{app.problemStatement}</p>
+                </div>
+              )}
+              {app.solution && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Solution</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{app.solution}</p>
+                </div>
+              )}
+              {app.useOfFunds && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Use of Funds</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
+                </div>
+              )}
+            </div>
 
-      {/* Meeting details */}
-      {!isDraft && app.meetingDate && (
-        <div className="mt-3 border-t border-gray-100 pt-3">
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <Clock size={12} className="text-violet-600" />
-            <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
-              Meeting Scheduled
-            </p>
-          </div>
-          <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
-            <p className="text-xs font-bold text-gray-900">
-              {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-              {' · '}
-              <span className="text-violet-600">
-                {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </p>
-            {app.meetingLocation && (
-              <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Location:</span> {app.meetingLocation}</p>
-            )}
-            {app.meetingLink && (
-              <p className="text-[11px] text-gray-600">
-                <span className="font-semibold text-gray-500">Link:</span>{' '}
-                <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{app.meetingLink}</a>
-              </p>
-            )}
-            {app.meetingAgenda && (
-              <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
-            )}
+            {/* Right column — messages, meeting, documents */}
+            <div className="lg:col-span-1 space-y-4">
+              {app.investorNotes && (
+                <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
+              )}
+
+              {app.meetingDate && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <Clock size={12} className="text-violet-600" />
+                    <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
+                      Meeting Scheduled
+                    </p>
+                  </div>
+                  <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
+                    <p className="text-xs font-bold text-gray-900">
+                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                      {' · '}
+                      <span className="text-violet-600">
+                        {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </p>
+                    {app.meetingLocation && (
+                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Location:</span> {app.meetingLocation}</p>
+                    )}
+                    {app.meetingLink && (
+                      <p className="text-[11px] text-gray-600">
+                        <span className="font-semibold text-gray-500">Link:</span>{' '}
+                        <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline break-all">{app.meetingLink}</a>
+                      </p>
+                    )}
+                    {app.meetingAgenda && (
+                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <DocumentUploadSection app={app} onRefresh={onRefresh} />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Requested documents with upload */}
-      {!isDraft && (
-        <DocumentUploadSection app={app} onRefresh={onRefresh} />
-      )}
-
-      {/* Expanded details */}
-      {expanded && !isDraft && (
-        <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-          {app.companyDescription && (
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</p>
-              <p className="text-xs text-gray-700 leading-relaxed">{app.companyDescription}</p>
-            </div>
+      {/* When collapsed, still show messages/meeting/docs below card summary */}
+      {!expanded && !isDraft && (app.investorNotes || app.meetingDate) && (
+        <div className="mt-3 border-t border-gray-100 pt-3 space-y-3">
+          {app.investorNotes && (
+            <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
           )}
-          <div className="grid grid-cols-2 gap-3">
-            {app.companyStage && (
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Stage</p>
-                <p className="text-xs text-gray-700">{app.companyStage}</p>
-              </div>
-            )}
-            {app.companyLocation && (
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Location</p>
-                <p className="text-xs text-gray-700">{app.companyLocation}</p>
-              </div>
-            )}
-            {app.currentRevenue && (
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Revenue</p>
-                <p className="text-xs text-gray-700">{formatCurrency(app.currentRevenue)}</p>
-              </div>
-            )}
-            {app.equityOffered && (
-              <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Equity Offered</p>
-                <p className="text-xs text-gray-700">{app.equityOffered}%</p>
-              </div>
-            )}
-          </div>
-          {app.problemStatement && (
+          {app.meetingDate && (
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Problem</p>
-              <p className="text-xs text-gray-700 leading-relaxed">{app.problemStatement}</p>
-            </div>
-          )}
-          {app.solution && (
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Solution</p>
-              <p className="text-xs text-gray-700 leading-relaxed">{app.solution}</p>
-            </div>
-          )}
-          {app.useOfFunds && (
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Use of Funds</p>
-              <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <Clock size={12} className="text-violet-600" />
+                <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
+                  Meeting Scheduled
+                </p>
+              </div>
+              <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
+                <p className="text-xs font-bold text-gray-900">
+                  {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  {' · '}
+                  <span className="text-violet-600">
+                    {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </p>
+                {app.meetingAgenda && (
+                  <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -783,7 +817,7 @@ export default function FounderApplicationTracker() {
                 Approved
                 <span className="text-xs font-medium text-green-400">{approvedApps.length}</span>
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {approvedApps.map(app => (
                   <ApplicationCard
                     key={app.id}
@@ -804,7 +838,7 @@ export default function FounderApplicationTracker() {
                 In Progress
                 <span className="ml-2 text-xs font-medium text-gray-400">{activeApps.length}</span>
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {activeApps.map(app => (
                   <ApplicationCard
                     key={app.id}
@@ -826,7 +860,7 @@ export default function FounderApplicationTracker() {
                 Rejected
                 <span className="text-xs font-medium text-red-300">{rejectedApps.length}</span>
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {rejectedApps.map(app => (
                   <ApplicationCard
                     key={app.id}
