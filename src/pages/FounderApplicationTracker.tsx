@@ -664,6 +664,9 @@ export default function FounderApplicationTracker() {
   useEffect(() => { loadApps(); }, [loadApps]);
 
   const drafts = applications.filter(a => a.status === 'draft');
+  const approvedApps = applications.filter(a => a.status === 'approved' || a.status === 'invested');
+  const rejectedApps = applications.filter(a => a.status === 'rejected');
+  const activeApps = applications.filter(a => a.status !== 'draft' && a.status !== 'approved' && a.status !== 'invested' && a.status !== 'rejected');
   const nonDrafts = applications.filter(a => a.status !== 'draft');
 
   // Stats
@@ -772,15 +775,59 @@ export default function FounderApplicationTracker() {
             </div>
           )}
 
-          {/* Submitted applications */}
-          {nonDrafts.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">
-                Submitted Applications
-                <span className="ml-2 text-xs font-medium text-gray-400">{nonDrafts.length}</span>
+          {/* Approved applications */}
+          {approvedApps.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
+                <CheckCircle size={14} className="text-green-500" />
+                Approved
+                <span className="text-xs font-medium text-green-400">{approvedApps.length}</span>
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {nonDrafts.map(app => (
+                {approvedApps.map(app => (
+                  <ApplicationCard
+                    key={app.id}
+                    app={app}
+                    expanded={expandedId === app.id}
+                    onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
+                    onRefresh={loadApps}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active applications */}
+          {activeApps.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                In Progress
+                <span className="ml-2 text-xs font-medium text-gray-400">{activeApps.length}</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {activeApps.map(app => (
+                  <ApplicationCard
+                    key={app.id}
+                    app={app}
+                    expanded={expandedId === app.id}
+                    onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
+                    onRefresh={loadApps}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rejected applications */}
+          {rejectedApps.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-red-600 mb-3 flex items-center gap-2">
+                <XCircle size={14} className="text-red-400" />
+                Rejected
+                <span className="text-xs font-medium text-red-300">{rejectedApps.length}</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {rejectedApps.map(app => (
                   <ApplicationCard
                     key={app.id}
                     app={app}

@@ -222,7 +222,7 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
 
   return {
     id:                 r.id,
-    status:             (str('Application_Status') || 'submitted') as ApplicationStatus,
+    status:             (str('Application_Status').toLowerCase() || 'submitted') as ApplicationStatus,
     companyName:        str('Name'),
     companyWebsite:     str('Website'),
     companyIndustry:    str('Industry'),
@@ -701,10 +701,16 @@ export async function approveApplication(
   // 1. Update status to approved
   const updated = await updateApplicationStatus(id, 'approved', reviewerName, isInvestor);
 
-  // 2. Create a Portfolio record from the application data
+  // 2. Create a Portfolio record from the application data (skip if already exists)
   if (isInvestor) {
     try {
-      const { createCRMPortfolioRecord } = await import('./crmPortfolio');
+      const { createCRMPortfolioRecord, fetchCRMPortfolio } = await import('./crmPortfolio');
+      const existing = await fetchCRMPortfolio();
+      const alreadyExists = existing.some(p => p.companyName === app.companyName && p.founderEmail === app.founderEmail);
+      if (alreadyExists) {
+        console.log('[approveApplication] Portfolio record already exists, skipping creation');
+        return updated;
+      }
       const noteParts = [`Approved from application. Reviewed by ${reviewerName}.`];
       if (details?.paymentType) noteParts.push(`Payment type: ${details.paymentType}`);
       if (details?.investmentNotes) noteParts.push(details.investmentNotes);

@@ -1097,6 +1097,13 @@ export default function ApplicationDetail() {
                 const Icon = a.icon;
                 const isActive = app.status === a.status;
                 const isLoading = actionLoading === a.status;
+                const isApproved = app.status === 'approved' || app.status === 'invested';
+                const isRejected = app.status === 'rejected';
+                const isTerminal = isApproved || isRejected;
+                const isDisabled = !!actionLoading || (isTerminal && a.status !== 'approved' && a.status !== 'rejected');
+                const isApproveDisabled = a.status === 'approved' && isApproved;
+                const isRejectDisabled = a.status === 'rejected' && isRejected;
+
                 const onClick = a.status === 'documents_requested'
                   ? () => setShowDocsModal(true)
                   : a.status === 'meeting_scheduled'
@@ -1108,16 +1115,17 @@ export default function ApplicationDetail() {
                   <button
                     key={a.status}
                     onClick={onClick}
-                    disabled={!!actionLoading}
+                    disabled={isDisabled || isApproveDisabled || isRejectDisabled}
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
                       isActive
                         ? `${a.color} ${a.activeBg} ${a.borderColor}`
                         : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
-                      isLoading && 'opacity-50 cursor-wait'
+                      isLoading && 'opacity-50 cursor-wait',
+                      (isApproveDisabled || isRejectDisabled) && 'opacity-50 cursor-not-allowed'
                     )}
                   >
-                    <Icon size={13} /> {isLoading ? 'Updating...' : a.label}
+                    <Icon size={13} /> {isLoading ? 'Updating...' : isApproveDisabled ? 'Approved ✓' : isRejectDisabled ? 'Rejected' : a.label}
                   </button>
                 );
               })}
@@ -1154,105 +1162,6 @@ export default function ApplicationDetail() {
               </div>
             )}
           </Section>
-
-          {/* Meeting Details */}
-          {app.meetingDate && (
-            <Section title="Meeting Details">
-              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                    <Calendar size={18} className="text-violet-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">
-                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                    </p>
-                    <p className="text-xs text-violet-600 font-medium">
-                      {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-                {app.meetingLocation && (
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
-                    <span className="font-semibold text-gray-500 w-16">Location</span>
-                    <span>{app.meetingLocation}</span>
-                  </div>
-                )}
-                {app.meetingLink && (
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
-                    <span className="font-semibold text-gray-500 w-16">Link</span>
-                    <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate">{app.meetingLink}</a>
-                  </div>
-                )}
-                {app.meetingAgenda && (
-                  <div className="text-xs text-gray-700 pt-1 border-t border-violet-100">
-                    <span className="font-semibold text-gray-500 block mb-1">Agenda</span>
-                    <p className="leading-relaxed whitespace-pre-wrap">{app.meetingAgenda}</p>
-                  </div>
-                )}
-              </div>
-            </Section>
-          )}
-
-          {/* Requested Documents Status */}
-          {requestedDocs.length > 0 && (
-            <Section title="Requested Documents">
-              <div className="space-y-2">
-                {requestedDocs.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileUp size={13} className={doc.status === 'submitted' ? 'text-green-500' : doc.status === 'uploaded' ? 'text-blue-500' : 'text-gray-400'} />
-                      <div className="min-w-0">
-                        <span className="text-xs font-medium text-gray-800">{doc.type}</span>
-                        {doc.fileName && (doc.status === 'submitted' || doc.status === 'uploaded') && (
-                          <p className="text-[10px] text-gray-400 truncate">{doc.fileName}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {doc.status === 'submitted' ? (
-                        <>
-                          {doc.attachmentId && (
-                            <a
-                              href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
-                            >
-                              <Download size={10} /> View File
-                            </a>
-                          )}
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                            <Check size={10} /> Submitted
-                          </span>
-                        </>
-                      ) : doc.status === 'uploaded' ? (
-                        <>
-                          {doc.attachmentId && (
-                            <a
-                              href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
-                            >
-                              <Download size={10} /> View File
-                            </a>
-                          )}
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                            <Check size={10} /> Uploaded
-                          </span>
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                          <Clock size={10} /> Pending
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (
@@ -1364,6 +1273,95 @@ export default function ApplicationDetail() {
 
         {/* RIGHT — sidebar */}
         <div className="space-y-6">
+
+          {/* Meeting Details */}
+          {app.meetingDate && (
+            <Section title="Meeting Details">
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                    <Calendar size={18} className="text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                    <p className="text-xs text-violet-600 font-medium">
+                      {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+                {app.meetingLocation && (
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <span className="font-semibold text-gray-500 w-16">Location</span>
+                    <span>{app.meetingLocation}</span>
+                  </div>
+                )}
+                {app.meetingLink && (
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <span className="font-semibold text-gray-500 w-16">Link</span>
+                    <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate">{app.meetingLink}</a>
+                  </div>
+                )}
+                {app.meetingAgenda && (
+                  <div className="text-xs text-gray-700 pt-1 border-t border-violet-100">
+                    <span className="font-semibold text-gray-500 block mb-1">Agenda</span>
+                    <p className="leading-relaxed whitespace-pre-wrap">{app.meetingAgenda}</p>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
+          {/* Requested Documents */}
+          {requestedDocs.length > 0 && (
+            <Section title="Requested Documents">
+              <div className="space-y-2">
+                {requestedDocs.map((doc, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileUp size={12} className={doc.status === 'submitted' ? 'text-green-500' : doc.status === 'uploaded' ? 'text-blue-500' : 'text-gray-400'} />
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-medium text-gray-800">{doc.type}</span>
+                        {doc.fileName && (doc.status === 'submitted' || doc.status === 'uploaded') && (
+                          <p className="text-[10px] text-gray-400 truncate max-w-[100px]">{doc.fileName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {doc.status === 'submitted' ? (
+                        <>
+                          {doc.attachmentId && (
+                            <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                              <Download size={9} /> View
+                            </a>
+                          )}
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                            <Check size={9} /> Submitted
+                          </span>
+                        </>
+                      ) : doc.status === 'uploaded' ? (
+                        <>
+                          {doc.attachmentId && (
+                            <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                              <Download size={9} /> View
+                            </a>
+                          )}
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                            <Check size={9} /> Uploaded
+                          </span>
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                          <Clock size={9} /> Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* Company Details */}
           <Section title="Company Info">
