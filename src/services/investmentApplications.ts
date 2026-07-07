@@ -681,10 +681,19 @@ export async function updateApplicationStatus(
  * Approve an application: set status to 'approved' and create a Portfolio record
  * so the founder appears on the Founders page.
  */
+export interface ApprovalDetails {
+  investmentAmount: string;
+  paymentType: string;
+  investmentDate: string;
+  equityOffered: string;
+  investmentNotes: string;
+}
+
 export async function approveApplication(
   id: string,
   reviewerName: string,
   isInvestor: boolean,
+  details?: ApprovalDetails,
 ): Promise<InvestmentApplication | null> {
   const app = await getApplicationById(id, isInvestor);
   if (!app) return null;
@@ -696,6 +705,10 @@ export async function approveApplication(
   if (isInvestor) {
     try {
       const { createCRMPortfolioRecord } = await import('./crmPortfolio');
+      const noteParts = [`Approved from application. Reviewed by ${reviewerName}.`];
+      if (details?.paymentType) noteParts.push(`Payment type: ${details.paymentType}`);
+      if (details?.investmentNotes) noteParts.push(details.investmentNotes);
+
       await createCRMPortfolioRecord({
         companyName: app.companyName,
         website: app.companyWebsite,
@@ -707,12 +720,12 @@ export async function approveApplication(
         shortDescription: app.companyDescription?.slice(0, 200) || '',
         fullDescription: app.companyDescription,
         tags: app.companyIndustry,
-        investmentAmount: app.fundingAsk,
-        investmentDate: new Date().toISOString().split('T')[0],
+        investmentAmount: details?.investmentAmount || app.fundingAsk,
+        investmentDate: details?.investmentDate || new Date().toISOString().split('T')[0],
         preMoneyValuation: app.currentValuation,
-        ownershipPct: app.equityOffered,
+        ownershipPct: details?.equityOffered || app.equityOffered,
         status: 'Active',
-        notes: `Approved from application. Reviewed by ${reviewerName}.`,
+        notes: noteParts.join('\n'),
         founderName: app.founderName,
         founderEmail: app.founderEmail,
         founderLinkedin: app.founderLinkedin,

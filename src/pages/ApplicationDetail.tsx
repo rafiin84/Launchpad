@@ -17,6 +17,7 @@ import {
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
+  type ApprovalDetails,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
 import { cn } from '../lib/cn';
@@ -447,6 +448,162 @@ function ActionConfirmModal({
   );
 }
 
+// ─── Approve Application Modal ───────────────────────────────────────────────
+
+const PAYMENT_TYPES = ['Wire Transfer', 'SAFE', 'Convertible Note', 'Equity', 'SAFT', 'Check', 'Other'] as const;
+
+function ApproveApplicationModal({
+  app,
+  onSubmit,
+  onClose,
+}: {
+  app: InvestmentApplication;
+  onSubmit: (data: { investmentAmount: string; paymentType: string; investmentDate: string; equityOffered: string; investmentNotes: string }) => void;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState(app.fundingAsk || '');
+  const [paymentType, setPaymentType] = useState('');
+  const [investDate, setInvestDate] = useState(new Date().toISOString().split('T')[0]);
+  const [equity, setEquity] = useState(app.equityOffered || '');
+  const [investNotes, setInvestNotes] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = () => {
+    const errs: Record<string, string> = {};
+    if (!amount.trim()) errs.amount = 'Investment amount is required';
+    if (!paymentType) errs.paymentType = 'Payment type is required';
+    if (!investDate) errs.investDate = 'Investment date is required';
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+
+    onSubmit({
+      investmentAmount: amount.replace(/[,$\s]/g, ''),
+      paymentType,
+      investmentDate: investDate,
+      equityOffered: equity,
+      investmentNotes: investNotes,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="px-6 pt-6 pb-4">
+          <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+            <CheckCircle2 size={22} className="text-green-600" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900 mb-1">Approve & Invest</h3>
+          <p className="text-xs text-gray-500 mb-1 font-medium">{app.companyName}</p>
+          <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+            Complete the investment details below. This will approve the application, create a portfolio record, and move the applicant to the Founders page.
+          </p>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Investment Amount <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                  <input
+                    type="text"
+                    value={amount}
+                    onChange={e => { setAmount(e.target.value); setErrors(p => ({ ...p, amount: '' })); }}
+                    placeholder="500,000"
+                    className={cn(
+                      'w-full text-xs border rounded-xl pl-7 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400',
+                      errors.amount ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    )}
+                  />
+                </div>
+                {errors.amount && <p className="text-[10px] text-red-500 mt-0.5">{errors.amount}</p>}
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Equity Offered (%)
+                </label>
+                <input
+                  type="text"
+                  value={equity}
+                  onChange={e => setEquity(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                Payment Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {PAYMENT_TYPES.map(pt => (
+                  <button
+                    key={pt}
+                    type="button"
+                    onClick={() => { setPaymentType(pt); setErrors(p => ({ ...p, paymentType: '' })); }}
+                    className={cn(
+                      'text-[11px] font-medium px-3 py-1.5 rounded-lg border transition-all',
+                      paymentType === pt
+                        ? 'bg-green-50 border-green-300 text-green-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    {pt}
+                  </button>
+                ))}
+              </div>
+              {errors.paymentType && <p className="text-[10px] text-red-500 mt-0.5">{errors.paymentType}</p>}
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                Investment Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={investDate}
+                onChange={e => { setInvestDate(e.target.value); setErrors(p => ({ ...p, investDate: '' })); }}
+                className={cn(
+                  'w-full text-xs border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400',
+                  errors.investDate ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                )}
+              />
+              {errors.investDate && <p className="text-[10px] text-red-500 mt-0.5">{errors.investDate}</p>}
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Notes</label>
+              <textarea
+                value={investNotes}
+                onChange={e => setInvestNotes(e.target.value)}
+                placeholder="Any additional notes about this investment..."
+                rows={2}
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="flex-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Approve & Invest
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Schedule Meeting Modal ──────────────────────────────────────────────────
 
 function ScheduleMeetingModal({
@@ -602,6 +759,7 @@ export default function ApplicationDetail() {
   const [actionError, setActionError] = useState('');
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null);
 
   const loadApp = useCallback(async () => {
@@ -632,11 +790,7 @@ export default function ApplicationDetail() {
     setActionError('');
 
     try {
-      if (newStatus === 'approved') {
-        await approveApplication(id, currentUser.name, isInvestor);
-      } else {
-        await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
-      }
+      await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
 
       const notifGen = NOTIFICATION_MESSAGES[newStatus];
       if (notifGen) {
@@ -734,6 +888,32 @@ export default function ApplicationDetail() {
       await loadApp();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to request documents';
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
+  const handleApprove = async (details: ApprovalDetails) => {
+    if (!app || !id) return;
+    setShowApproveModal(false);
+    setActionLoading('approved');
+    setActionError('');
+    try {
+      await approveApplication(id, currentUser.name, isInvestor, details);
+
+      const { title, message } = NOTIFICATION_MESSAGES.approved(app.companyName, currentUser.name);
+      addNotification({
+        type: 'company_update',
+        title,
+        message: `${message} Investment: $${Number(details.investmentAmount).toLocaleString()} via ${details.paymentType}.`,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to approve application';
       setActionError(msg);
     }
     setActionLoading(null);
@@ -838,6 +1018,14 @@ export default function ApplicationDetail() {
         />
       )}
 
+      {showApproveModal && (
+        <ApproveApplicationModal
+          app={app}
+          onSubmit={handleApprove}
+          onClose={() => setShowApproveModal(false)}
+        />
+      )}
+
       {showMeetingModal && (
         <ScheduleMeetingModal
           companyName={app.companyName || 'this application'}
@@ -913,6 +1101,8 @@ export default function ApplicationDetail() {
                   ? () => setShowDocsModal(true)
                   : a.status === 'meeting_scheduled'
                   ? () => setShowMeetingModal(true)
+                  : a.status === 'approved'
+                  ? () => setShowApproveModal(true)
                   : () => setConfirmAction(a.status);
                 return (
                   <button
