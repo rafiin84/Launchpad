@@ -447,6 +447,142 @@ function ActionConfirmModal({
   );
 }
 
+// ─── Schedule Meeting Modal ──────────────────────────────────────────────────
+
+function ScheduleMeetingModal({
+  companyName,
+  onSubmit,
+  onClose,
+}: {
+  companyName: string;
+  onSubmit: (data: { meetingDate: string; meetingLocation: string; meetingLink: string; meetingAgenda: string }) => void;
+  onClose: () => void;
+}) {
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [link, setLink] = useState('');
+  const [agenda, setAgenda] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = () => {
+    const errs: Record<string, string> = {};
+    if (!date) errs.date = 'Date is required';
+    if (!time) errs.time = 'Time is required';
+    if (!agenda.trim()) errs.agenda = 'Agenda is required';
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+
+    const meetingDate = new Date(`${date}T${time}`).toISOString();
+    onSubmit({ meetingDate, meetingLocation: location, meetingLink: link, meetingAgenda: agenda });
+  };
+
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="px-6 pt-6 pb-4">
+          <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+            <Calendar size={22} className="text-violet-600" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900 mb-1">Schedule Meeting</h3>
+          <p className="text-xs text-gray-500 mb-4">{companyName}</p>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  min={today}
+                  value={date}
+                  onChange={e => { setDate(e.target.value); setErrors(p => ({ ...p, date: '' })); }}
+                  className={cn(
+                    'w-full text-xs border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400',
+                    errors.date ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  )}
+                />
+                {errors.date && <p className="text-[10px] text-red-500 mt-0.5">{errors.date}</p>}
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                  Time <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={e => { setTime(e.target.value); setErrors(p => ({ ...p, time: '' })); }}
+                  className={cn(
+                    'w-full text-xs border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400',
+                    errors.time ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  )}
+                />
+                {errors.time && <p className="text-[10px] text-red-500 mt-0.5">{errors.time}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder="e.g. Office, Conference Room A"
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Meeting Link</label>
+              <input
+                type="url"
+                value={link}
+                onChange={e => setLink(e.target.value)}
+                placeholder="e.g. https://zoom.us/j/..."
+                className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                Agenda / Notes <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={agenda}
+                onChange={e => { setAgenda(e.target.value); setErrors(p => ({ ...p, agenda: '' })); }}
+                placeholder="What will be discussed in the meeting?"
+                rows={3}
+                className={cn(
+                  'w-full text-xs border rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400',
+                  errors.agenda ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                )}
+              />
+              {errors.agenda && <p className="text-[10px] text-red-500 mt-0.5">{errors.agenda}</p>}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-6 pb-6">
+          <button
+            onClick={onClose}
+            className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="flex-1 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Schedule Meeting
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ApplicationDetail() {
@@ -465,6 +601,7 @@ export default function ApplicationDetail() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null);
 
   const loadApp = useCallback(async () => {
@@ -602,6 +739,43 @@ export default function ApplicationDetail() {
     setActionLoading(null);
   };
 
+  const handleScheduleMeeting = async (data: { meetingDate: string; meetingLocation: string; meetingLink: string; meetingAgenda: string }) => {
+    if (!app || !id) return;
+    setShowMeetingModal(false);
+    setActionLoading('meeting_scheduled');
+    setActionError('');
+    try {
+      await updateApplication(id, {
+        ...data,
+        status: 'meeting_scheduled' as ApplicationStatus,
+        reviewedBy: currentUser.name,
+        reviewedAt: new Date().toISOString(),
+      }, isInvestor);
+
+      const meetingTime = new Date(data.meetingDate).toLocaleString('en-US', {
+        dateStyle: 'medium', timeStyle: 'short',
+      });
+      const details = [meetingTime];
+      if (data.meetingLocation) details.push(data.meetingLocation);
+      if (data.meetingLink) details.push(data.meetingLink);
+
+      addNotification({
+        type: 'company_update',
+        title: 'Meeting Scheduled',
+        message: `${currentUser.name} has scheduled a meeting for ${app.companyName}: ${details.join(' · ')}. Agenda: ${data.meetingAgenda}`,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to schedule meeting';
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
   if (loading) return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full animate-pulse space-y-4">
       <div className="h-4 bg-gray-100 rounded w-32" />
@@ -661,6 +835,14 @@ export default function ApplicationDetail() {
           existingDocs={requestedDocs}
           onSubmit={handleRequestDocs}
           onClose={() => setShowDocsModal(false)}
+        />
+      )}
+
+      {showMeetingModal && (
+        <ScheduleMeetingModal
+          companyName={app.companyName || 'this application'}
+          onSubmit={handleScheduleMeeting}
+          onClose={() => setShowMeetingModal(false)}
         />
       )}
 
@@ -729,6 +911,8 @@ export default function ApplicationDetail() {
                 const isLoading = actionLoading === a.status;
                 const onClick = a.status === 'documents_requested'
                   ? () => setShowDocsModal(true)
+                  : a.status === 'meeting_scheduled'
+                  ? () => setShowMeetingModal(true)
                   : () => setConfirmAction(a.status);
                 return (
                   <button
@@ -780,6 +964,45 @@ export default function ApplicationDetail() {
               </div>
             )}
           </Section>
+
+          {/* Meeting Details */}
+          {app.meetingDate && (
+            <Section title="Meeting Details">
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                    <Calendar size={18} className="text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">
+                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                    <p className="text-xs text-violet-600 font-medium">
+                      {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+                {app.meetingLocation && (
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <span className="font-semibold text-gray-500 w-16">Location</span>
+                    <span>{app.meetingLocation}</span>
+                  </div>
+                )}
+                {app.meetingLink && (
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <span className="font-semibold text-gray-500 w-16">Link</span>
+                    <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate">{app.meetingLink}</a>
+                  </div>
+                )}
+                {app.meetingAgenda && (
+                  <div className="text-xs text-gray-700 pt-1 border-t border-violet-100">
+                    <span className="font-semibold text-gray-500 block mb-1">Agenda</span>
+                    <p className="leading-relaxed whitespace-pre-wrap">{app.meetingAgenda}</p>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
 
           {/* Requested Documents Status */}
           {requestedDocs.length > 0 && (

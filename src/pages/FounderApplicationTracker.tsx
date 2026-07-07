@@ -549,6 +549,39 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
         <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
       )}
 
+      {/* Meeting details */}
+      {!isDraft && app.meetingDate && (
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Clock size={12} className="text-violet-600" />
+            <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
+              Meeting Scheduled
+            </p>
+          </div>
+          <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
+            <p className="text-xs font-bold text-gray-900">
+              {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+              {' · '}
+              <span className="text-violet-600">
+                {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </p>
+            {app.meetingLocation && (
+              <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Location:</span> {app.meetingLocation}</p>
+            )}
+            {app.meetingLink && (
+              <p className="text-[11px] text-gray-600">
+                <span className="font-semibold text-gray-500">Link:</span>{' '}
+                <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{app.meetingLink}</a>
+              </p>
+            )}
+            {app.meetingAgenda && (
+              <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Requested documents with upload */}
       {!isDraft && (
         <DocumentUploadSection app={app} onRefresh={onRefresh} />

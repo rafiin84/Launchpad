@@ -558,6 +558,10 @@ export default function FounderApplicationForm() {
       reviewedBy: '',
       reviewedAt: '',
       requestedDocuments: '',
+      meetingDate: '',
+      meetingLocation: '',
+      meetingLink: '',
+      meetingAgenda: '',
     };
   }
 

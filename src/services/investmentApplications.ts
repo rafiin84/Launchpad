@@ -102,6 +102,12 @@ export interface InvestmentApplication {
 
   // Requested documents (JSON string)
   requestedDocuments: string;
+
+  // Meeting details
+  meetingDate: string;
+  meetingLocation: string;
+  meetingLink: string;
+  meetingAgenda: string;
 }
 
 export type InvestmentApplicationFields = Omit<InvestmentApplication, 'id' | 'submittedAt' | 'updatedAt'>;
@@ -155,6 +161,10 @@ const FIELD_MAP: Record<keyof Omit<InvestmentApplication, 'id' | 'submittedAt' |
   reviewedBy:          'Reviewed_By',
   reviewedAt:          'Reviewed_At',
   requestedDocuments:  'Requested_Documents',
+  meetingDate:         'Meeting_Date',
+  meetingLocation:     'Meeting_Location',
+  meetingLink:         'Meeting_Link',
+  meetingAgenda:       'Meeting_Agenda',
 };
 
 /** Currency fields in CRM — values must be sent as numbers */
@@ -167,7 +177,7 @@ const CURRENCY_FIELDS = new Set([
 const INTEGER_FIELDS = new Set(['foundedYear']);
 
 /** Datetime fields in CRM — Zoho requires YYYY-MM-DDTHH:mm:ss+HH:mm (no ms, no Z) */
-const DATETIME_FIELDS = new Set(['reviewedAt']);
+const DATETIME_FIELDS = new Set(['reviewedAt', 'meetingDate']);
 
 function toZohoDatetime(isoStr: string): string {
   const d = new Date(isoStr);
@@ -259,6 +269,10 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
     reviewedBy:         str('Reviewed_By'),
     reviewedAt:         str('Reviewed_At'),
     requestedDocuments: str('Requested_Documents'),
+    meetingDate:        str('Meeting_Date'),
+    meetingLocation:    str('Meeting_Location'),
+    meetingLink:        str('Meeting_Link'),
+    meetingAgenda:      str('Meeting_Agenda'),
   };
 }
 
