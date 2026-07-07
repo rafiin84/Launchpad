@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle,
-  TrendingUp, Building2, DollarSign, ArrowRight,
+  TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -162,6 +162,66 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
   );
 }
 
+interface ParsedMessage {
+  timestamp: string;
+  sender: string;
+  text: string;
+}
+
+function parseInvestorMessages(notes: string): ParsedMessage[] {
+  if (!notes) return [];
+  const messages: ParsedMessage[] = [];
+  const pattern = /\[([^\]]+)\]\s*([^:]+):\s*([\s\S]*?)(?=\n\n\[|$)/g;
+  let match;
+  while ((match = pattern.exec(notes)) !== null) {
+    messages.push({
+      timestamp: match[1].trim(),
+      sender: match[2].trim(),
+      text: match[3].trim(),
+    });
+  }
+  return messages;
+}
+
+function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; reviewedBy?: string; reviewedAt?: string }) {
+  const messages = parseInvestorMessages(notes);
+
+  if (messages.length === 0 && !notes) return null;
+
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <MessageSquare size={12} className="text-indigo-500" />
+        <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">
+          Messages from Investor
+        </p>
+      </div>
+      {messages.length > 0 ? (
+        <div className="space-y-2">
+          {messages.map((msg, i) => (
+            <div key={i} className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-indigo-700">{msg.sender}</span>
+                <span className="text-[10px] text-indigo-400">{msg.timestamp}</span>
+              </div>
+              <p className="text-xs text-gray-700 leading-relaxed">{msg.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : notes ? (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-gray-700 leading-relaxed">{notes}</p>
+          {reviewedBy && (
+            <p className="text-[10px] text-indigo-400 mt-1.5">
+              — {reviewedBy}{reviewedAt ? `, ${new Date(reviewedAt).toLocaleDateString()}` : ''}
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
 
 function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void }) {
@@ -276,6 +336,11 @@ function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplicati
         )}
       </div>
 
+      {/* Investor messages — always visible */}
+      {!isDraft && app.investorNotes && (
+        <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
+      )}
+
       {/* Expanded details */}
       {expanded && !isDraft && (
         <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
@@ -327,17 +392,6 @@ function ApplicationCard({ app, expanded, onToggle }: { app: InvestmentApplicati
             <div>
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Use of Funds</p>
               <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
-            </div>
-          )}
-          {app.investorNotes && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-              <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider mb-1">Investor Notes</p>
-              <p className="text-xs text-indigo-700 leading-relaxed">{app.investorNotes}</p>
-              {app.reviewedBy && (
-                <p className="text-[10px] text-indigo-400 mt-1">
-                  Reviewed by {app.reviewedBy} {app.reviewedAt ? `on ${new Date(app.reviewedAt).toLocaleDateString()}` : ''}
-                </p>
-              )}
             </div>
           )}
         </div>
