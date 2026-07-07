@@ -12,6 +12,14 @@ export const config = {
 const ZOHO_API_BASE = 'https://www.zohoapis.in';
 const CRM_MODULE = 'Applications';
 
+function buildMultipart(fileName: string, buffer: Buffer, mimeType: string) {
+  const boundary = '----ZohoCRMAttachment' + Date.now();
+  const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+  const footer = `\r\n--${boundary}--\r\n`;
+  const body = Buffer.concat([Buffer.from(header), buffer, Buffer.from(footer)]);
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -39,17 +47,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const buffer = Buffer.from(fileData, 'base64');
-      const blob = new Blob([buffer], { type: mimeType || 'application/octet-stream' });
-
-      const formData = new FormData();
-      formData.append('file', blob, fileName);
+      const { body, contentType } = buildMultipart(fileName, buffer, mimeType || 'application/octet-stream');
 
       const response = await fetch(
         `${ZOHO_API_BASE}/crm/v2/${CRM_MODULE}/${recordId}/Attachments`,
         {
           method: 'POST',
-          headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-          body: formData,
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'Content-Type': contentType,
+          },
+          body,
         }
       );
 
