@@ -3,7 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, ExternalLink, FileText, Play, StickyNote,
   CheckCircle2, Pause, XCircle, MessageSquare, FileUp, Calendar,
-  Star, Send, Inbox, X, Check, Clock, AlertTriangle, Info,
+  Star, Send, Inbox, X, Check, Clock, Info, Download,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -786,20 +786,55 @@ export default function ApplicationDetail() {
             <Section title="Requested Documents">
               <div className="space-y-2">
                 {requestedDocs.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <FileUp size={13} className="text-gray-400" />
-                      <span className="text-xs font-medium text-gray-800">{doc.type}</span>
+                  <div key={i} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileUp size={13} className={doc.status === 'submitted' ? 'text-green-500' : doc.status === 'uploaded' ? 'text-blue-500' : 'text-gray-400'} />
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium text-gray-800">{doc.type}</span>
+                        {doc.fileName && (doc.status === 'submitted' || doc.status === 'uploaded') && (
+                          <p className="text-[10px] text-gray-400 truncate">{doc.fileName}</p>
+                        )}
+                      </div>
                     </div>
-                    {doc.status === 'uploaded' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                        <Check size={10} /> Uploaded{doc.fileName ? `: ${doc.fileName}` : ''}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                        <Clock size={10} /> Pending
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {doc.status === 'submitted' ? (
+                        <>
+                          {doc.attachmentId && (
+                            <a
+                              href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              <Download size={10} /> View File
+                            </a>
+                          )}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                            <Check size={10} /> Submitted
+                          </span>
+                        </>
+                      ) : doc.status === 'uploaded' ? (
+                        <>
+                          {doc.attachmentId && (
+                            <a
+                              href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              <Download size={10} /> View File
+                            </a>
+                          )}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            <Check size={10} /> Uploaded
+                          </span>
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                          <Clock size={10} /> Pending
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

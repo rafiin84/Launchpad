@@ -733,8 +733,9 @@ export async function deleteApplication(id: string, isInvestor: boolean): Promis
 
 export interface RequestedDocument {
   type: string;
-  status: 'pending' | 'uploaded';
+  status: 'pending' | 'uploaded' | 'submitted';
   fileName?: string;
+  attachmentId?: string;
 }
 
 export const DOCUMENT_TYPES = [

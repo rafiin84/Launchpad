@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle,
   TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
-  Upload, Check,
+  Upload, Check, Send, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -16,6 +16,7 @@ import {
   type ApplicationStatus,
   type RequestedDocument,
 } from '../services/investmentApplications';
+import { addNotification } from '../services/notifications';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 
@@ -227,20 +228,37 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
   );
 }
 
-function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication; onUploaded: () => void }) {
+function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
+  const [localDocs, setLocalDocs] = useState<RequestedDocument[]>(requestedDocs);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<string | null>(null);
 
-  if (requestedDocs.length === 0) return null;
+  useEffect(() => {
+    setLocalDocs(parseRequestedDocuments(app.requestedDocuments));
+  }, [app.requestedDocuments]);
+
+  if (localDocs.length === 0) return null;
 
   const handleFileSelect = (docType: string) => {
     setUploadTarget(docType);
     setUploadError(null);
     setTimeout(() => fileInputRef.current?.click(), 0);
   };
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -249,15 +267,25 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
     setUploading(uploadTarget);
     setUploadError(null);
     try {
-      const updatedDocs = requestedDocs.map(d =>
+      const base64 = await fileToBase64(file);
+      const uploadRes = await fetch(`/api/attachments?id=${encodeURIComponent(app.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: `[${uploadTarget}] ${file.name}`, fileData: base64, mimeType: file.type }),
+      });
+      const uploadJson = await uploadRes.json();
+      const attachmentId = uploadJson?.data?.[0]?.details?.id || '';
+
+      const updatedDocs = localDocs.map(d =>
         d.type === uploadTarget
-          ? { ...d, status: 'uploaded' as const, fileName: file.name }
+          ? { ...d, status: 'uploaded' as const, fileName: file.name, attachmentId }
           : d
       );
+      setLocalDocs(updatedDocs);
+
       await updateApplication(app.id, {
         requestedDocuments: stringifyRequestedDocuments(updatedDocs),
       }, false);
-      onUploaded();
     } catch (err) {
       console.error('Upload failed:', err);
       setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
@@ -267,8 +295,40 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const pendingDocs = requestedDocs.filter(d => d.status === 'pending');
-  const uploadedDocs = requestedDocs.filter(d => d.status === 'uploaded');
+  const handleSubmitDocs = async () => {
+    setSubmitting(true);
+    setUploadError(null);
+    try {
+      const submittedDocs = localDocs.map(d =>
+        d.status === 'uploaded' ? { ...d, status: 'submitted' as const } : d
+      );
+      await updateApplication(app.id, {
+        requestedDocuments: stringifyRequestedDocuments(submittedDocs),
+        status: 'under_review' as ApplicationStatus,
+      }, false);
+
+      addNotification({
+        type: 'company_update',
+        title: 'Documents Submitted',
+        message: `Documents have been submitted for ${app.companyName}: ${submittedDocs.filter(d => d.status === 'submitted').map(d => d.type).join(', ')}`,
+        actor: app.founderName || 'Founder',
+        actorRole: 'founder',
+        link: `/applications/${app.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      onRefresh();
+    } catch (err) {
+      console.error('Submit failed:', err);
+      setUploadError(err instanceof Error ? err.message : 'Submit failed. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  const pendingDocs = localDocs.filter(d => d.status === 'pending');
+  const uploadedDocs = localDocs.filter(d => d.status === 'uploaded');
+  const submittedDocs = localDocs.filter(d => d.status === 'submitted');
+  const hasUploaded = uploadedDocs.length > 0;
+  const allDone = pendingDocs.length === 0 && uploadedDocs.length === 0;
 
   return (
     <div className="mt-3 border-t border-gray-100 pt-3">
@@ -278,14 +338,16 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
           Requested Documents
         </p>
         <span className="text-[10px] text-gray-400 ml-auto">
-          {uploadedDocs.length}/{requestedDocs.length} uploaded
+          {uploadedDocs.length + submittedDocs.length}/{localDocs.length} uploaded
         </span>
       </div>
+
       {uploadError && (
-        <div className="mb-2 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
-          {uploadError}
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+          <AlertCircle size={12} className="flex-shrink-0" /> {uploadError}
         </div>
       )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -293,6 +355,7 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
         onChange={handleFileChange}
         accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.zip"
       />
+
       <div className="space-y-1.5">
         {pendingDocs.map((doc, i) => (
           <div key={`p-${i}`} className="flex items-center justify-between bg-yellow-50 border border-yellow-100 rounded-xl px-3 py-2.5">
@@ -310,8 +373,24 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
             </button>
           </div>
         ))}
+
         {uploadedDocs.map((doc, i) => (
-          <div key={`u-${i}`} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+          <div key={`u-${i}`} className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <FileText size={13} className="text-blue-500" />
+              <span className="text-xs font-medium text-gray-800">{doc.type}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {doc.fileName && <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{doc.fileName}</span>}
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">
+                <Check size={10} /> Ready
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {submittedDocs.map((doc, i) => (
+          <div key={`s-${i}`} className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
             <div className="flex items-center gap-2">
               <FileText size={13} className="text-green-500" />
               <span className="text-xs font-medium text-gray-800">{doc.type}</span>
@@ -319,12 +398,29 @@ function DocumentUploadSection({ app, onUploaded }: { app: InvestmentApplication
             <div className="flex items-center gap-2">
               {doc.fileName && <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{doc.fileName}</span>}
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">
-                <Check size={10} /> Done
+                <Check size={10} /> Submitted
               </span>
             </div>
           </div>
         ))}
       </div>
+
+      {hasUploaded && (
+        <button
+          onClick={handleSubmitDocs}
+          disabled={submitting}
+          className="mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+        >
+          <Send size={13} />
+          {submitting ? 'Submitting Documents...' : `Submit ${uploadedDocs.length} Document${uploadedDocs.length !== 1 ? 's' : ''} to Investor`}
+        </button>
+      )}
+
+      {allDone && (
+        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-600 font-medium">
+          <CheckCircle size={12} /> All documents have been submitted
+        </div>
+      )}
     </div>
   );
 }
@@ -450,7 +546,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
 
       {/* Requested documents with upload */}
       {!isDraft && (
-        <DocumentUploadSection app={app} onUploaded={onRefresh} />
+        <DocumentUploadSection app={app} onRefresh={onRefresh} />
       )}
 
       {/* Expanded details */}
