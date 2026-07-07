@@ -195,7 +195,8 @@ function toCrmPayload(app: Partial<InvestmentApplication>): Record<string, unkno
   for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
     const val = (app as Record<string, unknown>)[appKey];
     if (val === undefined || val === null || val === '') continue;
-    const strVal = String(val);
+    const strVal = String(val).trim();
+    if (!strVal) continue;
 
     if (CURRENCY_FIELDS.has(appKey)) {
       const n = parseFloat(strVal.replace(/[,$]/g, ''));
