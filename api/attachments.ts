@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminAccessToken } from './_zohoAdmin';
+import https from 'https';
 
 export const config = {
   api: {
@@ -12,12 +13,53 @@ export const config = {
 const ZOHO_API_BASE = 'https://www.zohoapis.in';
 const CRM_MODULE = 'Applications';
 
-function buildMultipart(fileName: string, buffer: Buffer, mimeType: string) {
-  const boundary = '----ZohoCRMAttachment' + Date.now();
-  const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-  const footer = `\r\n--${boundary}--\r\n`;
-  const body = Buffer.concat([Buffer.from(header), buffer, Buffer.from(footer)]);
-  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+function uploadToCRM(
+  token: string,
+  recordId: string,
+  fileName: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const boundary = '----ZohoBoundary' + Date.now();
+    const crlf = '\r\n';
+
+    const preamble = Buffer.from(
+      `--${boundary}${crlf}` +
+      `Content-Disposition: form-data; name="file"; filename="${fileName}"${crlf}` +
+      `Content-Type: ${mimeType}${crlf}${crlf}`
+    );
+    const epilogue = Buffer.from(`${crlf}--${boundary}--${crlf}`);
+    const payload = Buffer.concat([preamble, buffer, epilogue]);
+
+    const url = new URL(`${ZOHO_API_BASE}/crm/v2/${CRM_MODULE}/${recordId}/Attachments`);
+
+    const options: https.RequestOptions = {
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Authorization': `Zoho-oauthtoken ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': payload.length,
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf-8');
+        let body: any;
+        try { body = JSON.parse(raw); } catch { body = { raw }; }
+        resolve({ status: res.statusCode || 500, body });
+      });
+    });
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -47,22 +89,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const buffer = Buffer.from(fileData, 'base64');
-      const { body, contentType } = buildMultipart(fileName, buffer, mimeType || 'application/octet-stream');
-
-      const response = await fetch(
-        `${ZOHO_API_BASE}/crm/v2/${CRM_MODULE}/${recordId}/Attachments`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Zoho-oauthtoken ${token}`,
-            'Content-Type': contentType,
-          },
-          body,
-        }
-      );
-
-      const json = await response.json().catch(() => ({}));
-      return res.status(response.status).json(json);
+      const result = await uploadToCRM(token, recordId, fileName, buffer, mimeType || 'application/octet-stream');
+      return res.status(result.status).json(result.body);
     }
 
     if (req.method === 'GET') {
@@ -76,11 +104,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(response.status).json({ error: 'Failed to download attachment' });
         }
 
-        const contentType = response.headers.get('content-type') || 'application/octet-stream';
-        const contentDisposition = response.headers.get('content-disposition') || '';
+        const ct = response.headers.get('content-type') || 'application/octet-stream';
+        const cd = response.headers.get('content-disposition') || '';
 
-        res.setHeader('Content-Type', contentType);
-        if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
+        res.setHeader('Content-Type', ct);
+        if (cd) res.setHeader('Content-Disposition', cd);
 
         const arrayBuffer = await response.arrayBuffer();
         return res.send(Buffer.from(arrayBuffer));
