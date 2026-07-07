@@ -3,7 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, ExternalLink, FileText, Play, StickyNote,
   CheckCircle2, Pause, XCircle, MessageSquare, FileUp, Calendar,
-  Star, Send, Inbox,
+  Star, Send, Inbox, X, Check, Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -11,8 +11,12 @@ import {
   updateApplicationStatus,
   updateApplication,
   approveApplication,
+  parseRequestedDocuments,
+  stringifyRequestedDocuments,
+  DOCUMENT_TYPES,
   type InvestmentApplication,
   type ApplicationStatus,
+  type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
 import { cn } from '../lib/cn';
@@ -176,6 +180,160 @@ function TextBlock({ label, text }: { label: string; text?: string }) {
   );
 }
 
+// ─── Request Documents Modal ──────────────────────────────────────────────────
+
+function RequestDocsModal({
+  existingDocs,
+  onSubmit,
+  onClose,
+}: {
+  existingDocs: RequestedDocument[];
+  onSubmit: (docs: RequestedDocument[]) => void;
+  onClose: () => void;
+}) {
+  const alreadyRequested = new Set(existingDocs.map(d => d.type));
+  const [selected, setSelected] = useState<Set<string>>(new Set(alreadyRequested));
+  const [customDoc, setCustomDoc] = useState('');
+
+  const toggle = (type: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const addCustom = () => {
+    const trimmed = customDoc.trim();
+    if (trimmed && !selected.has(trimmed)) {
+      setSelected(prev => new Set(prev).add(trimmed));
+      setCustomDoc('');
+    }
+  };
+
+  const handleSubmit = () => {
+    const docs: RequestedDocument[] = Array.from(selected).map(type => {
+      const existing = existingDocs.find(d => d.type === type);
+      return existing ?? { type, status: 'pending' as const };
+    });
+    onSubmit(docs);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Request Documents</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Select the documents you need from the founder</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={16} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 max-h-[400px] overflow-y-auto">
+          <div className="space-y-1.5">
+            {DOCUMENT_TYPES.map(type => {
+              const isSelected = selected.has(type);
+              const existing = existingDocs.find(d => d.type === type);
+              const isUploaded = existing?.status === 'uploaded';
+              return (
+                <label
+                  key={type}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border',
+                    isSelected
+                      ? 'bg-indigo-50 border-indigo-200'
+                      : 'bg-white border-gray-100 hover:bg-gray-50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggle(type)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/20"
+                  />
+                  <span className="text-xs font-medium text-gray-800 flex-1">{type}</span>
+                  {isUploaded && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                      <Check size={10} /> Uploaded
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+
+            {/* Custom doc types that aren't in the default list */}
+            {Array.from(selected).filter(s => !(DOCUMENT_TYPES as readonly string[]).includes(s)).map(type => {
+              const existing = existingDocs.find(d => d.type === type);
+              const isUploaded = existing?.status === 'uploaded';
+              return (
+                <label
+                  key={type}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border bg-indigo-50 border-indigo-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => toggle(type)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/20"
+                  />
+                  <span className="text-xs font-medium text-gray-800 flex-1">{type}</span>
+                  {isUploaded && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                      <Check size={10} /> Uploaded
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Add custom */}
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              value={customDoc}
+              onChange={e => setCustomDoc(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCustom()}
+              placeholder="Add custom document type..."
+              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+            />
+            <button
+              onClick={addCustom}
+              disabled={!customDoc.trim()}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2 disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+          <p className="text-xs text-gray-500">{selected.size} document{selected.size !== 1 ? 's' : ''} selected</p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="text-xs font-medium text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={selected.size === 0}
+              className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Request Documents
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ApplicationDetail() {
@@ -193,6 +351,7 @@ export default function ApplicationDetail() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [showDocsModal, setShowDocsModal] = useState(false);
 
   const loadApp = useCallback(async () => {
     if (!id) return;
@@ -298,6 +457,37 @@ export default function ApplicationDetail() {
     await loadApp();
   };
 
+  const handleRequestDocs = async (docs: RequestedDocument[]) => {
+    if (!app || !id) return;
+    setShowDocsModal(false);
+    setActionLoading('documents_requested');
+    setActionError('');
+    try {
+      await updateApplication(id, {
+        requestedDocuments: stringifyRequestedDocuments(docs),
+        status: 'documents_requested' as ApplicationStatus,
+        reviewedBy: currentUser.name,
+        reviewedAt: new Date().toISOString(),
+      }, isInvestor);
+
+      const docNames = docs.map(d => d.type).join(', ');
+      addNotification({
+        type: 'company_update',
+        title: 'Documents Requested',
+        message: `${currentUser.name} has requested the following documents for ${app.companyName}: ${docNames}`,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to request documents';
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
   if (loading) return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full animate-pulse space-y-4">
       <div className="h-4 bg-gray-100 rounded w-32" />
@@ -348,8 +538,18 @@ export default function ApplicationDetail() {
     { label: 'NPS',             value: app.nps },
   ].filter(f => f.value);
 
+  const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+      {showDocsModal && (
+        <RequestDocsModal
+          existingDocs={requestedDocs}
+          onSubmit={handleRequestDocs}
+          onClose={() => setShowDocsModal(false)}
+        />
+      )}
+
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6">
         <ArrowLeft size={15} /> Back to Applications
       </Link>
@@ -400,10 +600,13 @@ export default function ApplicationDetail() {
                 const Icon = a.icon;
                 const isActive = app.status === a.status;
                 const isLoading = actionLoading === a.status;
+                const onClick = a.status === 'documents_requested'
+                  ? () => setShowDocsModal(true)
+                  : () => handleStatusChange(a.status);
                 return (
                   <button
                     key={a.status}
-                    onClick={() => handleStatusChange(a.status)}
+                    onClick={onClick}
                     disabled={!!actionLoading}
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
@@ -450,6 +653,31 @@ export default function ApplicationDetail() {
               </div>
             )}
           </Section>
+
+          {/* Requested Documents Status */}
+          {requestedDocs.length > 0 && (
+            <Section title="Requested Documents">
+              <div className="space-y-2">
+                {requestedDocs.map((doc, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <FileUp size={13} className="text-gray-400" />
+                      <span className="text-xs font-medium text-gray-800">{doc.type}</span>
+                    </div>
+                    {doc.status === 'uploaded' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                        <Check size={10} /> Uploaded{doc.fileName ? `: ${doc.fileName}` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                        <Clock size={10} /> Pending
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (

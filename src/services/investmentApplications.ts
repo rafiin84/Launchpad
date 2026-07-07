@@ -99,6 +99,9 @@ export interface InvestmentApplication {
   investorNotes: string;
   reviewedBy: string;
   reviewedAt: string;
+
+  // Requested documents (JSON string)
+  requestedDocuments: string;
 }
 
 export type InvestmentApplicationFields = Omit<InvestmentApplication, 'id' | 'submittedAt' | 'updatedAt'>;
@@ -151,6 +154,7 @@ const FIELD_MAP: Record<keyof Omit<InvestmentApplication, 'id' | 'submittedAt' |
   investorNotes:       'Investor_Notes',
   reviewedBy:          'Reviewed_By',
   reviewedAt:          'Reviewed_At',
+  requestedDocuments:  'Requested_Documents',
 };
 
 /** Currency fields in CRM — values must be sent as numbers */
@@ -254,6 +258,7 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
     investorNotes:      str('Investor_Notes'),
     reviewedBy:         str('Reviewed_By'),
     reviewedAt:         str('Reviewed_At'),
+    requestedDocuments: str('Requested_Documents'),
   };
 }
 
@@ -722,4 +727,36 @@ export async function deleteApplication(id: string, isInvestor: boolean): Promis
   try {
     await proxyDelete(id);
   } catch { /* silent — may not exist in CRM */ }
+}
+
+// ─── Requested Documents helpers ──────────────────────────────────────────
+
+export interface RequestedDocument {
+  type: string;
+  status: 'pending' | 'uploaded';
+  fileName?: string;
+}
+
+export const DOCUMENT_TYPES = [
+  'Financial Statements',
+  'Cap Table',
+  'Pitch Deck',
+  'Business Plan',
+  'Revenue Projections',
+  'Term Sheet',
+  'Legal Documents',
+  'Tax Returns',
+  'Incorporation Certificate',
+  'Bank Statements',
+  'Customer Contracts',
+  'IP Documentation',
+] as const;
+
+export function parseRequestedDocuments(json: string): RequestedDocument[] {
+  if (!json) return [];
+  try { return JSON.parse(json); } catch { return []; }
+}
+
+export function stringifyRequestedDocuments(docs: RequestedDocument[]): string {
+  return JSON.stringify(docs);
 }
