@@ -1,13 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
- * /api/send-invite — Send a portal invitation email directly to an applicant.
+ * /api/send-invite — Send a portal invitation to an applicant.
+ *
+ * Strategy cascade:
+ * 1. Zoho CRM portal invite API (sends Zoho's own invitation email)
+ * 2. Zoho CRM send_mail API (sends custom email via CRM)
  *
  * POST /api/send-invite
  *   Body: { contactId, email, name, portalUrl }
- *   → Sends invitation email via Zoho CRM Send Mail API
- *
- * Also invites the user to the CRM portal so they can authenticate.
  */
 
 const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
@@ -24,7 +25,7 @@ async function getAdminToken(): Promise<string> {
   const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing Zoho env vars');
+    throw new Error('Missing Zoho env vars (ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN)');
   }
 
   const res = await fetch(`${ZOHO_ACCOUNTS_URL}/oauth/v2/token`, {
@@ -46,88 +47,125 @@ async function getAdminToken(): Promise<string> {
   return cachedToken;
 }
 
-function buildInviteHtml(name: string, portalUrl: string): string {
-  const firstName = name.split(' ')[0] || 'there';
-  return `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 0;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="font-size: 24px; font-weight: 700; color: #111827; margin: 0;">🚀 Launchpad</h1>
-    <p style="font-size: 13px; color: #9CA3AF; margin: 4px 0 0;">Private Founder + Investor Network</p>
-  </div>
-
-  <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 16px; padding: 32px;">
-    <h2 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 12px;">
-      Hi ${firstName}, you're invited!
-    </h2>
-    <p style="font-size: 14px; line-height: 1.6; color: #4B5563; margin: 0 0 24px;">
-      You've been invited to join <strong>Launchpad</strong> — a private platform connecting founders with investors.
-      Sign in to submit your application, share documents, and track your investment progress.
-    </p>
-
-    <div style="text-align: center; margin: 28px 0;">
-      <a href="${portalUrl}"
-         style="display: inline-block; background: #111827; color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 12px; text-decoration: none;">
-        Sign in to Launchpad →
-      </a>
-    </div>
-
-    <p style="font-size: 13px; color: #9CA3AF; margin: 24px 0 0; text-align: center;">
-      Use your email <strong>${name}</strong> to sign in via the Founder portal.
-    </p>
-  </div>
-
-  <p style="font-size: 11px; color: #D1D5DB; text-align: center; margin-top: 24px;">
-    This invitation was sent from Launchpad. If you did not expect this, you can safely ignore it.
-  </p>
-</div>`.trim();
+interface StepResult {
+  step: string;
+  success: boolean;
+  detail: string;
 }
 
-async function getFromAddress(token: string): Promise<{ email: string; userName: string }> {
-  // Try CRM email settings first
-  const emailsRes = await fetch(`${ZOHO_API_BASE}/crm/v2/settings/emails`, {
+async function tryPortalInvite(token: string, contactId: string): Promise<StepResult> {
+  const step = 'portal_invite';
+
+  // 1. Get portals
+  const portalsRes = await fetch(`${ZOHO_API_BASE}/crm/v2/settings/portals`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
-  if (emailsRes.ok) {
-    const data = await emailsRes.json().catch(() => ({})) as {
-      emails?: Array<{ from: string; user_name?: string }>;
-    };
-    if (data.emails?.[0]) {
-      return { email: data.emails[0].from, userName: data.emails[0].user_name || 'Launchpad' };
+  if (!portalsRes.ok) {
+    return { step, success: false, detail: `Portals API returned ${portalsRes.status}` };
+  }
+  const portalsData = await portalsRes.json().catch(() => ({})) as {
+    portals?: Array<{ name: string; active: boolean }>;
+  };
+  const portal = portalsData?.portals?.find(p => p.active) ?? portalsData?.portals?.[0];
+  if (!portal) {
+    return { step, success: false, detail: 'No portal configured in CRM' };
+  }
+
+  // 2. Get user types
+  const utRes = await fetch(
+    `${ZOHO_API_BASE}/crm/v2/settings/portals/${encodeURIComponent(portal.name)}/user_type`,
+    { headers: { 'Authorization': `Zoho-oauthtoken ${token}` } },
+  );
+  if (!utRes.ok) {
+    return { step, success: false, detail: `User types API returned ${utRes.status}` };
+  }
+  const utData = await utRes.json().catch(() => ({})) as {
+    user_type?: Array<{ id: string; name: string; active: boolean }>;
+  };
+  const userType = utData?.user_type?.find(ut => ut.active) ?? utData?.user_type?.[0];
+  if (!userType) {
+    return { step, success: false, detail: 'No user type configured for portal' };
+  }
+
+  console.log('[send-invite] Portal:', portal.name, 'UserType:', userType.id, userType.name);
+
+  // 3. Try invite then reinvite
+  for (const type of ['invite', 'reinvite'] as const) {
+    const qs = new URLSearchParams({ user_type_id: userType.id, language: 'en_US', type });
+    const res = await fetch(
+      `${ZOHO_API_BASE}/crm/v2/Contacts/${contactId}/actions/portal_invite?${qs}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+      },
+    );
+    const text = await res.text();
+    console.log(`[send-invite] Portal ${type}: ${res.status}`, text);
+
+    let json: Record<string, unknown> = {};
+    try { json = JSON.parse(text); } catch { /* not JSON */ }
+
+    const inviteArr = (json as { portal_invite?: Array<{ code?: string; message?: string; status?: string }> }).portal_invite;
+    const code = inviteArr?.[0]?.code || '';
+    const msg = inviteArr?.[0]?.message || '';
+
+    // Success cases
+    if (code === 'SUCCESS') {
+      return { step, success: true, detail: `${type}: ${msg || 'Invitation sent'}` };
+    }
+    // Already invited = success
+    if (code === 'DUPLICATE_DATA' || msg.toLowerCase().includes('already')) {
+      return { step, success: true, detail: `User already invited (${type})` };
+    }
+
+    // If invite failed, try reinvite next
+    if (type === 'reinvite') {
+      return { step, success: false, detail: `${type}: ${code} - ${msg || text.slice(0, 200)}` };
     }
   }
 
-  // Fallback: get current user's email
+  return { step, success: false, detail: 'All portal invite attempts failed' };
+}
+
+async function trySendMail(token: string, contactId: string, toEmail: string, name: string, portalUrl: string): Promise<StepResult> {
+  const step = 'crm_send_mail';
+
+  // Get from email
   const usersRes = await fetch(`${ZOHO_API_BASE}/crm/v2/users?type=CurrentUser`, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
-  if (usersRes.ok) {
-    const data = await usersRes.json().catch(() => ({})) as {
-      users?: Array<{ email: string; full_name?: string }>;
-    };
-    if (data.users?.[0]) {
-      return { email: data.users[0].email, userName: data.users[0].full_name || 'Launchpad' };
-    }
+  const usersData = await usersRes.json().catch(() => ({})) as {
+    users?: Array<{ email: string; full_name?: string }>;
+  };
+  const fromUser = usersData?.users?.[0];
+  if (!fromUser?.email) {
+    return { step, success: false, detail: 'Could not determine sender email' };
   }
 
-  throw new Error('Could not determine sender email address');
-}
+  const firstName = name.split(' ')[0] || 'there';
+  const htmlContent = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:32px 0">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="font-size:24px;font-weight:700;color:#111827;margin:0">Launchpad</h1>
+    <p style="font-size:13px;color:#9CA3AF;margin:4px 0 0">Private Founder + Investor Network</p>
+  </div>
+  <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:32px">
+    <h2 style="font-size:20px;font-weight:600;color:#111827;margin:0 0 12px">Hi ${firstName}, you're invited!</h2>
+    <p style="font-size:14px;line-height:1.6;color:#4B5563;margin:0 0 24px">
+      You've been invited to join <strong>Launchpad</strong> — a private platform connecting founders with investors.
+      Sign in to submit your application, share documents, and track your investment progress.
+    </p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${portalUrl}" style="display:inline-block;background:#111827;color:#fff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:12px;text-decoration:none">
+        Sign in to Launchpad
+      </a>
+    </div>
+  </div>
+</div>`.trim();
 
-async function sendCRMEmail(
-  token: string,
-  contactId: string,
-  toEmail: string,
-  name: string,
-  portalUrl: string,
-): Promise<void> {
-  const from = await getFromAddress(token);
-  console.log('[send-invite] From:', from.email, 'To:', toEmail);
-
-  const htmlContent = buildInviteHtml(name, portalUrl);
-
-  // Zoho CRM Send Mail API v2
   const mailPayload = {
     data: [{
-      from: { user_name: from.userName, email: from.email },
+      from: { user_name: fromUser.full_name || 'Launchpad', email: fromUser.email },
       to: [{ user_name: name, email: toEmail }],
       subject: "You're invited to Launchpad — Sign in to get started",
       content: htmlContent,
@@ -135,8 +173,7 @@ async function sendCRMEmail(
     }],
   };
 
-  console.log('[send-invite] Sending via CRM send_mail...');
-  const mailRes = await fetch(
+  const res = await fetch(
     `${ZOHO_API_BASE}/crm/v2/Contacts/${contactId}/actions/send_mail`,
     {
       method: 'POST',
@@ -148,117 +185,19 @@ async function sendCRMEmail(
     },
   );
 
-  const mailText = await mailRes.text();
-  console.log('[send-invite] CRM send_mail response:', mailRes.status, mailText);
+  const text = await res.text();
+  console.log('[send-invite] CRM send_mail:', res.status, text);
 
-  let mailJson: Record<string, unknown> = {};
-  try { mailJson = JSON.parse(mailText); } catch { /* not JSON */ }
+  let json: Record<string, unknown> = {};
+  try { json = JSON.parse(text); } catch { /* not JSON */ }
 
-  // Check for success
-  const dataArr = (mailJson as { data?: Array<{ code?: string; message?: string; status?: string }> }).data;
+  const dataArr = (json as { data?: Array<{ code?: string; message?: string; status?: string }> }).data;
   if (dataArr?.[0]?.code === 'SUCCESS' || dataArr?.[0]?.status === 'success') {
-    console.log('[send-invite] Email sent successfully via CRM');
-    return;
+    return { step, success: true, detail: 'Email sent via CRM' };
   }
 
-  // If CRM send_mail fails, try Zoho Mail API as fallback
-  console.warn('[send-invite] CRM send_mail failed, trying Zoho Mail API...');
-
-  const zohoMailRes = await fetch('https://mail.zoho.in/api/accounts', {
-    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-  });
-  const zohoMailData = await zohoMailRes.json().catch(() => ({})) as {
-    data?: Array<{ accountId: string; primaryEmailAddress: string }>;
-  };
-
-  const mailAccount = zohoMailData.data?.[0];
-  if (mailAccount) {
-    console.log('[send-invite] Using Zoho Mail account:', mailAccount.primaryEmailAddress);
-    const sendRes = await fetch(
-      `https://mail.zoho.in/api/accounts/${mailAccount.accountId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Zoho-oauthtoken ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fromAddress: mailAccount.primaryEmailAddress,
-          toAddress: toEmail,
-          subject: "You're invited to Launchpad — Sign in to get started",
-          content: htmlContent,
-        }),
-      },
-    );
-    const sendData = await sendRes.text();
-    console.log('[send-invite] Zoho Mail response:', sendRes.status, sendData);
-
-    if (sendRes.ok) {
-      console.log('[send-invite] Email sent via Zoho Mail');
-      return;
-    }
-  }
-
-  // If both fail, report the CRM error
-  const errMsg = dataArr?.[0]?.message
-    || (mailJson as { message?: string }).message
-    || `CRM send_mail returned ${mailRes.status}`;
-  throw new Error(`Failed to send email: ${errMsg}`);
-}
-
-async function sendPortalInvite(token: string, contactId: string): Promise<void> {
-  // 1. Get portal config
-  const portalsRes = await fetch(`${ZOHO_API_BASE}/crm/v2/settings/portals`, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-  });
-  const portalsData = await portalsRes.json().catch(() => ({})) as {
-    portals?: Array<{ name: string; active: boolean }>;
-  };
-  const portal = portalsData?.portals?.find(p => p.active) ?? portalsData?.portals?.[0];
-  if (!portal) {
-    console.warn('[send-invite] No portal found, skipping portal invite');
-    return;
-  }
-
-  // 2. Get user types
-  const utRes = await fetch(
-    `${ZOHO_API_BASE}/crm/v2/settings/portals/${encodeURIComponent(portal.name)}/user_type`,
-    { headers: { 'Authorization': `Zoho-oauthtoken ${token}` } },
-  );
-  const utData = await utRes.json().catch(() => ({})) as {
-    user_type?: Array<{ id: string; name: string; active: boolean }>;
-  };
-  const userType = utData?.user_type?.find(ut => ut.active) ?? utData?.user_type?.[0];
-  if (!userType) {
-    console.warn('[send-invite] No user type found, skipping portal invite');
-    return;
-  }
-
-  // 3. Send portal invite (try invite, then reinvite)
-  let lastError = '';
-  for (const type of ['invite', 'reinvite'] as const) {
-    const qs = new URLSearchParams({ user_type_id: userType.id, language: 'en_US', type });
-    const res = await fetch(
-      `${ZOHO_API_BASE}/crm/v2/Contacts/${contactId}/actions/portal_invite?${qs}`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-      },
-    );
-    const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-    console.log(`[send-invite] Portal ${type}:`, res.status, JSON.stringify(json));
-
-    const inviteArr = (json as { portal_invite?: Array<{ code?: string; message?: string }> }).portal_invite;
-    const code = inviteArr?.[0]?.code || '';
-
-    if (res.ok && code !== 'FAILURE') return;
-
-    // Already invited counts as success
-    if (code === 'INTERNAL_ERROR' || code === 'DUPLICATE_DATA') return;
-
-    lastError = inviteArr?.[0]?.message || `HTTP ${res.status}`;
-  }
-  throw new Error(`Portal invite failed: ${lastError}`);
+  const errMsg = dataArr?.[0]?.message || (json as { message?: string }).message || text.slice(0, 200);
+  return { step, success: false, detail: errMsg };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -268,6 +207,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const steps: StepResult[] = [];
 
   try {
     const { contactId, email, name, portalUrl } = req.body as {
@@ -281,47 +222,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'contactId and email are required' });
     }
 
+    console.log('[send-invite] Start:', { contactId, email, name });
+
     const token = await getAdminToken();
-    const appUrl = portalUrl || 'https://launchpad-iota-ten.vercel.app';
+    console.log('[send-invite] Admin token obtained');
 
-    // 1. Send portal invite (primary — this sends Zoho's invitation email AND creates portal user)
-    let portalInviteSent = false;
-    try {
-      await sendPortalInvite(token, contactId);
-      portalInviteSent = true;
-      console.log('[send-invite] Portal invite sent successfully');
-    } catch (err) {
-      console.warn('[send-invite] Portal invite failed:', err);
-    }
+    // Strategy 1: Portal invite (sends Zoho's own invitation email)
+    const portalResult = await tryPortalInvite(token, contactId);
+    steps.push(portalResult);
+    console.log('[send-invite] Portal result:', JSON.stringify(portalResult));
 
-    // 2. Also try sending a custom branded email (bonus — not critical)
-    let customEmailSent = false;
-    try {
-      await sendCRMEmail(token, contactId, email, name || email, appUrl);
-      customEmailSent = true;
-      console.log('[send-invite] Custom email also sent');
-    } catch (err) {
-      console.warn('[send-invite] Custom email failed (non-critical):', err);
-    }
+    // Strategy 2: CRM send_mail (custom branded email)
+    const mailResult = await trySendMail(token, contactId, email, name || email, portalUrl || `https://launchpad-iota-ten.vercel.app/login`);
+    steps.push(mailResult);
+    console.log('[send-invite] Mail result:', JSON.stringify(mailResult));
 
-    if (!portalInviteSent && !customEmailSent) {
-      return res.status(500).json({
-        error: 'Failed to send invitation',
-        message: 'Both portal invite and email delivery failed. Check Zoho CRM email integration.',
+    const anySuccess = steps.some(s => s.success);
+
+    if (anySuccess) {
+      const successStep = steps.find(s => s.success)!;
+      return res.status(200).json({
+        success: true,
+        message: successStep.detail,
+        steps,
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: portalInviteSent
-        ? `Portal invitation sent to ${email}`
-        : `Invitation email sent to ${email}`,
+    // All failed
+    return res.status(500).json({
+      error: 'Failed to send invitation',
+      message: steps.map(s => `${s.step}: ${s.detail}`).join(' | '),
+      steps,
     });
   } catch (err) {
     console.error('[send-invite] Error:', err);
     return res.status(500).json({
       error: 'Failed to send invitation',
       message: err instanceof Error ? err.message : String(err),
+      steps,
     });
   }
 }

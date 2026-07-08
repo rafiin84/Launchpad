@@ -61,14 +61,18 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'User';
 
       // Send invitation email directly to the applicant
+      let inviteFailed = false;
       if (form.email) {
         setInviteStatus('Sending invitation...');
         try {
           const result = await sendInviteEmail(id, form.email, displayName);
           setInviteStatus(result.message);
         } catch (err) {
-          console.warn('[Invite] Email send failed:', err);
-          setInviteStatus('Contact created but invitation email failed. You can reinvite later.');
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn('[Invite] Email send failed:', msg);
+          setError(`Contact created but invitation failed: ${msg}`);
+          setInviteStatus('');
+          inviteFailed = true;
         }
       }
 
@@ -92,9 +96,10 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         createdTime:    new Date().toISOString(),
       });
 
-      // Brief delay so user sees status before modal closes
-      await new Promise(r => setTimeout(r, 1000));
-      onClose();
+      if (!inviteFailed) {
+        await new Promise(r => setTimeout(r, 1000));
+        onClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add founder');
       setInviteStatus('');
