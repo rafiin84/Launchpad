@@ -333,6 +333,7 @@ export default function FounderApplicationForm() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [originalStatus, setOriginalStatus] = useState<string | null>(null);
 
   // Check if user already has an active application (not editing a draft)
   useEffect(() => {
@@ -367,6 +368,7 @@ export default function FounderApplicationForm() {
           } catch {
             docs = [];
           }
+          setOriginalStatus(existing.status);
           setForm({
             companyName: existing.companyName,
             companyWebsite: existing.companyWebsite,
@@ -588,20 +590,38 @@ export default function FounderApplicationForm() {
     setSubmitting(true);
     try {
       const fields = buildFields('submitted');
-      if (editId) {
+      if (editId && originalStatus && originalStatus !== 'draft') {
+        const { status: _drop, ...fieldsWithoutStatus } = fields;
+        await updateApplication(editId, fieldsWithoutStatus, isInvestor);
+        addNotification({
+          type: 'company_update',
+          title: 'Application Updated',
+          message: `${form.companyName || 'A company'} updated their investment application.`,
+          actor: form.founderName || currentUser?.name || 'Founder',
+          actorRole: 'founder',
+          link: '/applications',
+        });
+      } else if (editId) {
         await updateApplication(editId, fields, isInvestor);
+        addNotification({
+          type: 'company_update',
+          title: 'Application Submitted',
+          message: `${form.companyName || 'A company'} submitted an investment application.`,
+          actor: form.founderName || currentUser?.name || 'Founder',
+          actorRole: 'founder',
+          link: '/applications',
+        });
       } else {
         await createApplication(fields, isInvestor);
+        addNotification({
+          type: 'company_update',
+          title: 'Application Submitted',
+          message: `${form.companyName || 'A company'} submitted an investment application.`,
+          actor: form.founderName || currentUser?.name || 'Founder',
+          actorRole: 'founder',
+          link: '/applications',
+        });
       }
-
-      addNotification({
-        type: 'company_update',
-        title: 'Application Submitted',
-        message: `${form.companyName || 'A company'} submitted an investment application.`,
-        actor: form.founderName || currentUser?.name || 'Founder',
-        actorRole: 'founder',
-        link: '/applications',
-      });
 
       window.dispatchEvent(new Event('notifications-updated'));
       navigate('/applications');
@@ -969,15 +989,17 @@ export default function FounderApplicationForm() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save as Draft'}
-            </button>
+            {!(editId && originalStatus && originalStatus !== 'draft') && (
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save as Draft'}
+              </button>
+            )}
 
             {isLastStep ? (
               <button
@@ -987,7 +1009,7 @@ export default function FounderApplicationForm() {
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
-                {submitting ? 'Submitting...' : 'Submit Application'}
+                {submitting ? 'Submitting...' : editId && originalStatus && originalStatus !== 'draft' ? 'Save Changes' : 'Submit Application'}
               </button>
             ) : (
               <button

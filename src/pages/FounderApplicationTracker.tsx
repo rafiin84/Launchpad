@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Inbox, Plus, FileText, Clock, CheckCircle, XCircle,
+  Inbox, Plus, FileText, Clock, CheckCircle, XCircle, Edit2,
   TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
   Upload, Check, Send, AlertCircle,
 } from 'lucide-react';
@@ -534,13 +534,23 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
             <FileText size={12} /> Continue Editing
           </Link>
         ) : (
-          <button
-            onClick={onToggle}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            {expanded ? 'Hide Details' : 'View Details'}
-            <ArrowRight size={12} className={cn('transition-transform', expanded && 'rotate-90')} />
-          </button>
+          <>
+            <button
+              onClick={onToggle}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {expanded ? 'Hide Details' : 'View Details'}
+              <ArrowRight size={12} className={cn('transition-transform', expanded && 'rotate-90')} />
+            </button>
+            {!isApproved && app.status !== 'rejected' && (
+              <Link
+                to={`/applications/apply?edit=${app.id}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Edit2 size={12} /> Edit Application
+              </Link>
+            )}
+          </>
         )}
       </div>
 
