@@ -82,6 +82,36 @@ function buildInviteHtml(name: string, portalUrl: string): string {
 </div>`.trim();
 }
 
+async function getFromAddress(token: string): Promise<{ email: string; userName: string }> {
+  // Try CRM email settings first
+  const emailsRes = await fetch(`${ZOHO_API_BASE}/crm/v2/settings/emails`, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  if (emailsRes.ok) {
+    const data = await emailsRes.json().catch(() => ({})) as {
+      emails?: Array<{ from: string; user_name?: string }>;
+    };
+    if (data.emails?.[0]) {
+      return { email: data.emails[0].from, userName: data.emails[0].user_name || 'Launchpad' };
+    }
+  }
+
+  // Fallback: get current user's email
+  const usersRes = await fetch(`${ZOHO_API_BASE}/crm/v2/users?type=CurrentUser`, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  if (usersRes.ok) {
+    const data = await usersRes.json().catch(() => ({})) as {
+      users?: Array<{ email: string; full_name?: string }>;
+    };
+    if (data.users?.[0]) {
+      return { email: data.users[0].email, userName: data.users[0].full_name || 'Launchpad' };
+    }
+  }
+
+  throw new Error('Could not determine sender email address');
+}
+
 async function sendCRMEmail(
   token: string,
   contactId: string,
@@ -89,31 +119,23 @@ async function sendCRMEmail(
   name: string,
   portalUrl: string,
 ): Promise<void> {
-  // Get the CRM org's "from" email addresses
-  const fromRes = await fetch(`${ZOHO_API_BASE}/crm/v2/settings/emails`, {
-    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-  });
-  const fromData = await fromRes.json().catch(() => ({})) as {
-    emails?: Array<{ from: string; id: string; user_name?: string }>;
-  };
+  const from = await getFromAddress(token);
+  console.log('[send-invite] From:', from.email, 'To:', toEmail);
 
-  const fromEmail = fromData.emails?.[0];
-  if (!fromEmail) {
-    throw new Error('No email address configured in Zoho CRM. Please set up email integration.');
-  }
+  const htmlContent = buildInviteHtml(name, portalUrl);
 
-  console.log('[send-invite] Using from email:', fromEmail.from);
-
+  // Zoho CRM Send Mail API v2
   const mailPayload = {
     data: [{
-      from: { user_name: fromEmail.user_name || 'Launchpad', email: fromEmail.from },
+      from: { user_name: from.userName, email: from.email },
       to: [{ user_name: name, email: toEmail }],
       subject: "You're invited to Launchpad — Sign in to get started",
-      content: buildInviteHtml(name, portalUrl),
+      content: htmlContent,
       mail_format: 'html',
     }],
   };
 
+  console.log('[send-invite] Sending via CRM send_mail...');
   const mailRes = await fetch(
     `${ZOHO_API_BASE}/crm/v2/Contacts/${contactId}/actions/send_mail`,
     {
@@ -126,13 +148,62 @@ async function sendCRMEmail(
     },
   );
 
-  const mailJson = await mailRes.json().catch(() => ({})) as Record<string, unknown>;
-  console.log('[send-invite] Mail response:', JSON.stringify(mailJson));
+  const mailText = await mailRes.text();
+  console.log('[send-invite] CRM send_mail response:', mailRes.status, mailText);
 
-  if (!mailRes.ok) {
-    const msg = (mailJson as { message?: string }).message || `HTTP ${mailRes.status}`;
-    throw new Error(`Failed to send email: ${msg}`);
+  let mailJson: Record<string, unknown> = {};
+  try { mailJson = JSON.parse(mailText); } catch { /* not JSON */ }
+
+  // Check for success
+  const dataArr = (mailJson as { data?: Array<{ code?: string; message?: string; status?: string }> }).data;
+  if (dataArr?.[0]?.code === 'SUCCESS' || dataArr?.[0]?.status === 'success') {
+    console.log('[send-invite] Email sent successfully via CRM');
+    return;
   }
+
+  // If CRM send_mail fails, try Zoho Mail API as fallback
+  console.warn('[send-invite] CRM send_mail failed, trying Zoho Mail API...');
+
+  const zohoMailRes = await fetch('https://mail.zoho.in/api/accounts', {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  const zohoMailData = await zohoMailRes.json().catch(() => ({})) as {
+    data?: Array<{ accountId: string; primaryEmailAddress: string }>;
+  };
+
+  const mailAccount = zohoMailData.data?.[0];
+  if (mailAccount) {
+    console.log('[send-invite] Using Zoho Mail account:', mailAccount.primaryEmailAddress);
+    const sendRes = await fetch(
+      `https://mail.zoho.in/api/accounts/${mailAccount.accountId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromAddress: mailAccount.primaryEmailAddress,
+          toAddress: toEmail,
+          subject: "You're invited to Launchpad — Sign in to get started",
+          content: htmlContent,
+        }),
+      },
+    );
+    const sendData = await sendRes.text();
+    console.log('[send-invite] Zoho Mail response:', sendRes.status, sendData);
+
+    if (sendRes.ok) {
+      console.log('[send-invite] Email sent via Zoho Mail');
+      return;
+    }
+  }
+
+  // If both fail, report the CRM error
+  const errMsg = dataArr?.[0]?.message
+    || (mailJson as { message?: string }).message
+    || `CRM send_mail returned ${mailRes.status}`;
+  throw new Error(`Failed to send email: ${errMsg}`);
 }
 
 async function sendPortalInvite(token: string, contactId: string): Promise<void> {
