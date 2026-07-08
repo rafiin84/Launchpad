@@ -305,7 +305,7 @@ function PortalStatusToggle({
     try {
       await sendPortalInvitation(founder.id);
       addNotification({
-        type: 'portal_invite',
+        type: 'invitation_sent',
         title: 'Reinvitation Sent',
         message: `Portal reinvitation sent to ${displayName} (${founder.email}).`,
         actor: 'Admin',
