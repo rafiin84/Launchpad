@@ -548,18 +548,37 @@ export default function Activities() {
     setRecords(prev => [activity, ...prev]);
   };
 
-  const RECENT_EVENTS = [
-    { icon: PlusCircle,   color: 'text-indigo-500 bg-indigo-50',  text: 'NeuralPath AI added to portfolio',            time: '2h ago' },
-    { icon: DollarSign,   color: 'text-emerald-500 bg-emerald-50', text: 'Investment completed — FinFlow Payments $3M', time: '5h ago' },
-    { icon: Users,        color: 'text-violet-500 bg-violet-50',   text: 'Founder meeting with Lena Kovacs (Stackly)',  time: '1d ago' },
-    { icon: FileText,     color: 'text-blue-500 bg-blue-50',       text: 'Startup application received — GreenVault',  time: '1d ago' },
-    { icon: TrendingUp,   color: 'text-amber-500 bg-amber-50',     text: 'Deal stage updated — Orbis Logistics',       time: '2d ago' },
-    { icon: Upload,       color: 'text-pink-500 bg-pink-50',       text: 'Document uploaded — Medisync Term Sheet',    time: '2d ago' },
-    { icon: MessageSquare,color: 'text-teal-500 bg-teal-50',       text: 'Discussion post created — Q2 Review',        time: '3d ago' },
-    { icon: DollarSign,   color: 'text-emerald-500 bg-emerald-50', text: 'Valuation updated — Medisync Health $58M',   time: '4d ago' },
-    { icon: PlusCircle,   color: 'text-indigo-500 bg-indigo-50',   text: 'RetailMind 34% revenue milestone achieved',  time: '5d ago' },
-    { icon: Users,        color: 'text-violet-500 bg-violet-50',   text: 'Intro: Priya Mehta ↔ Dr. Sarah Okonkwo',    time: '6d ago' },
-  ];
+  const RECENT_TYPE_STYLE: Record<string, { icon: typeof Activity; color: string }> = {
+    win:          { icon: TrendingUp,   color: 'text-emerald-500 bg-emerald-50' },
+    insight:      { icon: Sparkles,     color: 'text-amber-500 bg-amber-50' },
+    update:       { icon: RefreshCw,    color: 'text-blue-500 bg-blue-50' },
+    advice:       { icon: MessageSquare,color: 'text-indigo-500 bg-indigo-50' },
+    introduction: { icon: Users,        color: 'text-violet-500 bg-violet-50' },
+  };
+  const defaultStyle = { icon: Activity, color: 'text-gray-500 bg-gray-50' };
+
+  function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  }
+
+  const RECENT_EVENTS = records.slice(0, 5).map(r => {
+    const style = RECENT_TYPE_STYLE[r.activityType?.toLowerCase()] ?? defaultStyle;
+    const label = r.title || r.content?.slice(0, 60) || 'Activity';
+    const author = r.authorName ? ` — ${r.authorName}` : '';
+    return {
+      icon: style.icon,
+      color: style.color,
+      text: `${label}${author}`,
+      time: r.createdTime ? timeAgo(r.createdTime) : '',
+    };
+  });
 
   return (
     <div className="min-h-screen py-6 sm:py-8 px-4 sm:px-6 lg:px-8 relative"
