@@ -612,6 +612,15 @@ export default function FounderApplicationForm() {
     { key: 'equityOffered',      label: 'Equity Offered',      step: 3 },
   ];
 
+  function validateStep(s: number): string | null {
+    const missing = REQUIRED_FIELDS.filter(f => f.step === s).filter(f => {
+      const val = form[f.key];
+      return typeof val === 'string' ? !val.trim() : !val;
+    });
+    if (missing.length === 0) return null;
+    return `Please fill in: ${missing.map(f => f.label).join(', ')}`;
+  }
+
   function validateForm(): string | null {
     const missing = REQUIRED_FIELDS.filter(f => {
       const val = form[f.key];
@@ -621,6 +630,16 @@ export default function FounderApplicationForm() {
     const first = missing[0];
     setStep(first.step);
     return `Please fill in: ${missing.map(f => f.label).join(', ')}`;
+  }
+
+  function handleNext() {
+    setValidationError('');
+    const error = validateStep(step);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+    setStep(step + 1);
   }
 
   async function handleSubmit() {
@@ -1065,7 +1084,7 @@ export default function FounderApplicationForm() {
             ) : (
               <button
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={handleNext}
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors"
               >
                 Next
