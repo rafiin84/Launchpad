@@ -19,6 +19,7 @@ import {
   Globe,
   Video,
   File,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -31,6 +32,7 @@ import {
 } from '../services/investmentApplications';
 import { fetchCompanyProfile, EMPTY, type CompanyData } from '../services/companyProfile';
 import { addNotification } from '../services/notifications';
+import { cn } from '../lib/cn';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -175,10 +177,13 @@ const headingClass = 'text-sm font-semibold text-gray-900';
 
 // ─── Small reusable components ──────────────────────────────────────────────
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className={labelClass}>{label}</label>
+      <label className={labelClass}>
+        {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
       {children}
     </div>
   );
@@ -190,21 +195,23 @@ function TextInput({
   onChange,
   placeholder,
   type = 'text',
+  required,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  required?: boolean;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} required={required}>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={inputClass}
+        className={cn(inputClass, required && !value.trim() && 'border-red-200')}
       />
     </Field>
   );
@@ -216,16 +223,18 @@ function SelectInput({
   onChange,
   options,
   placeholder = 'Select...',
+  required,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder?: string;
+  required?: boolean;
 }) {
   return (
-    <Field label={label}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+    <Field label={label} required={required}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={cn(inputClass, required && !value && 'border-red-200')}>
         <option value="">{placeholder}</option>
         {options.map((o) => (
           <option key={o} value={o}>
@@ -243,21 +252,23 @@ function TextareaInput({
   onChange,
   placeholder,
   rows = 3,
+  required,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  required?: boolean;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} required={required}>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className={`${inputClass} resize-none`}
+        className={cn(`${inputClass} resize-none`, required && !value.trim() && 'border-red-200')}
       />
     </Field>
   );
@@ -334,6 +345,7 @@ export default function FounderApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState('');
 
   // Check if user already has an active application (not editing a draft)
   useEffect(() => {
@@ -469,6 +481,7 @@ export default function FounderApplicationForm() {
   const set = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {
       setForm((prev) => ({ ...prev, [key]: value }));
+      setValidationError('');
     },
     [],
   );
@@ -586,7 +599,37 @@ export default function FounderApplicationForm() {
 
   // ── Submit ──────────────────────────────────────────────────────────────
 
+  const REQUIRED_FIELDS: { key: keyof typeof form; label: string; step: number }[] = [
+    { key: 'companyName',        label: 'Company Name',        step: 0 },
+    { key: 'companyIndustry',    label: 'Industry',            step: 0 },
+    { key: 'companyStage',       label: 'Company Stage',       step: 0 },
+    { key: 'companyDescription', label: 'Company Description', step: 0 },
+    { key: 'founderName',        label: 'Founder Name',        step: 1 },
+    { key: 'founderEmail',       label: 'Founder Email',       step: 1 },
+    { key: 'problemStatement',   label: 'Problem Statement',   step: 2 },
+    { key: 'solution',           label: 'Solution',            step: 2 },
+    { key: 'fundingAsk',         label: 'Funding Ask',         step: 3 },
+    { key: 'equityOffered',      label: 'Equity Offered',      step: 3 },
+  ];
+
+  function validateForm(): string | null {
+    const missing = REQUIRED_FIELDS.filter(f => {
+      const val = form[f.key];
+      return typeof val === 'string' ? !val.trim() : !val;
+    });
+    if (missing.length === 0) return null;
+    const first = missing[0];
+    setStep(first.step);
+    return `Please fill in: ${missing.map(f => f.label).join(', ')}`;
+  }
+
   async function handleSubmit() {
+    setValidationError('');
+    const error = validateForm();
+    if (error) {
+      setValidationError(error);
+      return;
+    }
     setSubmitting(true);
     try {
       const fields = buildFields('submitted');
@@ -637,14 +680,14 @@ export default function FounderApplicationForm() {
       <div className="space-y-5">
         <h3 className={headingClass}>Company Information</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <TextInput label="Company Name" value={form.companyName} onChange={(v) => set('companyName', v)} placeholder="Acme Inc." />
+          <TextInput label="Company Name" value={form.companyName} onChange={(v) => set('companyName', v)} placeholder="Acme Inc." required />
           <TextInput label="Company Website" value={form.companyWebsite} onChange={(v) => set('companyWebsite', v)} placeholder="https://example.com" />
-          <SelectInput label="Industry" value={form.companyIndustry} onChange={(v) => set('companyIndustry', v)} options={INDUSTRY_OPTIONS} />
-          <SelectInput label="Company Stage" value={form.companyStage} onChange={(v) => set('companyStage', v)} options={STAGE_OPTIONS} />
+          <SelectInput label="Industry" value={form.companyIndustry} onChange={(v) => set('companyIndustry', v)} options={INDUSTRY_OPTIONS} required />
+          <SelectInput label="Company Stage" value={form.companyStage} onChange={(v) => set('companyStage', v)} options={STAGE_OPTIONS} required />
           <TextInput label="Location" value={form.companyLocation} onChange={(v) => set('companyLocation', v)} placeholder="San Francisco, CA" />
           <TextInput label="Founded Year" value={form.foundedYear} onChange={(v) => set('foundedYear', v)} placeholder="2023" />
         </div>
-        <TextareaInput label="Company Description" value={form.companyDescription} onChange={(v) => set('companyDescription', v)} placeholder="Brief description of your company..." rows={4} />
+        <TextareaInput label="Company Description" value={form.companyDescription} onChange={(v) => set('companyDescription', v)} placeholder="Brief description of your company..." rows={4} required />
       </div>
     );
   }
@@ -654,8 +697,8 @@ export default function FounderApplicationForm() {
       <div className="space-y-5">
         <h3 className={headingClass}>Founder Details</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <TextInput label="Full Name" value={form.founderName} onChange={(v) => set('founderName', v)} placeholder="Jane Doe" />
-          <TextInput label="Email" value={form.founderEmail} onChange={(v) => set('founderEmail', v)} placeholder="jane@company.com" type="email" />
+          <TextInput label="Full Name" value={form.founderName} onChange={(v) => set('founderName', v)} placeholder="Jane Doe" required />
+          <TextInput label="Email" value={form.founderEmail} onChange={(v) => set('founderEmail', v)} placeholder="jane@company.com" type="email" required />
           <TextInput label="Phone" value={form.founderPhone} onChange={(v) => set('founderPhone', v)} placeholder="+1 (555) 000-0000" />
           <TextInput label="LinkedIn Profile" value={form.founderLinkedin} onChange={(v) => set('founderLinkedin', v)} placeholder="https://linkedin.com/in/janedoe" />
           <SelectInput label="Role" value={form.founderRole} onChange={(v) => set('founderRole', v)} options={ROLE_OPTIONS} />
@@ -669,8 +712,8 @@ export default function FounderApplicationForm() {
     return (
       <div className="space-y-5">
         <h3 className={headingClass}>Business Overview</h3>
-        <TextareaInput label="Problem Statement" value={form.problemStatement} onChange={(v) => set('problemStatement', v)} placeholder="What problem are you solving?" rows={3} />
-        <TextareaInput label="Solution" value={form.solution} onChange={(v) => set('solution', v)} placeholder="How does your product solve this problem?" rows={3} />
+        <TextareaInput label="Problem Statement" value={form.problemStatement} onChange={(v) => set('problemStatement', v)} placeholder="What problem are you solving?" rows={3} required />
+        <TextareaInput label="Solution" value={form.solution} onChange={(v) => set('solution', v)} placeholder="How does your product solve this problem?" rows={3} required />
         <TextareaInput label="Target Market" value={form.targetMarket} onChange={(v) => set('targetMarket', v)} placeholder="Who are your target customers? TAM/SAM/SOM?" rows={3} />
         <TextareaInput label="Business Model" value={form.businessModel} onChange={(v) => set('businessModel', v)} placeholder="How do you make money?" rows={3} />
         <TextareaInput label="Competitive Advantage" value={form.competitiveAdvantage} onChange={(v) => set('competitiveAdvantage', v)} placeholder="What sets you apart from competitors?" rows={3} />
@@ -683,10 +726,10 @@ export default function FounderApplicationForm() {
       <div className="space-y-5">
         <h3 className={headingClass}>Funding & Financials</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <TextInput label="Funding Ask" value={form.fundingAsk} onChange={(v) => set('fundingAsk', v)} placeholder="$500,000" />
+          <TextInput label="Funding Ask" value={form.fundingAsk} onChange={(v) => set('fundingAsk', v)} placeholder="$500,000" required />
           <TextInput label="Previous Funding" value={form.previousFunding} onChange={(v) => set('previousFunding', v)} placeholder="$100,000 (friends & family)" />
           <TextInput label="Current Valuation" value={form.currentValuation} onChange={(v) => set('currentValuation', v)} placeholder="$5,000,000" />
-          <TextInput label="Equity Offered (%)" value={form.equityOffered} onChange={(v) => set('equityOffered', v)} placeholder="10%" />
+          <TextInput label="Equity Offered (%)" value={form.equityOffered} onChange={(v) => set('equityOffered', v)} placeholder="10%" required />
           <TextInput label="Current Revenue" value={form.currentRevenue} onChange={(v) => set('currentRevenue', v)} placeholder="$50,000" />
           <TextInput label="MRR" value={form.mrr} onChange={(v) => set('mrr', v)} placeholder="$8,000" />
           <TextInput label="ARR" value={form.arr} onChange={(v) => set('arr', v)} placeholder="$96,000" />
@@ -972,6 +1015,14 @@ export default function FounderApplicationForm() {
       {/* Form Card */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6">
         {stepRenderers[step]()}
+
+        {/* Validation Error */}
+        {validationError && (
+          <div className="flex items-center gap-2 mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {validationError}
+          </div>
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex items-center justify-between mt-8 pt-5 border-t border-gray-100">
