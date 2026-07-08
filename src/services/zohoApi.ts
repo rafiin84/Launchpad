@@ -122,7 +122,7 @@ export async function zohoGetById(module: string, id: string, fields?: string): 
   const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: authHeader() });
-  if (res.status === 404) return null;
+  if (res.status === 204 || res.status === 404) return null;
 
   const json: ZohoListResponse = await res.json();
   if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');

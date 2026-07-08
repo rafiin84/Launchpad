@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Tag, Trash2, Edit2 } from 'lucide-react';
-import { getCRMActivity, deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
+import { deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
 import { fetchSharedActivities } from '../services/sharedActivities';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
@@ -63,22 +63,14 @@ export default function ActivityDetail() {
 
   useEffect(() => {
     if (!id) return;
-    const isLocal = id.startsWith('local_');
-    if (isLocal) {
-      fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
-        .then(all => {
-          const found = all.find(a => a.id === id);
-          if (found) setActivity(found);
-          else setError('Activity not found');
-        })
-        .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-        .finally(() => setLoading(false));
-    } else {
-      getCRMActivity(id)
-        .then(setActivity)
-        .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-        .finally(() => setLoading(false));
-    }
+    fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
+      .then(all => {
+        const found = all.find(a => a.id === id);
+        if (found) setActivity(found);
+        else setError('Activity not found');
+      })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleDelete = async () => {
