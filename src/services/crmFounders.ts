@@ -1,4 +1,4 @@
-import { zohoList, zohoGetById, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
 import { loadToken } from './oauth';
 
 const isDev = import.meta.env.DEV;
@@ -156,6 +156,15 @@ export async function createCRMFounder(fields: CRMFounderFields): Promise<string
   }
 
   return contactId;
+}
+
+export async function findContactByEmail(email: string): Promise<string | null> {
+  try {
+    const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
+    return records[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteCRMFounder(id: string): Promise<void> {

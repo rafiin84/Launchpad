@@ -7,7 +7,7 @@ import {
 import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../components/ui/Avatar';
 import {
-  fetchCRMFounders, createCRMFounder, deleteCRMFounder,
+  fetchCRMFounders, createCRMFounder, deleteCRMFounder, findContactByEmail,
   fetchAllPortalUserStatuses, sendInviteEmail,
   LEAD_SOURCE_OPTIONS, SALUTATION_OPTIONS,
   type CRMFounder, type CRMFounderFields, type PortalUserAPIStatus,
@@ -56,11 +56,28 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
     if (!canSave || saving) return;
     setSaving(true); setError(''); setInviteStatus('');
     try {
-      setInviteStatus('Creating contact...');
-      const id = await createCRMFounder(form);
       const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'User';
 
-      // Send invitation email directly to the applicant
+      // Step 1: Create contact (or find existing if duplicate)
+      let id: string | null = null;
+      setInviteStatus('Creating contact...');
+      try {
+        id = await createCRMFounder(form);
+      } catch (createErr) {
+        const msg = createErr instanceof Error ? createErr.message : String(createErr);
+        console.warn('[Invite] Create failed, checking for existing contact:', msg);
+        if (form.email) {
+          setInviteStatus('Contact may already exist, looking up...');
+          id = await findContactByEmail(form.email);
+        }
+        if (!id) {
+          setError(`Failed to create contact: ${msg}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Step 2: Send invitation email
       let inviteFailed = false;
       if (form.email) {
         setInviteStatus('Sending invitation...');
