@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  DollarSign, Building2, Inbox,
+  DollarSign, Building2, Inbox, Users,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
   Percent, Layers, PieChart, Target, Award,
   Sparkles, Lightbulb, AlertTriangle, CheckCircle, Zap, ArrowRight,
@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
+import { fetchCRMFounders, fetchAllPortalUserStatuses } from '../services/crmFounders';
 import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
@@ -249,8 +250,12 @@ export default function Home() {
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
   const [applications, setApplications] = useState<CRMApplication[]>([]);
+  const [foundersCount, setFoundersCount] = useState(0);
+  const [applicantsCount, setApplicantsCount] = useState(0);
   const [loadingPortfolio, setLoadingPortfolio] = useState(true);
   const [loadingApps, setLoadingApps] = useState(true);
+  const [loadingFounders, setLoadingFounders] = useState(true);
+  const [loadingApplicants, setLoadingApplicants] = useState(true);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
 
   const [orgName, setOrgName] = useState<string | null>(null);
@@ -258,16 +263,28 @@ export default function Home() {
     if (isFounder || !isConnected) {
       setLoadingPortfolio(false);
       setLoadingApps(false);
+      setLoadingFounders(false);
+      setLoadingApplicants(false);
       return;
     }
     fetchCRMPortfolio()
-      .then(setPortfolio)
+      .then(list => {
+        setPortfolio(list);
+        setFoundersCount(list.filter(c => c.founderName).length);
+      })
       .catch(() => {})
-      .finally(() => setLoadingPortfolio(false));
+      .finally(() => { setLoadingPortfolio(false); setLoadingFounders(false); });
     fetchCRMApplications()
       .then(setApplications)
       .catch(() => {})
       .finally(() => setLoadingApps(false));
+    Promise.all([fetchCRMFounders(), fetchAllPortalUserStatuses()])
+      .then(([contacts, statusMap]) => {
+        const portalEmails = new Set(statusMap.keys());
+        setApplicantsCount(contacts.filter(c => c.email && portalEmails.has(c.email.toLowerCase())).length);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingApplicants(false));
     fetchZohoOrgName().then(setOrgName).catch(() => {});
   }, [isFounder, isConnected]);
 
@@ -354,9 +371,11 @@ export default function Home() {
 
         // Chips that are also navigation links
         const linkedChips = [
-          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/portfolio',   icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio, sub: 'across portfolio' },
-          { label: 'Portfolio Companies', value: String(portfolio.length),          path: '/portfolio',   icon: <Building2 size={16} />,  accent: false, loading: loadingPortfolio, sub: `${activeCount} active` },
-          { label: 'Applications',        value: String(applications.length),       path: '/applications',icon: <Inbox size={16} />,      accent: false, loading: loadingApps,      sub: 'submitted' },
+          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/portfolio',    icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio,   sub: 'across portfolio' },
+          { label: 'Company',             value: String(portfolio.length),           path: '/portfolio',    icon: <PieChart size={16} />,   accent: false, loading: loadingPortfolio,   sub: `${activeCount} active` },
+          { label: 'Applications',        value: String(applications.length),        path: '/applications', icon: <Inbox size={16} />,      accent: false, loading: loadingApps,        sub: 'submitted' },
+          { label: 'Founders',            value: String(foundersCount),              path: '/founders',     icon: <Building2 size={16} />,  accent: false, loading: loadingFounders,    sub: 'in portfolio' },
+          { label: 'Applicants',          value: String(applicantsCount),            path: '/applicants',   icon: <Users size={16} />,      accent: false, loading: loadingApplicants,  sub: 'portal users' },
         ];
 
         // Static portfolio metric chips (no link)
