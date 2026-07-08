@@ -6,7 +6,7 @@ import {
   AlertCircle, ExternalLink, Globe, Clock, XCircle, RefreshCw,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
-import { getCRMFounder, deleteCRMFounder, sendPortalInvitation, checkPortalStatus, type CRMFounder, type PortalInviteResult } from '../services/crmFounders';
+import { getCRMFounder, deleteCRMFounder, sendInviteEmail, checkPortalStatus, type CRMFounder } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
@@ -88,8 +88,8 @@ export default function FounderDetail() {
     setInviting(true);
     setInviteResult(null);
     try {
-      const result = await sendPortalInvitation(id);
       const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+      const result = await sendInviteEmail(id, founder.email, displayName);
       const isResend = portalStatus !== null;
 
       registerPortalUser({
@@ -103,7 +103,7 @@ export default function FounderDetail() {
       });
       setPortalStatus('invited');
 
-      const statusMsg = isResend || result.wasReinvite
+      const statusMsg = isResend
         ? 'Re-invitation sent — a new invite has been sent to the user.'
         : `${result.message} — User registered as ${inviteRole}.`;
       setInviteResult({ type: 'success', message: statusMsg });

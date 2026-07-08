@@ -8,7 +8,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../components/ui/Avatar';
 import {
   fetchCRMFounders, createCRMFounder, deleteCRMFounder,
-  fetchAllPortalUserStatuses, sendPortalInvitation,
+  fetchAllPortalUserStatuses, sendInviteEmail,
   LEAD_SOURCE_OPTIONS, SALUTATION_OPTIONS,
   type CRMFounder, type CRMFounderFields, type PortalUserAPIStatus,
 } from '../services/crmFounders';
@@ -56,6 +56,17 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
     setSaving(true); setError('');
     try {
       const id = await createCRMFounder(form);
+      const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'User';
+
+      // Send invitation email directly to the applicant
+      if (form.email) {
+        try {
+          await sendInviteEmail(id, form.email, displayName);
+        } catch (err) {
+          console.warn('[Invite] Email send failed:', err);
+        }
+      }
+
       onAdded({
         id,
         salutation:     form.salutation || '',
@@ -300,21 +311,21 @@ function PortalStatusToggle({
   const handleReinvite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (reinviting) return;
+    if (reinviting || !founder.email) return;
     setReinviting(true);
     try {
-      await sendPortalInvitation(founder.id);
+      await sendInviteEmail(founder.id, founder.email, displayName);
       addNotification({
         type: 'invitation_sent',
-        title: 'Reinvitation Sent',
-        message: `Portal reinvitation sent to ${displayName} (${founder.email}).`,
+        title: 'Invitation Sent',
+        message: `Invitation email sent to ${displayName} (${founder.email}).`,
         actor: 'Admin',
         actorRole: 'investor',
         link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
     } catch (err) {
-      alert(`Failed to reinvite: ${err instanceof Error ? err.message : String(err)}`);
+      alert(`Failed to send invitation: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setReinviting(false);
     }

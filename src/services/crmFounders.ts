@@ -277,80 +277,60 @@ export async function fetchAllPortalUserStatuses(): Promise<Map<string, PortalUs
   return result;
 }
 
-export async function sendPortalInvitation(contactId: string): Promise<PortalInviteResult> {
+/**
+ * Send invitation email directly to an applicant via the server-side API.
+ * This sends a branded email with a portal login link AND creates the
+ * portal user in Zoho CRM so they can authenticate.
+ */
+export async function sendInviteEmail(contactId: string, email: string, name: string): Promise<{ message: string }> {
+  const portalUrl = `${window.location.origin}/login`;
+
+  const res = await fetch('/api/send-invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contactId, email, name, portalUrl }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+    throw new Error(body.message || `Failed to send invitation (${res.status})`);
+  }
+
+  const json = await res.json() as { message?: string };
+  return { message: json.message || `Invitation sent to ${email}` };
+}
+
+/**
+ * @deprecated Use sendInviteEmail instead — sends email directly from the app.
+ * Kept for backward compatibility.
+ */
+export async function sendPortalInvitation(contactId: string, email?: string, name?: string): Promise<PortalInviteResult> {
+  if (email) {
+    const result = await sendInviteEmail(contactId, email, name || email);
+    return { message: result.message, wasReinvite: false };
+  }
+
   const token = loadToken();
   if (!token) throw new Error('Not connected to Zoho. Please sign in first.');
 
-  // 1. Fetch portal config
   const portals = await fetchPortals();
   const activePortal = portals.find(p => p.active) ?? portals[0];
-  if (!activePortal) {
-    throw new Error('No portal configured in your Zoho CRM. Please set up a portal first.');
-  }
+  if (!activePortal) throw new Error('No portal configured in your Zoho CRM.');
 
-  // 2. Fetch user types for this portal
   const userTypes = await fetchPortalUserTypes(activePortal.name);
   const activeUserType = userTypes.find(ut => ut.active) ?? userTypes[0];
-  if (!activeUserType) {
-    throw new Error('No user type configured for this portal. Please set up a user type in your portal settings.');
-  }
+  if (!activeUserType) throw new Error('No user type configured for this portal.');
 
-  console.log('[Portal] Sending invite with portal:', activePortal.name, 'user_type:', activeUserType.id, activeUserType.name);
-
-  // 3. Try without 'type' first, then 'invite', then 'reinvite'
-  for (const type of [null, 'invite', 'reinvite'] as const) {
-    const qsParams: Record<string, string> = {
-      user_type_id: activeUserType.id,
-      language: 'en_US',
-    };
-    if (type) qsParams.type = type;
-
-    // Build the full CRM API path with query string
-    const invitePath = `/crm/v2/${MODULE}/${contactId}/actions/portal_invite`;
-    const fullPath = `${invitePath}?${new URLSearchParams(qsParams).toString()}`;
-
-    const url = crmUrl(fullPath);
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: crmHeaders(),
-    });
-
+  for (const type of ['invite', 'reinvite'] as const) {
+    const qs = new URLSearchParams({ user_type_id: activeUserType.id, language: 'en_US', type });
+    const invitePath = `/crm/v2/${MODULE}/${contactId}/actions/portal_invite?${qs}`;
+    const url = crmUrl(invitePath);
+    const res = await fetch(url, { method: 'POST', headers: crmHeaders() });
     const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+    if (res.ok) {
+      return { message: `Portal invitation sent successfully`, wasReinvite: type === 'reinvite' };
+    }
     console.log(`[Portal] type=${type}:`, res.status, JSON.stringify(json));
-
-    // Parse response
-    const inviteResult = (json as { portal_invite?: Array<{ message?: string; code?: string; status?: string }> }).portal_invite;
-    const topMessage = (json as { message?: string }).message ?? '';
-    const resultEntry = inviteResult?.[0];
-    const resultMessage = resultEntry?.message ?? topMessage;
-    const resultCode = resultEntry?.code ?? (json as { code?: string }).code ?? '';
-
-    // If param missing or invalid type, try next variant
-    if (type !== 'reinvite' && !res.ok) {
-      const msg = resultMessage.toLowerCase();
-      if (msg.includes('invalid type') || msg.includes('required') || msg.includes('param')) {
-        console.log(`[Portal] type=${type ?? 'none'} failed, trying next variant...`);
-        continue;
-      }
-    }
-
-    // If reinvite gets INTERNAL_ERROR, still report as success (user was already invited)
-    if (type === 'reinvite' && resultCode === 'INTERNAL_ERROR') {
-      return {
-        message: 'User was already invited to the portal. They can log in with their portal credentials.',
-        wasReinvite: true,
-      };
-    }
-
-    if (!res.ok || resultEntry?.status === 'error' || (resultCode && resultCode !== 'SUCCESS')) {
-      throw new Error(resultMessage || `Failed to send invitation (HTTP ${res.status})`);
-    }
-
-    return {
-      message: resultMessage || (type === 'reinvite' ? 'Portal re-invitation sent successfully' : 'Portal invitation sent successfully'),
-      wasReinvite: type === 'reinvite',
-    };
   }
-
   throw new Error('Failed to send portal invitation');
 }
