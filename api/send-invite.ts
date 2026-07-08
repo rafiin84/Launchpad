@@ -235,6 +235,7 @@ async function sendPortalInvite(token: string, contactId: string): Promise<void>
   }
 
   // 3. Send portal invite (try invite, then reinvite)
+  let lastError = '';
   for (const type of ['invite', 'reinvite'] as const) {
     const qs = new URLSearchParams({ user_type_id: userType.id, language: 'en_US', type });
     const res = await fetch(
@@ -245,10 +246,19 @@ async function sendPortalInvite(token: string, contactId: string): Promise<void>
       },
     );
     const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-    console.log(`[send-invite] Portal ${type}:`, JSON.stringify(json));
+    console.log(`[send-invite] Portal ${type}:`, res.status, JSON.stringify(json));
 
-    if (res.ok) return;
+    const inviteArr = (json as { portal_invite?: Array<{ code?: string; message?: string }> }).portal_invite;
+    const code = inviteArr?.[0]?.code || '';
+
+    if (res.ok && code !== 'FAILURE') return;
+
+    // Already invited counts as success
+    if (code === 'INTERNAL_ERROR' || code === 'DUPLICATE_DATA') return;
+
+    lastError = inviteArr?.[0]?.message || `HTTP ${res.status}`;
   }
+  throw new Error(`Portal invite failed: ${lastError}`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -272,18 +282,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const token = await getAdminToken();
+    const appUrl = portalUrl || 'https://launchpad-iota-ten.vercel.app';
 
-    // 1. Send the invitation email directly
-    await sendCRMEmail(token, contactId, email, name || email, portalUrl || 'https://launchpad-gilt.vercel.app');
+    // 1. Send portal invite (primary — this sends Zoho's invitation email AND creates portal user)
+    let portalInviteSent = false;
+    try {
+      await sendPortalInvite(token, contactId);
+      portalInviteSent = true;
+      console.log('[send-invite] Portal invite sent successfully');
+    } catch (err) {
+      console.warn('[send-invite] Portal invite failed:', err);
+    }
 
-    // 2. Also add them as a portal user (so they can authenticate)
-    await sendPortalInvite(token, contactId).catch(err => {
-      console.warn('[send-invite] Portal invite failed (non-critical):', err);
-    });
+    // 2. Also try sending a custom branded email (bonus — not critical)
+    let customEmailSent = false;
+    try {
+      await sendCRMEmail(token, contactId, email, name || email, appUrl);
+      customEmailSent = true;
+      console.log('[send-invite] Custom email also sent');
+    } catch (err) {
+      console.warn('[send-invite] Custom email failed (non-critical):', err);
+    }
+
+    if (!portalInviteSent && !customEmailSent) {
+      return res.status(500).json({
+        error: 'Failed to send invitation',
+        message: 'Both portal invite and email delivery failed. Check Zoho CRM email integration.',
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: `Invitation email sent to ${email}`,
+      message: portalInviteSent
+        ? `Portal invitation sent to ${email}`
+        : `Invitation email sent to ${email}`,
     });
   } catch (err) {
     console.error('[send-invite] Error:', err);

@@ -45,6 +45,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const [inviteStatus, setInviteStatus] = useState('');
 
   const set = (key: keyof CRMFounderFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -53,17 +54,21 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
 
   async function handleSave() {
     if (!canSave || saving) return;
-    setSaving(true); setError('');
+    setSaving(true); setError(''); setInviteStatus('');
     try {
+      setInviteStatus('Creating contact...');
       const id = await createCRMFounder(form);
       const displayName = [form.firstName, form.lastName].filter(Boolean).join(' ') || 'User';
 
       // Send invitation email directly to the applicant
       if (form.email) {
+        setInviteStatus('Sending invitation...');
         try {
-          await sendInviteEmail(id, form.email, displayName);
+          const result = await sendInviteEmail(id, form.email, displayName);
+          setInviteStatus(result.message);
         } catch (err) {
           console.warn('[Invite] Email send failed:', err);
+          setInviteStatus('Contact created but invitation email failed. You can reinvite later.');
         }
       }
 
@@ -86,9 +91,13 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         description:    form.description || '',
         createdTime:    new Date().toISOString(),
       });
+
+      // Brief delay so user sees status before modal closes
+      await new Promise(r => setTimeout(r, 1000));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add founder');
+      setInviteStatus('');
     } finally { setSaving(false); }
   }
 
@@ -210,6 +219,13 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             />
           </Field>
         </div>
+
+        {/* Status */}
+        {inviteStatus && !error && (
+          <div className="flex items-center gap-2 mt-3 text-sm text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">
+            <RefreshCw size={14} className={saving ? 'animate-spin' : ''} /> {inviteStatus}
+          </div>
+        )}
 
         {/* Error */}
         {error && (
