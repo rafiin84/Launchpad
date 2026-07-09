@@ -18,6 +18,7 @@ import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
 import { fetchCRMPortfolio } from '../services/crmPortfolio';
 import { fetchCRMDeals } from '../services/crmDeals';
+import { addNotification } from '../services/notifications';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
 
@@ -197,6 +198,18 @@ function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) =
         imageData:    imageMode === 'upload' ? imageData : '',
       };
       const activity = await postSharedActivity(fields);
+
+      const targetRole = isInvestor ? 'founder' : 'investor';
+      addNotification({
+        type: 'activity_post',
+        title: `New Activity: ${title.trim()}`,
+        message: `${currentUser.name} posted a new ${activityType} activity${companyName.trim() ? ` for ${companyName.trim()}` : ''}.`,
+        actor: currentUser.name,
+        actorRole: isInvestor ? 'investor' : 'founder',
+        targetRole,
+        link: `/activities/${activity.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
 
       onPost(activity);
       if (!activity.synced) {
