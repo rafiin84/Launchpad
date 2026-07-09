@@ -7,6 +7,7 @@ import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
   clearCachedProfile, clearModuleStatusCache,
+  serverGetCoverImage,
   type AppUser,
 } from '../services/crmAppUsers';
 import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
@@ -128,9 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentEmail]);
 
   // Fetch photo from appusers record image API
-  const fetchAvatarFromAppUsers = useCallback(async (recordId: string) => {
+  const fetchAvatarFromAppUsers = useCallback(async (recordId: string, email?: string) => {
     try {
-      const dataUrl = await fetchAppUserPhoto(recordId);
+      const dataUrl = await fetchAppUserPhoto(recordId, email);
       if (dataUrl) {
         setAvatarUrl(dataUrl);
         try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* ok */ }
@@ -255,7 +256,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUserName(found.name);
                 saveUserName(found.name);
               }
-              await fetchAvatarFromAppUsers(found.id);
+              await fetchAvatarFromAppUsers(found.id, emailForLookup);
+            }
+          } catch { /* ok */ }
+        }
+
+        // Load cover image from CRM for portal users
+        if (emailForLookup) {
+          try {
+            const cover = await serverGetCoverImage(emailForLookup);
+            if (cover) {
+              setCoverImageState(cover);
+              try { localStorage.setItem(COVER_CACHE_KEY, cover); } catch { /* ok */ }
             }
           } catch { /* ok */ }
         }
@@ -309,6 +321,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Try to load appUser profile and photo from appusers module
       if (user.email) {
+        // Load cover image from CRM
+        try {
+          const cover = await serverGetCoverImage(user.email);
+          if (cover) {
+            setCoverImageState(cover);
+            try { localStorage.setItem(COVER_CACHE_KEY, cover); } catch { /* ok */ }
+          }
+        } catch { /* ok */ }
+
         try {
           const found = await findAppUserByEmail(user.email);
           if (found) {
@@ -389,11 +410,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggedIn(false);
   }
 
-  /** Save cover image as data URL */
+  /** Save cover image as data URL (localStorage + CRM sync) */
   const setCoverImage = useCallback((dataUrl: string) => {
     setCoverImageState(dataUrl);
     try { localStorage.setItem(COVER_CACHE_KEY, dataUrl); } catch { /* ok */ }
-  }, []);
+    const email = zohoEmail || portalSession?.email || '';
+    if (email) {
+      serverSaveCoverImage(email, dataUrl).catch(() => {});
+    }
+  }, [zohoEmail, portalSession?.email]);
 
   /** Set avatar directly from a data URL (local fallback) */
   const setProfileImage = useCallback((dataUrl: string) => {
@@ -404,10 +429,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Re-fetch avatar from appusers (call after uploading a new photo) */
   const refreshAvatar = useCallback(() => {
     const rid = appUserRecordId || loadCachedRecordId();
+    const email = zohoEmail || portalSession?.email || '';
     if (rid) {
-      fetchAvatarFromAppUsers(rid);
+      fetchAvatarFromAppUsers(rid, email || undefined);
     }
-  }, [appUserRecordId, fetchAvatarFromAppUsers]);
+  }, [appUserRecordId, fetchAvatarFromAppUsers, zohoEmail, portalSession?.email]);
 
   /** Force-reload appUser data from CRM */
   const refreshAppUser = useCallback(async () => {

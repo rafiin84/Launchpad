@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
-import { updateAppUser, uploadAppUserPhoto, loadCachedProfile, cacheProfileLocally } from '../services/crmAppUsers';
-import { saveUserName } from '../services/oauth';
+import { updateAppUser, uploadAppUserPhoto, loadCachedProfile, cacheProfileLocally, serverSaveCoverImage } from '../services/crmAppUsers';
+import { saveUserName, loadRole, loadToken } from '../services/oauth';
 import { addNotification } from '../services/notifications';
 
 interface ProfileForm {
@@ -39,8 +39,10 @@ function loadInitialForm(currentUserName: string, appUserData: Record<string, un
 }
 
 export default function EditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession } = useAuth();
   const navigate = useNavigate();
+  const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
+  const isPortal = loadRole() === 'founder' && !loadToken();
 
   const [form, setForm] = useState<ProfileForm>(() =>
     loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null)
@@ -143,18 +145,19 @@ export default function EditProfile() {
       } catch { /* ok */ }
 
       let crmSuccess = true;
+      const canUseCrm = appUserRecordId || (isPortal && userEmail);
 
       // Sync to appusers CRM module if available
-      if (appUserRecordId) {
+      if (canUseCrm) {
         try {
-          const updated = await updateAppUser(appUserRecordId, {
+          const updated = await updateAppUser(appUserRecordId || '', {
             name: form.name.trim(),
             bio: form.bio,
             location: form.location,
             linkedIn: form.linkedIn,
             twitter: form.twitter,
             expertise: form.expertise,
-          });
+          }, userEmail);
           if (!updated) crmSuccess = false;
         } catch {
           crmSuccess = false;
@@ -164,11 +167,10 @@ export default function EditProfile() {
         if (photoFile) {
           setUploadingPhoto(true);
           try {
-            const uploaded = await uploadAppUserPhoto(appUserRecordId, photoFile, photoFile.name || 'photo.jpg');
+            const uploaded = await uploadAppUserPhoto(appUserRecordId || '', photoFile, photoFile.name || 'photo.jpg', userEmail);
             if (uploaded) {
-              refreshAvatar(); // re-fetch avatar from appusers
+              refreshAvatar();
             } else {
-              // CRM upload failed — save locally as fallback
               if (photoDataUrl) setProfileImage(photoDataUrl);
               crmSuccess = false;
             }
@@ -181,30 +183,36 @@ export default function EditProfile() {
         }
       } else {
         crmSuccess = false;
-        // No CRM record — save photo locally if selected
         if (photoFile && photoDataUrl) {
           setProfileImage(photoDataUrl);
         }
       }
 
-      // Save cover image (localStorage-based)
+      // Save cover image to CRM and localStorage
       if (coverFile && coverPreview) {
         setCoverImage(coverPreview);
+        if (userEmail) {
+          try { await serverSaveCoverImage(userEmail, coverPreview); } catch { /* ok */ }
+        }
       } else if (!coverPreview && coverImage) {
-        // User removed the cover image
         setCoverImage('');
+        if (userEmail) {
+          try { await serverSaveCoverImage(userEmail, ''); } catch { /* ok */ }
+        }
       }
 
       setSaveResult(crmSuccess ? 'success' : 'partial');
 
       // Notify about profile update
+      const myRole = isPortal ? 'founder' : 'investor';
+      const otherRole = isPortal ? 'investor' : 'founder';
       addNotification({
         type: 'profile_update',
         title: 'Profile Updated',
         message: `${form.name.trim() || 'User'} updated their profile.`,
         actor: form.name.trim() || 'User',
-        actorRole: 'investor',
-        targetRole: 'founder',
+        actorRole: myRole,
+        targetRole: otherRole,
         link: '/profile',
       });
       window.dispatchEvent(new Event('notifications-updated'));

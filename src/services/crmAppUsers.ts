@@ -16,7 +16,7 @@ import {
   zohoUploadRecordPhoto, zohoGetRecordPhoto,
   type ZohoRecord,
 } from './zohoApi';
-import { loadToken } from './oauth';
+import { loadToken, loadRole } from './oauth';
 
 const isDev = import.meta.env.DEV;
 
@@ -233,6 +233,18 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
   // Always cache locally as backup
   cacheProfileLocally(fields);
 
+  // Portal users: use server API
+  if (isPortalUser()) {
+    try {
+      const ok = await serverUpdateProfile(fields.email, fields);
+      if (ok) {
+        const result = await serverGetProfile(fields.email);
+        if (result.recordId) { cacheRecordId(result.recordId); return result.recordId; }
+      }
+    } catch (err) { console.warn('[AppUsers] Server sync failed:', err); }
+    return null;
+  }
+
   const available = await isModuleAvailable();
   if (!available) {
     console.warn('[AppUsers] Module "appusers" not found in CRM — skipping sync. Profile saved locally.');
@@ -255,6 +267,19 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
  * Returns null if not found or module unavailable.
  */
 export async function findAppUserByEmail(email: string): Promise<AppUser | null> {
+  // Portal users: use server API
+  if (isPortalUser()) {
+    try {
+      const result = await serverGetProfile(email);
+      if (result.profile) {
+        cacheRecordId(result.recordId || result.profile.id);
+        cacheProfileLocally(result.profile);
+        return result.profile;
+      }
+    } catch { /* fallback */ }
+    return null;
+  }
+
   const available = await isModuleAvailable();
   if (!available) return null;
 
@@ -263,25 +288,12 @@ export async function findAppUserByEmail(email: string): Promise<AppUser | null>
     if (records.length === 0) return null;
     const user = fromRecord(records[0]);
     cacheRecordId(user.id);
-
-    // Also update the local profile cache with CRM data
     cacheProfileLocally({
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      mobile: user.mobile,
-      role: user.role,
-      bio: user.bio,
-      location: user.location,
-      linkedIn: user.linkedIn,
-      twitter: user.twitter,
-      expertise: user.expertise,
-      zohoUserId: user.zohoUserId,
-      jobTitle: user.jobTitle,
-      state: user.state,
-      country: user.country,
+      name: user.name, email: user.email, phone: user.phone, mobile: user.mobile,
+      role: user.role, bio: user.bio, location: user.location, linkedIn: user.linkedIn,
+      twitter: user.twitter, expertise: user.expertise, zohoUserId: user.zohoUserId,
+      jobTitle: user.jobTitle, state: user.state, country: user.country,
     });
-
     return user;
   } catch {
     return null;
@@ -293,9 +305,19 @@ export async function findAppUserByEmail(email: string): Promise<AppUser | null>
  * Also updates local cache as fallback.
  * Returns true if CRM update succeeded, false otherwise.
  */
-export async function updateAppUser(recordId: string, fields: Partial<AppUserFields>): Promise<boolean> {
+export async function updateAppUser(recordId: string, fields: Partial<AppUserFields>, email?: string): Promise<boolean> {
   // Always update local cache
   cacheProfileLocally(fields);
+
+  // Portal users: use server API
+  if (isPortalUser() && email) {
+    try {
+      return await serverUpdateProfile(email, fields);
+    } catch (err) {
+      console.warn('[AppUsers] Server update failed:', err);
+      return false;
+    }
+  }
 
   const available = await isModuleAvailable();
   if (!available) {
@@ -318,7 +340,21 @@ export async function updateAppUser(recordId: string, fields: Partial<AppUserFie
  * Accepts a File or Blob.
  * Returns true if upload succeeded, false otherwise.
  */
-export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<boolean> {
+export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName = 'photo.jpg', email?: string): Promise<boolean> {
+  // Portal users: convert to base64 and upload via server
+  if (isPortalUser() && email) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const mime = file.type || 'image/jpeg';
+      const dataUrl = `data:${mime};base64,${base64}`;
+      return await serverUploadPhoto(email, dataUrl);
+    } catch (err) {
+      console.warn('[AppUsers] Server photo upload failed:', err);
+      return false;
+    }
+  }
+
   const available = await isModuleAvailable();
   if (!available) {
     console.warn('[AppUsers] Module unavailable — cannot upload photo.');
@@ -338,11 +374,85 @@ export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName 
  * Fetch the appusers record's photo as a data: URL.
  * Returns null if no photo is set or module unavailable.
  */
-export async function fetchAppUserPhoto(recordId: string): Promise<string | null> {
+export async function fetchAppUserPhoto(recordId: string, email?: string): Promise<string | null> {
+  // Portal users: use server API
+  if (isPortalUser() && email) {
+    try {
+      return await serverGetPhoto(email);
+    } catch { return null; }
+  }
+
   const available = await isModuleAvailable();
   if (!available) return null;
 
   return zohoGetRecordPhoto(MODULE, recordId);
+}
+
+// ─── Server API fallback (for portal users without direct CRM token) ────────
+
+async function serverGetProfile(email: string): Promise<{ profile: AppUser | null; recordId: string | null }> {
+  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+  if (!res.ok) return { profile: null, recordId: null };
+  const json = await res.json() as { profile?: Record<string, unknown> | null; recordId?: string };
+  if (!json.profile) return { profile: null, recordId: null };
+  const p = json.profile;
+  const s = (k: string) => (p[k] == null ? '' : String(p[k]));
+  const expertiseRaw = s('expertise');
+  const user: AppUser = {
+    id: s('id'), name: s('name'), email: s('email'), phone: s('phone') || '',
+    mobile: s('mobile') || '', role: s('role'), bio: s('bio'), location: s('location'),
+    linkedIn: s('linkedIn'), twitter: s('twitter'),
+    expertise: expertiseRaw ? expertiseRaw.split(',').map((x: string) => x.trim()).filter(Boolean) : [],
+    zohoUserId: s('zohoUserId'), jobTitle: s('jobTitle'), state: s('state'), country: s('country'),
+  };
+  return { profile: user, recordId: json.recordId || user.id };
+}
+
+async function serverUpdateProfile(email: string, fields: Partial<AppUserFields>): Promise<boolean> {
+  const payload: Record<string, unknown> = { ...fields };
+  if (fields.expertise) payload.expertise = fields.expertise.join(', ');
+  const res = await fetch('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, fields: payload }),
+  });
+  return res.ok;
+}
+
+async function serverUploadPhoto(email: string, dataUrl: string): Promise<boolean> {
+  const res = await fetch('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, type: 'photo', data: dataUrl }),
+  });
+  return res.ok;
+}
+
+async function serverGetPhoto(email: string): Promise<string | null> {
+  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}&photo=1`);
+  if (!res.ok) return null;
+  const json = await res.json() as { photo?: string | null };
+  return json.photo || null;
+}
+
+export async function serverGetCoverImage(email: string): Promise<string | null> {
+  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
+  if (!res.ok) return null;
+  const json = await res.json() as { profile?: { coverImage?: string } | null };
+  return json.profile?.coverImage || null;
+}
+
+export async function serverSaveCoverImage(email: string, dataUrl: string): Promise<boolean> {
+  const res = await fetch('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, type: 'cover', data: dataUrl }),
+  });
+  return res.ok;
+}
+
+function isPortalUser(): boolean {
+  return loadRole() === 'founder' && !loadToken();
 }
 
 /**
