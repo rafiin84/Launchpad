@@ -120,7 +120,7 @@ export default function FounderCompany() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saveResult, setSaveResult] = useState<'success' | 'partial' | 'error' | null>(null);
-  const [allProfiles, setAllProfiles] = useState<Array<{ email: string; data: CompanyData }>>([]);
+  const [allProfiles, setAllProfiles] = useState<Array<{ email: string; data: CompanyData; logo: string | null }>>([]);
   const [selectedProfile, setSelectedProfile] = useState(0);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
