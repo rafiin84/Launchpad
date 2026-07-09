@@ -96,6 +96,7 @@ export default function EditActivity() {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
   const [authorRole, setAuthorRole] = useState('');
+  const [visibility, setVisibility] = useState('public');
   const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [compressing, setCompressing] = useState(false);
   const [isDragging, setIsDragging]   = useState(false);
@@ -117,6 +118,7 @@ export default function EditActivity() {
       });
       if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
       setAuthorRole(activity.authorRole || '');
+      setVisibility(activity.visibility || 'public');
       setLoading(false);
     };
     if (id.startsWith('local_')) {
@@ -175,6 +177,7 @@ export default function EditActivity() {
         tags:         form.tags.trim(),
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',
+        visibility,
       };
       if (id!.startsWith('local_')) {
         const STORAGE_KEY = 'lp_shared_activities';

@@ -12,7 +12,7 @@ import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
-import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities } from '../services/sharedActivities';
+import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
@@ -106,7 +106,7 @@ function compressImage(file: File): Promise<string> {
 
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
-function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void }) {
+function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -196,6 +196,7 @@ function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) =
         tags:         '',
         imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? imageData : '',
+        visibility:   postVisibility,
       };
       const activity = await postSharedActivity(fields);
 
@@ -536,9 +537,11 @@ export default function Activities() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [syncWarning, setSyncWarning] = useState('');
+  const [mySharePublic, setMySharePublic] = useState(false);
   const isConnected = !!loadToken();
   const canFetch = isConnected || isFounder;
-  const viewerRole = isInvestor ? 'investor' : 'founder';
+
+  const postVisibility = isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only');
 
   const load = () => {
     if (!canFetch) { setLoading(false); return; }
@@ -555,6 +558,14 @@ export default function Activities() {
       syncUnsyncedActivities().then(count => {
         if (count > 0) load();
       }).catch(() => {});
+    }
+    if (isFounder && currentUser.email) {
+      fetchActivityPermissions()
+        .then(perms => {
+          const me = perms.find(p => p.email.toLowerCase() === currentUser.email.toLowerCase());
+          if (me?.shareActivitiesPublic) setMySharePublic(true);
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -668,7 +679,7 @@ export default function Activities() {
       )}
 
       {/* Composer */}
-      <Composer onPost={handlePost} onSyncWarning={setSyncWarning} />
+      <Composer onPost={handlePost} onSyncWarning={setSyncWarning} postVisibility={postVisibility} />
 
       {/* Empty */}
       {!loading && !error && records.length === 0 && canFetch && (

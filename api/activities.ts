@@ -7,8 +7,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * 1. Admin token (env vars) → zohoapis.in — guaranteed for all users
  * 2. Client's portal token → zcrmportals.in (server-side, bypasses CORS)
  *
- * GET  /api/activities  → { activities: Activity[] }
- * POST /api/activities  → { activity: Activity }
+ * GET  /api/activities                          → { activities: Activity[] }
+ * POST /api/activities                          → { activity: Activity }
+ * PUT  /api/activities?action=getPermissions     → { permissions: ContactPermission[] }
+ * PUT  /api/activities?action=setPermission      → { success: true }
  */
 
 const ZOHO_ACCOUNTS_URL = 'https://accounts.zoho.in';
@@ -27,9 +29,12 @@ const FIELD_MAP: Record<string, string> = {
   tags:         'Activity_Tags',
   imageUrl:     'Image_URL',
   imageData:    'Activity_Image_Data',
+  visibility:   'Visibility',
 };
 
 const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',Created_Time';
+
+const CONTACTS_MODULE = 'Contacts';
 
 interface Activity {
   id: string;
@@ -42,6 +47,7 @@ interface Activity {
   tags: string;
   imageUrl: string;
   imageData: string;
+  visibility: string;
   createdTime: string;
 }
 
@@ -62,8 +68,16 @@ function fromRecord(r: Record<string, unknown>): Activity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
+    visibility:   str(FIELD_MAP.visibility) || 'public',
     createdTime:  str('Created_Time'),
   };
+}
+
+interface ContactPermission {
+  id: string;
+  name: string;
+  email: string;
+  shareActivitiesPublic: boolean;
 }
 
 // ─── Admin token (env vars) ─────────────────────────────────────────────────
@@ -137,11 +151,43 @@ async function crmPost(base: string, token: string, payload: Record<string, unkn
   return record.details.id;
 }
 
+// ─── Contact permissions helpers ────────────────────────────────────────────
+
+async function fetchContactPermissions(token: string): Promise<ContactPermission[]> {
+  const fields = 'Full_Name,Email,Share_Activities_Public';
+  const url = `${ZOHO_API_BASE}/crm/v2/${CONTACTS_MODULE}?per_page=200&fields=${fields}`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  if (res.status === 204) return [];
+  if (!res.ok) throw new Error(`Contacts GET ${res.status}`);
+  const json = await res.json() as { data?: Array<Record<string, unknown>> };
+  return (json.data || []).map(r => ({
+    id: String(r.id || ''),
+    name: String(r.Full_Name || ''),
+    email: String(r.Email || ''),
+    shareActivitiesPublic: r.Share_Activities_Public === true,
+  }));
+}
+
+async function updateContactPermission(token: string, contactId: string, share: boolean): Promise<void> {
+  const url = `${ZOHO_API_BASE}/crm/v2/${CONTACTS_MODULE}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Zoho-oauthtoken ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data: [{ id: contactId, Share_Activities_Public: share }] }),
+  });
+  if (!res.ok) throw new Error(`Contacts PUT ${res.status}: ${await res.text()}`);
+}
+
 // ─── Handler ────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -239,6 +285,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(500).json({ error: 'All CRM strategies failed' });
+    }
+
+    if (req.method === 'PUT') {
+      const action = req.query.action as string;
+      const adminToken = await getAdminToken().catch(() => null);
+      if (!adminToken) {
+        return res.status(500).json({ error: 'Admin token unavailable' });
+      }
+
+      if (action === 'getPermissions') {
+        const permissions = await fetchContactPermissions(adminToken);
+        return res.status(200).json({ permissions });
+      }
+
+      if (action === 'setPermission') {
+        const { contactId, share } = req.body as { contactId: string; share: boolean };
+        if (!contactId || typeof share !== 'boolean') {
+          return res.status(400).json({ error: 'contactId and share (boolean) required' });
+        }
+        await updateContactPermission(adminToken, contactId, share);
+        return res.status(200).json({ success: true });
+      }
+
+      return res.status(400).json({ error: 'Unknown action' });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Image, X, Tag, Building2, User, Send, Upload,
@@ -7,7 +7,7 @@ import { Input, Textarea } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
 import { type CRMActivityFields } from '../services/crmActivities';
-import { postSharedActivity } from '../services/sharedActivities';
+import { postSharedActivity, fetchActivityPermissions } from '../services/sharedActivities';
 import { cn } from '../lib/cn';
 
 // ─── Activity types (must match CRM picklist exact values) ────────────────────
@@ -114,7 +114,7 @@ function validate(f: FormState): Record<string, string> {
 
 export default function AddActivity() {
   const navigate = useNavigate();
-  const { currentUser, founderCompanyName, isInvestor } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor, isFounder } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>(empty(currentUser.name, founderCompanyName));
@@ -124,6 +124,18 @@ export default function AddActivity() {
   const [isDragging, setIsDragging] = useState(false);
   const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [compressing, setCompressing] = useState(false);
+  const [mySharePublic, setMySharePublic] = useState(false);
+
+  useEffect(() => {
+    if (isFounder && currentUser.email) {
+      fetchActivityPermissions()
+        .then(perms => {
+          const me = perms.find(p => p.email.toLowerCase() === currentUser.email.toLowerCase());
+          if (me?.shareActivitiesPublic) setMySharePublic(true);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -184,6 +196,7 @@ export default function AddActivity() {
         tags:         form.tags.trim(),
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',
+        visibility:   isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only'),
       };
       const result = await postSharedActivity(fields);
       if (!result.synced) {

@@ -2,13 +2,15 @@
  * sharedActivities.ts
  *
  * Shared activity feed with role-based visibility:
- * - Investor sees ALL activities (own + all founder posts)
- * - Founder sees own posts + all investor posts (NOT other founders' posts)
+ * - Investor sees ALL activities
+ * - Portal user sees: own posts + investor posts (public) + other portal users'
+ *   posts only if those users have Share_Activities_Public enabled
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
 import { loadToken } from './oauth';
+import { loadRole, loadUserName } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -29,6 +31,7 @@ function fromApiRecord(r: Record<string, unknown>): CRMActivity {
     tags:         str('tags'),
     imageUrl:     str('imageUrl'),
     imageData:    str('imageData'),
+    visibility:   str('visibility') || 'public',
     createdTime:  str('createdTime'),
   };
 }
@@ -52,7 +55,26 @@ function generateLocalId(): string {
 }
 
 function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
-  return activities.filter(a => a.activityType?.toLowerCase() !== 'notification');
+  const role = loadRole();
+  const isInvestor = role === 'investor';
+  const myName = (loadUserName() || '').trim().toLowerCase();
+
+  return activities.filter(a => {
+    if (a.activityType?.toLowerCase() === 'notification') return false;
+
+    // Investor sees everything
+    if (isInvestor) return true;
+
+    // Portal user sees:
+    // 1. Their own posts (always)
+    // 2. Investor posts (always visible to portal users)
+    // 3. Other portal user posts ONLY if visibility is 'public'
+    if (a.authorRole?.toLowerCase() === 'investor') return true;
+    if (myName && a.authorName?.trim().toLowerCase() === myName) return true;
+    if (a.visibility === 'public') return true;
+
+    return false;
+  });
 }
 
 async function fetchViaApi(): Promise<CRMActivity[]> {
@@ -170,6 +192,7 @@ export async function syncUnsyncedActivities(): Promise<number> {
       content: activity.content, companyName: activity.companyName,
       authorName: activity.authorName, authorRole: activity.authorRole,
       tags: activity.tags, imageUrl: activity.imageUrl, imageData: activity.imageData,
+      visibility: activity.visibility,
     };
 
     let newId: string | null = null;
@@ -187,4 +210,40 @@ export async function syncUnsyncedActivities(): Promise<number> {
   if (synced > 0) saveLocal(local);
   console.log(`[Activities] Synced ${synced}/${unsynced.length} local activities`);
   return synced;
+}
+
+// ─── Activity sharing permissions ────────────────────────────────────────────
+
+export interface ActivityPermission {
+  id: string;
+  name: string;
+  email: string;
+  shareActivitiesPublic: boolean;
+}
+
+export async function fetchActivityPermissions(): Promise<ActivityPermission[]> {
+  const token = loadToken();
+  const res = await fetch('/api/activities?action=getPermissions', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
+    },
+  });
+  if (!res.ok) throw new Error(`GET permissions ${res.status}`);
+  const json = await res.json() as { permissions: ActivityPermission[] };
+  return json.permissions;
+}
+
+export async function setActivityPermission(contactId: string, share: boolean): Promise<void> {
+  const token = loadToken();
+  const res = await fetch('/api/activities?action=setPermission', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
+    },
+    body: JSON.stringify({ contactId, share }),
+  });
+  if (!res.ok) throw new Error(`SET permission ${res.status}`);
 }

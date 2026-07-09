@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
-import { Lock, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Check, Loader2, Activity } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
+import {
+  fetchActivityPermissions,
+  setActivityPermission,
+  type ActivityPermission,
+} from '../services/sharedActivities';
 
 function SettingsSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -50,8 +55,80 @@ function ToggleRow({
   );
 }
 
+function ActivitySettings() {
+  const [permissions, setPermissions] = useState<ActivityPermission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchActivityPermissions()
+      .then(p => setPermissions(p.filter(c => c.email)))
+      .catch(err => console.error('[ActivitySettings] Failed:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleToggle(contact: ActivityPermission) {
+    setToggling(contact.id);
+    const newVal = !contact.shareActivitiesPublic;
+    try {
+      await setActivityPermission(contact.id, newVal);
+      setPermissions(prev =>
+        prev.map(p => p.id === contact.id ? { ...p, shareActivitiesPublic: newVal } : p)
+      );
+    } catch (err) {
+      console.error('[ActivitySettings] Toggle failed:', err);
+    } finally {
+      setToggling(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <Loader2 size={18} className="animate-spin text-gray-400" />
+        <span className="ml-2 text-sm text-gray-500">Loading portal users...</span>
+      </div>
+    );
+  }
+
+  if (permissions.length === 0) {
+    return (
+      <p className="text-xs text-gray-400 py-3">No portal users found.</p>
+    );
+  }
+
+  return (
+    <div>
+      {permissions.map(contact => (
+        <div key={contact.id} className="flex items-start justify-between py-3 border-b border-gray-50 last:border-0">
+          <div className="flex-1 pr-4">
+            <p className="text-sm text-gray-900">{contact.name || contact.email}</p>
+            {contact.name && <p className="text-xs text-gray-500 mt-0.5">{contact.email}</p>}
+          </div>
+          <button
+            onClick={() => handleToggle(contact)}
+            disabled={toggling === contact.id}
+            className={cn(
+              'w-10 h-6 rounded-full transition-all flex-shrink-0 relative',
+              contact.shareActivitiesPublic ? 'bg-black' : 'bg-gray-200',
+              toggling === contact.id && 'opacity-50'
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all',
+                contact.shareActivitiesPublic ? 'left-5' : 'left-1'
+              )}
+            />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Settings() {
-  const { currentUser } = useAuth();
+  const { currentUser, isInvestor } = useAuth();
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -96,6 +173,16 @@ export default function Settings() {
         <ToggleRow label="New knowledge articles" description="Weekly digest of top articles" />
         <ToggleRow label="Email notifications" defaultOn />
       </SettingsSection>
+
+      {/* Activity Settings — Investor only */}
+      {isInvestor && (
+        <SettingsSection
+          title="Activity Settings"
+          description="Allow selected portal users to share their activity posts with everyone. When enabled, a portal user's posts will be visible to all other portal users."
+        >
+          <ActivitySettings />
+        </SettingsSection>
+      )}
 
       {/* Privacy */}
       <SettingsSection title="Privacy" description="Control what others can see">

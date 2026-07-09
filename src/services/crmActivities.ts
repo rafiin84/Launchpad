@@ -10,8 +10,9 @@ const FIELD_MAP: Record<string, string> = {
   authorName:      'Author_Name',
   authorRole:      'Author_Role',
   tags:            'Activity_Tags',
-  imageUrl:        'Image_URL',        // website field — stores public URLs only
-  imageData:       'Activity_Image_Data', // large textarea — stores compressed base64
+  imageUrl:        'Image_URL',
+  imageData:       'Activity_Image_Data',
+  visibility:      'Visibility',
 };
 
 export interface CRMActivity {
@@ -23,9 +24,10 @@ export interface CRMActivity {
   authorName: string;
   authorRole: string;
   tags: string;
-  imageUrl: string;   // public URL (from URL mode)
-  imageData: string;  // compressed base64 (from file upload)
-  createdTime: string; // ISO timestamp from CRM
+  imageUrl: string;
+  imageData: string;
+  visibility: string;
+  createdTime: string;
 }
 
 export type CRMActivityFields = Omit<CRMActivity, 'id' | 'createdTime'>;
@@ -47,12 +49,13 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
+    visibility:   str(FIELD_MAP.visibility) || 'public',
     createdTime:  str('Created_Time'),
   };
 }
 
 // Explicitly list all fields — Zoho omits large textarea fields from default list responses
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Created_Time';
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Created_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
