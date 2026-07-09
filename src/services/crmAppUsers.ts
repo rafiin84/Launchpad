@@ -244,23 +244,19 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
   // Always cache locally as backup
   cacheProfileLocally(fields);
 
-  // Portal users: use server API
-  if (isPortalUser()) {
-    try {
-      const ok = await serverUpdateProfile(fields.email, fields);
-      if (ok) {
-        const result = await serverGetProfile(fields.email);
-        if (result.recordId) { cacheRecordId(result.recordId); return result.recordId; }
-      }
-    } catch (err) { console.warn('[AppUsers] Server sync failed:', err); }
-    return null;
-  }
+  // Always try server API first (works for portal users AND investors)
+  try {
+    const ok = await serverUpdateProfile(fields.email, fields);
+    if (ok) {
+      const result = await serverGetProfile(fields.email);
+      if (result.recordId) { cacheRecordId(result.recordId); return result.recordId; }
+    }
+  } catch { /* fall through to direct CRM */ }
+
+  if (isPortalUser()) return null;
 
   const available = await isModuleAvailable();
-  if (!available) {
-    console.warn('[AppUsers] Module "appusers" not found in CRM — skipping sync. Profile saved locally.');
-    return null;
-  }
+  if (!available) return null;
 
   try {
     const payload = toPayload(fields);
@@ -319,21 +315,18 @@ export async function updateAppUser(recordId: string, fields: Partial<AppUserFie
   // Always update local cache
   cacheProfileLocally(fields);
 
-  // Portal users: use server API
-  if (isPortalUser() && email) {
+  // Always try server API first (works for portal users AND investors)
+  if (email) {
     try {
-      return await serverUpdateProfile(email, fields);
-    } catch (err) {
-      console.warn('[AppUsers] Server update failed:', err);
-      return false;
-    }
+      const ok = await serverUpdateProfile(email, fields);
+      if (ok) return true;
+    } catch { /* fall through to direct CRM */ }
   }
 
+  if (isPortalUser()) return false;
+
   const available = await isModuleAvailable();
-  if (!available) {
-    console.warn('[AppUsers] Module unavailable — saved to local cache only.');
-    return false;
-  }
+  if (!available) return false;
 
   try {
     const payload = toPayload(fields);
