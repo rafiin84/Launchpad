@@ -12,11 +12,11 @@ export function NotificationBell({ className, size = 17 }: NotificationBellProps
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const refresh = () => setCount(getUnreadCount());
+    const refresh = () => { getUnreadCount().then(setCount).catch(() => {}); };
 
     refresh();
 
-    const interval = setInterval(refresh, 3000);
+    const interval = setInterval(refresh, 15000);
 
     window.addEventListener('notifications-updated', refresh);
 

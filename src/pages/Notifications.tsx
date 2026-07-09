@@ -57,28 +57,31 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const refresh = useCallback(() => {
-    setNotifications(getNotifications());
-    setUnreadCount(getUnreadCount());
+  const refresh = useCallback(async () => {
+    const notifs = await getNotifications();
+    setNotifications(notifs);
+    const count = notifs.filter(n => !n.read).length;
+    setUnreadCount(count);
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const handleMarkAsRead = (id: string) => {
-    markAsRead(id);
+  const handleMarkAsRead = async (id: string) => {
+    await markAsRead(id);
     refresh();
   };
 
-  const handleMarkAllAsRead = () => {
-    markAllAsRead();
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
     refresh();
   };
 
   const handleClearAll = () => {
     clearNotifications();
-    refresh();
+    setNotifications([]);
+    setUnreadCount(0);
   };
 
   // ─── Empty state ─────────────────────────────────────────────────────────────

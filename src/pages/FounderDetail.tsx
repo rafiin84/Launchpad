@@ -114,6 +114,7 @@ export default function FounderDetail() {
         message: `${displayName} (${founder.email}) was ${isResend ? 're-' : ''}invited to the portal as ${inviteRole}.`,
         actor: 'Admin',
         actorRole: 'investor',
+        targetRole: 'founder',
         link: `/applicants/${id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -137,6 +138,7 @@ export default function FounderDetail() {
       message: `${founderName}'s portal access has been activated.`,
       actor: 'Admin',
       actorRole: 'investor',
+      targetRole: 'founder',
       link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));
@@ -156,6 +158,7 @@ export default function FounderDetail() {
       message: `${founderName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
+      targetRole: 'founder',
       link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));

@@ -340,6 +340,7 @@ function PortalStatusToggle({
         message: `${displayName}'s portal access has been activated.`,
         actor: 'Admin',
         actorRole: 'investor',
+        targetRole: 'founder',
         link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -359,6 +360,7 @@ function PortalStatusToggle({
         message: `Invitation email sent to ${displayName} (${founder.email}).`,
         actor: 'Admin',
         actorRole: 'investor',
+        targetRole: 'founder',
         link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -379,6 +381,7 @@ function PortalStatusToggle({
       message: `${displayName}'s portal access has been disabled.`,
       actor: 'Admin',
       actorRole: 'investor',
+      targetRole: 'founder',
       link: `/applicants/${founder.id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));

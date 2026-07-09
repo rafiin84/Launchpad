@@ -801,6 +801,7 @@ export default function ApplicationDetail() {
           message,
           actor: currentUser.name,
           actorRole: 'investor',
+          targetRole: 'founder',
           link: '/applications/track',
         });
       } else {
@@ -811,6 +812,7 @@ export default function ApplicationDetail() {
           message: `${app.companyName} has been marked as "${statusLabel}" by ${currentUser.name}.`,
           actor: currentUser.name,
           actorRole: 'investor',
+          targetRole: 'founder',
           link: '/applications/track',
         });
       }
@@ -852,6 +854,7 @@ export default function ApplicationDetail() {
       message: `${currentUser.name} sent a message regarding ${app.companyName}: "${messageText.slice(0, 80)}${messageText.length > 80 ? '...' : ''}"`,
       actor: currentUser.name,
       actorRole: 'investor',
+      targetRole: 'founder',
       link: '/applications/track',
     });
 
@@ -882,6 +885,7 @@ export default function ApplicationDetail() {
         message: `${currentUser.name} has requested the following documents for ${app.companyName}: ${docNames}`,
         actor: currentUser.name,
         actorRole: 'investor',
+        targetRole: 'founder',
         link: '/applications/track',
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -908,6 +912,7 @@ export default function ApplicationDetail() {
         message: `${message} Investment: $${Number(details.investmentAmount).toLocaleString()} via ${details.paymentType}.`,
         actor: currentUser.name,
         actorRole: 'investor',
+        targetRole: 'founder',
         link: '/applications/track',
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -945,6 +950,7 @@ export default function ApplicationDetail() {
         message: `${currentUser.name} has scheduled a meeting for ${app.companyName}: ${details.join(' · ')}. Agenda: ${data.meetingAgenda}`,
         actor: currentUser.name,
         actorRole: 'investor',
+        targetRole: 'founder',
         link: '/applications/track',
       });
       window.dispatchEvent(new Event('notifications-updated'));

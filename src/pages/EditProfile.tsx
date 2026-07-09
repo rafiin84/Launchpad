@@ -204,6 +204,7 @@ export default function EditProfile() {
         message: `${form.name.trim() || 'User'} updated their profile.`,
         actor: form.name.trim() || 'User',
         actorRole: 'investor',
+        targetRole: 'founder',
         link: '/profile',
       });
       window.dispatchEvent(new Event('notifications-updated'));

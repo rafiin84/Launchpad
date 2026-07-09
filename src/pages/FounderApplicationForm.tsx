@@ -661,6 +661,7 @@ export default function FounderApplicationForm() {
           message: `${form.companyName || 'A company'} updated their investment application.`,
           actor: form.founderName || currentUser?.name || 'Founder',
           actorRole: 'founder',
+          targetRole: 'investor',
           link: '/applications',
         });
       } else if (editId) {
@@ -671,6 +672,7 @@ export default function FounderApplicationForm() {
           message: `${form.companyName || 'A company'} submitted an investment application.`,
           actor: form.founderName || currentUser?.name || 'Founder',
           actorRole: 'founder',
+          targetRole: 'investor',
           link: '/applications',
         });
       } else {
@@ -681,6 +683,7 @@ export default function FounderApplicationForm() {
           message: `${form.companyName || 'A company'} submitted an investment application.`,
           actor: form.founderName || currentUser?.name || 'Founder',
           actorRole: 'founder',
+          targetRole: 'investor',
           link: '/applications',
         });
       }

@@ -318,6 +318,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
         message: `Documents have been submitted for ${app.companyName}: ${submittedDocs.filter(d => d.status === 'submitted').map(d => d.type).join(', ')}`,
         actor: app.founderName || 'Founder',
         actorRole: 'founder',
+        targetRole: 'investor',
         link: `/applications/${app.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));

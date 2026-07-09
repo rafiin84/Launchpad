@@ -52,10 +52,13 @@ function generateLocalId(): string {
 }
 
 function filterByVisibility(activities: CRMActivity[], viewerRole: string | null, viewerName: string): CRMActivity[] {
-  if (viewerRole === 'investor') return activities;
+  // Exclude notification records from the activities feed
+  const nonNotifications = activities.filter(a => a.activityType?.toLowerCase() !== 'notification');
+
+  if (viewerRole === 'investor') return nonNotifications;
 
   // Founder/portal user: see own posts + investor posts only
-  return activities.filter(a => {
+  return nonNotifications.filter(a => {
     const role = a.authorRole?.toLowerCase() || '';
     if (role === 'investor') return true;
     if (a.authorName?.trim().toLowerCase() === viewerName.trim().toLowerCase()) return true;
