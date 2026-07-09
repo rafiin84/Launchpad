@@ -265,12 +265,27 @@ export default function FounderDashboard() {
   }, [userEmail]);
 
   useEffect(() => {
-    if (userEmail) {
-      getApplications(false, userEmail).then(apps => {
-        setHasApplication(apps.some(a => a.status !== 'draft'));
-      }).catch(() => setHasApplication(false));
-    }
-  }, [userEmail]);
+    const founderName = currentUser.name?.trim().toLowerCase() || '';
+    getApplications(false, userEmail || undefined).then(apps => {
+      const submitted = apps.filter(a => a.status !== 'draft');
+      if (submitted.length > 0) {
+        setHasApplication(true);
+      } else if (userEmail) {
+        setHasApplication(false);
+      } else if (founderName) {
+        getApplications(false).then(allApps => {
+          const match = allApps.some(a =>
+            a.status !== 'draft' &&
+            (a.founderName?.trim().toLowerCase() === founderName ||
+             a.submittedBy?.trim().toLowerCase() === founderName)
+          );
+          setHasApplication(match);
+        }).catch(() => setHasApplication(false));
+      } else {
+        setHasApplication(false);
+      }
+    }).catch(() => setHasApplication(false));
+  }, [userEmail, currentUser.name]);
 
   useEffect(() => {
     const insights = generateFounderInsights(

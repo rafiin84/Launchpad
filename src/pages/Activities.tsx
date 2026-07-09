@@ -537,10 +537,11 @@ export default function Activities() {
   const [error, setError]     = useState('');
   const [syncWarning, setSyncWarning] = useState('');
   const isConnected = !!loadToken();
+  const canFetch = isConnected || isFounder;
   const viewerRole = isInvestor ? 'investor' : 'founder';
 
   const load = () => {
-    if (!isConnected) { setLoading(false); return; }
+    if (!canFetch) { setLoading(false); return; }
     setLoading(true); setError('');
     fetchSharedActivities(currentUser.name, viewerRole)
       .then(setRecords)
@@ -550,7 +551,7 @@ export default function Activities() {
 
   useEffect(() => {
     load();
-    if (isConnected) {
+    if (canFetch) {
       syncUnsyncedActivities().then(count => {
         if (count > 0) load();
       }).catch(() => {});
