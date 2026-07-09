@@ -360,7 +360,7 @@ export default function EditProfile() {
       } catch { /* ok */ }
 
       let crmSuccess = true;
-      const canUseCrm = appUserRecordId || (isPortal && userEmail);
+      const canUseCrm = appUserRecordId || userEmail;
 
       // Sync to appusers CRM module if available
       if (canUseCrm) {
