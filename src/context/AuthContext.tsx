@@ -252,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (found) {
               setAppUser(found);
               setAppUserRecordId(found.id);
-              if (found.name) {
+              if (found.name && isRealN(found.name)) {
                 setUserName(found.name);
                 saveUserName(found.name);
               }
@@ -336,8 +336,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAppUser(found);
             setAppUserRecordId(found.id);
 
-            // Use appUser name if available
-            if (found.name) setUserName(found.name);
+            // Use appUser name only if it's a real name (not generic placeholder)
+            const isAppUserNameReal = found.name && found.name !== 'User' && found.name !== 'Founder' && found.name !== 'Investor';
+            if (isAppUserNameReal) setUserName(found.name);
 
             // Fetch photo from appusers record image API
             const gotPhoto = await fetchAvatarFromAppUsers(found.id, user.email);
