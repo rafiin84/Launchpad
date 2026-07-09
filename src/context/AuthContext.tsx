@@ -340,7 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (found.name) setUserName(found.name);
 
             // Fetch photo from appusers record image API
-            const gotPhoto = await fetchAvatarFromAppUsers(found.id);
+            const gotPhoto = await fetchAvatarFromAppUsers(found.id, user.email);
             if (gotPhoto) return; // done — got photo from appusers
           }
         } catch { /* fallback below */ }
@@ -350,7 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cachedId = loadCachedRecordId();
       if (cachedId) {
         setAppUserRecordId(cachedId);
-        const gotPhoto = await fetchAvatarFromAppUsers(cachedId);
+        const gotPhoto = await fetchAvatarFromAppUsers(cachedId, user.email);
         if (gotPhoto) return;
       }
 
