@@ -31,7 +31,7 @@ function fromApiRecord(r: Record<string, unknown>): CRMActivity {
     tags:         str('tags'),
     imageUrl:     str('imageUrl'),
     imageData:    str('imageData'),
-    visibility:   str('visibility') || 'public',
+    visibility:   str('visibility'),
     createdTime:  str('createdTime'),
   };
 }
@@ -66,12 +66,12 @@ function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
     if (isInvestor) return true;
 
     // Portal user sees:
-    // 1. Their own posts (always)
-    // 2. Investor posts (always visible to portal users)
-    // 3. Other portal user posts ONLY if visibility is 'public'
+    // 1. Investor posts (always visible to portal users)
+    // 2. Their own posts (always)
+    // 3. Other portal user posts ONLY if visibility is explicitly 'public'
     if (a.authorRole?.toLowerCase() === 'investor') return true;
     if (myName && a.authorName?.trim().toLowerCase() === myName) return true;
-    if (a.visibility === 'public') return true;
+    if (a.visibility?.toLowerCase() === 'public') return true;
 
     return false;
   });

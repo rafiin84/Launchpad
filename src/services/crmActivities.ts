@@ -49,7 +49,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
-    visibility:   str(FIELD_MAP.visibility) || 'public',
+    visibility:   str(FIELD_MAP.visibility),
     createdTime:  str('Created_Time'),
   };
 }

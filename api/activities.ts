@@ -68,7 +68,7 @@ function fromRecord(r: Record<string, unknown>): Activity {
     tags:         str(FIELD_MAP.tags),
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
-    visibility:   str(FIELD_MAP.visibility) || 'public',
+    visibility:   str(FIELD_MAP.visibility),
     createdTime:  str('Created_Time'),
   };
 }
@@ -306,6 +306,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         await updateContactPermission(adminToken, contactId, share);
         return res.status(200).json({ success: true });
+      }
+
+      if (action === 'migrateVisibility') {
+        const activities = await crmFetch(ZOHO_API_BASE, adminToken, listPath);
+        const founderPosts = activities.filter(a =>
+          a.authorRole?.toLowerCase() !== 'investor' && a.visibility?.toLowerCase() !== 'investor_only'
+        );
+        if (founderPosts.length === 0) {
+          return res.status(200).json({ updated: 0, message: 'No records to migrate' });
+        }
+        const batch = founderPosts.map(a => ({ id: a.id, Visibility: 'investor_only' }));
+        const url = `${ZOHO_API_BASE}/crm/v2/${MODULE}`;
+        const putRes = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Authorization': `Zoho-oauthtoken ${adminToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: batch }),
+        });
+        if (!putRes.ok) throw new Error(`Migration PUT ${putRes.status}: ${await putRes.text()}`);
+        return res.status(200).json({ updated: founderPosts.length });
       }
 
       return res.status(400).json({ error: 'Unknown action' });

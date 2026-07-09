@@ -15,6 +15,7 @@ import {
   BookOpen,
   ArrowLeftRight,
   Users,
+  Settings,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Avatar } from '../ui/Avatar';
@@ -35,6 +36,7 @@ const investorNav: NavItem[] = [
   { label: 'Founders',     path: '/founders',     icon: Building2 },
   { label: 'Applicants',   path: '/applicants',   icon: Users },
   { label: 'Documents',    path: '/documents',    icon: FileText },
+  { label: 'Settings',     path: '/settings',     icon: Settings },
 ];
 
 const founderNav: NavItem[] = [
