@@ -278,18 +278,17 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
  * Returns null if not found or module unavailable.
  */
 export async function findAppUserByEmail(email: string): Promise<AppUser | null> {
-  // Portal users: use server API
-  if (isPortalUser()) {
-    try {
-      const result = await serverGetProfile(email);
-      if (result.profile) {
-        cacheRecordId(result.recordId || result.profile.id);
-        cacheProfileLocally(result.profile);
-        return result.profile;
-      }
-    } catch { /* fallback */ }
-    return null;
-  }
+  // Always try server API first — works for both portal users and investors
+  try {
+    const result = await serverGetProfile(email);
+    if (result.profile) {
+      cacheRecordId(result.recordId || result.profile.id);
+      cacheProfileLocally(result.profile);
+      return result.profile;
+    }
+  } catch { /* fall through to direct CRM */ }
+
+  if (isPortalUser()) return null;
 
   const available = await isModuleAvailable();
   if (!available) return null;
@@ -355,15 +354,21 @@ export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName 
   // Portal users: convert to base64 and upload via server
   if (isPortalUser() && email) {
     try {
-      const buffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-      const mime = file.type || 'image/jpeg';
-      const dataUrl = `data:${mime};base64,${base64}`;
+      const dataUrl = await blobToDataUrl(file);
       return await serverUploadPhoto(email, dataUrl);
     } catch (err) {
       console.warn('[AppUsers] Server photo upload failed:', err);
       return false;
     }
+  }
+
+  // Also try server API if email is available (fallback for portal users with token)
+  if (email) {
+    try {
+      const dataUrl = await blobToDataUrl(file);
+      const ok = await serverUploadPhoto(email, dataUrl);
+      if (ok) return true;
+    } catch { /* fall through to direct CRM */ }
   }
 
   const available = await isModuleAvailable();
@@ -381,6 +386,15 @@ export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName 
   }
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
  * Fetch the appusers record's photo as a data: URL.
  * Returns null if no photo is set or module unavailable.
@@ -393,6 +407,14 @@ export async function fetchAppUserPhoto(recordId: string, email?: string): Promi
     } catch { return null; }
   }
 
+  // Try server API first if email is available (works for portal users with token too)
+  if (email) {
+    try {
+      const photo = await serverGetPhoto(email);
+      if (photo) return photo;
+    } catch { /* fall through to direct CRM */ }
+  }
+
   const available = await isModuleAvailable();
   if (!available) return null;
 
@@ -403,9 +425,13 @@ export async function fetchAppUserPhoto(recordId: string, email?: string): Promi
  * Delete the profile photo from the appusers record.
  */
 export async function deleteAppUserPhoto(recordId: string, email?: string): Promise<boolean> {
-  if (isPortalUser() && email) {
-    try { return await serverDeletePhoto(email); } catch { return false; }
+  if (email) {
+    try {
+      const ok = await serverDeletePhoto(email);
+      if (ok) return true;
+    } catch { /* fall through */ }
   }
+  if (isPortalUser()) return false;
   const available = await isModuleAvailable();
   if (!available) return false;
   return zohoDeleteRecordPhoto(MODULE, recordId);
