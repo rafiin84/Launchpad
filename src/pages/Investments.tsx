@@ -3,6 +3,7 @@ import { DollarSign, Percent, AlertCircle, RefreshCw, Plus, Building2, ArrowLeft
 import { Link, useNavigate } from 'react-router-dom';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { loadToken } from '../services/oauth';
 import { PageHeader } from '../components/layout/PageHeader';
 
@@ -27,7 +28,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function InvestmentRow({ record }: { record: CRMPortfolioRecord }) {
+function InvestmentRow({ record, logoUrl }: { record: CRMPortfolioRecord; logoUrl?: string }) {
   const amount = parseFloat(record.investmentAmount) || 0;
   const ownership = parseFloat(record.ownershipPct) || 0;
   const valuation = parseFloat(record.preMoneyValuation) || 0;
@@ -36,7 +37,7 @@ function InvestmentRow({ record }: { record: CRMPortfolioRecord }) {
     <Link to={`/portfolio/${record.id}`}>
       <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all group">
         <div className="flex items-center gap-4">
-          <CompanyLogo name={record.companyName || '?'} website={record.website} size={10} />
+          <CompanyLogo name={record.companyName || '?'} website={record.website} logoUrl={logoUrl} size={10} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
@@ -90,6 +91,7 @@ export default function Investments() {
   const [records, setRecords] = useState<CRMPortfolioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [logoMap, setLogoMap] = useState<Record<string, string>>({});
   const isConnected = !!loadToken();
 
   const load = () => {
@@ -103,6 +105,19 @@ export default function Investments() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    fetchAllCompanyProfiles().then(profiles => {
+      const map: Record<string, string> = {};
+      for (const p of profiles) {
+        if (p.logo) {
+          map[p.email.toLowerCase()] = p.logo;
+          if (p.data.companyName) map[p.data.companyName.toLowerCase()] = p.logo;
+        }
+      }
+      setLogoMap(map);
+    }).catch(() => {});
+  }, []);
 
   const totalInvested = records.reduce((s, r) => s + (parseFloat(r.investmentAmount) || 0), 0);
   const avgOwnership = records.length > 0
@@ -224,7 +239,7 @@ export default function Investments() {
 
           {!loading && !error && records.length > 0 && (
             <div className="space-y-3">
-              {records.map(r => <InvestmentRow key={r.id} record={r} />)}
+              {records.map(r => <InvestmentRow key={r.id} record={r} logoUrl={logoMap[r.founderEmail?.toLowerCase() || ''] || logoMap[r.companyName?.toLowerCase() || '']} />)}
             </div>
           )}
         </div>

@@ -11,6 +11,7 @@ import { AIBadge } from '../components/ui/AIBadge';
 import { useAuth } from '../context/AuthContext';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { fetchCRMApplications, type CRMApplication } from '../services/crmApplications';
 import { fetchCRMFounders, fetchAllPortalUserStatuses } from '../services/crmFounders';
 import { loadToken } from '../services/oauth';
@@ -257,6 +258,7 @@ export default function Home() {
   const [loadingFounders, setLoadingFounders] = useState(true);
   const [loadingApplicants, setLoadingApplicants] = useState(true);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [logoMap, setLogoMap] = useState<Record<string, string>>({});
 
   const [orgName, setOrgName] = useState<string | null>(null);
   useEffect(() => {
@@ -286,6 +288,16 @@ export default function Home() {
       .catch(() => {})
       .finally(() => setLoadingApplicants(false));
     fetchZohoOrgName().then(setOrgName).catch(() => {});
+    fetchAllCompanyProfiles().then(profiles => {
+      const map: Record<string, string> = {};
+      for (const p of profiles) {
+        if (p.logo) {
+          map[p.email.toLowerCase()] = p.logo;
+          if (p.data.companyName) map[p.data.companyName.toLowerCase()] = p.logo;
+        }
+      }
+      setLogoMap(map);
+    }).catch(() => {});
   }, [isFounder, isConnected]);
 
   useEffect(() => {
@@ -468,7 +480,7 @@ export default function Home() {
               {recentPortfolio.map(company => (
                 <Link key={company.id} to={`/portfolio/${company.id}`} className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all group">
                   <div className="flex items-start gap-3 mb-3">
-                    <CompanyLogo name={company.companyName || '?'} website={company.website} size={10} />
+                    <CompanyLogo name={company.companyName || '?'} website={company.website} logoUrl={logoMap[company.founderEmail?.toLowerCase() || ''] || logoMap[company.companyName?.toLowerCase() || '']} size={10} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors truncate">
                         {company.companyName || '—'}
