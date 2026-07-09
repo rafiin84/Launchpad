@@ -151,7 +151,7 @@ async function uploadPhoto(token: string, recordId: string, base64Data: string):
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -267,6 +267,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(400).json({ error: 'type must be "photo" or "cover"' });
+    }
+
+    // DELETE — remove profile photo
+    if (req.method === 'DELETE') {
+      const email = req.query.email as string;
+      if (!email) return res.status(400).json({ error: 'email query param required' });
+
+      const result = await findByEmail(token, email);
+      if (!result) return res.status(404).json({ error: 'Profile not found' });
+
+      const url = `${ZOHO_API_BASE}/crm/v2/${MODULE}/${result.id}/photo`;
+      const delRes = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+      });
+      return res.status(delRes.ok ? 200 : 500).json({ success: delRes.ok });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

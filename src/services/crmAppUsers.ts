@@ -18,6 +18,17 @@ import {
 } from './zohoApi';
 import { loadToken, loadRole } from './oauth';
 
+async function zohoDeleteRecordPhoto(module: string, recordId: string): Promise<boolean> {
+  const token = loadToken();
+  if (!token) return false;
+  const base = import.meta.env.DEV ? `/zoho-crm-proxy` : 'https://www.zohoapis.in';
+  const res = await fetch(`${base}/crm/v2/${module}/${recordId}/photo`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  return res.ok;
+}
+
 const isDev = import.meta.env.DEV;
 
 function crmUrl(apiPath: string): string {
@@ -388,6 +399,18 @@ export async function fetchAppUserPhoto(recordId: string, email?: string): Promi
   return zohoGetRecordPhoto(MODULE, recordId);
 }
 
+/**
+ * Delete the profile photo from the appusers record.
+ */
+export async function deleteAppUserPhoto(recordId: string, email?: string): Promise<boolean> {
+  if (isPortalUser() && email) {
+    try { return await serverDeletePhoto(email); } catch { return false; }
+  }
+  const available = await isModuleAvailable();
+  if (!available) return false;
+  return zohoDeleteRecordPhoto(MODULE, recordId);
+}
+
 // ─── Server API fallback (for portal users without direct CRM token) ────────
 
 async function serverGetProfile(email: string): Promise<{ profile: AppUser | null; recordId: string | null }> {
@@ -433,6 +456,11 @@ async function serverGetPhoto(email: string): Promise<string | null> {
   if (!res.ok) return null;
   const json = await res.json() as { photo?: string | null };
   return json.photo || null;
+}
+
+export async function serverDeletePhoto(email: string): Promise<boolean> {
+  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+  return res.ok;
 }
 
 export async function serverGetCoverImage(email: string): Promise<string | null> {

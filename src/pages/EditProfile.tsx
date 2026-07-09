@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, ExternalLink, Link2, Plus, Trash2, ArrowLeft, Camera, Loader2, User, ImagePlus, X,
+  ZoomIn, ZoomOut, RotateCw, Move,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
-import { updateAppUser, uploadAppUserPhoto, loadCachedProfile, cacheProfileLocally, serverSaveCoverImage } from '../services/crmAppUsers';
+import { updateAppUser, uploadAppUserPhoto, deleteAppUserPhoto, loadCachedProfile, cacheProfileLocally, serverSaveCoverImage } from '../services/crmAppUsers';
 import { saveUserName, loadRole, loadToken } from '../services/oauth';
 import { addNotification } from '../services/notifications';
 
@@ -38,6 +39,206 @@ function loadInitialForm(currentUserName: string, appUserData: Record<string, un
   };
 }
 
+const CROP_SIZE = 256;
+
+function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
+  imageSrc: string;
+  onConfirm: (croppedDataUrl: string, croppedBlob: Blob) => void;
+  onCancel: () => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const offsetStart = useRef({ x: 0, y: 0 });
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => { imgRef.current = img; setImgLoaded(true); };
+    img.src = imageSrc;
+  }, [imageSrc]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const displaySize = canvas.clientWidth;
+    canvas.width = displaySize * 2;
+    canvas.height = displaySize * 2;
+    const s = displaySize * 2;
+
+    ctx.clearRect(0, 0, s, s);
+    ctx.save();
+    ctx.translate(s / 2, s / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.scale(zoom, zoom);
+
+    const aspect = img.width / img.height;
+    let dw: number, dh: number;
+    if (aspect > 1) {
+      dh = s;
+      dw = s * aspect;
+    } else {
+      dw = s;
+      dh = s / aspect;
+    }
+
+    ctx.drawImage(img, -dw / 2 + offset.x * 2, -dh / 2 + offset.y * 2, dw, dh);
+    ctx.restore();
+  }, [zoom, rotation, offset, imgLoaded]);
+
+  useEffect(() => { draw(); }, [draw]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    offsetStart.current = { ...offset };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setOffset({ x: offsetStart.current.x + dx, y: offsetStart.current.y + dy });
+  };
+
+  const handlePointerUp = () => setDragging(false);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom(z => Math.max(0.2, Math.min(5, z - e.deltaY * 0.002)));
+  };
+
+  const handleConfirm = () => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const out = document.createElement('canvas');
+    out.width = CROP_SIZE;
+    out.height = CROP_SIZE;
+    const ctx = out.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.translate(CROP_SIZE / 2, CROP_SIZE / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.scale(zoom, zoom);
+
+    const aspect = img.width / img.height;
+    let dw: number, dh: number;
+    if (aspect > 1) {
+      dh = CROP_SIZE;
+      dw = CROP_SIZE * aspect;
+    } else {
+      dw = CROP_SIZE;
+      dh = CROP_SIZE / aspect;
+    }
+
+    const scale = CROP_SIZE / (canvasRef.current?.clientWidth || CROP_SIZE);
+    ctx.drawImage(img, -dw / 2 + offset.x * scale, -dh / 2 + offset.y * scale, dw, dh);
+    ctx.restore();
+
+    out.toBlob(blob => {
+      if (!blob) return;
+      onConfirm(out.toDataURL('image/jpeg', 0.92), blob);
+    }, 'image/jpeg', 0.92);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+        <div className="px-5 pt-5 pb-3">
+          <h3 className="text-base font-semibold text-gray-900">Adjust Profile Picture</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Drag to reposition. Scroll or use controls to zoom.</p>
+        </div>
+
+        <div className="px-5">
+          <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 cursor-move mx-auto max-w-[260px]">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onWheel={handleWheel}
+              style={{ touchAction: 'none' }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-3 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setZoom(z => Math.max(0.2, z - 0.15))}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            title="Zoom out"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <input
+            type="range"
+            min="0.2"
+            max="5"
+            step="0.05"
+            value={zoom}
+            onChange={e => setZoom(parseFloat(e.target.value))}
+            className="flex-1 h-1.5 accent-black"
+          />
+          <button
+            type="button"
+            onClick={() => setZoom(z => Math.min(5, z + 0.15))}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            title="Zoom in"
+          >
+            <ZoomIn size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setRotation(r => (r + 90) % 360)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            title="Rotate"
+          >
+            <RotateCw size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setOffset({ x: 0, y: 0 }); setZoom(1); setRotation(0); }}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            title="Reset"
+          >
+            <Move size={14} />
+          </button>
+        </div>
+
+        <div className="flex gap-2 px-5 pb-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EditProfile() {
   const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession } = useAuth();
   const navigate = useNavigate();
@@ -52,6 +253,8 @@ export default function EditProfile() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string>(coverImage || '');
   const [saveResult, setSaveResult] = useState<'success' | 'partial' | null>(null);
@@ -91,13 +294,25 @@ export default function EditProfile() {
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhotoFile(file);
-    const url = URL.createObjectURL(file);
-    setPhotoPreview(url);
-    // Also read as data URL for localStorage fallback
     const reader = new FileReader();
-    reader.onload = () => setPhotoDataUrl(reader.result as string);
+    reader.onload = () => setCropSrc(reader.result as string);
     reader.readAsDataURL(file);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleCropConfirm = (croppedDataUrl: string, croppedBlob: Blob) => {
+    setCropSrc(null);
+    setPhotoDataUrl(croppedDataUrl);
+    setPhotoPreview(croppedDataUrl);
+    setPhotoFile(new File([croppedBlob], 'photo.jpg', { type: 'image/jpeg' }));
+    setRemovePhoto(false);
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview('');
+    setPhotoDataUrl('');
+    setRemovePhoto(true);
   };
 
   const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,11 +395,19 @@ export default function EditProfile() {
           } finally {
             setUploadingPhoto(false);
           }
+        } else if (removePhoto) {
+          try {
+            await deleteAppUserPhoto(appUserRecordId || '', userEmail);
+            setProfileImage('');
+            refreshAvatar();
+          } catch { crmSuccess = false; }
         }
       } else {
         crmSuccess = false;
         if (photoFile && photoDataUrl) {
           setProfileImage(photoDataUrl);
+        } else if (removePhoto) {
+          setProfileImage('');
         }
       }
 
@@ -241,7 +464,7 @@ export default function EditProfile() {
       {/* Header with photo upload */}
       <div className="flex items-center gap-4 mb-8">
         <div className="relative group">
-          <Avatar src={photoPreview || currentUser.avatar} name={currentUser.name} size="lg" />
+          <Avatar src={removePhoto ? '' : (photoPreview || currentUser.avatar)} name={currentUser.name} size="lg" />
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -257,8 +480,47 @@ export default function EditProfile() {
           {photoFile && (
             <p className="text-xs text-emerald-600 mt-0.5">New photo selected — will upload on save</p>
           )}
+          {removePhoto && !photoFile && (
+            <p className="text-xs text-red-500 mt-0.5">Photo will be removed on save</p>
+          )}
+          <div className="flex gap-2 mt-1.5">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="text-xs font-medium text-gray-600 hover:text-black transition-colors"
+            >
+              {currentUser.avatar || photoPreview ? 'Change photo' : 'Upload photo'}
+            </button>
+            {(currentUser.avatar || photoPreview) && !removePhoto && (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+              >
+                Remove photo
+              </button>
+            )}
+            {removePhoto && !photoFile && (
+              <button
+                type="button"
+                onClick={() => setRemovePhoto(false)}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Undo remove
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Crop modal */}
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropSrc(null)}
+        />
+      )}
 
       {/* Cover image upload */}
       <div className="mb-6">
