@@ -619,7 +619,7 @@ export default function Activities() {
       <div className="relative z-10 w-full max-w-5xl">
 
       <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-900">Activities</h1>
+        <h1 className="text-xl font-bold text-gray-900">{isFounder ? 'My Activities' : 'Activities'}</h1>
         <p className="text-sm text-gray-400 mt-0.5">What's happening across your portfolio network</p>
       </div>
 

@@ -28,7 +28,7 @@ export function BottomNav() {
 
   const founderItems = [
     { label: 'Dashboard',    path: '/',                    icon: Home },
-    { label: 'Activities',   path: '/activities',           icon: Rss },
+    { label: 'My Activities', path: '/activities',          icon: Rss },
     { label: 'Applications', path: '/applications/track',   icon: Inbox },
     { label: 'Company',      path: '/company',              icon: Building2 },
   ];
