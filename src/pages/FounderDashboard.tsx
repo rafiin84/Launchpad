@@ -13,6 +13,8 @@ import { cn } from '../lib/cn';
 import { generateFounderInsights, type AIInsight } from '../services/aiEngine';
 import { AIBadge } from '../components/ui/AIBadge';
 import { fetchCompanyProfile, type CompanyData } from '../services/companyProfile';
+import { getApplications } from '../services/investmentApplications';
+import { Inbox, FileText } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +217,7 @@ export default function FounderDashboard() {
   const [newDueDate, setNewDueDate] = useState('');
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [hasApplication, setHasApplication] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Fetch company profile from CRM → populate company name + KPIs
@@ -259,6 +262,14 @@ export default function FounderDashboard() {
     }
     window.addEventListener('founder-company-updated', handleCompanyUpdate);
     return () => window.removeEventListener('founder-company-updated', handleCompanyUpdate);
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (userEmail) {
+      getApplications(false, userEmail).then(apps => {
+        setHasApplication(apps.some(a => a.status !== 'draft'));
+      }).catch(() => setHasApplication(false));
+    }
   }, [userEmail]);
 
   useEffect(() => {
@@ -410,6 +421,29 @@ export default function FounderDashboard() {
           <button onClick={() => setShowKPIEditor(true)} className="text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
             Fill in KPIs
           </button>
+        </div>
+      )}
+
+      {/* Application not submitted banner */}
+      {hasApplication === false && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Inbox size={20} className="text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-gray-900 mb-1">You have not submitted an application yet</h2>
+              <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                Submit your investment application so investors can review your company and take the next steps.
+              </p>
+              <Link
+                to="/applications/apply"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg transition-colors"
+              >
+                <FileText size={13} /> Submit Application
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
