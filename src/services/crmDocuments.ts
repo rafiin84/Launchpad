@@ -1,16 +1,4 @@
-import { zohoList, zohoCreate, zohoDelete, type ZohoRecord } from './zohoApi';
-
-const MODULE = 'My_Documents';
-
-const FIELD_MAP: Record<string, string> = {
-  documentName:  'Name',
-  documentType:  'Document_Type',
-  relatedCompany:'Related_Company',
-  description:   'Document_Description',
-  visibility:    'Visibility',
-  fileName:      'File_Name',
-  fileSize:      'File_Size',
-};
+import { loadToken } from './oauth';
 
 export interface CRMDocument {
   id: string;
@@ -21,42 +9,61 @@ export interface CRMDocument {
   visibility: string;
   fileName: string;
   fileSize: string;
+  authorName: string;
+  authorRole: string;
+  createdTime: string;
 }
 
-export type CRMDocumentFields = Omit<CRMDocument, 'id'>;
+export type CRMDocumentFields = Omit<CRMDocument, 'id' | 'createdTime'>;
 
-function fromRecord(r: ZohoRecord): CRMDocument {
-  const str = (key: string): string => {
-    const v = r[key];
-    if (v === null || v === undefined) return '';
-    return String(v);
-  };
-  return {
-    id:             r.id,
-    documentName:   str(FIELD_MAP.documentName),
-    documentType:   str(FIELD_MAP.documentType),
-    relatedCompany: str(FIELD_MAP.relatedCompany),
-    description:    str(FIELD_MAP.description),
-    visibility:     str(FIELD_MAP.visibility),
-    fileName:       str(FIELD_MAP.fileName),
-    fileSize:       str(FIELD_MAP.fileSize),
-  };
+function authHeaders(): Record<string, string> {
+  const token = loadToken();
+  return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
 }
 
 export async function fetchCRMDocuments(): Promise<CRMDocument[]> {
-  const records = await zohoList(MODULE, { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' });
-  return records.map(fromRecord);
+  const res = await fetch('/api/documents', { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Documents GET ${res.status}`);
+  const json = await res.json() as { documents?: CRMDocument[] };
+  return json.documents || [];
 }
 
-export async function createCRMDocument(fields: CRMDocumentFields): Promise<string> {
-  const payload: Record<string, unknown> = {};
-  for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
-    const raw = (fields as Record<string, string>)[formKey] ?? '';
-    if (raw !== '') payload[crmKey] = raw;
+export async function createCRMDocument(
+  fields: CRMDocumentFields & { fileData?: string; mimeType?: string },
+): Promise<string> {
+  const res = await fetch('/api/documents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Documents POST ${res.status}: ${body}`);
   }
-  return zohoCreate(MODULE, payload);
+  const json = await res.json() as { document?: { id: string } };
+  if (!json.document?.id) throw new Error('No document id in response');
+  return json.document.id;
 }
 
 export async function deleteCRMDocument(id: string): Promise<void> {
-  return zohoDelete(MODULE, id);
+  const res = await fetch(`/api/documents?id=${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Documents DELETE ${res.status}`);
+}
+
+export async function fetchDocumentAttachments(
+  recordId: string,
+): Promise<Array<{ id: string; File_Name: string; Size: string }>> {
+  const res = await fetch(`/api/documents?id=${recordId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Attachments GET ${res.status}`);
+  const json = await res.json() as { data?: Array<{ id: string; File_Name: string; Size: string }> };
+  return json.data || [];
+}
+
+export function getDownloadUrl(recordId: string, attachmentId: string): string {
+  return `/api/documents?id=${recordId}&attachmentId=${attachmentId}`;
 }

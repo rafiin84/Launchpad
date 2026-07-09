@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Lock, File, FileSpreadsheet, Scale, Plus, Building2, Eye, EyeOff, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  FileText, Lock, File, FileSpreadsheet, Scale, Plus,
+  Building2, Trash2, AlertCircle, RefreshCw, Download, User,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
-import { fetchCRMDocuments, deleteCRMDocument, type CRMDocument } from '../services/crmDocuments';
-import { loadToken } from '../services/oauth';
+import {
+  fetchCRMDocuments, deleteCRMDocument, fetchDocumentAttachments,
+  getDownloadUrl, type CRMDocument,
+} from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -15,12 +20,6 @@ const TYPE_META: Record<string, { icon: React.ElementType; color: string; label:
   'other':            { icon: FileText,        color: 'text-gray-500 bg-gray-100',     label: 'Other' },
 };
 
-function visibilityLabel(v: string) {
-  if (v === 'shared-investors') return 'Shared with Investors';
-  if (v === 'public-portfolio') return 'Public to Portfolio';
-  return 'Private';
-}
-
 function normalizeType(t: string): string {
   if (!t) return 'other';
   const lower = t.toLowerCase().replace(/\s+/g, '-');
@@ -28,17 +27,31 @@ function normalizeType(t: string): string {
   return 'other';
 }
 
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes === 0) return '';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return ''; }
+}
+
 export default function Documents() {
-  const { isFounder } = useAuth();
+  const { isFounder, isInvestor } = useAuth();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const isConnected = !!loadToken();
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const load = () => {
-    if (!isConnected) { setLoading(false); return; }
     setLoading(true);
     setError('');
     fetchCRMDocuments()
@@ -55,11 +68,30 @@ export default function Documents() {
     try {
       await deleteCRMDocument(pendingDeleteId);
       setDocs(prev => prev.filter(d => d.id !== pendingDeleteId));
+    } catch { /* swallow */ }
+    finally { setDeleting(false); setPendingDeleteId(null); }
+  };
+
+  const handleDownload = async (doc: CRMDocument) => {
+    setDownloading(doc.id);
+    try {
+      const attachments = await fetchDocumentAttachments(doc.id);
+      if (attachments.length === 0) {
+        alert('No file attached to this document.');
+        return;
+      }
+      const att = attachments[0];
+      const url = getDownloadUrl(doc.id, att.id);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = att.File_Name || doc.fileName || 'document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch {
-      // swallow
+      alert('Failed to download. Please try again.');
     } finally {
-      setDeleting(false);
-      setPendingDeleteId(null);
+      setDownloading(null);
     }
   };
 
@@ -68,8 +100,6 @@ export default function Documents() {
     acc[t] = (acc[t] ?? 0) + 1;
     return acc;
   }, {});
-
-  const allTypes = Object.keys(TYPE_META);
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -82,35 +112,32 @@ export default function Documents() {
           deleting={deleting}
         />
       )}
-      <PageHeader
-        title="Documents"
-        description="Secure document repository for your portfolio"
-      />
 
-      {/* Not-connected banner */}
-      {!isConnected && !isFounder && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
-          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
-            <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
-          </div>
-          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
-        </div>
-      )}
+      <div className="flex items-center justify-between mb-6">
+        <PageHeader
+          title="Documents"
+          description="Secure document repository for your portfolio"
+        />
+        <Link
+          to="/documents/new"
+          className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0"
+        >
+          <Plus size={14} /> Upload
+        </Link>
+      </div>
 
-      {/* Privacy notice */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
         <Lock size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-gray-600 leading-relaxed">
-          Documents are <strong>private by default</strong>. Pitch decks, financial models, and legal documents are visible only to authorized investors and the founder.
+          {isFounder
+            ? 'Documents you upload are shared with your investor. Your investor may also upload documents for you to review.'
+            : 'Documents uploaded by founders are visible to you. Documents you upload are visible to all portal users.'}
         </p>
       </div>
 
       {/* Category cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        {allTypes.map((type) => {
-          const meta = TYPE_META[type];
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        {Object.entries(TYPE_META).map(([type, meta]) => {
           const Icon = meta.icon;
           const count = typeCounts[type] ?? 0;
           return (
@@ -151,26 +178,33 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && docs.length === 0 && isConnected && (
+      {!loading && !error && docs.length === 0 && (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 mb-4">
             {isFounder
-              ? 'Documents shared by your investor will appear here.'
-              : 'Add pitch decks, financial models, and legal documents.'}
+              ? 'Upload pitch decks, financials, or legal documents to share with your investor.'
+              : 'Upload documents or wait for founders to share theirs.'}
           </p>
+          <Link
+            to="/documents/new"
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg"
+          >
+            <Plus size={12} /> Upload Document
+          </Link>
         </div>
       )}
 
       {!loading && !error && docs.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Documents ({docs.length})</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">All Documents ({docs.length})</h2>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
             {docs.map((doc, i) => {
               const typeKey = normalizeType(doc.documentType);
               const meta = TYPE_META[typeKey] ?? TYPE_META['other'];
               const Icon = meta.icon;
+              const size = parseInt(doc.fileSize) || 0;
               return (
                 <div
                   key={doc.id}
@@ -183,6 +217,18 @@ export default function Documents() {
                     <p className="text-sm font-semibold text-gray-900 truncate">{doc.documentName || '—'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-400">{meta.label}</span>
+                      {doc.fileName && (
+                        <>
+                          <span className="text-gray-200">·</span>
+                          <span className="text-xs text-gray-400">{doc.fileName}</span>
+                        </>
+                      )}
+                      {size > 0 && (
+                        <>
+                          <span className="text-gray-200">·</span>
+                          <span className="text-xs text-gray-400">{formatBytes(size)}</span>
+                        </>
+                      )}
                       {doc.relatedCompany && (
                         <>
                           <span className="text-gray-200">·</span>
@@ -191,27 +237,39 @@ export default function Documents() {
                           </span>
                         </>
                       )}
-                      {doc.description && (
-                        <>
-                          <span className="text-gray-200">·</span>
-                          <span className="text-xs text-gray-400 truncate max-w-[200px]">{doc.description}</span>
-                        </>
-                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {doc.visibility && (
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
-                        doc.visibility === 'private' || !doc.visibility
-                          ? 'bg-gray-100 text-gray-600'
-                          : doc.visibility === 'shared-investors'
-                          ? 'bg-indigo-50 text-indigo-600'
-                          : 'bg-emerald-50 text-emerald-600'
-                      }`}>
-                        {doc.visibility === 'private' || !doc.visibility ? <EyeOff size={10} /> : <Eye size={10} />}
-                        {visibilityLabel(doc.visibility)}
-                      </span>
+                    {(doc.authorName || doc.createdTime) && (
+                      <div className="flex items-center gap-2 mt-1">
+                        {doc.authorName && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <User size={10} /> {doc.authorName}
+                            {doc.authorRole && (
+                              <span className={`ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                                doc.authorRole === 'investor' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'
+                              }`}>
+                                {doc.authorRole === 'investor' ? 'Investor' : 'Founder'}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {doc.createdTime && (
+                          <>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-xs text-gray-400">{formatDate(doc.createdTime)}</span>
+                          </>
+                        )}
+                      </div>
                     )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      disabled={downloading === doc.id}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                      title="Download"
+                    >
+                      <Download size={14} className={downloading === doc.id ? 'animate-pulse' : ''} />
+                    </button>
                     <button
                       onClick={() => setPendingDeleteId(doc.id)}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
