@@ -136,7 +136,7 @@ function Composer({ onPost, onSyncWarning }: { onPost: (activity: CRMActivity) =
     setGenerating(true);
     try {
       const [acts, portfolio, deals, apps, founders] = await Promise.all([
-        fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder').catch(() => []),
+        fetchSharedActivities().catch(() => []),
         fetchCRMPortfolio().catch(() => []),
         fetchCRMDeals().catch(() => []),
         fetchCRMApplications().catch(() => []),
@@ -543,7 +543,7 @@ export default function Activities() {
   const load = () => {
     if (!canFetch) { setLoading(false); return; }
     setLoading(true); setError('');
-    fetchSharedActivities(currentUser.name, viewerRole)
+    fetchSharedActivities()
       .then(setRecords)
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
@@ -671,7 +671,7 @@ export default function Activities() {
       <Composer onPost={handlePost} onSyncWarning={setSyncWarning} />
 
       {/* Empty */}
-      {!loading && !error && records.length === 0 && isConnected && (
+      {!loading && !error && records.length === 0 && canFetch && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
           <Activity size={28} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>

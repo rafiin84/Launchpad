@@ -8,7 +8,7 @@
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity } from './crmActivities';
-import { loadRole, loadToken } from './oauth';
+import { loadToken } from './oauth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -51,19 +51,8 @@ function generateLocalId(): string {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function filterByVisibility(activities: CRMActivity[], viewerRole: string | null, viewerName: string): CRMActivity[] {
-  // Exclude notification records from the activities feed
-  const nonNotifications = activities.filter(a => a.activityType?.toLowerCase() !== 'notification');
-
-  if (viewerRole === 'investor') return nonNotifications;
-
-  // Founder/portal user: see own posts + investor posts only
-  return nonNotifications.filter(a => {
-    const role = a.authorRole?.toLowerCase() || '';
-    if (role === 'investor') return true;
-    if (a.authorName?.trim().toLowerCase() === viewerName.trim().toLowerCase()) return true;
-    return false;
-  });
+function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
+  return activities.filter(a => a.activityType?.toLowerCase() !== 'notification');
 }
 
 async function fetchViaApi(): Promise<CRMActivity[]> {
@@ -97,9 +86,8 @@ async function postViaApi(fields: CRMActivityFields): Promise<string> {
   return json.activity.id;
 }
 
-export async function fetchSharedActivities(viewerName = '', viewerRole?: string | null): Promise<CRMActivity[]> {
+export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
-  const role = viewerRole ?? loadRole();
 
   // Try API endpoint first (has admin token on Vercel for full visibility)
   try {
@@ -110,7 +98,7 @@ export async function fetchSharedActivities(viewerName = '', viewerRole?: string
     const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
     const merged = [...localOnly, ...activities];
     saveLocal(merged);
-    return filterByVisibility(merged, role, viewerName);
+    return filterByVisibility(merged);
   } catch (err) {
     console.warn('[Activities] API fetch failed, trying direct CRM:', err);
   }
@@ -120,16 +108,16 @@ export async function fetchSharedActivities(viewerName = '', viewerRole?: string
     const activities = await fetchCRMActivities();
     console.log('[Activities] Fetched from CRM (direct):', activities.length);
 
-    if (activities.length === 0) return filterByVisibility(localActivities, role, viewerName);
+    if (activities.length === 0) return filterByVisibility(localActivities);
 
     const serverIds = new Set(activities.map(a => a.id));
     const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
     const merged = [...localOnly, ...activities];
     saveLocal(merged);
-    return filterByVisibility(merged, role, viewerName);
+    return filterByVisibility(merged);
   } catch (err) {
     console.warn('[Activities] Direct CRM fetch also failed:', err);
-    return filterByVisibility(localActivities, role, viewerName);
+    return filterByVisibility(localActivities);
   }
 }
 

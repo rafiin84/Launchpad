@@ -270,9 +270,10 @@ export default function FounderDashboard() {
       const submitted = apps.filter(a => a.status !== 'draft');
       if (submitted.length > 0) {
         setHasApplication(true);
-      } else if (userEmail) {
-        setHasApplication(false);
-      } else if (founderName) {
+        return;
+      }
+      // Email-based check found nothing — try name-based fallback
+      if (founderName) {
         getApplications(false).then(allApps => {
           const match = allApps.some(a =>
             a.status !== 'draft' &&

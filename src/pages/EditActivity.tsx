@@ -120,7 +120,7 @@ export default function EditActivity() {
       setLoading(false);
     };
     if (id.startsWith('local_')) {
-      fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
+      fetchSharedActivities()
         .then(all => {
           const found = all.find(a => a.id === id);
           if (found) populateForm(found);

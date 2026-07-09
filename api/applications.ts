@@ -62,6 +62,7 @@ async function crmRequest(
 }
 
 const CRM_MODULE = 'Applications';
+const LIST_FIELDS = 'Name,Application_Status,Founder_Email,Submitted_By_Email,Founder_Name,Company_Name,Submitted_By_Name,Submitted_By_Role,Website,Industry,Company_Stage,Location,Funding_Ask,MRR,ARR,Current_Revenue,Monthly_Burn,Runway_Months,Active_Users,MoM_Growth,Churn_Rate,NPS_Score,Team_Size,Founded_Year,Founder_Phone,Founder_LinkedIn,Founder_Role,Co_Founders,Company_Description,Problem_Statement,Solution,Target_Market,Business_Model,Competitive_Advantage,Use_of_Funds,Previous_Funding,Current_Valuation,Equity_Offered,Pitch_Deck_URL,Pitch_Deck_Name,Demo_Video_URL,Supporting_Docs,Key_Metric,Key_Metric_Label,Investor_Notes,Reviewed_By,Reviewed_At,Requested_Documents,Meeting_Date,Meeting_Location,Meeting_Link,Meeting_Agenda,Created_Time,Modified_Time';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -77,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const result = await crmRequest('GET', `/crm/v2/${CRM_MODULE}/${id}`);
         return res.status(result.status).json(result.data);
       }
-      const result = await crmRequest('GET', `/crm/v2/${CRM_MODULE}?sort_by=Modified_Time&sort_order=desc&per_page=200`);
+      const result = await crmRequest('GET', `/crm/v2/${CRM_MODULE}?sort_by=Modified_Time&sort_order=desc&per_page=200&fields=${LIST_FIELDS}`);
       return res.status(result.status).json(result.data);
     }
 

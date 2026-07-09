@@ -63,7 +63,7 @@ export default function ActivityDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchSharedActivities(currentUser.name, isInvestor ? 'investor' : 'founder')
+    fetchSharedActivities()
       .then(all => {
         const found = all.find(a => a.id === id);
         if (found) setActivity(found);
