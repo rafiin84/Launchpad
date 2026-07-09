@@ -11,6 +11,7 @@ import {
   getDownloadUrl, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
+import { loadUserName } from '../services/oauth';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   'pitch-deck':       { icon: File,           color: 'text-indigo-500 bg-indigo-50',   label: 'Pitch Deck' },
@@ -62,6 +63,15 @@ export default function Documents() {
 
   useEffect(() => { load(); }, []);
 
+  const myName = (loadUserName() || '').trim().toLowerCase();
+  const visibleDocs = isInvestor
+    ? docs
+    : docs.filter(d => {
+        if (d.authorRole?.toLowerCase() === 'investor') return true;
+        if (myName && d.authorName?.trim().toLowerCase() === myName) return true;
+        return false;
+      });
+
   const handleDelete = async () => {
     if (!pendingDeleteId) return;
     setDeleting(true);
@@ -95,7 +105,7 @@ export default function Documents() {
     }
   };
 
-  const typeCounts = docs.reduce<Record<string, number>>((acc, d) => {
+  const typeCounts = visibleDocs.reduce<Record<string, number>>((acc, d) => {
     const t = normalizeType(d.documentType);
     acc[t] = (acc[t] ?? 0) + 1;
     return acc;
@@ -178,7 +188,7 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && docs.length === 0 && (
+      {!loading && !error && visibleDocs.length === 0 && (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
@@ -196,11 +206,11 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && docs.length > 0 && (
+      {!loading && !error && visibleDocs.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">All Documents ({docs.length})</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">All Documents ({visibleDocs.length})</h2>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-            {docs.map((doc, i) => {
+            {visibleDocs.map((doc, i) => {
               const typeKey = normalizeType(doc.documentType);
               const meta = TYPE_META[typeKey] ?? TYPE_META['other'];
               const Icon = meta.icon;
@@ -208,7 +218,7 @@ export default function Documents() {
               return (
                 <div
                   key={doc.id}
-                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < docs.length - 1 ? 'border-b border-gray-50' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < visibleDocs.length - 1 ? 'border-b border-gray-50' : ''}`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.color}`}>
                     <Icon size={16} />
