@@ -7,7 +7,7 @@ import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
   clearCachedProfile, clearModuleStatusCache,
-  serverGetCoverImage,
+  serverGetCoverImage, serverSaveCoverImage,
   type AppUser,
 } from '../services/crmAppUsers';
 import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
