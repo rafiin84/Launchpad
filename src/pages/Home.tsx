@@ -293,7 +293,7 @@ export default function Home() {
       for (const p of profiles) {
         if (p.logo) {
           map[p.email.toLowerCase()] = p.logo;
-          if (p.data.companyName) map[p.data.companyName.toLowerCase()] = p.logo;
+          if (p.data.name) map[p.data.name.toLowerCase()] = p.logo;
         }
       }
       setLogoMap(map);
