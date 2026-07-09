@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   FileText, Lock, File, FileSpreadsheet, Scale, Plus,
-  Building2, Trash2, AlertCircle, RefreshCw, Download, User,
+  Building2, Trash2, AlertCircle, RefreshCw, Download, User, Eye,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -51,6 +51,7 @@ export default function Documents() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -102,6 +103,24 @@ export default function Documents() {
       alert('Failed to download. Please try again.');
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleView = async (doc: CRMDocument) => {
+    setViewing(doc.id);
+    try {
+      const attachments = await fetchDocumentAttachments(doc.id);
+      if (attachments.length === 0) {
+        alert('No file attached to this document.');
+        return;
+      }
+      const att = attachments[0];
+      const url = getDownloadUrl(doc.id, att.id);
+      window.open(url, '_blank');
+    } catch {
+      alert('Failed to open document. Please try again.');
+    } finally {
+      setViewing(null);
     }
   };
 
@@ -272,6 +291,14 @@ export default function Documents() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleView(doc)}
+                      disabled={viewing === doc.id}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                      title="View"
+                    >
+                      <Eye size={14} className={viewing === doc.id ? 'animate-pulse' : ''} />
+                    </button>
                     <button
                       onClick={() => handleDownload(doc)}
                       disabled={downloading === doc.id}
