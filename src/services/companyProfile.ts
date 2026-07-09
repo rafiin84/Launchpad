@@ -76,31 +76,37 @@ function saveLocal(email: string, d: CompanyData) {
   localStorage.setItem(storageKey(email), JSON.stringify(d));
 }
 
-export async function fetchCompanyProfile(email: string): Promise<CompanyData> {
+export interface CompanyProfileResult {
+  data: CompanyData;
+  logo: string | null;
+}
+
+export async function fetchCompanyProfile(email: string): Promise<CompanyProfileResult> {
   let crmData: CompanyData | null = null;
+  let logo: string | null = null;
 
   try {
     const res = await fetch(`/api/company?email=${encodeURIComponent(email)}`);
     if (res.ok) {
-      const json = await res.json() as { data?: Record<string, unknown> };
+      const json = await res.json() as { data?: Record<string, unknown>; logo?: string | null };
       if (json.data) {
         crmData = { ...EMPTY, ...(json.data as Partial<CompanyData>) };
         saveLocal(email, crmData);
       }
+      logo = json.logo || null;
     }
   } catch (err) {
     console.warn('[CompanyProfile] API fetch failed, using localStorage:', err);
   }
 
-  if (crmData) return crmData;
+  if (crmData) return { data: crmData, logo };
 
-  // CRM has no data — check localStorage for pre-existing data to auto-sync
   const local = loadLocal(email);
   if (local.name) {
     console.log('[CompanyProfile] Auto-syncing local data to CRM for', email);
     syncToCrm(email, local);
   }
-  return local;
+  return { data: local, logo: null };
 }
 
 function syncToCrm(email: string, data: CompanyData) {
@@ -115,20 +121,47 @@ function syncToCrm(email: string, data: CompanyData) {
   });
 }
 
-export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; data: CompanyData }>> {
+export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; data: CompanyData; logo: string | null }>> {
   try {
     const res = await fetch('/api/company?all=true');
     if (res.ok) {
-      const json = await res.json() as { profiles?: Array<{ email: string; data: Record<string, unknown> }> };
+      const json = await res.json() as { profiles?: Array<{ email: string; data: Record<string, unknown>; logo?: string | null }> };
       return (json.profiles ?? []).map(p => ({
         email: p.email,
         data: { ...EMPTY, ...(p.data as Partial<CompanyData>) },
+        logo: p.logo || null,
       }));
     }
   } catch (err) {
     console.warn('[CompanyProfile] API fetch all failed:', err);
   }
   return [];
+}
+
+export async function fetchCompanyLogo(email: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/company?email=${encodeURIComponent(email)}&action=getLogo`, {
+      method: 'PUT',
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { logo?: string | null };
+    return json.logo || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function uploadCompanyLogo(email: string, logoDataUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/company', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, logo: logoDataUrl }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export interface SaveResult {

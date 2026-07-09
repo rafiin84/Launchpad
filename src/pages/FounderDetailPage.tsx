@@ -73,8 +73,8 @@ export default function FounderDetailPage() {
       .then(async (record) => {
         setCompany(record);
         if (record?.founderEmail) {
-          const p = await fetchCompanyProfile(record.founderEmail).catch(() => EMPTY);
-          setProfile(p);
+          const result = await fetchCompanyProfile(record.founderEmail).catch(() => ({ data: EMPTY, logo: null }));
+          setProfile(result.data);
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))

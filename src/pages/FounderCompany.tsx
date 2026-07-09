@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
-  Calendar, Shield, Loader2, CheckCircle, AlertCircle,
+  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
 import {
   type CompanyData, EMPTY,
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
+  uploadCompanyLogo,
 } from '../services/companyProfile';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
@@ -121,28 +122,48 @@ export default function FounderCompany() {
   const [saveResult, setSaveResult] = useState<'success' | 'partial' | 'error' | null>(null);
   const [allProfiles, setAllProfiles] = useState<Array<{ email: string; data: CompanyData }>>([]);
   const [selectedProfile, setSelectedProfile] = useState(0);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    if (isInvestor && queryEmail) {
-      fetchCompanyProfile(queryEmail)
-        .then(setData)
-        .finally(() => setLoading(false));
-    } else if (isInvestor) {
+    const targetEmail = isInvestor && queryEmail ? queryEmail : userEmail;
+    if (isInvestor && !queryEmail) {
       fetchAllCompanyProfiles()
         .then(profiles => {
           setAllProfiles(profiles);
-          if (profiles.length > 0) setData(profiles[0].data);
+          if (profiles.length > 0) {
+            setData(profiles[0].data);
+            setLogoUrl(profiles[0].logo);
+          }
         })
         .finally(() => setLoading(false));
-    } else if (userEmail) {
-      fetchCompanyProfile(userEmail)
-        .then(setData)
-        .finally(() => setLoading(false));
+    } else if (targetEmail) {
+      fetchCompanyProfile(targetEmail).then(result => {
+        setData(result.data);
+        setLogoUrl(result.logo);
+      }).finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
   }, [userEmail, isInvestor, queryEmail]);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setLogoUrl(dataUrl);
+      await uploadCompanyLogo(userEmail, dataUrl);
+      setUploadingLogo(false);
+    };
+    reader.onerror = () => setUploadingLogo(false);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
 
   useEffect(() => {
     if (editing) setDraft({ ...data });
@@ -175,7 +196,10 @@ export default function FounderCompany() {
 
   function selectInvestorProfile(idx: number) {
     setSelectedProfile(idx);
-    if (allProfiles[idx]) setData(allProfiles[idx].data);
+    if (allProfiles[idx]) {
+      setData(allProfiles[idx].data);
+      setLogoUrl(allProfiles[idx].logo);
+    }
   }
 
   const d = editing ? draft : data;
@@ -209,8 +233,29 @@ export default function FounderCompany() {
         <div className="relative h-full flex items-center justify-between px-6 sm:px-8">
           {/* Left: logo + name + tagline */}
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-900/40">
-              <Building2 size={28} className="text-white" />
+            <div className="w-16 h-16 rounded-2xl flex-shrink-0 shadow-lg shadow-indigo-900/40 relative group/logo overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt={d.name || 'Logo'} className="w-full h-full object-cover rounded-2xl" />
+              ) : (
+                <div className="w-full h-full rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center">
+                  <Building2 size={28} className="text-white" />
+                </div>
+              )}
+              {!isInvestor && editing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => logoFileRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity cursor-pointer rounded-2xl"
+                  >
+                    {uploadingLogo
+                      ? <Loader2 size={20} className="text-white animate-spin" />
+                      : <Camera size={20} className="text-white" />}
+                  </button>
+                  <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </>
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white leading-tight">

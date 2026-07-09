@@ -444,7 +444,8 @@ export default function FounderApplicationForm() {
     if (editId) return;
     const email = currentUser?.email;
     if (!email) return;
-    fetchCompanyProfile(email).then((profile: CompanyData) => {
+    fetchCompanyProfile(email).then((result) => {
+      const profile = result.data;
       if (!profile || profile === EMPTY) return;
       setForm((prev) => ({
         ...prev,

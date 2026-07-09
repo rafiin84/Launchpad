@@ -19,12 +19,13 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
+import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 
 // ─── CRM Company Card ────────────────────────────────────────────────────────
 
-function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id: string) => void }) {
+function CRMCompanyCard({ c, onDelete, logoUrl }: { c: CRMPortfolioRecord; onDelete: (id: string) => void; logoUrl?: string }) {
   const amount = parseFloat(c.investmentAmount) || 0;
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
@@ -37,7 +38,7 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
     <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all">
       <div className="flex items-start gap-3 mb-3">
         <Link to={`/portfolio/${c.id}`} className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer">
-          <CompanyLogo name={c.companyName || '?'} website={c.website} size={10} />
+          <CompanyLogo name={c.companyName || '?'} website={c.website} logoUrl={logoUrl} size={10} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
             <p className="text-xs text-gray-400 capitalize">{c.industry}{c.stage ? ` · ${c.stage}` : ''}</p>
@@ -92,7 +93,7 @@ function CRMCompanyCard({ c, onDelete }: { c: CRMPortfolioRecord; onDelete: (id:
 
 // ─── Portfolio List Table ─────────────────────────────────────────────────────
 
-function PortfolioTable({ companies, onDelete }: { companies: CRMPortfolioRecord[]; onDelete: (id: string) => void }) {
+function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfolioRecord[]; onDelete: (id: string) => void; logoMap: Record<string, string> }) {
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
     exited: 'bg-indigo-50 text-indigo-700',
@@ -131,7 +132,7 @@ function PortfolioTable({ companies, onDelete }: { companies: CRMPortfolioRecord
                 {/* Logo + Name */}
                 <td className="px-5 py-4">
                   <Link to={`/portfolio/${c.id}`} className="flex items-center gap-3">
-                    <CompanyLogo name={c.companyName || '?'} website={c.website} size={8} />
+                    <CompanyLogo name={c.companyName || '?'} website={c.website} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} size={8} />
                     <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
                   </Link>
                 </td>
@@ -208,6 +209,7 @@ export default function Portfolio() {
   const [modulesLoading, setModulesLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [logoMap, setLogoMap] = useState<Record<string, string>>({});
   const isConnected = !!loadToken();
 
   // Ref for the Portfolio Companies section
@@ -238,7 +240,17 @@ export default function Portfolio() {
     loadCRMData();
   };
 
-  useEffect(() => { loadCRMData(); }, []);
+  useEffect(() => {
+    loadCRMData();
+    fetchAllCompanyProfiles().then(profiles => {
+      const map: Record<string, string> = {};
+      for (const p of profiles) {
+        if (p.logo && p.email) map[p.email.toLowerCase()] = p.logo;
+        if (p.logo && p.data.name) map[p.data.name.toLowerCase()] = p.logo;
+      }
+      setLogoMap(map);
+    }).catch(() => {});
+  }, []);
 
   const handleDeleteCRM = async () => {
     if (!pendingDeleteId) return;
@@ -397,12 +409,12 @@ export default function Portfolio() {
         {view === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {crmCompanies.map(c => (
-              <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} />
+              <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} />
             ))}
           </div>
         ) : (
           crmCompanies.length > 0 && (
-            <PortfolioTable companies={crmCompanies} onDelete={setPendingDeleteId} />
+            <PortfolioTable companies={crmCompanies} onDelete={setPendingDeleteId} logoMap={logoMap} />
           )
         )}
 

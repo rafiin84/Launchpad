@@ -158,9 +158,26 @@ async function findAll(): Promise<Array<{ id: string; record: Record<string, unk
   return records.map(r => ({ id: r.id as string, record: r }));
 }
 
+async function fetchRecordPhoto(recordId: string): Promise<string | null> {
+  try {
+    const token = await getAdminToken();
+    const photoRes = await fetch(`${ZOHO_API_BASE}/crm/v2/${MODULE}/${recordId}/photo`, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
+    if (!photoRes.ok) return null;
+    const blob = await photoRes.blob();
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    const base64 = buffer.toString('base64');
+    const mime = photoRes.headers.get('content-type') || 'image/png';
+    return `data:${mime};base64,${base64}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -171,12 +188,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (all === 'true') {
         const records = await findAll();
-        const profiles = records
+        const entries = records
           .map(r => {
             const profile = recordToProfile(r.record);
-            return { email: profile.email || (r.record.Email as string) || '', data: profile };
+            return { id: r.id, email: profile.email || (r.record.Email as string) || '', data: profile };
           })
           .filter(p => p.email);
+
+        const logos = await Promise.all(entries.map(e => fetchRecordPhoto(e.id)));
+        const profiles = entries.map((e, i) => ({ email: e.email, data: e.data, logo: logos[i] }));
         console.log('[company] GET all →', profiles.length, 'profiles');
         return res.status(200).json({ profiles });
       }
@@ -188,8 +208,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const found = await findByEmail(email);
       if (found) {
         const profile = recordToProfile(found.record);
+        const logo = await fetchRecordPhoto(found.id);
         console.log('[company] Found profile for', email, '→', profile.name);
-        return res.status(200).json({ data: profile, recordId: found.id });
+        return res.status(200).json({ data: profile, recordId: found.id, logo });
       }
 
       console.log('[company] No profile for', email);
@@ -236,6 +257,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('[company] Created:', entry?.code);
       }
 
+      return res.status(200).json({ success: true });
+    }
+
+    // PUT — upload or fetch company logo (Record Image API)
+    if (req.method === 'PUT') {
+      const email = (req.query.email || req.body?.email) as string;
+      const action = req.query.action as string;
+
+      if (!email) return res.status(400).json({ error: 'email is required' });
+
+      const found = await findByEmail(email);
+      if (!found) return res.status(404).json({ error: 'Company profile not found' });
+
+      // GET logo: PUT ?email=x&action=getLogo
+      if (action === 'getLogo') {
+        const token = await getAdminToken();
+        const photoRes = await fetch(`${ZOHO_API_BASE}/crm/v2/${MODULE}/${found.id}/photo`, {
+          headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+        });
+        if (!photoRes.ok) return res.status(200).json({ logo: null });
+        const blob = await photoRes.blob();
+        const buffer = Buffer.from(await blob.arrayBuffer());
+        const base64 = buffer.toString('base64');
+        const mime = photoRes.headers.get('content-type') || 'image/png';
+        return res.status(200).json({ logo: `data:${mime};base64,${base64}` });
+      }
+
+      // Upload logo: PUT body { email, logo: "data:image/...;base64,..." }
+      const logoData = req.body?.logo as string;
+      if (!logoData) return res.status(400).json({ error: 'logo (base64 data URL) is required' });
+
+      const match = logoData.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return res.status(400).json({ error: 'Invalid base64 data URL' });
+      const [, mime, b64] = match;
+      const buffer = Buffer.from(b64, 'base64');
+
+      const boundary = '----FormBoundary' + Date.now().toString(36);
+      const fileName = 'logo.' + (mime.includes('png') ? 'png' : 'jpg');
+      const header = Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mime}\r\n\r\n`
+      );
+      const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+      const body = Buffer.concat([header, buffer, footer]);
+
+      const token = await getAdminToken();
+      const uploadRes = await fetch(`${ZOHO_API_BASE}/crm/v2/${MODULE}/${found.id}/photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${token}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        },
+        body,
+      });
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        console.error('[company] Logo upload failed:', errText);
+        return res.status(500).json({ error: 'Logo upload failed' });
+      }
       return res.status(200).json({ success: true });
     }
 

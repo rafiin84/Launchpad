@@ -222,10 +222,10 @@ export default function FounderDashboard() {
   useEffect(() => {
     // Fetch company profile from CRM → populate company name + KPIs
     if (userEmail) {
-      fetchCompanyProfile(userEmail).then(profile => {
+      fetchCompanyProfile(userEmail).then(result => {
+        const profile = result.data;
         if (profile.name) setCompanyName(profile.name);
 
-        // Auto-populate KPIs from company profile if KPIs haven't been manually set
         const savedKpis = localStorage.getItem(STORAGE_KPIS);
         if (!savedKpis) {
           const map = companyToKpiMap(profile);
@@ -249,7 +249,8 @@ export default function FounderDashboard() {
   useEffect(() => {
     function handleCompanyUpdate() {
       if (!userEmail) return;
-      fetchCompanyProfile(userEmail).then(profile => {
+      fetchCompanyProfile(userEmail).then(result => {
+        const profile = result.data;
         if (profile.name) setCompanyName(profile.name);
         const map = companyToKpiMap(profile);
         const hasAny = Object.values(map).some(v => !!v);
