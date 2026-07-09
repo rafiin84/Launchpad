@@ -47,9 +47,18 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const AVATAR_CACHE_KEY = 'lp_avatar_data';
-const COVER_CACHE_KEY  = 'lp_cover_image';
+const AVATAR_CACHE_PREFIX = 'lp_avatar_data_';
+const COVER_CACHE_PREFIX  = 'lp_cover_image_';
+const LEGACY_AVATAR_KEY = 'lp_avatar_data';
+const LEGACY_COVER_KEY  = 'lp_cover_image';
 const FOUNDER_COMPANY_PREFIX = 'lp_founder_company_';
+
+function avatarKey(email?: string | null): string {
+  return email ? `${AVATAR_CACHE_PREFIX}${email.toLowerCase()}` : LEGACY_AVATAR_KEY;
+}
+function coverKey(email?: string | null): string {
+  return email ? `${COVER_CACHE_PREFIX}${email.toLowerCase()}` : LEGACY_COVER_KEY;
+}
 
 function loadFounderCompanyName(email: string): string {
   if (!email) return '';
@@ -93,13 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>(initial.role);
   const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
   const [userName, setUserName] = useState<string | null>(loadUserName);
-  // Initialize avatar from localStorage cache immediately (no flash)
-  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
-    try { return localStorage.getItem(AVATAR_CACHE_KEY) || ''; } catch { return ''; }
-  });
-  const [coverImage, setCoverImageState] = useState<string>(() => {
-    try { return localStorage.getItem(COVER_CACHE_KEY) || ''; } catch { return ''; }
-  });
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [coverImage, setCoverImageState] = useState<string>('');
   // Initialize zohoEmail from portal session immediately so it's available on first render
   const [zohoEmail, setZohoEmail] = useState<string | null>(() => {
     const session = loadPortalSession();
@@ -128,13 +132,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [currentEmail]);
 
+  // Load cached avatar/cover from per-user localStorage once email is known
+  useEffect(() => {
+    if (!currentEmail) return;
+    try {
+      localStorage.removeItem(LEGACY_AVATAR_KEY);
+      localStorage.removeItem(LEGACY_COVER_KEY);
+      const cachedAvatar = localStorage.getItem(avatarKey(currentEmail));
+      if (cachedAvatar && !avatarUrl) setAvatarUrl(cachedAvatar);
+      const cachedCover = localStorage.getItem(coverKey(currentEmail));
+      if (cachedCover && !coverImage) setCoverImageState(cachedCover);
+    } catch { /* ok */ }
+  }, [currentEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch photo from appusers record image API
   const fetchAvatarFromAppUsers = useCallback(async (recordId: string, email?: string) => {
     try {
       const dataUrl = await fetchAppUserPhoto(recordId, email);
       if (dataUrl) {
         setAvatarUrl(dataUrl);
-        try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* ok */ }
+        try { localStorage.setItem(avatarKey(email), dataUrl); } catch { /* ok */ }
         return true;
       }
     } catch { /* fallback below */ }
@@ -207,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setZohoProfile({ email: accountsUser.email, phone: null, mobile: null, state: null, country: null, jobTitle: null });
               if (accountsUser.picture) {
                 setAvatarUrl(accountsUser.picture);
-                try { localStorage.setItem(AVATAR_CACHE_KEY, accountsUser.picture); } catch { /* ok */ }
+                try { localStorage.setItem(avatarKey(accountsUser.email), accountsUser.picture); } catch { /* ok */ }
               } else if (accountsUser.zuid) {
                 setAvatarUrl(`https://profile.zoho.in/file?ID=${accountsUser.zuid}&fs=medium`);
               }
@@ -267,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const cover = await serverGetCoverImage(emailForLookup);
             if (cover) {
               setCoverImageState(cover);
-              try { localStorage.setItem(COVER_CACHE_KEY, cover); } catch { /* ok */ }
+              try { localStorage.setItem(coverKey(emailForLookup), cover); } catch { /* ok */ }
             }
           } catch { /* ok */ }
         }
@@ -326,7 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const cover = await serverGetCoverImage(user.email);
           if (cover) {
             setCoverImageState(cover);
-            try { localStorage.setItem(COVER_CACHE_KEY, cover); } catch { /* ok */ }
+            try { localStorage.setItem(coverKey(user.email), cover); } catch { /* ok */ }
           }
         } catch { /* ok */ }
 
@@ -360,7 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const photoUrl = await fetchUserPhoto();
         if (photoUrl) {
           setAvatarUrl(photoUrl);
-          try { localStorage.setItem(AVATAR_CACHE_KEY, photoUrl); } catch { /* ok */ }
+          try { localStorage.setItem(avatarKey(user.email), photoUrl); } catch { /* ok */ }
         } else if (zuid) {
           setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
         }
@@ -395,15 +412,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    const email = zohoEmail || portalSession?.email || '';
     clearToken();
     clearRole();
     clearUserName();
     clearCachedRecordId();
     clearModuleStatusCache();
     clearPortalSession();
-    // Don't clear profile cache or cover image on logout — preserve for next login
-    try { localStorage.removeItem(AVATAR_CACHE_KEY); } catch { /* ok */ }
+    // Clear per-user avatar/cover caches so other users don't see them
+    try { localStorage.removeItem(avatarKey(email)); } catch { /* ok */ }
+    try { localStorage.removeItem(coverKey(email)); } catch { /* ok */ }
+    try { localStorage.removeItem(LEGACY_AVATAR_KEY); } catch { /* ok */ }
+    try { localStorage.removeItem(LEGACY_COVER_KEY); } catch { /* ok */ }
     setAvatarUrl('');
+    setCoverImageState('');
     setUserName(null);
     setAppUser(null);
     setAppUserRecordId(null);
@@ -414,8 +436,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Save cover image as data URL (localStorage + CRM sync) */
   const setCoverImage = useCallback((dataUrl: string) => {
     setCoverImageState(dataUrl);
-    try { localStorage.setItem(COVER_CACHE_KEY, dataUrl); } catch { /* ok */ }
     const email = zohoEmail || portalSession?.email || '';
+    try { localStorage.setItem(coverKey(email), dataUrl); } catch { /* ok */ }
     if (email) {
       serverSaveCoverImage(email, dataUrl).catch(() => {});
     }
@@ -424,8 +446,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Set avatar directly from a data URL (local fallback) */
   const setProfileImage = useCallback((dataUrl: string) => {
     setAvatarUrl(dataUrl);
-    try { localStorage.setItem(AVATAR_CACHE_KEY, dataUrl); } catch { /* ok */ }
-  }, []);
+    const email = zohoEmail || portalSession?.email || '';
+    try { localStorage.setItem(avatarKey(email), dataUrl); } catch { /* ok */ }
+  }, [zohoEmail, portalSession?.email]);
 
   /** Re-fetch avatar from appusers (call after uploading a new photo) */
   const refreshAvatar = useCallback(() => {
