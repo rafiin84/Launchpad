@@ -59,7 +59,7 @@ export default function Login() {
         <div className="w-full max-w-md space-y-6">
           {/* Role selection cards */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Administrator card */}
+            {/* Investor card */}
             <button
               type="button"
               onClick={() => handleRoleSelect('investor')}
@@ -71,7 +71,7 @@ export default function Login() {
               <div className="w-10 h-10 bg-gray-100 group-hover/card:bg-white/15 rounded-xl flex items-center justify-center mb-3 transition-colors">
                 <TrendingUp size={18} className="text-gray-600 group-hover/card:text-white transition-colors" />
               </div>
-              <h3 className="text-sm font-bold text-gray-900 group-hover/card:text-white mb-1 transition-colors">Administrator</h3>
+              <h3 className="text-sm font-bold text-gray-900 group-hover/card:text-white mb-1 transition-colors">Investor</h3>
               <div className="space-y-1.5 mt-3">
                 {[
                   { icon: LayoutDashboard, label: 'Analytics dashboard' },
@@ -116,7 +116,7 @@ export default function Login() {
           <div className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-4">
             <ShieldCheck size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-gray-500 leading-relaxed">
-              <strong>Administrators:</strong> Sign in with your Zoho CRM account.
+              <strong>Investors:</strong> Sign in with your Zoho CRM account.
               <br />
               <strong>Founders:</strong> Sign in via the Launchpad Portal using the account from your invitation email.
             </p>
