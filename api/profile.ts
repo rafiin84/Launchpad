@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminAccessToken } from './_zohoAdmin';
+import { getAdminAccessToken } from './_zohoAdmin.js';
 
 /**
  * /api/profile — Server-side profile management for the appusers CRM module.
