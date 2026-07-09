@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import https from 'https';
-import { getAdminAccessToken } from './_zohoAdmin';
+import { getAdminAccessToken } from './_zohoAdmin.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
