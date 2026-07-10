@@ -44,6 +44,10 @@ function getColor(name: string) {
 export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps) {
   const [imgError, setImgError] = React.useState(false);
 
+  React.useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
   return (
     <div
       className={cn(
