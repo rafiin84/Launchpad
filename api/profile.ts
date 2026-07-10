@@ -119,7 +119,7 @@ async function fetchPhoto(token: string, recordId: string): Promise<string | nul
   return `data:${mime};base64,${base64}`;
 }
 
-async function uploadPhoto(token: string, recordId: string, base64Data: string): Promise<boolean> {
+async function uploadPhoto(token: string, recordId: string, base64Data: string, module = MODULE): Promise<boolean> {
   const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return false;
   const [, mime, b64] = match;
@@ -137,7 +137,7 @@ async function uploadPhoto(token: string, recordId: string, base64Data: string):
   const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
   const body = Buffer.concat([header, buffer, footer]);
 
-  const url = `${ZOHO_API_BASE}/crm/v2/${MODULE}/${recordId}/photo`;
+  const url = `${ZOHO_API_BASE}/crm/v2/${module}/${recordId}/photo`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -159,8 +159,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const token = await getAdminAccessToken();
 
-    // GET — fetch profile or photo by email
+    // GET — fetch profile, photo, or contact photos
     if (req.method === 'GET') {
+      // Bulk fetch contact photos for founders page
+      if (req.query.contactPhotos === '1') {
+        const contactsRes = await fetch(
+          `${ZOHO_API_BASE}/crm/v2/Contacts?per_page=200&fields=Email,Full_Name`,
+          { headers: { 'Authorization': `Zoho-oauthtoken ${token}` } },
+        );
+        if (contactsRes.status === 204) return res.status(200).json({ photos: {} });
+        if (!contactsRes.ok) throw new Error(`Contacts GET ${contactsRes.status}`);
+        const contactsJson = await contactsRes.json() as { data?: Array<{ id: string; Email: string; Full_Name: string }> };
+        const contacts = contactsJson.data || [];
+
+        const photos: Record<string, string> = {};
+        await Promise.all(contacts.map(async (c) => {
+          if (!c.Email) return;
+          try {
+            const photoRes = await fetch(
+              `${ZOHO_API_BASE}/crm/v2/Contacts/${c.id}/photo`,
+              { headers: { 'Authorization': `Zoho-oauthtoken ${token}` } },
+            );
+            if (!photoRes.ok) return;
+            const ct = photoRes.headers.get('content-type') || 'image/jpeg';
+            if (ct.includes('json') || ct.includes('html')) return;
+            const buf = Buffer.from(await photoRes.arrayBuffer());
+            if (buf.byteLength < 100) return;
+            photos[c.Email.toLowerCase()] = `data:${ct};base64,${buf.toString('base64')}`;
+          } catch { /* skip */ }
+        }));
+
+        return res.status(200).json({ photos });
+      }
+
       const email = req.query.email as string;
       const wantPhoto = req.query.photo === '1';
       if (!email) return res.status(400).json({ error: 'email query param required' });
@@ -250,6 +281,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (type === 'photo') {
         const ok = await uploadPhoto(token, result.id, imageData);
         if (!ok) return res.status(500).json({ error: 'Photo upload failed' });
+
+        // Also sync photo to the Contacts record
+        try {
+          const contactSearch = `${ZOHO_API_BASE}/crm/v2/Contacts/search?criteria=(Email:equals:${email})`;
+          const contactRes = await fetch(contactSearch, {
+            headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+          });
+          if (contactRes.ok && contactRes.status !== 204) {
+            const contactJson = await contactRes.json() as { data?: Array<{ id: string }> };
+            const contactId = contactJson.data?.[0]?.id;
+            if (contactId) {
+              await uploadPhoto(token, contactId, imageData, 'Contacts');
+            }
+          }
+        } catch (err) {
+          console.warn('[profile] Contact photo sync failed:', err);
+        }
+
         return res.status(200).json({ success: true, recordId: result.id });
       }
 
