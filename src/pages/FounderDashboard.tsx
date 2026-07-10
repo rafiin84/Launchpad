@@ -221,6 +221,7 @@ export default function FounderDashboard() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [hasApplication, setHasApplication] = useState<boolean | null>(null);
+  const [hasDraftApplication, setHasDraftApplication] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem(WELCOME_KEY));
   const navigate = useNavigate();
 
@@ -274,9 +275,14 @@ export default function FounderDashboard() {
     const founderName = currentUser.name?.trim().toLowerCase() || '';
     getApplications(false, userEmail || undefined).then(apps => {
       const submitted = apps.filter(a => a.status !== 'draft');
+      const drafts = apps.filter(a => a.status === 'draft');
       if (submitted.length > 0) {
         setHasApplication(true);
+        setHasDraftApplication(false);
         return;
+      }
+      if (drafts.length > 0) {
+        setHasDraftApplication(true);
       }
       // Email-based check found nothing — try name-based fallback
       if (founderName) {
@@ -541,6 +547,29 @@ export default function FounderDashboard() {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg transition-colors"
               >
                 <FileText size={13} /> Submit Application
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draft application banner — shown when founder has a saved but unsubmitted draft */}
+      {hasApplication === false && hasDraftApplication && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-5 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Edit3 size={20} className="text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-gray-900 mb-1">Complete your application</h2>
+              <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                You have a saved draft. Pick up where you left off and submit it to your investor.
+              </p>
+              <Link
+                to="/applications/apply"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+              >
+                <ArrowRight size={13} /> Continue Application
               </Link>
             </div>
           </div>
