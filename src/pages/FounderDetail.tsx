@@ -6,6 +6,7 @@ import {
   AlertCircle, ExternalLink, Globe, Clock, XCircle, RefreshCw,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
+import { loadToken } from '../services/oauth';
 import { getCRMFounder, deleteCRMFounder, sendInviteEmail, checkPortalStatus, type CRMFounder } from '../services/crmFounders';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
@@ -22,6 +23,9 @@ export default function FounderDetail() {
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Profile photo
+  const [photoUrl, setPhotoUrl] = useState<string>('');
 
   // Portal invite state
   const [inviting, setInviting] = useState(false);
@@ -64,6 +68,21 @@ export default function FounderDetail() {
           } catch {
             // API check failed — stick with local registry status
           }
+        }
+
+
+        // 3. Fetch profile photo
+        if (f.email) {
+          const token = loadToken();
+          fetch('/api/profile?contactPhotos=1', {
+            headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
+          })
+            .then(r => r.json())
+            .then((json: { photos?: Record<string, string> }) => {
+              const photo = json.photos?.[f.email.toLowerCase()];
+              if (photo) setPhotoUrl(photo);
+            })
+            .catch(() => {});
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
@@ -294,7 +313,7 @@ export default function FounderDetail() {
         {/* Avatar overlapping banner */}
         <div className="absolute -bottom-8 left-6">
           <div className="w-20 h-20 rounded-full bg-white border-4 border-white shadow-lg overflow-hidden flex items-center justify-center">
-            <Avatar name={displayName} size="xl" />
+            <Avatar src={photoUrl || undefined} name={displayName} size="xl" />
           </div>
         </div>
       </div>

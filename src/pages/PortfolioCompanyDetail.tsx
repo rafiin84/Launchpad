@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { getCRMPortfolioRecord, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { Avatar } from '../components/ui/Avatar';
+import { loadToken } from '../services/oauth';
 
 function formatCurrency(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -39,12 +41,27 @@ export default function PortfolioCompanyDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [founderPhotoUrl, setFounderPhotoUrl] = useState<string>('');
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     getCRMPortfolioRecord(id)
-      .then(setRecord)
+      .then(r => {
+        setRecord(r);
+        if (r.founderEmail) {
+          const token = loadToken();
+          fetch('/api/profile?contactPhotos=1', {
+            headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
+          })
+            .then(res => res.json())
+            .then((json: { photos?: Record<string, string> }) => {
+              const photo = json.photos?.[r.founderEmail!.toLowerCase()];
+              if (photo) setFounderPhotoUrl(photo);
+            })
+            .catch(() => {});
+        }
+      })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load record'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -250,11 +267,8 @@ export default function PortfolioCompanyDetail() {
               <h3 className="text-sm font-semibold text-gray-900 mb-5">Founder Information</h3>
               {record.founderName || record.founderEmail || record.founderLinkedin || record.founderPhone ? (
                 <div className="flex items-start gap-5">
-                  {/* Avatar initial */}
-                  <div className="w-14 h-14 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xl font-bold text-indigo-400">
-                      {record.founderName ? record.founderName.charAt(0).toUpperCase() : <User size={20} />}
-                    </span>
+                  <div className="flex-shrink-0">
+                    <Avatar src={founderPhotoUrl || undefined} name={record.founderName || '?'} size="xl" />
                   </div>
                   <div className="space-y-3 flex-1">
                     {record.founderName && (

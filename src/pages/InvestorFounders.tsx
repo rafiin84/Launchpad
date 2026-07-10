@@ -9,24 +9,17 @@ import { cn } from '../lib/cn';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
-import { Avatar } from '../components/ui/Avatar';
-import { loadToken } from '../services/oauth';
 
 type ViewMode = 'list' | 'grid';
 
-function FounderRow({ company, logoUrl, photoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null; photoUrl?: string | null }) {
+function FounderRow({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null }) {
   return (
     <Link
       to={`/founders/${company.id}`}
       className="flex items-center gap-4 px-4 py-3 bg-white hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors group"
     >
-      <div className="relative flex-shrink-0">
+      <div className="flex-shrink-0">
         <CompanyLogo name={company.companyName || company.founderName || '?'} website={company.website} logoUrl={logoUrl} size={10} />
-        {photoUrl && (
-          <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
-            <Avatar src={photoUrl} name={company.founderName || ''} size="xs" />
-          </div>
-        )}
       </div>
       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-x-6 gap-y-0.5 items-center">
         <div className="min-w-0">
@@ -75,20 +68,15 @@ function FounderRow({ company, logoUrl, photoUrl }: { company: CRMPortfolioRecor
   );
 }
 
-function FounderCard({ company, logoUrl, photoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null; photoUrl?: string | null }) {
+function FounderCard({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null }) {
   return (
     <Link
       to={`/founders/${company.id}`}
       className="block bg-white border border-gray-100 rounded-2xl p-5 hover:border-indigo-200 hover:shadow-md transition-all group"
     >
       <div className="flex items-start gap-4">
-        <div className="relative flex-shrink-0">
+        <div className="flex-shrink-0">
           <CompanyLogo name={company.companyName || company.founderName || '?'} website={company.website} logoUrl={logoUrl} size={12} />
-          {photoUrl && (
-            <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
-              <Avatar src={photoUrl} name={company.founderName || ''} size="sm" />
-            </div>
-          )}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
@@ -160,7 +148,6 @@ export default function InvestorFounders() {
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('list');
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
-  const [photoMap, setPhotoMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCRMPortfolio()
@@ -176,16 +163,6 @@ export default function InvestorFounders() {
       }
       setLogoMap(map);
     }).catch(() => {});
-
-    const token = loadToken();
-    fetch('/api/profile?contactPhotos=1', {
-      headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
-    })
-      .then(r => r.json())
-      .then((json: { photos?: Record<string, string> }) => {
-        if (json.photos) setPhotoMap(json.photos);
-      })
-      .catch(() => {});
   }, []);
 
   const filtered = companies.filter(c => {
@@ -280,7 +257,7 @@ export default function InvestorFounders() {
       {filtered.length > 0 && view === 'list' && (
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
           {filtered.map(c => (
-            <FounderRow key={c.id} company={c} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} photoUrl={photoMap[c.founderEmail?.toLowerCase() || '']} />
+            <FounderRow key={c.id} company={c} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} />
           ))}
         </div>
       )}
@@ -289,7 +266,7 @@ export default function InvestorFounders() {
       {filtered.length > 0 && view === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(c => (
-            <FounderCard key={c.id} company={c} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} photoUrl={photoMap[c.founderEmail?.toLowerCase() || '']} />
+            <FounderCard key={c.id} company={c} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} />
           ))}
         </div>
       )}
