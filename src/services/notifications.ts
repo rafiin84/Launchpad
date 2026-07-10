@@ -141,9 +141,12 @@ export async function addNotification(
     console.warn('[Notifications] Server post failed, cached locally:', err);
   }
 
-  // Always cache locally too
-  const existing = loadLocal();
-  saveLocal([notification, ...existing]);
+  // Only cache locally if targeted at the current user's role
+  const myRole = loadRole() || 'investor';
+  if (n.targetRole === myRole) {
+    const existing = loadLocal();
+    saveLocal([notification, ...existing]);
+  }
 
   return notification;
 }
