@@ -123,8 +123,11 @@ export default function FounderCompany() {
   const [allProfiles, setAllProfiles] = useState<Array<{ email: string; data: CompanyData; logo: string | null }>>([]);
   const [selectedProfile, setSelectedProfile] = useState(0);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   useEffect(() => {
     setLoading(true);
@@ -233,9 +236,9 @@ export default function FounderCompany() {
         <div className="relative h-full flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-8 pt-4 sm:pt-0 gap-3 sm:gap-0">
           {/* Left: logo + name + tagline */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex-shrink-0 shadow-lg shadow-indigo-900/40 relative group/logo overflow-hidden">
-              {logoUrl ? (
-                <img src={logoUrl} alt={d.name || 'Logo'} className="w-full h-full object-cover rounded-2xl" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex-shrink-0 shadow-lg shadow-indigo-900/40 relative group/logo overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-600">
+              {logoUrl && !logoError ? (
+                <img src={logoUrl} alt={d.name || 'Logo'} className="w-full h-full object-cover rounded-2xl" onError={() => setLogoError(true)} />
               ) : (
                 <div className="w-full h-full rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center">
                   <Building2 size={28} className="text-white" />
