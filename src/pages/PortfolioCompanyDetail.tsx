@@ -49,14 +49,15 @@ export default function PortfolioCompanyDetail() {
     getCRMPortfolioRecord(id)
       .then(r => {
         setRecord(r);
-        if (r.founderEmail) {
+        if (r?.founderEmail) {
+          const email = r.founderEmail.toLowerCase();
           const token = loadToken();
           fetch('/api/profile?contactPhotos=1', {
             headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
           })
             .then(res => res.json())
             .then((json: { photos?: Record<string, string> }) => {
-              const photo = json.photos?.[r.founderEmail!.toLowerCase()];
+              const photo = json.photos?.[email];
               if (photo) setFounderPhotoUrl(photo);
             })
             .catch(() => {});
