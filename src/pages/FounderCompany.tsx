@@ -230,10 +230,10 @@ export default function FounderCompany() {
           />
         )}
 
-        <div className="relative h-full flex items-center justify-between px-6 sm:px-8">
+        <div className="relative h-full flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-8 pt-4 sm:pt-0 gap-3 sm:gap-0">
           {/* Left: logo + name + tagline */}
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl flex-shrink-0 shadow-lg shadow-indigo-900/40 relative group/logo overflow-hidden">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex-shrink-0 shadow-lg shadow-indigo-900/40 relative group/logo overflow-hidden">
               {logoUrl ? (
                 <img src={logoUrl} alt={d.name || 'Logo'} className="w-full h-full object-cover rounded-2xl" />
               ) : (
@@ -257,18 +257,18 @@ export default function FounderCompany() {
                 </>
               )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight truncate">
                 {d.name || 'Your Company'}
               </h1>
-              <p className="text-sm text-white/60 mt-0.5 max-w-md leading-relaxed">
+              <p className="text-xs sm:text-sm text-white/60 mt-0.5 max-w-md leading-relaxed line-clamp-2">
                 {d.tagline || 'Add your one-liner tagline'}
               </p>
             </div>
           </div>
 
           {/* Right: action buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center pb-3 sm:pb-0">
             {!isInvestor && (
               editing ? (
                 <>
