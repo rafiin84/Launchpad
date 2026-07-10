@@ -142,7 +142,7 @@ function profileToRecord(data: Record<string, unknown>): Record<string, unknown>
 async function findByEmail(email: string): Promise<{ id: string; record: Record<string, unknown> } | null> {
   const result = await crmFetch(
     'GET',
-    `/crm/v2/${MODULE}/search?email=${encodeURIComponent(email)}&fields=${CRM_FIELDS}`,
+    `/crm/v2/${MODULE}/search?email=${encodeURIComponent(email)}&fields=${CRM_FIELDS},Record_Image`,
   );
   const records = (result.data as { data?: Array<Record<string, unknown>> })?.data;
   if (records?.[0]) return { id: records[0].id as string, record: records[0] };
@@ -152,7 +152,7 @@ async function findByEmail(email: string): Promise<{ id: string; record: Record<
 async function findAll(): Promise<Array<{ id: string; record: Record<string, unknown> }>> {
   const result = await crmFetch(
     'GET',
-    `/crm/v2/${MODULE}?fields=${CRM_FIELDS}&per_page=200&sort_by=Modified_Time&sort_order=desc`,
+    `/crm/v2/${MODULE}?fields=${CRM_FIELDS},Record_Image&per_page=200&sort_by=Modified_Time&sort_order=desc`,
   );
   const records = (result.data as { data?: Array<Record<string, unknown>> })?.data ?? [];
   return records.map(r => ({ id: r.id as string, record: r }));
@@ -191,11 +191,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const entries = records
           .map(r => {
             const profile = recordToProfile(r.record);
-            return { id: r.id, email: profile.email || (r.record.Email as string) || '', data: profile };
+            return { id: r.id, email: profile.email || (r.record.Email as string) || '', data: profile, hasPhoto: !!r.record.Record_Image };
           })
           .filter(p => p.email);
 
-        const logos = await Promise.all(entries.map(e => fetchRecordPhoto(e.id)));
+        const logos = await Promise.all(entries.map(e => e.hasPhoto ? fetchRecordPhoto(e.id) : Promise.resolve(null)));
         const profiles = entries.map((e, i) => ({ email: e.email, data: e.data, logo: logos[i] }));
         console.log('[company] GET all →', profiles.length, 'profiles');
         return res.status(200).json({ profiles });
@@ -208,7 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const found = await findByEmail(email);
       if (found) {
         const profile = recordToProfile(found.record);
-        const logo = await fetchRecordPhoto(found.id);
+        const logo = found.record.Record_Image ? await fetchRecordPhoto(found.id) : null;
         console.log('[company] Found profile for', email, '→', profile.name);
         return res.status(200).json({ data: profile, recordId: found.id, logo });
       }
@@ -272,16 +272,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // GET logo: PUT ?email=x&action=getLogo
       if (action === 'getLogo') {
-        const token = await getAdminToken();
-        const photoRes = await fetch(`${ZOHO_API_BASE}/crm/v2/${MODULE}/${found.id}/photo`, {
-          headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
-        });
-        if (!photoRes.ok) return res.status(200).json({ logo: null });
-        const blob = await photoRes.blob();
-        const buffer = Buffer.from(await blob.arrayBuffer());
-        const base64 = buffer.toString('base64');
-        const mime = photoRes.headers.get('content-type') || 'image/png';
-        return res.status(200).json({ logo: `data:${mime};base64,${base64}` });
+        if (!found.record.Record_Image) return res.status(200).json({ logo: null });
+        const logo = await fetchRecordPhoto(found.id);
+        return res.status(200).json({ logo });
       }
 
       // Upload logo: PUT body { email, logo: "data:image/...;base64,..." }
