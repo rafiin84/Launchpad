@@ -263,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Try to look up the user in the appusers CRM module via portal session email
+        let gotPortalPhoto = false;
         if (emailForLookup && !appUser) {
           try {
             const found = await findAppUserByEmail(emailForLookup);
@@ -273,7 +274,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUserName(found.name);
                 saveUserName(found.name);
               }
-              await fetchAvatarFromAppUsers(found.id, emailForLookup);
+              gotPortalPhoto = await fetchAvatarFromAppUsers(found.id, emailForLookup);
+            }
+          } catch { /* ok */ }
+        }
+
+        // Fallback: fetch photo via server API if appusers photo wasn't found
+        if (!gotPortalPhoto && emailForLookup) {
+          try {
+            const res = await fetch(`/api/profile?email=${encodeURIComponent(emailForLookup)}&photo=1`);
+            if (res.ok) {
+              const json = await res.json() as { photo?: string | null };
+              if (json.photo) {
+                setAvatarUrl(json.photo);
+                try { localStorage.setItem(avatarKey(emailForLookup), json.photo); } catch { /* ok */ }
+              }
             }
           } catch { /* ok */ }
         }
