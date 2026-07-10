@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/ui/Avatar';
 import { updateAppUser, uploadAppUserPhoto, deleteAppUserPhoto, loadCachedProfile, cacheProfileLocally, serverSaveCoverImage } from '../services/crmAppUsers';
-import { saveUserName, loadRole, loadToken } from '../services/oauth';
+import { saveUserName } from '../services/oauth';
 import { addNotification } from '../services/notifications';
 
 interface ProfileForm {
@@ -240,10 +240,10 @@ function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
 }
 
 export default function EditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession, isFounder } = useAuth();
   const navigate = useNavigate();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
-  const isPortal = loadRole() === 'founder' && !loadToken();
+  const isPortal = isFounder;
 
   const [form, setForm] = useState<ProfileForm>(() =>
     loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null)
