@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { getCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchCompanyProfile, type CompanyData, EMPTY } from '../services/companyProfile';
+import { Avatar } from '../components/ui/Avatar';
+import { loadToken } from '../services/oauth';
 
 function fmt(val: string, prefix = '$') {
   if (!val) return '';
@@ -65,6 +67,7 @@ export default function FounderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const [photoUrl, setPhotoUrl] = useState<string>('');
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +78,17 @@ export default function FounderDetailPage() {
         if (record?.founderEmail) {
           const result = await fetchCompanyProfile(record.founderEmail).catch(() => ({ data: EMPTY, logo: null }));
           setProfile(result.data);
+
+          const token = loadToken();
+          fetch('/api/profile?contactPhotos=1', {
+            headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
+          })
+            .then(r => r.json())
+            .then((json: { photos?: Record<string, string> }) => {
+              const photo = json.photos?.[record.founderEmail!.toLowerCase()];
+              if (photo) setPhotoUrl(photo);
+            })
+            .catch(() => {});
         }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
@@ -125,10 +139,8 @@ export default function FounderDetailPage() {
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 sm:p-8 text-white mb-6">
         <div className="flex items-start gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl font-bold text-white">
-              {(c.founderName || 'F').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-            </span>
+          <div className="flex-shrink-0">
+            <Avatar src={photoUrl || undefined} name={c.founderName || 'F'} size="xl" className="ring-2 ring-white/30" />
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold">{c.founderName}</h1>
