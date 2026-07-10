@@ -222,6 +222,7 @@ export default function FounderDashboard() {
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [hasApplication, setHasApplication] = useState<boolean | null>(null);
   const [hasDraftApplication, setHasDraftApplication] = useState(false);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem(WELCOME_KEY));
   const navigate = useNavigate();
 
@@ -232,6 +233,9 @@ export default function FounderDashboard() {
         const profile = result.data;
         if (profile.name) setCompanyName(profile.name);
 
+        const coreFields = [profile.name, profile.industry, profile.website, profile.description];
+        setProfileComplete(coreFields.filter(Boolean).length >= 3);
+
         const savedKpis = localStorage.getItem(STORAGE_KPIS);
         if (!savedKpis) {
           const map = companyToKpiMap(profile);
@@ -241,7 +245,7 @@ export default function FounderDashboard() {
             setKPIs(populated);
           }
         }
-      }).catch(() => {});
+      }).catch(() => setProfileComplete(false));
     }
 
     // Also try CRM org API for company name fallback
@@ -484,17 +488,17 @@ export default function FounderDashboard() {
         </button>
       </div>
 
-      {/* Onboarding banner — shown when founder is brand new (all KPIs empty & no milestones) */}
-      {emptyCount === kpis.length && milestones.length === 0 && (
+      {/* Company profile incomplete banner */}
+      {profileComplete === false && (
         <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <Rocket size={20} className="text-indigo-600" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Welcome to Launchpad!</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-1">Complete your company profile</h2>
               <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                Get started by setting up your company profile and adding your key metrics.
+                Set up your company profile and add your key metrics.
                 Your investors will see this data on their dashboard.
               </p>
               <div className="flex flex-wrap gap-2">
