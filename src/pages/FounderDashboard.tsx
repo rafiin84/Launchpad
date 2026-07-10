@@ -4,8 +4,9 @@ import {
   Edit3, Check, X, Plus, AlertCircle,
   Clock, Target, Flame, BarChart2,
   Sparkles, ArrowRight, Rocket, Building2,
+  ExternalLink, BookmarkCheck, Globe, Shield,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
@@ -15,6 +16,8 @@ import { AIBadge } from '../components/ui/AIBadge';
 import { fetchCompanyProfile, type CompanyData } from '../services/companyProfile';
 import { getApplications } from '../services/investmentApplications';
 import { Inbox, FileText } from 'lucide-react';
+
+const WELCOME_KEY = 'lp_founder_welcome_done';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -218,6 +221,8 @@ export default function FounderDashboard() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [hasApplication, setHasApplication] = useState<boolean | null>(null);
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem(WELCOME_KEY));
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Fetch company profile from CRM → populate company name + KPIs
@@ -353,8 +358,86 @@ export default function FounderDashboard() {
   const filledKPIs = kpis.filter(k => k.value.trim());
   const emptyCount = kpis.filter(k => !k.value.trim()).length;
 
+  function dismissWelcome() {
+    localStorage.setItem(WELCOME_KEY, '1');
+    setShowWelcome(false);
+  }
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+
+      {/* Welcome modal — first-time founders */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 px-6 py-8 text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Rocket size={32} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Welcome to Launchpad!</h2>
+              <p className="text-white/80 text-sm mt-2">
+                Your investor portal is ready. Here's how to get started.
+              </p>
+            </div>
+
+            {/* Steps */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Building2 size={16} className="text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Set up your company profile</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Add your company details, metrics, and logo so investors can review your data.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText size={16} className="text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Submit your application</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Fill out the investment application so your investor can take the next steps.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <BookmarkCheck size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Bookmark your login page</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    For future logins, always use this URL:
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                    <Globe size={13} className="text-gray-400 flex-shrink-0" />
+                    <code className="text-xs text-indigo-600 font-medium truncate">launchpad-iota-ten.vercel.app/login</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex flex-col gap-2">
+              <button
+                onClick={() => { dismissWelcome(); navigate('/company'); }}
+                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-xl transition-colors"
+              >
+                <Building2 size={16} /> Set Up Company Profile
+              </button>
+              <button
+                onClick={dismissWelcome}
+                className="w-full text-sm font-medium text-gray-500 hover:text-gray-700 px-4 py-2 rounded-xl transition-colors"
+              >
+                I'll explore on my own
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Greeting */}
       <div className="flex items-start justify-between mb-6">
