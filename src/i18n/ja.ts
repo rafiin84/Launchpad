@@ -646,6 +646,31 @@ const ja: TranslationKeys = {
     untitled: '無題',
   },
 
+  // ─── Portfolio Page ──────────────────────────────────────────────────────────
+  portfolioPage: {
+    description: '投資先企業とポートフォリオのパフォーマンス',
+    portfolioCompanies: 'ポートフォリオ企業',
+    refresh: '更新',
+    invested: '投資額',
+    ownership: '持分',
+    company: '企業',
+    industryStage: '業界 / ステージ',
+    status: 'ステータス',
+    ownershipPct: '持分 %',
+    location: '所在地',
+    gridView: 'グリッド表示',
+    listView: 'リスト表示',
+    connectCRM: 'Zoho CRMに接続してライブポートフォリオデータを表示',
+    connectCRMDesc: 'ログインページから「Zoho CRMでサインイン」をクリックしてください。',
+    connect: '接続',
+    showMyModules: 'モジュールを表示',
+    selectModule: '以下から正しいモジュールを選択して、ポートフォリオモジュールとして接続してください：',
+    selectionSaved: '選択内容が保存されます。アプリはすぐに再試行します。',
+    noCompaniesDesc: '最初のポートフォリオ企業を追加してCRMに同期しましょう。',
+    deleteTitle: 'ポートフォリオ企業を削除',
+    deleteMessage: 'この企業レコードを削除してもよろしいですか？この操作は元に戻せません。',
+  },
+
   // ─── Add Portfolio Company ─────────────────────────────────────────────────
   addPortfolio: {
     backToPortfolio: 'ポートフォリオに戻る',

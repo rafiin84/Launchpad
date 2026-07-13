@@ -658,6 +658,31 @@ const en = {
     untitled: 'Untitled',
   },
 
+  // ─── Portfolio Page ──────────────────────────────────────────────────────────
+  portfolioPage: {
+    description: 'Your invested companies and portfolio performance',
+    portfolioCompanies: 'Portfolio Companies',
+    refresh: 'Refresh',
+    invested: 'Invested',
+    ownership: 'Ownership',
+    company: 'Company',
+    industryStage: 'Industry / Stage',
+    status: 'Status',
+    ownershipPct: 'Ownership %',
+    location: 'Location',
+    gridView: 'Grid view',
+    listView: 'List view',
+    connectCRM: 'Connect Zoho CRM to see live portfolio data',
+    connectCRMDesc: 'Go to Login page and click "Sign in with Zoho CRM".',
+    connect: 'Connect',
+    showMyModules: 'Show my modules',
+    selectModule: 'Click the correct module below to connect it as your Portfolio module:',
+    selectionSaved: 'This saves your selection. The app will retry immediately.',
+    noCompaniesDesc: 'Add your first portfolio company to sync it to your CRM.',
+    deleteTitle: 'Delete Portfolio Company',
+    deleteMessage: 'Are you sure you want to delete this company record? This action cannot be undone.',
+  },
+
   // ─── Add Portfolio Company ─────────────────────────────────────────────────
   addPortfolio: {
     backToPortfolio: 'Back to Portfolio',
