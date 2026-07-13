@@ -55,6 +55,14 @@ export default function Documents() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
 
+  const typeLabels: Record<string, string> = {
+    'pitch-deck': t.addDocument.pitchDeck,
+    'financial-model': t.addDocument.financialModel,
+    'legal-document': t.addDocument.legalDocument,
+    'due-diligence': t.addDocument.dueDiligence,
+    'other': t.addDocument.other,
+  };
+
   const load = () => {
     setLoading(true);
     setError('');
@@ -176,7 +184,7 @@ export default function Documents() {
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${meta.color}`}>
                 <Icon size={20} />
               </div>
-              <p className="text-sm font-semibold text-gray-900">{meta.label}</p>
+              <p className="text-sm font-semibold text-gray-900">{typeLabels[type] || meta.label}</p>
               <p className="text-xs text-gray-500 mt-0.5">{count} document{count !== 1 ? 's' : ''}</p>
             </div>
           );
@@ -204,7 +212,7 @@ export default function Documents() {
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
           <p className="text-sm text-red-600 mb-3">{error}</p>
           <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors">
-            <RefreshCw size={12} /> Retry
+            <RefreshCw size={12} /> {t.documentsPage.retry}
           </button>
         </div>
       )}
@@ -247,7 +255,7 @@ export default function Documents() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{doc.documentName || '—'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-gray-400">{meta.label}</span>
+                      <span className="text-xs text-gray-400">{typeLabels[typeKey] || meta.label}</span>
                       {doc.fileName && (
                         <>
                           <span className="text-gray-200">·</span>
@@ -278,7 +286,7 @@ export default function Documents() {
                               <span className={`ml-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                                 doc.authorRole === 'investor' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'
                               }`}>
-                                {doc.authorRole === 'investor' ? 'Investor' : 'Founder'}
+                                {doc.authorRole === 'investor' ? t.login.investor : t.login.founder}
                               </span>
                             )}
                           </span>

@@ -68,10 +68,26 @@ const STAGE_COLORS: Record<string, { color: string; bg: string }> = {
 };
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
+  const { t } = useLanguage();
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.submitted;
+  const statusLabels: Record<string, string> = {
+    draft: t.applicationTracker.statusDraft,
+    submitted: t.applicationTracker.statusSubmitted,
+    under_review: t.applicationTracker.statusUnderReview,
+    interested: t.applicationTracker.statusInterested,
+    more_info_requested: t.applicationTracker.statusMoreInfo,
+    documents_requested: t.applicationTracker.statusDocsRequested,
+    shortlisted: t.applicationTracker.statusShortlisted,
+    meeting_scheduled: t.applicationTracker.statusMeeting,
+    due_diligence: t.applicationTracker.statusDueDiligence,
+    on_hold: t.applicationTracker.statusOnHold,
+    approved: t.applicationTracker.statusApproved,
+    invested: t.applicationTracker.statusInvested,
+    rejected: t.applicationTracker.statusRejected,
+  };
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.color, cfg.bg)}>
-      {cfg.label}
+      {statusLabels[status] || cfg.label}
     </span>
   );
 }
@@ -111,6 +127,17 @@ export default function InvestorApplications() {
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
+  const filterLabels: Record<string, string> = {
+    all: t.investorApplications.all,
+    submitted: t.investorApplications.submitted,
+    under_review: t.investorApplications.underReview,
+    shortlisted: t.investorApplications.shortlisted,
+    meeting_scheduled: t.investorApplications.meeting,
+    on_hold: t.investorApplications.onHold,
+    approved: t.investorApplications.approved,
+    rejected: t.investorApplications.rejected,
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -142,10 +169,10 @@ export default function InvestorApplications() {
   // ── Stats ─────────────────────────────────────────────────────────────────
 
   const stats = [
-    { label: 'Total',       value: applications.length,                                                                                             icon: BarChart3,    color: 'text-blue-600',   bg: 'bg-blue-50' },
-    { label: 'Shortlisted', value: applications.filter(a => a.status === 'shortlisted').length,                                                     icon: Star,         color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Approved',    value: applications.filter(a => a.status === 'approved' || a.status === 'invested').length,                              icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50' },
-    { label: 'Rejected',    value: applications.filter(a => a.status === 'rejected').length,                                                        icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
+    { label: t.investorApplications.total,       value: applications.length,                                                                                             icon: BarChart3,    color: 'text-blue-600',   bg: 'bg-blue-50' },
+    { label: t.investorApplications.shortlisted, value: applications.filter(a => a.status === 'shortlisted').length,                                                     icon: Star,         color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: t.investorApplications.approved,    value: applications.filter(a => a.status === 'approved' || a.status === 'invested').length,                              icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50' },
+    { label: t.investorApplications.rejected,    value: applications.filter(a => a.status === 'rejected').length,                                                        icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
   ];
 
   return (
@@ -163,7 +190,7 @@ export default function InvestorApplications() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search companies, industries, founders..."
+            placeholder={t.investorApplications.searchPlaceholder}
             value={query}
             onChange={e => setQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
@@ -182,7 +209,7 @@ export default function InvestorApplications() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               )}
             >
-              {tab.label}
+              {filterLabels[tab.id] || tab.label}
             </button>
           ))}
         </div>
@@ -256,12 +283,12 @@ export default function InvestorApplications() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || 'Untitled'}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || t.investorApplications.untitled}</p>
                     <StageBadge stage={app.companyStage} />
                     <StatusBadge status={app.status} />
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span>{app.companyIndustry || 'No industry'}</span>
+                    <span>{app.companyIndustry || t.investorApplications.noIndustry}</span>
                     {app.companyLocation && (
                       <>
                         <span className="text-gray-300">|</span>
