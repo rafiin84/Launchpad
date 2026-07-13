@@ -6,6 +6,7 @@ import {
   Upload, Check, Send, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
   canApplyAgain,
@@ -90,10 +91,26 @@ function progressPercent(status: ApplicationStatus): number {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
+  const { t } = useLanguage();
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.submitted;
+  const statusLabels: Record<string, string> = {
+    draft: t.applicationTracker.statusDraft,
+    submitted: t.applicationTracker.statusSubmitted,
+    under_review: t.applicationTracker.statusUnderReview,
+    interested: t.applicationTracker.statusInterested,
+    more_info_requested: t.applicationTracker.statusMoreInfo,
+    documents_requested: t.applicationTracker.statusDocsRequested,
+    shortlisted: t.applicationTracker.statusShortlisted,
+    meeting_scheduled: t.applicationTracker.statusMeeting,
+    due_diligence: t.applicationTracker.statusDueDiligence,
+    on_hold: t.applicationTracker.statusOnHold,
+    approved: t.applicationTracker.statusApproved,
+    invested: t.applicationTracker.statusInvested,
+    rejected: t.applicationTracker.statusRejected,
+  };
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
-      {cfg.label}
+      {statusLabels[status] || cfg.label}
     </span>
   );
 }
@@ -113,6 +130,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 }
 
 function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
+  const { t } = useLanguage();
   const nonDraft = apps.filter(a => a.status !== 'draft');
   const counts: Record<string, number> = {};
   for (const a of nonDraft) {
@@ -120,19 +138,19 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
   }
 
   const allStages: { status: ApplicationStatus; label: string }[] = [
-    { status: 'submitted', label: 'Submitted' },
-    { status: 'under_review', label: 'Under Review' },
-    { status: 'shortlisted', label: 'Shortlisted' },
-    { status: 'meeting_scheduled', label: 'Meeting' },
-    { status: 'due_diligence', label: 'Due Diligence' },
-    { status: 'approved', label: 'Approved' },
-    { status: 'on_hold', label: 'On Hold' },
-    { status: 'rejected', label: 'Rejected' },
+    { status: 'submitted', label: t.applicationTracker.statusSubmitted },
+    { status: 'under_review', label: t.applicationTracker.statusUnderReview },
+    { status: 'shortlisted', label: t.applicationTracker.statusShortlisted },
+    { status: 'meeting_scheduled', label: t.applicationTracker.statusMeeting },
+    { status: 'due_diligence', label: t.applicationTracker.statusDueDiligence },
+    { status: 'approved', label: t.applicationTracker.statusApproved },
+    { status: 'on_hold', label: t.applicationTracker.statusOnHold },
+    { status: 'rejected', label: t.applicationTracker.statusRejected },
   ];
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-6 overflow-x-auto">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">Application Pipeline</h3>
+      <h3 className="text-sm font-semibold text-gray-900 mb-4">{t.applicationTracker.applicationPipeline}</h3>
       <div className="flex items-center gap-1 min-w-[640px]">
         {allStages.map((stage, i) => {
           const count = counts[stage.status] || 0;
@@ -190,6 +208,7 @@ function parseInvestorMessages(notes: string): ParsedMessage[] {
 }
 
 function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; reviewedBy?: string; reviewedAt?: string }) {
+  const { t } = useLanguage();
   const messages = parseInvestorMessages(notes);
 
   if (messages.length === 0 && !notes) return null;
@@ -199,7 +218,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
       <div className="flex items-center gap-1.5 mb-2.5">
         <MessageSquare size={12} className="text-indigo-500" />
         <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">
-          Messages from Investor
+          {t.applicationTracker.messagesFromInvestor}
         </p>
       </div>
       {messages.length > 0 ? (
@@ -229,6 +248,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 }
 
 function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
+  const { t } = useLanguage();
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
   const [localDocs, setLocalDocs] = useState<RequestedDocument[]>(requestedDocs);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -341,10 +361,10 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
       <div className="flex items-center gap-1.5 mb-2.5">
         <Upload size={12} className="text-yellow-600" />
         <p className="text-[10px] font-semibold text-yellow-600 uppercase tracking-wider">
-          Requested Documents
+          {t.applicationTracker.requestedDocuments}
         </p>
         <span className="text-[10px] text-gray-400 ml-auto">
-          {uploadedDocs.length + submittedDocs.length}/{localDocs.length} uploaded
+          {uploadedDocs.length + submittedDocs.length}/{localDocs.length} {t.applicationTracker.uploaded}
         </span>
       </div>
 
@@ -375,7 +395,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
               className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-yellow-500 hover:bg-yellow-600 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
             >
               <Upload size={11} />
-              {uploading === doc.type ? 'Uploading...' : 'Upload'}
+              {uploading === doc.type ? t.applicationTracker.uploading : 'Upload'}
             </button>
           </div>
         ))}
@@ -389,7 +409,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
             <div className="flex items-center gap-2">
               {doc.fileName && <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{doc.fileName}</span>}
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded-full">
-                <Check size={10} /> Ready
+                <Check size={10} /> {t.applicationTracker.ready}
               </span>
             </div>
           </div>
@@ -404,7 +424,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
             <div className="flex items-center gap-2">
               {doc.fileName && <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{doc.fileName}</span>}
               <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full">
-                <Check size={10} /> Submitted
+                <Check size={10} /> {t.applicationTracker.submittedStatus}
               </span>
             </div>
           </div>
@@ -418,13 +438,13 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
           className="mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
         >
           <Send size={13} />
-          {submitting ? 'Submitting Documents...' : `Submit ${uploadedDocs.length} Document${uploadedDocs.length !== 1 ? 's' : ''} to Investor`}
+          {submitting ? t.applicationTracker.submittingDocuments : t.applicationTracker.submitDocuments.replace('{n}', String(uploadedDocs.length)).replace('{s}', uploadedDocs.length !== 1 ? 's' : '')}
         </button>
       )}
 
       {allDone && (
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-600 font-medium">
-          <CheckCircle size={12} /> All documents have been submitted
+          <CheckCircle size={12} /> {t.applicationTracker.allDocumentsSubmitted}
         </div>
       )}
     </div>
@@ -434,6 +454,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
 const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
 
 function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void }) {
+  const { t } = useLanguage();
   const cfg = STATUS_CONFIG[app.status] ?? STATUS_CONFIG.submitted;
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
@@ -454,25 +475,25 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
       {needsAction && (
         <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mb-3">
           <Clock size={12} />
-          {app.status === 'more_info_requested' ? 'Investor has requested more information' : 'Investor has requested documents'}
+          {app.status === 'more_info_requested' ? t.applicationTracker.moreInfoRequested : t.applicationTracker.docsRequested}
         </div>
       )}
       {isApproved && (
         <div className="flex items-center gap-2 text-xs font-medium text-green-700 bg-green-100 rounded-lg px-3 py-1.5 mb-3">
           <CheckCircle size={12} />
-          Your application has been approved! You are now a Founder.
+          {t.applicationTracker.applicationApproved}
         </div>
       )}
       {app.status === 'on_hold' && (
         <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 mb-3">
           <Clock size={12} />
-          Your application is currently on hold.
+          {t.applicationTracker.applicationOnHold}
         </div>
       )}
       {app.status === 'rejected' && (
         <div className="flex items-center gap-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-1.5 mb-3">
           <XCircle size={12} />
-          Your application has been declined.
+          {t.applicationTracker.applicationDeclined}
         </div>
       )}
       {/* Top row */}
@@ -520,7 +541,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
             />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
-            {app.status === 'rejected' ? 'Rejected' : `${PIPELINE_STAGES[stageIndex(app.status)]?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Submitted'} (${progress}%)`}
+            {app.status === 'rejected' ? t.applicationTracker.statusRejected : `${PIPELINE_STAGES[stageIndex(app.status)]?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || t.applicationTracker.statusSubmitted} (${progress}%)`}
           </p>
         </div>
       )}
@@ -532,7 +553,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
             to={`/applications/apply?edit=${app.id}`}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
           >
-            <FileText size={12} /> Continue Editing
+            <FileText size={12} /> {t.applicationTracker.continueEditing}
           </Link>
         ) : (
           <>
@@ -540,7 +561,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
               onClick={onToggle}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
             >
-              {expanded ? 'Hide Details' : 'View Details'}
+              {expanded ? t.applicationTracker.hideDetails : t.applicationTracker.viewDetails}
               <ArrowRight size={12} className={cn('transition-transform', expanded && 'rotate-90')} />
             </button>
             {!isApproved && app.status !== 'rejected' && (
@@ -548,7 +569,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
                 to={`/applications/apply?edit=${app.id}`}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
               >
-                <Edit2 size={12} /> Edit Application
+                <Edit2 size={12} /> {t.applicationTracker.editApplication}
               </Link>
             )}
           </>
@@ -563,51 +584,51 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
             <div className="lg:col-span-2 space-y-3">
               {app.companyDescription && (
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.description}</p>
                   <p className="text-xs text-gray-700 leading-relaxed">{app.companyDescription}</p>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
                 {app.companyStage && (
                   <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Stage</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.stage}</p>
                     <p className="text-xs text-gray-700">{app.companyStage}</p>
                   </div>
                 )}
                 {app.companyLocation && (
                   <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Location</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.location}</p>
                     <p className="text-xs text-gray-700">{app.companyLocation}</p>
                   </div>
                 )}
                 {app.currentRevenue && (
                   <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Revenue</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.revenue}</p>
                     <p className="text-xs text-gray-700">{formatCurrency(app.currentRevenue)}</p>
                   </div>
                 )}
                 {app.equityOffered && (
                   <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Equity Offered</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.equityOffered}</p>
                     <p className="text-xs text-gray-700">{app.equityOffered}%</p>
                   </div>
                 )}
               </div>
               {app.problemStatement && (
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Problem</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.problem}</p>
                   <p className="text-xs text-gray-700 leading-relaxed">{app.problemStatement}</p>
                 </div>
               )}
               {app.solution && (
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Solution</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.solution}</p>
                   <p className="text-xs text-gray-700 leading-relaxed">{app.solution}</p>
                 </div>
               )}
               {app.useOfFunds && (
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Use of Funds</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.useOfFunds}</p>
                   <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
                 </div>
               )}
@@ -624,7 +645,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
                   <div className="flex items-center gap-1.5 mb-2.5">
                     <Clock size={12} className="text-violet-600" />
                     <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
-                      Meeting Scheduled
+                      {t.applicationTracker.meetingScheduled}
                     </p>
                   </div>
                   <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
@@ -636,7 +657,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
                       </span>
                     </p>
                     {app.meetingLocation && (
-                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Location:</span> {app.meetingLocation}</p>
+                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.location}:</span> {app.meetingLocation}</p>
                     )}
                     {app.meetingLink && (
                       <p className="text-[11px] text-gray-600">
@@ -645,7 +666,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
                       </p>
                     )}
                     {app.meetingAgenda && (
-                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
+                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.agenda}:</span> {app.meetingAgenda}</p>
                     )}
                   </div>
                 </div>
@@ -680,7 +701,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
                   </span>
                 </p>
                 {app.meetingAgenda && (
-                  <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">Agenda:</span> {app.meetingAgenda}</p>
+                  <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.agenda}:</span> {app.meetingAgenda}</p>
                 )}
               </div>
             </div>
@@ -694,6 +715,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function FounderApplicationTracker() {
+  const { t } = useLanguage();
   const { currentUser, isInvestor } = useAuth();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -728,15 +750,15 @@ export default function FounderApplicationTracker() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <PageHeader
-        title="My Application"
-        description="Track the status of your investment proposal"
+        title={t.applicationTracker.myApplication}
+        description={t.applicationTracker.trackDescription}
         action={
           allowNewApplication ? (
             <Link
               to="/applications/apply"
               className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
             >
-              <Plus size={14} /> {applications.some(a => a.status === 'rejected') ? 'Re-Apply' : 'New Application'}
+              <Plus size={14} /> {applications.some(a => a.status === 'rejected') ? t.applicationTracker.reApply : t.applicationTracker.newApplication}
             </Link>
           ) : null
         }
@@ -746,7 +768,7 @@ export default function FounderApplicationTracker() {
       {loading && (
         <div className="text-center py-20">
           <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Loading applications...</p>
+          <p className="text-sm text-gray-500">{t.applicationTracker.loadingApplications}</p>
         </div>
       )}
 
@@ -754,13 +776,13 @@ export default function FounderApplicationTracker() {
       {!loading && isEmpty && (
         <div className="text-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No application yet</p>
-          <p className="text-xs text-gray-400 mb-5">Submit your investment proposal to get started</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.applicationTracker.noApplicationYet}</p>
+          <p className="text-xs text-gray-400 mb-5">{t.applicationTracker.noApplicationDesc}</p>
           <Link
             to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
-            <Plus size={14} /> Apply Now
+            <Plus size={14} /> {t.applicationTracker.applyNow}
           </Link>
         </div>
       )}
@@ -771,25 +793,25 @@ export default function FounderApplicationTracker() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <StatCard
               icon={<FileText size={16} className="text-indigo-500" />}
-              label="Total Submitted"
+              label={t.applicationTracker.totalSubmitted}
               value={totalSubmitted}
               color="bg-indigo-50"
             />
             <StatCard
               icon={<TrendingUp size={16} className="text-amber-500" />}
-              label="In Progress"
+              label={t.applicationTracker.inProgress}
               value={inProgress}
               color="bg-amber-50"
             />
             <StatCard
               icon={<CheckCircle size={16} className="text-green-500" />}
-              label="Approved"
+              label={t.applicationTracker.approved}
               value={approved}
               color="bg-green-50"
             />
             <StatCard
               icon={<XCircle size={16} className="text-red-500" />}
-              label="Rejected"
+              label={t.applicationTracker.rejected}
               value={rejected}
               color="bg-red-50"
             />
@@ -803,7 +825,7 @@ export default function FounderApplicationTracker() {
             <div className="mb-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                 <FileText size={14} className="text-amber-500" />
-                Drafts
+                {t.applicationTracker.drafts}
                 <span className="text-xs font-medium text-gray-400">{drafts.length}</span>
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -825,7 +847,7 @@ export default function FounderApplicationTracker() {
             <div className="mb-6">
               <h2 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                 <CheckCircle size={14} className="text-green-500" />
-                Approved
+                {t.applicationTracker.approved}
                 <span className="text-xs font-medium text-green-400">{approvedApps.length}</span>
               </h2>
               <div className="space-y-4">
@@ -846,7 +868,7 @@ export default function FounderApplicationTracker() {
           {activeApps.length > 0 && (
             <div className="mb-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">
-                In Progress
+                {t.applicationTracker.inProgress}
                 <span className="ml-2 text-xs font-medium text-gray-400">{activeApps.length}</span>
               </h2>
               <div className="space-y-4">
@@ -868,7 +890,7 @@ export default function FounderApplicationTracker() {
             <div>
               <h2 className="text-sm font-semibold text-red-600 mb-3 flex items-center gap-2">
                 <XCircle size={14} className="text-red-400" />
-                Rejected
+                {t.applicationTracker.rejected}
                 <span className="text-xs font-medium text-red-300">{rejectedApps.length}</span>
               </h2>
               <div className="space-y-4">
