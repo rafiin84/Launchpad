@@ -500,8 +500,8 @@ export default function FounderDetail() {
                 <Building2 size={18} className="text-indigo-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-indigo-900">View Company Profile</p>
-                <p className="text-xs text-indigo-600 mt-0.5">See full company details, metrics, and financials</p>
+                <p className="text-sm font-semibold text-indigo-900">{t.founderDetail.viewCompanyProfile}</p>
+                <p className="text-xs text-indigo-600 mt-0.5">{t.founderDetail.viewCompanyProfileDesc}</p>
               </div>
               <ExternalLink size={14} className="text-indigo-400 group-hover:text-indigo-600 transition-colors flex-shrink-0" />
             </div>
@@ -510,7 +510,7 @@ export default function FounderDetail() {
           {/* Portal Access Card */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-900">Portal Access</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t.founderDetail.portalAccess}</h3>
               {portalStatus && (
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                   portalStatus === 'active'
@@ -522,7 +522,7 @@ export default function FounderDetail() {
                   {portalStatus === 'active' && <CheckCircle size={12} />}
                   {portalStatus === 'invited' && <Clock size={12} />}
                   {portalStatus === 'disabled' && <XCircle size={12} />}
-                  {portalStatus === 'active' ? 'Active' : portalStatus === 'invited' ? 'Pending Invitation' : 'Disabled'}
+                  {portalStatus === 'active' ? t.founderDetail.active : portalStatus === 'invited' ? t.founderDetail.pendingInvitation : t.founderDetail.disabled}
                 </span>
               )}
             </div>
@@ -548,9 +548,9 @@ export default function FounderDetail() {
                         ? 'text-amber-800'
                         : 'text-red-700'
                     }`}>
-                      {portalStatus === 'active' && 'Portal access active'}
-                      {portalStatus === 'invited' && 'Invitation sent — pending acceptance'}
-                      {portalStatus === 'disabled' && 'Portal access disabled'}
+                      {portalStatus === 'active' && t.founderDetail.portalAccessActive}
+                      {portalStatus === 'invited' && t.founderDetail.invitationSentPending}
+                      {portalStatus === 'disabled' && t.founderDetail.portalAccessDisabled}
                     </p>
                     <p className={`text-xs truncate ${
                       portalStatus === 'active'
@@ -566,15 +566,15 @@ export default function FounderDetail() {
                 {portalStatus !== 'invited' && (
                   <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-800">Portal Access</p>
+                      <p className="text-sm font-medium text-gray-800">{t.founderDetail.portalAccess}</p>
                       <p className="text-xs text-gray-500">
-                        {portalStatus === 'active' ? 'User can access the portal' : 'User cannot access the portal'}
+                        {portalStatus === 'active' ? t.founderDetail.userCanAccessPortal : t.founderDetail.userCannotAccessPortal}
                       </p>
                     </div>
                     <button
                       onClick={handleToggle}
                       className="relative"
-                      aria-label={portalStatus === 'active' ? 'Disable user' : 'Activate user'}
+                      aria-label={portalStatus === 'active' ? t.founderDetail.disableUserAria : t.founderDetail.activateUserAria}
                     >
                       <div className={`w-11 h-6 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                         <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[22px]' : 'left-0.5'}`} />
@@ -589,7 +589,7 @@ export default function FounderDetail() {
                     onClick={handleActivate}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                   >
-                    <CheckCircle size={13} /> Mark as Active
+                    <CheckCircle size={13} /> {t.founderDetail.markAsActive}
                   </button>
                 )}
 
@@ -600,18 +600,18 @@ export default function FounderDetail() {
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors px-1 py-1"
                 >
                   <RefreshCw size={11} className={inviting ? 'animate-spin' : ''} />
-                  {inviting ? 'Re-sending...' : 'Re-send Invitation'}
+                  {inviting ? t.founderDetail.reSendingInvitation : t.founderDetail.reSendInvitation}
                 </button>
               </div>
             ) : founder.email ? (
               <div className="space-y-3">
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Send a portal invitation so this founder can log in to Launchpad.
+                  {t.founderDetail.sendInvitationDesc}
                 </p>
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
                   <Mail size={15} className="text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">Invitation will be sent to</p>
+                    <p className="text-sm font-medium text-gray-700 truncate">{t.founderDetail.invitationWillBeSentTo}</p>
                     <p className="text-xs text-indigo-600 truncate">{founder.email}</p>
                   </div>
                   <button
@@ -620,9 +620,9 @@ export default function FounderDetail() {
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all flex-shrink-0 bg-black text-white hover:bg-gray-800 disabled:opacity-50"
                   >
                     {inviting ? (
-                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+                      <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t.founderDetail.sending}</>
                     ) : (
-                      <><Send size={12} /> Send Invite</>
+                      <><Send size={12} /> {t.founderDetail.sendInvite}</>
                     )}
                   </button>
                 </div>
@@ -630,7 +630,7 @@ export default function FounderDetail() {
             ) : (
               <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-4 py-3">
                 <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
-                <p className="text-xs text-amber-700">No email address available. Add an email to send an invitation.</p>
+                <p className="text-xs text-amber-700">{t.founderDetail.noEmailAvailable}</p>
               </div>
             )}
           </div>
@@ -641,7 +641,7 @@ export default function FounderDetail() {
 
           {/* Company card */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Company</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">{t.founderDetail.company}</h3>
             {founder.company ? (
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0">
@@ -655,7 +655,7 @@ export default function FounderDetail() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400">No company listed</p>
+              <p className="text-sm text-gray-400">{t.founderDetail.noCompanyListed}</p>
             )}
             {founder.department && (
               <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
@@ -667,11 +667,11 @@ export default function FounderDetail() {
 
           {/* Lead source & metadata */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Details</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">{t.founderDetail.details}</h3>
             <div className="space-y-3">
               {founder.leadSource && founder.leadSource !== '-None-' && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Lead Source</p>
+                  <p className="text-xs text-gray-400 mb-1">{t.founderDetail.leadSource}</p>
                   <span className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full font-medium">
                     {founder.leadSource}
                   </span>
@@ -679,13 +679,13 @@ export default function FounderDetail() {
               )}
               {founder.salutation && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Salutation</p>
+                  <p className="text-xs text-gray-400 mb-1">{t.founderDetail.salutation}</p>
                   <p className="text-sm text-gray-700">{founder.salutation}</p>
                 </div>
               )}
               {joined && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Created</p>
+                  <p className="text-xs text-gray-400 mb-1">{t.founderDetail.created}</p>
                   <p className="text-sm text-gray-700">{joined}</p>
                 </div>
               )}
@@ -694,14 +694,14 @@ export default function FounderDetail() {
 
           {/* Quick actions */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Quick Actions</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">{t.founderDetail.quickActions}</h3>
             <div className="space-y-2">
               {founder.email && (
                 <a
                   href={`mailto:${founder.email}`}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Mail size={14} className="text-gray-400" /> Send Email
+                  <Mail size={14} className="text-gray-400" /> {t.founderDetail.sendEmail}
                 </a>
               )}
               {(founder.phone || founder.mobile) && (
@@ -709,14 +709,14 @@ export default function FounderDetail() {
                   href={`tel:${founder.phone || founder.mobile}`}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Phone size={14} className="text-gray-400" /> Call
+                  <Phone size={14} className="text-gray-400" /> {t.founderDetail.call}
                 </a>
               )}
               <button
                 onClick={() => setShowDeleteModal(true)}
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-50 transition-colors w-full text-left"
               >
-                <Trash2 size={14} /> Remove Founder
+                <Trash2 size={14} /> {t.founderDetail.removeFounder}
               </button>
             </div>
           </div>

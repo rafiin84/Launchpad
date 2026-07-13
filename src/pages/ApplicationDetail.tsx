@@ -270,7 +270,7 @@ function RequestDocsModal({
                   <span className="text-xs font-medium text-gray-800 flex-1">{type}</span>
                   {isUploaded && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                      <Check size={10} /> Uploaded
+                      <Check size={10} /> {t.applicationDetail.uploadedTag}
                     </span>
                   )}
                 </label>
@@ -295,7 +295,7 @@ function RequestDocsModal({
                   <span className="text-xs font-medium text-gray-800 flex-1">{type}</span>
                   {isUploaded && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                      <Check size={10} /> Uploaded
+                      <Check size={10} /> {t.applicationDetail.uploadedTag}
                     </span>
                   )}
                 </label>
@@ -310,7 +310,7 @@ function RequestDocsModal({
               value={customDoc}
               onChange={e => setCustomDoc(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addCustom()}
-              placeholder="Add custom document type..."
+              placeholder={t.applicationDetail.addCustomDocPlaceholder}
               className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
             />
             <button
@@ -318,26 +318,26 @@ function RequestDocsModal({
               disabled={!customDoc.trim()}
               className="text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2 disabled:opacity-40"
             >
-              Add
+              {t.applicationDetail.add}
             </button>
           </div>
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-gray-50/50">
-          <p className="text-xs text-gray-500">{selected.size} document{selected.size !== 1 ? 's' : ''} selected</p>
+          <p className="text-xs text-gray-500">{t.applicationDetail.documentsSelected.replace('{count}', String(selected.size)).replace('{s}', selected.size !== 1 ? 's' : '')}</p>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="text-xs font-medium text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              Cancel
+              {t.applicationDetail.cancel}
             </button>
             <button
               onClick={handleSubmit}
               disabled={selected.size === 0}
               className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50"
             >
-              Request Documents
+              {t.applicationDetail.requestDocumentsButton}
             </button>
           </div>
         </div>
@@ -348,7 +348,7 @@ function RequestDocsModal({
 
 // ─── Action Confirm Modal ────────────────────────────────────────────────────
 
-const ACTION_CONFIRM_CONFIG: Record<string, {
+function getActionConfirmConfig(t: TranslationKeys): Record<string, {
   title: string;
   description: string;
   confirmLabel: string;
@@ -356,62 +356,64 @@ const ACTION_CONFIRM_CONFIG: Record<string, {
   icon: React.ElementType;
   iconColor: string;
   iconBg: string;
-}> = {
-  approved: {
-    title: 'Approve Application',
-    description: 'This will approve the application and create a portfolio record for this company. The founder will be notified immediately.',
-    confirmLabel: 'Approve Application',
-    confirmColor: 'bg-green-600 hover:bg-green-700',
-    icon: CheckCircle2,
-    iconColor: 'text-green-600',
-    iconBg: 'bg-green-50',
-  },
-  on_hold: {
-    title: 'Put On Hold',
-    description: 'This will place the application on hold. The founder will be notified that their application is being paused temporarily.',
-    confirmLabel: 'Put On Hold',
-    confirmColor: 'bg-slate-600 hover:bg-slate-700',
-    icon: Pause,
-    iconColor: 'text-slate-600',
-    iconBg: 'bg-slate-100',
-  },
-  rejected: {
-    title: 'Reject Application',
-    description: 'This will reject the application. The founder will be notified that their application was not selected to move forward. This action cannot be easily undone.',
-    confirmLabel: 'Reject Application',
-    confirmColor: 'bg-red-600 hover:bg-red-700',
-    icon: XCircle,
-    iconColor: 'text-red-600',
-    iconBg: 'bg-red-50',
-  },
-  more_info_requested: {
-    title: 'Request More Information',
-    description: 'The founder will be notified to provide additional information about their application. You can also send a specific message using the "Send Message" button.',
-    confirmLabel: 'Request Info',
-    confirmColor: 'bg-amber-600 hover:bg-amber-700',
-    icon: Info,
-    iconColor: 'text-amber-600',
-    iconBg: 'bg-amber-50',
-  },
-  meeting_scheduled: {
-    title: 'Schedule Meeting',
-    description: 'This will mark the application as "Meeting Scheduled" and notify the founder. Please coordinate the actual meeting details separately.',
-    confirmLabel: 'Schedule Meeting',
-    confirmColor: 'bg-violet-600 hover:bg-violet-700',
-    icon: Calendar,
-    iconColor: 'text-violet-600',
-    iconBg: 'bg-violet-50',
-  },
-  shortlisted: {
-    title: 'Shortlist Application',
-    description: 'This will shortlist the application for further evaluation. The founder will be notified that their application has been selected for deeper review.',
-    confirmLabel: 'Shortlist',
-    confirmColor: 'bg-purple-600 hover:bg-purple-700',
-    icon: Star,
-    iconColor: 'text-purple-600',
-    iconBg: 'bg-purple-50',
-  },
-};
+}> {
+  return {
+    approved: {
+      title: t.applicationDetail.approveTitle,
+      description: t.applicationDetail.approveDesc,
+      confirmLabel: t.applicationDetail.approveConfirm,
+      confirmColor: 'bg-green-600 hover:bg-green-700',
+      icon: CheckCircle2,
+      iconColor: 'text-green-600',
+      iconBg: 'bg-green-50',
+    },
+    on_hold: {
+      title: t.applicationDetail.holdTitle,
+      description: t.applicationDetail.holdDesc,
+      confirmLabel: t.applicationDetail.holdConfirm,
+      confirmColor: 'bg-slate-600 hover:bg-slate-700',
+      icon: Pause,
+      iconColor: 'text-slate-600',
+      iconBg: 'bg-slate-100',
+    },
+    rejected: {
+      title: t.applicationDetail.rejectTitle,
+      description: t.applicationDetail.rejectDesc,
+      confirmLabel: t.applicationDetail.rejectConfirm,
+      confirmColor: 'bg-red-600 hover:bg-red-700',
+      icon: XCircle,
+      iconColor: 'text-red-600',
+      iconBg: 'bg-red-50',
+    },
+    more_info_requested: {
+      title: t.applicationDetail.requestInfoTitle,
+      description: t.applicationDetail.requestInfoDesc,
+      confirmLabel: t.applicationDetail.requestInfoConfirm,
+      confirmColor: 'bg-amber-600 hover:bg-amber-700',
+      icon: Info,
+      iconColor: 'text-amber-600',
+      iconBg: 'bg-amber-50',
+    },
+    meeting_scheduled: {
+      title: t.applicationDetail.scheduleMeetingTitle,
+      description: t.applicationDetail.scheduleMeetingDesc,
+      confirmLabel: t.applicationDetail.scheduleMeetingConfirm,
+      confirmColor: 'bg-violet-600 hover:bg-violet-700',
+      icon: Calendar,
+      iconColor: 'text-violet-600',
+      iconBg: 'bg-violet-50',
+    },
+    shortlisted: {
+      title: t.applicationDetail.shortlistTitle,
+      description: t.applicationDetail.shortlistDesc,
+      confirmLabel: t.applicationDetail.shortlistConfirm,
+      confirmColor: 'bg-purple-600 hover:bg-purple-700',
+      icon: Star,
+      iconColor: 'text-purple-600',
+      iconBg: 'bg-purple-50',
+    },
+  };
+}
 
 function ActionConfirmModal({
   status,
@@ -424,7 +426,8 @@ function ActionConfirmModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  const config = ACTION_CONFIRM_CONFIG[status];
+  const { t } = useLanguage();
+  const config = getActionConfirmConfig(t)[status];
   if (!config) return null;
 
   const Icon = config.icon;
@@ -445,7 +448,7 @@ function ActionConfirmModal({
             onClick={onClose}
             className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
           >
-            Cancel
+            {t.applicationDetail.cancel}
           </button>
           <button
             onClick={onConfirm}
@@ -472,6 +475,7 @@ function ApproveApplicationModal({
   onSubmit: (data: { investmentAmount: string; paymentType: string; investmentDate: string; equityOffered: string; investmentNotes: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [amount, setAmount] = useState(app.fundingAsk || '');
   const [paymentType, setPaymentType] = useState('');
   const [investDate, setInvestDate] = useState(new Date().toISOString().split('T')[0]);
@@ -481,9 +485,9 @@ function ApproveApplicationModal({
 
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
-    if (!amount.trim()) errs.amount = 'Investment amount is required';
-    if (!paymentType) errs.paymentType = 'Payment type is required';
-    if (!investDate) errs.investDate = 'Investment date is required';
+    if (!amount.trim()) errs.amount = t.applicationDetail.amountRequired;
+    if (!paymentType) errs.paymentType = t.applicationDetail.paymentTypeRequired;
+    if (!investDate) errs.investDate = t.applicationDetail.investmentDateRequired;
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
     onSubmit({
@@ -502,17 +506,17 @@ function ApproveApplicationModal({
           <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
             <CheckCircle2 size={22} className="text-green-600" />
           </div>
-          <h3 className="text-base font-bold text-gray-900 mb-1">Approve & Invest</h3>
+          <h3 className="text-base font-bold text-gray-900 mb-1">{t.applicationDetail.approveInvestTitle}</h3>
           <p className="text-xs text-gray-500 mb-1 font-medium">{app.companyName}</p>
           <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
-            Complete the investment details below. This will approve the application, create a portfolio record, and move the applicant to the Founders page.
+            {t.applicationDetail.approveInvestDesc}
           </p>
 
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                  Investment Amount <span className="text-red-500">*</span>
+                  {t.applicationDetail.investmentAmount} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
@@ -531,13 +535,13 @@ function ApproveApplicationModal({
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                  Equity Offered (%)
+                  {t.applicationDetail.equityOfferedPct}
                 </label>
                 <input
                   type="text"
                   value={equity}
                   onChange={e => setEquity(e.target.value)}
-                  placeholder="e.g. 10"
+                  placeholder={t.applicationDetail.equityOfferedPlaceholder}
                   className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400"
                 />
               </div>
@@ -545,7 +549,7 @@ function ApproveApplicationModal({
 
             <div>
               <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                Payment Type <span className="text-red-500">*</span>
+                {t.applicationDetail.paymentType} <span className="text-red-500">*</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {PAYMENT_TYPES.map(pt => (
@@ -569,7 +573,7 @@ function ApproveApplicationModal({
 
             <div>
               <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                Investment Date <span className="text-red-500">*</span>
+                {t.applicationDetail.investmentDate} <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -584,11 +588,11 @@ function ApproveApplicationModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Notes</label>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">{t.applicationDetail.notes}</label>
               <textarea
                 value={investNotes}
                 onChange={e => setInvestNotes(e.target.value)}
-                placeholder="Any additional notes about this investment..."
+                placeholder={t.applicationDetail.investmentNotesPlaceholder}
                 rows={2}
                 className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-400"
               />
@@ -601,13 +605,13 @@ function ApproveApplicationModal({
             onClick={onClose}
             className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
           >
-            Cancel
+            {t.applicationDetail.cancel}
           </button>
           <button
             onClick={handleSubmit}
             className="flex-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2.5 rounded-xl transition-colors"
           >
-            Approve & Invest
+            {t.applicationDetail.approveInvestButton}
           </button>
         </div>
       </div>
@@ -626,6 +630,7 @@ function ScheduleMeetingModal({
   onSubmit: (data: { meetingDate: string; meetingLocation: string; meetingLink: string; meetingAgenda: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
@@ -635,9 +640,9 @@ function ScheduleMeetingModal({
 
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
-    if (!date) errs.date = 'Date is required';
-    if (!time) errs.time = 'Time is required';
-    if (!agenda.trim()) errs.agenda = 'Agenda is required';
+    if (!date) errs.date = t.applicationDetail.dateRequired;
+    if (!time) errs.time = t.applicationDetail.timeRequired;
+    if (!agenda.trim()) errs.agenda = t.applicationDetail.agendaRequired;
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
     const meetingDate = new Date(`${date}T${time}`).toISOString();
@@ -653,14 +658,14 @@ function ScheduleMeetingModal({
           <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
             <Calendar size={22} className="text-violet-600" />
           </div>
-          <h3 className="text-base font-bold text-gray-900 mb-1">Schedule Meeting</h3>
+          <h3 className="text-base font-bold text-gray-900 mb-1">{t.applicationDetail.scheduleMeetingModalTitle}</h3>
           <p className="text-xs text-gray-500 mb-4">{companyName}</p>
 
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                  Date <span className="text-red-500">*</span>
+                  {t.applicationDetail.date} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -676,7 +681,7 @@ function ScheduleMeetingModal({
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                  Time <span className="text-red-500">*</span>
+                  {t.applicationDetail.time} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="time"
@@ -692,35 +697,35 @@ function ScheduleMeetingModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Location</label>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">{t.applicationDetail.location}</label>
               <input
                 type="text"
                 value={location}
                 onChange={e => setLocation(e.target.value)}
-                placeholder="e.g. Office, Conference Room A"
+                placeholder={t.applicationDetail.locationPlaceholder}
                 className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Meeting Link</label>
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1">{t.applicationDetail.meetingLink}</label>
               <input
                 type="url"
                 value={link}
                 onChange={e => setLink(e.target.value)}
-                placeholder="e.g. https://zoom.us/j/..."
+                placeholder={t.applicationDetail.meetingLinkPlaceholder}
                 className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
               />
             </div>
 
             <div>
               <label className="block text-[11px] font-semibold text-gray-600 mb-1">
-                Agenda / Notes <span className="text-red-500">*</span>
+                {t.applicationDetail.agendaNotes} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={agenda}
                 onChange={e => { setAgenda(e.target.value); setErrors(p => ({ ...p, agenda: '' })); }}
-                placeholder="What will be discussed in the meeting?"
+                placeholder={t.applicationDetail.agendaPlaceholder}
                 rows={3}
                 className={cn(
                   'w-full text-xs border rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400',
@@ -737,13 +742,13 @@ function ScheduleMeetingModal({
             onClick={onClose}
             className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-colors"
           >
-            Cancel
+            {t.applicationDetail.cancel}
           </button>
           <button
             onClick={handleSubmit}
             className="flex-1 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-4 py-2.5 rounded-xl transition-colors"
           >
-            Schedule Meeting
+            {t.applicationDetail.scheduleMeetingButton}
           </button>
         </div>
       </div>
@@ -756,6 +761,7 @@ function ScheduleMeetingModal({
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
   const { currentUser, isInvestor, isFounder } = useAuth();
+  const { t, language } = useLanguage();
 
   const [app, setApp] = useState<InvestmentApplication | null>(null);
   const [loading, setLoading] = useState(true);
@@ -781,13 +787,13 @@ export default function ApplicationDetail() {
         setApp(result);
         setNotes(result.investorNotes || '');
       } else {
-        setError('Application not found');
+        setError(t.applicationDetail.applicationNotFound);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load application');
+      setError(err instanceof Error ? err.message : t.applicationDetail.failedToLoad);
     }
     setLoading(false);
-  }, [id, isInvestor]);
+  }, [id, isInvestor, t]);
 
   useEffect(() => { loadApp(); }, [loadApp]);
 
@@ -803,7 +809,7 @@ export default function ApplicationDetail() {
     try {
       await updateApplicationStatus(id, newStatus, currentUser.name, isInvestor);
 
-      const notifGen = NOTIFICATION_MESSAGES[newStatus];
+      const notifGen = getNotificationMessages(t)[newStatus];
       if (notifGen) {
         const { title, message } = notifGen(app.companyName, currentUser.name);
         addNotification({
@@ -816,11 +822,11 @@ export default function ApplicationDetail() {
           link: '/applications/track',
         });
       } else {
-        const statusLabel = STATUS_CONFIG[newStatus]?.label ?? newStatus;
+        const statusLabel = getStatusConfig(t)[newStatus]?.label ?? newStatus;
         addNotification({
           type: 'company_update',
-          title: `Application ${statusLabel}`,
-          message: `${app.companyName} has been marked as "${statusLabel}" by ${currentUser.name}.`,
+          title: t.notificationMessages.genericStatusTitle.replace('{status}', statusLabel),
+          message: t.notificationMessages.genericStatusMessage.replace('{c}', app.companyName).replace('{status}', statusLabel).replace('{i}', currentUser.name),
           actor: currentUser.name,
           actorRole: 'investor',
           targetRole: 'founder',
@@ -831,7 +837,7 @@ export default function ApplicationDetail() {
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update status';
+      const msg = err instanceof Error ? err.message : t.applicationDetail.failedToUpdateStatus;
       console.error('Failed to update status:', err);
       setActionError(msg);
     }
@@ -861,8 +867,11 @@ export default function ApplicationDetail() {
 
     addNotification({
       type: 'company_update',
-      title: 'Message from Investor',
-      message: `${currentUser.name} sent a message regarding ${app.companyName}: "${messageText.slice(0, 80)}${messageText.length > 80 ? '...' : ''}"`,
+      title: t.notificationMessages.messageFromInvestorTitle,
+      message: t.notificationMessages.messageFromInvestorMessage
+        .replace('{i}', currentUser.name)
+        .replace('{c}', app.companyName)
+        .replace('{msg}', `${messageText.slice(0, 80)}${messageText.length > 80 ? '...' : ''}`),
       actor: currentUser.name,
       actorRole: 'investor',
       targetRole: 'founder',
@@ -892,8 +901,8 @@ export default function ApplicationDetail() {
       const docNames = docs.map(d => d.type).join(', ');
       addNotification({
         type: 'company_update',
-        title: 'Documents Requested',
-        message: `${currentUser.name} has requested the following documents for ${app.companyName}: ${docNames}`,
+        title: t.notificationMessages.documentsRequestedNotifTitle,
+        message: t.notificationMessages.documentsRequestedNotifMessage.replace('{i}', currentUser.name).replace('{c}', app.companyName).replace('{docs}', docNames),
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
@@ -902,7 +911,7 @@ export default function ApplicationDetail() {
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to request documents';
+      const msg = err instanceof Error ? err.message : t.applicationDetail.failedToRequestDocuments;
       setActionError(msg);
     }
     setActionLoading(null);
@@ -916,11 +925,14 @@ export default function ApplicationDetail() {
     try {
       await approveApplication(id, currentUser.name, isInvestor, details);
 
-      const { title, message } = NOTIFICATION_MESSAGES.approved(app.companyName, currentUser.name);
+      const { title, message } = getNotificationMessages(t).approved(app.companyName, currentUser.name);
+      const investmentSuffix = t.notificationMessages.approvedInvestmentSuffix
+        .replace('{amount}', `$${Number(details.investmentAmount).toLocaleString()}`)
+        .replace('{paymentType}', details.paymentType);
       addNotification({
         type: 'company_update',
         title,
-        message: `${message} Investment: $${Number(details.investmentAmount).toLocaleString()} via ${details.paymentType}.`,
+        message: `${message}${investmentSuffix}`,
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
@@ -929,7 +941,7 @@ export default function ApplicationDetail() {
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to approve application';
+      const msg = err instanceof Error ? err.message : t.applicationDetail.failedToApprove;
       setActionError(msg);
     }
     setActionLoading(null);
@@ -948,7 +960,7 @@ export default function ApplicationDetail() {
         reviewedAt: new Date().toISOString(),
       }, isInvestor);
 
-      const meetingTime = new Date(data.meetingDate).toLocaleString('en-US', {
+      const meetingTime = new Date(data.meetingDate).toLocaleString(language === 'ja' ? 'ja-JP' : 'en-US', {
         dateStyle: 'medium', timeStyle: 'short',
       });
       const details = [meetingTime];
@@ -957,8 +969,12 @@ export default function ApplicationDetail() {
 
       addNotification({
         type: 'company_update',
-        title: 'Meeting Scheduled',
-        message: `${currentUser.name} has scheduled a meeting for ${app.companyName}: ${details.join(' · ')}. Agenda: ${data.meetingAgenda}`,
+        title: t.applicationDetail.scheduleMeetingTitle,
+        message: t.notificationMessages.meetingScheduledNotifMessage
+          .replace('{i}', currentUser.name)
+          .replace('{c}', app.companyName)
+          .replace('{details}', details.join(' · '))
+          .replace('{agenda}', data.meetingAgenda),
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
@@ -967,7 +983,7 @@ export default function ApplicationDetail() {
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to schedule meeting';
+      const msg = err instanceof Error ? err.message : t.applicationDetail.failedToScheduleMeeting;
       setActionError(msg);
     }
     setActionLoading(null);
@@ -987,23 +1003,23 @@ export default function ApplicationDetail() {
   if (error || !app) return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
-        <ArrowLeft size={15} /> Applications
+        <ArrowLeft size={15} /> {t.applications.title}
       </Link>
       <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
         <Inbox size={28} className="text-gray-200 mx-auto mb-3" />
-        <p className="text-sm font-medium text-gray-500">{error || 'Application not found'}</p>
+        <p className="text-sm font-medium text-gray-500">{error || t.applicationDetail.applicationNotFound}</p>
       </div>
     </div>
   );
 
   const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string }[] = [
-    { label: 'Approve',          status: 'approved',            icon: CheckCircle2,  color: 'text-green-600',   hoverBg: 'hover:bg-green-50',  activeBg: 'bg-green-50',  borderColor: 'border-green-300' },
-    { label: 'Hold',             status: 'on_hold',             icon: Pause,         color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50',  activeBg: 'bg-slate-100', borderColor: 'border-slate-300' },
-    { label: 'Reject',           status: 'rejected',            icon: XCircle,       color: 'text-red-600',     hoverBg: 'hover:bg-red-50',    activeBg: 'bg-red-50',    borderColor: 'border-red-300' },
-    { label: 'Request Info',     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
-    { label: 'Request Docs',     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
-    { label: 'Schedule Meeting', status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
-    { label: 'Shortlist',        status: 'shortlisted',         icon: Star,          color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50', activeBg: 'bg-purple-50', borderColor: 'border-purple-300' },
+    { label: t.applicationDetail.approve,         status: 'approved',            icon: CheckCircle2,  color: 'text-green-600',   hoverBg: 'hover:bg-green-50',  activeBg: 'bg-green-50',  borderColor: 'border-green-300' },
+    { label: t.applicationDetail.hold,            status: 'on_hold',             icon: Pause,         color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50',  activeBg: 'bg-slate-100', borderColor: 'border-slate-300' },
+    { label: t.applicationDetail.reject,          status: 'rejected',            icon: XCircle,       color: 'text-red-600',     hoverBg: 'hover:bg-red-50',    activeBg: 'bg-red-50',    borderColor: 'border-red-300' },
+    { label: t.applicationDetail.requestInfo,     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
+    { label: t.applicationDetail.requestDocs,     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
+    { label: t.applicationDetail.scheduleMeeting, status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
+    { label: t.applicationDetail.shortlist,       status: 'shortlisted',         icon: Star,          color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50', activeBg: 'bg-purple-50', borderColor: 'border-purple-300' },
   ];
 
   let supportingDocs: { name: string; url: string }[] = [];
@@ -1012,15 +1028,15 @@ export default function ApplicationDetail() {
   } catch { /* ignore */ }
 
   const financials = [
-    { label: 'Current Revenue', value: app.currentRevenue },
-    { label: 'MRR',             value: app.mrr },
-    { label: 'ARR',             value: app.arr },
-    { label: 'Monthly Burn',    value: app.monthlyBurn },
-    { label: 'Runway',          value: app.runway },
-    { label: 'Active Users',    value: app.activeUsers },
-    { label: 'MoM Growth',      value: app.momGrowth },
-    { label: 'Churn Rate',      value: app.churnRate },
-    { label: 'NPS',             value: app.nps },
+    { label: t.applicationDetail.currentRevenue, value: app.currentRevenue },
+    { label: t.applicationDetail.mrr,            value: app.mrr },
+    { label: t.applicationDetail.arr,            value: app.arr },
+    { label: t.applicationDetail.monthlyBurn,    value: app.monthlyBurn },
+    { label: t.applicationDetail.runway,         value: app.runway },
+    { label: t.applicationDetail.activeUsers,    value: app.activeUsers },
+    { label: t.applicationDetail.momGrowth,      value: app.momGrowth },
+    { label: t.applicationDetail.churnRate,      value: app.churnRate },
+    { label: t.applicationDetail.nps,            value: app.nps },
   ].filter(f => f.value);
 
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
@@ -1045,7 +1061,7 @@ export default function ApplicationDetail() {
 
       {showMeetingModal && (
         <ScheduleMeetingModal
-          companyName={app.companyName || 'this application'}
+          companyName={app.companyName || t.applicationDetail.untitledApplication}
           onSubmit={handleScheduleMeeting}
           onClose={() => setShowMeetingModal(false)}
         />
@@ -1054,7 +1070,7 @@ export default function ApplicationDetail() {
       {confirmAction && (
         <ActionConfirmModal
           status={confirmAction}
-          companyName={app.companyName || 'this application'}
+          companyName={app.companyName || t.applicationDetail.untitledApplication}
           onConfirm={() => {
             const action = confirmAction;
             setConfirmAction(null);
@@ -1065,7 +1081,7 @@ export default function ApplicationDetail() {
       )}
 
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6">
-        <ArrowLeft size={15} /> Back to Applications
+        <ArrowLeft size={15} /> {t.applicationDetail.backToApplications}
       </Link>
 
       {/* Header */}
@@ -1076,7 +1092,7 @@ export default function ApplicationDetail() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{app.companyName || 'Untitled Application'}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{app.companyName || t.applicationDetail.untitledApplication}</h1>
               <StatusBadge status={app.status} />
               {app.companyStage && <StageBadge stage={app.companyStage} />}
             </div>
@@ -1084,12 +1100,12 @@ export default function ApplicationDetail() {
               {app.companyIndustry && <span>{app.companyIndustry}</span>}
               {app.companyLocation && <><span className="text-gray-300">|</span><span>{app.companyLocation}</span></>}
               {app.founderName && <><span className="text-gray-300">|</span><span>{app.founderName}</span></>}
-              {app.submittedAt && <><span className="text-gray-300">|</span><span>Submitted {relativeTime(app.submittedAt)}</span></>}
+              {app.submittedAt && <><span className="text-gray-300">|</span><span>{t.applicationDetail.submittedAgo.replace('{time}', relativeTime(app.submittedAt, t, language))}</span></>}
             </div>
           </div>
           {app.fundingAsk && (
             <div className="text-right flex-shrink-0">
-              <p className="text-xs text-gray-500">Funding Ask</p>
+              <p className="text-xs text-gray-500">{t.applicationDetail.fundingAsk}</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(parseFloat(app.fundingAsk))}</p>
             </div>
           )}
@@ -1103,7 +1119,7 @@ export default function ApplicationDetail() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Actions */}
-          <Section title="Actions">
+          <Section title={t.applicationDetail.actions}>
             {actionError && (
               <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-medium">
                 {actionError}
@@ -1142,7 +1158,7 @@ export default function ApplicationDetail() {
                       (isApproveDisabled || isRejectDisabled) && 'opacity-50 cursor-not-allowed'
                     )}
                   >
-                    <Icon size={13} /> {isLoading ? 'Updating...' : isApproveDisabled ? 'Approved ✓' : isRejectDisabled ? 'Rejected' : a.label}
+                    <Icon size={13} /> {isLoading ? t.applicationDetail.updating : isApproveDisabled ? t.applicationDetail.approvedCheck : isRejectDisabled ? t.applicationDetail.rejectedLabel : a.label}
                   </button>
                 );
               })}
@@ -1155,7 +1171,7 @@ export default function ApplicationDetail() {
                     : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
                 )}
               >
-                <Send size={12} /> Send Message
+                <Send size={12} /> {t.applicationDetail.sendMessage}
               </button>
             </div>
             {showMessage && (
@@ -1163,7 +1179,7 @@ export default function ApplicationDetail() {
                 <textarea
                   value={messageText}
                   onChange={e => setMessageText(e.target.value)}
-                  placeholder="Type a message to the founder..."
+                  placeholder={t.applicationDetail.messagePlaceholder}
                   className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
                   rows={3}
                 />
@@ -1173,7 +1189,7 @@ export default function ApplicationDetail() {
                     disabled={sendingMessage || !messageText.trim()}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    <Send size={11} /> {sendingMessage ? 'Sending...' : 'Send Message'}
+                    <Send size={11} /> {sendingMessage ? t.applicationDetail.sending : t.applicationDetail.sendMessage}
                   </button>
                 </div>
               </div>
@@ -1182,49 +1198,49 @@ export default function ApplicationDetail() {
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (
-            <Section title="Business Overview">
+            <Section title={t.applicationDetail.businessOverview}>
               <div className="space-y-4">
-                <TextBlock label="About the Company" text={app.companyDescription} />
-                <TextBlock label="Problem" text={app.problemStatement} />
-                <TextBlock label="Solution" text={app.solution} />
-                <TextBlock label="Target Market" text={app.targetMarket} />
-                <TextBlock label="Business Model" text={app.businessModel} />
-                <TextBlock label="Competitive Advantage" text={app.competitiveAdvantage} />
+                <TextBlock label={t.applicationDetail.aboutTheCompany} text={app.companyDescription} />
+                <TextBlock label={t.applicationDetail.problem} text={app.problemStatement} />
+                <TextBlock label={t.applicationDetail.solution} text={app.solution} />
+                <TextBlock label={t.applicationDetail.targetMarket} text={app.targetMarket} />
+                <TextBlock label={t.applicationDetail.businessModel} text={app.businessModel} />
+                <TextBlock label={t.applicationDetail.competitiveAdvantage} text={app.competitiveAdvantage} />
               </div>
             </Section>
           )}
 
           {/* Funding Details */}
           {(app.fundingAsk || app.useOfFunds || app.previousFunding || app.currentValuation || app.equityOffered) && (
-            <Section title="Funding">
+            <Section title={t.applicationDetail.funding}>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {app.fundingAsk && (
                   <div>
-                    <p className="text-xs text-gray-500">Funding Ask</p>
+                    <p className="text-xs text-gray-500">{t.applicationDetail.fundingAsk}</p>
                     <p className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(app.fundingAsk))}</p>
                   </div>
                 )}
                 {app.currentValuation && (
                   <div>
-                    <p className="text-xs text-gray-500">Valuation</p>
+                    <p className="text-xs text-gray-500">{t.applicationDetail.valuation}</p>
                     <p className="text-sm font-semibold text-gray-900">{formatCurrency(parseFloat(app.currentValuation))}</p>
                   </div>
                 )}
                 {app.equityOffered && (
                   <div>
-                    <p className="text-xs text-gray-500">Equity Offered</p>
+                    <p className="text-xs text-gray-500">{t.applicationDetail.equityOffered}</p>
                     <p className="text-sm font-semibold text-gray-900">{app.equityOffered}%</p>
                   </div>
                 )}
                 {app.previousFunding && (
                   <div className="col-span-2 sm:col-span-3">
-                    <p className="text-xs text-gray-500">Previous Funding</p>
+                    <p className="text-xs text-gray-500">{t.applicationDetail.previousFunding}</p>
                     <p className="text-xs text-gray-700 leading-relaxed mt-1">{app.previousFunding}</p>
                   </div>
                 )}
                 {app.useOfFunds && (
                   <div className="col-span-2 sm:col-span-3">
-                    <p className="text-xs text-gray-500">Use of Funds</p>
+                    <p className="text-xs text-gray-500">{t.applicationDetail.useOfFunds}</p>
                     <p className="text-xs text-gray-700 leading-relaxed mt-1">{app.useOfFunds}</p>
                   </div>
                 )}
@@ -1234,7 +1250,7 @@ export default function ApplicationDetail() {
 
           {/* Financial Metrics */}
           {financials.length > 0 && (
-            <Section title="Financial Metrics">
+            <Section title={t.applicationDetail.financialMetrics}>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {financials.map(f => (
                   <div key={f.label}>
@@ -1244,7 +1260,7 @@ export default function ApplicationDetail() {
                 ))}
                 {app.keyMetric && (
                   <div>
-                    <p className="text-xs text-gray-500">{app.keyMetricLabel || 'Key Metric'}</p>
+                    <p className="text-xs text-gray-500">{app.keyMetricLabel || t.applicationDetail.keyMetric}</p>
                     <p className="text-sm font-semibold text-gray-900">{app.keyMetric}</p>
                   </div>
                 )}
@@ -1254,12 +1270,12 @@ export default function ApplicationDetail() {
 
           {/* Pitch Deck */}
           {app.pitchDeckUrl && (
-            <Section title="Pitch Deck">
+            <Section title={t.applicationDetail.pitchDeck}>
               {app.pitchDeckUrl.startsWith('data:') ? (
-                <iframe src={app.pitchDeckUrl} className="w-full rounded-xl" style={{ height: '500px' }} title="Pitch Deck" />
+                <iframe src={app.pitchDeckUrl} className="w-full rounded-xl" style={{ height: '500px' }} title={t.applicationDetail.pitchDeck} />
               ) : (
                 <a href={app.pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-                  <FileText size={14} /> {app.pitchDeckName || 'View Pitch Deck'} <ExternalLink size={10} />
+                  <FileText size={14} /> {app.pitchDeckName || t.applicationDetail.viewPitchDeck} <ExternalLink size={10} />
                 </a>
               )}
             </Section>
@@ -1267,14 +1283,14 @@ export default function ApplicationDetail() {
 
           {/* Demo Video */}
           {app.demoVideoUrl && (
-            <Section title="Demo Video">
+            <Section title={t.applicationDetail.demoVideo}>
               <VideoEmbed url={app.demoVideoUrl} />
             </Section>
           )}
 
           {/* Supporting Documents */}
           {supportingDocs.length > 0 && (
-            <Section title="Supporting Documents">
+            <Section title={t.applicationDetail.supportingDocuments}>
               <div className="space-y-2">
                 {supportingDocs.map((doc, i) => (
                   <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-indigo-600 transition-colors py-1">
@@ -1293,7 +1309,7 @@ export default function ApplicationDetail() {
 
           {/* Meeting Details */}
           {app.meetingDate && (
-            <Section title="Meeting Details">
+            <Section title={t.applicationDetail.meetingDetails}>
               <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
@@ -1301,28 +1317,28 @@ export default function ApplicationDetail() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-900">
-                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                      {new Date(app.meetingDate).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
                     <p className="text-xs text-violet-600 font-medium">
-                      {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(app.meetingDate).toLocaleTimeString(language === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
                 {app.meetingLocation && (
                   <div className="flex items-center gap-2 text-xs text-gray-700">
-                    <span className="font-semibold text-gray-500 w-16">Location</span>
+                    <span className="font-semibold text-gray-500 w-16">{t.applicationDetail.location}</span>
                     <span>{app.meetingLocation}</span>
                   </div>
                 )}
                 {app.meetingLink && (
                   <div className="flex items-center gap-2 text-xs text-gray-700">
-                    <span className="font-semibold text-gray-500 w-16">Link</span>
+                    <span className="font-semibold text-gray-500 w-16">{t.applicationDetail.link}</span>
                     <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate">{app.meetingLink}</a>
                   </div>
                 )}
                 {app.meetingAgenda && (
                   <div className="text-xs text-gray-700 pt-1 border-t border-violet-100">
-                    <span className="font-semibold text-gray-500 block mb-1">Agenda</span>
+                    <span className="font-semibold text-gray-500 block mb-1">{t.applicationDetail.agenda}</span>
                     <p className="leading-relaxed whitespace-pre-wrap">{app.meetingAgenda}</p>
                   </div>
                 )}
@@ -1332,7 +1348,7 @@ export default function ApplicationDetail() {
 
           {/* Requested Documents */}
           {requestedDocs.length > 0 && (
-            <Section title="Requested Documents">
+            <Section title={t.applicationDetail.requestedDocuments}>
               <div className="space-y-2">
                 {requestedDocs.map((doc, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
@@ -1350,27 +1366,27 @@ export default function ApplicationDetail() {
                         <>
                           {doc.attachmentId && (
                             <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
-                              <Download size={9} /> View
+                              <Download size={9} /> {t.applicationDetail.view}
                             </a>
                           )}
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                            <Check size={9} /> Submitted
+                            <Check size={9} /> {t.applicationDetail.submittedStatus}
                           </span>
                         </>
                       ) : doc.status === 'uploaded' ? (
                         <>
                           {doc.attachmentId && (
                             <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
-                              <Download size={9} /> View
+                              <Download size={9} /> {t.applicationDetail.view}
                             </a>
                           )}
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
-                            <Check size={9} /> Uploaded
+                            <Check size={9} /> {t.applicationDetail.uploadedStatus}
                           </span>
                         </>
                       ) : (
                         <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                          <Clock size={9} /> Pending
+                          <Clock size={9} /> {t.applicationDetail.pendingStatus}
                         </span>
                       )}
                     </div>
@@ -1381,38 +1397,38 @@ export default function ApplicationDetail() {
           )}
 
           {/* Company Details */}
-          <Section title="Company Info">
+          <Section title={t.applicationDetail.companyInfo}>
             <div>
-              <InfoRow label="Website" value={app.companyWebsite ? app.companyWebsite.replace(/^https?:\/\//, '') : undefined} href={app.companyWebsite ? (app.companyWebsite.startsWith('http') ? app.companyWebsite : `https://${app.companyWebsite}`) : undefined} />
-              <InfoRow label="Industry" value={app.companyIndustry} />
-              <InfoRow label="Stage" value={app.companyStage} />
-              <InfoRow label="Location" value={app.companyLocation} />
-              <InfoRow label="Founded" value={app.foundedYear} />
+              <InfoRow label={t.applicationDetail.website} value={app.companyWebsite ? app.companyWebsite.replace(/^https?:\/\//, '') : undefined} href={app.companyWebsite ? (app.companyWebsite.startsWith('http') ? app.companyWebsite : `https://${app.companyWebsite}`) : undefined} />
+              <InfoRow label={t.applicationDetail.industry} value={app.companyIndustry} />
+              <InfoRow label={t.applicationDetail.stage} value={app.companyStage} />
+              <InfoRow label={t.applicationDetail.location} value={app.companyLocation} />
+              <InfoRow label={t.applicationDetail.founded} value={app.foundedYear} />
             </div>
           </Section>
 
           {/* Founder Details */}
-          <Section title="Founder Details">
+          <Section title={t.applicationDetail.founderDetails}>
             <div>
-              <InfoRow label="Name" value={app.founderName} />
-              <InfoRow label="Email" value={app.founderEmail} href={app.founderEmail ? `mailto:${app.founderEmail}` : undefined} />
-              <InfoRow label="Phone" value={app.founderPhone} href={app.founderPhone ? `tel:${app.founderPhone}` : undefined} />
-              <InfoRow label="Role" value={app.founderRole} />
-              <InfoRow label="LinkedIn" value={app.founderLinkedin ? 'View Profile' : undefined} href={app.founderLinkedin || undefined} />
-              {app.coFounders && <InfoRow label="Co-Founders" value={app.coFounders} />}
+              <InfoRow label={t.applicationDetail.name} value={app.founderName} />
+              <InfoRow label={t.applicationDetail.email} value={app.founderEmail} href={app.founderEmail ? `mailto:${app.founderEmail}` : undefined} />
+              <InfoRow label={t.applicationDetail.phone} value={app.founderPhone} href={app.founderPhone ? `tel:${app.founderPhone}` : undefined} />
+              <InfoRow label={t.applicationDetail.role} value={app.founderRole} />
+              <InfoRow label={t.applicationDetail.linkedIn} value={app.founderLinkedin ? t.applicationDetail.viewProfile : undefined} href={app.founderLinkedin || undefined} />
+              {app.coFounders && <InfoRow label={t.applicationDetail.coFounders} value={app.coFounders} />}
             </div>
           </Section>
 
           {/* Investor Notes */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <StickyNote size={12} /> Investor Notes
+              <StickyNote size={12} /> {t.applicationDetail.investorNotes}
             </p>
             <div className="bg-white border border-gray-100 rounded-2xl p-4">
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="Write private notes about this application..."
+                placeholder={t.applicationDetail.notesPlaceholder}
                 className="w-full text-xs text-gray-700 leading-relaxed border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y"
                 rows={5}
               />
@@ -1422,7 +1438,7 @@ export default function ApplicationDetail() {
                   disabled={savingNotes}
                   className="text-xs font-semibold text-white bg-black hover:bg-gray-800 px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {savingNotes ? 'Saving...' : 'Save Notes'}
+                  {savingNotes ? t.applicationDetail.savingNotes : t.applicationDetail.saveNotes}
                 </button>
               </div>
             </div>
