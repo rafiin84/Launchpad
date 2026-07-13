@@ -7,14 +7,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { createCRMDocument } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
-
-const typeOptions = [
-  { value: 'pitch-deck', label: 'Pitch Deck' },
-  { value: 'financial-model', label: 'Financial Model' },
-  { value: 'legal-document', label: 'Legal Document' },
-  { value: 'due-diligence', label: 'Due Diligence' },
-  { value: 'other', label: 'Other' },
-];
+import { useLanguage } from '../context/LanguageContext';
 
 const MIME_MAP: Record<string, string> = {
   pdf: 'application/pdf',
@@ -48,17 +41,26 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function validate(f: FormState): Record<string, string> {
+function validate(f: FormState, t: any): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!f.documentName.trim()) e.documentName = 'Document name is required';
-  if (!f.type) e.type = 'Document type is required';
-  if (!f.fileName) e.file = 'Please select a file to upload';
+  if (!f.documentName.trim()) e.documentName = t.addDocument.nameRequired;
+  if (!f.type) e.type = t.addDocument.typeRequired;
+  if (!f.fileName) e.file = t.addDocument.fileRequired;
   return e;
 }
 
 export default function AddDocument() {
   const navigate = useNavigate();
   const { currentUser, isInvestor } = useAuth();
+  const { t } = useLanguage();
+
+  const typeOptions = [
+    { value: 'pitch-deck', label: t.addDocument.pitchDeck },
+    { value: 'financial-model', label: t.addDocument.financialModel },
+    { value: 'legal-document', label: t.addDocument.legalDocument },
+    { value: 'due-diligence', label: t.addDocument.dueDiligence },
+    { value: 'other', label: t.addDocument.other },
+  ];
   const [form, setForm] = useState<FormState>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
@@ -108,7 +110,7 @@ export default function AddDocument() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validate(form);
+    const errs = validate(form, t);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setSubmitting(true);
@@ -139,26 +141,26 @@ export default function AddDocument() {
       <div className="max-w-3xl mx-auto">
         <Link to="/documents" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors">
           <ArrowLeft className="w-4 h-4" />
-          Back to Documents
+          {t.addDocument.backToDocuments}
         </Link>
 
-        <PageHeader title="Upload Document" description="Upload a document to share with your network." />
+        <PageHeader title={t.addDocument.uploadDocument} description={t.addDocument.uploadDescription} />
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">Document Details</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.addDocument.documentDetails}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Document Name *" value={form.documentName} onChange={set('documentName')} error={errors.documentName} placeholder="Q3 Financial Model" />
-              <Select label="Type *" value={form.type} onChange={set('type')} options={typeOptions} placeholder="Select type" error={errors.type} />
-              <Input label="Related Company" value={form.relatedCompany} onChange={set('relatedCompany')} placeholder="Company name" className="sm:col-span-2" />
+              <Input label={`${t.addDocument.documentName} *`} value={form.documentName} onChange={set('documentName')} error={errors.documentName} placeholder="Q3 Financial Model" />
+              <Select label={`${t.addDocument.type} *`} value={form.type} onChange={set('type')} options={typeOptions} placeholder={t.addDocument.selectType} error={errors.type} />
+              <Input label={t.addDocument.relatedCompany} value={form.relatedCompany} onChange={set('relatedCompany')} placeholder="Company name" className="sm:col-span-2" />
             </div>
             <div className="mt-4">
-              <Textarea label="Description" value={form.description} onChange={set('description')} placeholder="Brief description of what this document contains..." rows={3} />
+              <Textarea label={t.addDocument.description} value={form.description} onChange={set('description')} placeholder="Brief description of what this document contains..." rows={3} />
             </div>
           </div>
 
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">File Upload</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.addDocument.fileUpload}</p>
 
             {form.fileName ? (
               <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl bg-gray-50">
@@ -190,8 +192,8 @@ export default function AddDocument() {
                   <Upload className="w-6 h-6 text-gray-400" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, DOCX, XLSX up to 10MB</p>
+                  <p className="text-sm font-medium text-gray-700">{t.addDocument.clickToUpload}</p>
+                  <p className="text-xs text-gray-400 mt-1">{t.addDocument.fileTypes}</p>
                 </div>
               </button>
             )}
@@ -207,12 +209,12 @@ export default function AddDocument() {
 
           <div className="flex items-center justify-end gap-3 pt-2 pb-8">
             <Link to="/documents">
-              <Button type="button" variant="outline">Cancel</Button>
+              <Button type="button" variant="outline">{t.common.cancel}</Button>
             </Link>
             <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? (
-                <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</span>
-              ) : 'Upload Document'}
+                <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {t.addDocument.uploading}</span>
+              ) : t.addDocument.uploadDocument}
             </Button>
           </div>
         </form>

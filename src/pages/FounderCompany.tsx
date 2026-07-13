@@ -356,19 +356,19 @@ export default function FounderCompany() {
         {saveResult === 'success' && (
           <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700 flex items-center gap-2">
             <CheckCircle size={16} className="flex-shrink-0" />
-            Company profile saved and synced to CRM successfully!
+            {t.companySidebar.savedAndSynced}
           </div>
         )}
         {saveResult === 'partial' && (
           <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700 flex items-center gap-2">
             <AlertCircle size={16} className="flex-shrink-0" />
-            Profile saved locally. CRM sync will retry on next save.
+            {t.companySidebar.savedLocally}
           </div>
         )}
         {saveResult === 'error' && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700 flex items-center gap-2">
             <AlertCircle size={16} className="flex-shrink-0" />
-            Failed to save profile. Please try again.
+            {t.companySidebar.saveFailed}
           </div>
         )}
 
@@ -412,8 +412,8 @@ export default function FounderCompany() {
           <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
             <Building2 size={16} className="text-gray-400 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-700">No company profile yet</p>
-              <p className="text-xs text-gray-500 mt-0.5">The founder hasn't completed their company profile yet.</p>
+              <p className="text-sm font-medium text-gray-700">{t.companySidebar.noCompanyProfile}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t.companySidebar.noCompanyProfileDesc}</p>
             </div>
           </div>
         )}
@@ -428,7 +428,7 @@ export default function FounderCompany() {
             <Section title={t.companyProfile.companyOverview} icon={Building2} editing={editing} iconColor="text-indigo-500" iconBg="bg-indigo-50">
               {editing ? (
                 <>
-                  <EditField label="Company Name" field="name" value={d.name} onChange={handleChange} placeholder="Acme Inc" />
+                  <EditField label={t.applicationForm.companyName} field="name" value={d.name} onChange={handleChange} placeholder="Acme Inc" />
                   <EditField label="Tagline" field="tagline" value={d.tagline} onChange={handleChange} placeholder="One-liner about your company" />
                   <EditField label={t.companyProfile.website} field="website" value={d.website} onChange={handleChange} placeholder="https://yourcompany.com" />
                   <EditField label={t.companyProfile.industry} field="industry" value={d.industry} onChange={handleChange} options={INDUSTRIES} />
@@ -479,13 +479,13 @@ export default function FounderCompany() {
               {editing ? (
                 <>
                   <div className="sm:col-span-2">
-                    <EditField label="Product Description" field="productDescription" value={d.productDescription} onChange={handleChange}
+                    <EditField label={t.companyProfile.product} field="productDescription" value={d.productDescription} onChange={handleChange}
                       placeholder="What does your product do? Who is it for? What's the core value?" multiline />
                   </div>
                   <EditField label="MRR ($)" field="mrr" value={d.mrr} onChange={handleChange} placeholder="50,000" />
                   <EditField label="ARR ($)" field="arr" value={d.arr} onChange={handleChange} placeholder="600,000" />
-                  <EditField label="Active Customers" field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
-                  <EditField label="MoM Revenue Growth (%)" field="momGrowth" value={d.momGrowth} onChange={handleChange} placeholder="12" />
+                  <EditField label={t.companySidebar.activeCustomers} field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
+                  <EditField label={`${t.companySidebar.momGrowth} (%)`} field="momGrowth" value={d.momGrowth} onChange={handleChange} placeholder="12" />
                   <EditField label={t.companyProfile.monthlyChurn} field="churnRate" value={d.churnRate} onChange={handleChange} placeholder="2.5" />
                   <EditField label={t.companyProfile.nps} field="nps" value={d.nps} onChange={handleChange} placeholder="72" />
                   <EditField label="Key Metric Value" field="keyMetric" value={d.keyMetric} onChange={handleChange} placeholder="4.2M" />
@@ -499,25 +499,25 @@ export default function FounderCompany() {
                       {d.mrr && (
                         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
                           <p className="text-lg font-bold text-emerald-700">{fmt(d.mrr)}</p>
-                          <p className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide mt-0.5">MRR</p>
+                          <p className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide mt-0.5">{t.companySidebar.mrr}</p>
                         </div>
                       )}
                       {d.arr && (
                         <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
                           <p className="text-lg font-bold text-indigo-700">{fmt(d.arr)}</p>
-                          <p className="text-[10px] font-medium text-indigo-500 uppercase tracking-wide mt-0.5">ARR</p>
+                          <p className="text-[10px] font-medium text-indigo-500 uppercase tracking-wide mt-0.5">{t.companySidebar.arr}</p>
                         </div>
                       )}
                       {d.activeCustomers && (
                         <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-center">
                           <p className="text-lg font-bold text-purple-700">{d.activeCustomers}</p>
-                          <p className="text-[10px] font-medium text-purple-500 uppercase tracking-wide mt-0.5">Customers</p>
+                          <p className="text-[10px] font-medium text-purple-500 uppercase tracking-wide mt-0.5">{t.companySidebar.customers}</p>
                         </div>
                       )}
                       {d.momGrowth && (
                         <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
                           <p className="text-lg font-bold text-teal-700">{d.momGrowth}%</p>
-                          <p className="text-[10px] font-medium text-teal-500 uppercase tracking-wide mt-0.5">MoM Growth</p>
+                          <p className="text-[10px] font-medium text-teal-500 uppercase tracking-wide mt-0.5">{t.companySidebar.momGrowth}</p>
                         </div>
                       )}
                     </div>
@@ -646,14 +646,14 @@ export default function FounderCompany() {
                 <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center">
                   <TrendingUp size={13} className="text-emerald-500" />
                 </div>
-                Key Metrics
+                {t.companySidebar.keyMetrics}
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: 'MRR',                          value: fmt(data.mrr) },
-                  { label: 'ARR',                          value: fmt(data.arr) },
-                  { label: 'Active Customers',             value: data.activeCustomers || '—' },
-                  { label: 'MoM Growth',                   value: data.momGrowth ? `${data.momGrowth}%` : '—' },
+                  { label: t.companySidebar.mrr,              value: fmt(data.mrr) },
+                  { label: t.companySidebar.arr,              value: fmt(data.arr) },
+                  { label: t.companySidebar.activeCustomers,  value: data.activeCustomers || '—' },
+                  { label: t.companySidebar.momGrowth,        value: data.momGrowth ? `${data.momGrowth}%` : '—' },
                   { label: t.companyProfile.monthlyChurn,  value: data.churnRate ? `${data.churnRate}%` : '—' },
                   { label: t.companyProfile.nps,           value: data.nps || '—' },
                 ].map(({ label, value }) => (
@@ -671,7 +671,7 @@ export default function FounderCompany() {
                 <div className="w-6 h-6 rounded-lg bg-green-50 flex items-center justify-center">
                   <DollarSign size={13} className="text-green-600" />
                 </div>
-                Funding Snapshot
+                {t.companySidebar.fundingSnapshot}
               </h3>
               <div className="space-y-3">
                 {[
@@ -713,7 +713,7 @@ export default function FounderCompany() {
                   <div className="w-6 h-6 rounded-lg bg-violet-50 flex items-center justify-center">
                     <Target size={13} className="text-violet-500" />
                   </div>
-                  Market Size
+                  {t.companySidebar.marketSize}
                 </h3>
                 <div className="space-y-3">
                   {[
@@ -741,7 +741,7 @@ export default function FounderCompany() {
                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center">
                   <Users size={13} className="text-amber-500" />
                 </div>
-                Team
+                {t.companySidebar.team}
               </h3>
               <div className="space-y-2.5">
                 {data.founderNames ? (
@@ -758,8 +758,8 @@ export default function FounderCompany() {
                 )}
                 {data.teamSize && (
                   <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Total team</span>
-                    <span className="text-sm font-bold text-gray-900">{data.teamSize} people</span>
+                    <span className="text-xs text-gray-500">{t.companySidebar.totalTeam}</span>
+                    <span className="text-sm font-bold text-gray-900">{data.teamSize} {t.companySidebar.people}</span>
                   </div>
                 )}
               </div>
@@ -772,7 +772,7 @@ export default function FounderCompany() {
                   <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
                     <Calendar size={13} className="text-indigo-500" />
                   </div>
-                  Next Milestones
+                  {t.companySidebar.nextMilestones}
                 </h3>
                 <p className="text-xs text-indigo-800 leading-relaxed">{data.nextMilestones}</p>
               </div>
