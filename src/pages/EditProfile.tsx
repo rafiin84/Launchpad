@@ -546,7 +546,7 @@ export default function EditProfile() {
                   onClick={removeCover}
                   className="flex items-center gap-1 text-xs font-medium text-white bg-red-500/80 backdrop-blur-sm px-2.5 py-1.5 rounded-lg hover:bg-red-600 transition-colors"
                 >
-                  <X size={12} /> Remove
+                  <X size={12} /> {t.common.remove}
                 </button>
               </div>
             </>
@@ -557,25 +557,25 @@ export default function EditProfile() {
               className="w-full h-full bg-gray-50 hover:bg-gray-100 transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer"
             >
               <ImagePlus size={20} className="text-gray-400" />
-              <span className="text-xs text-gray-500 font-medium">Click to upload a cover image</span>
+              <span className="text-xs text-gray-500 font-medium">{t.profile.uploadCoverImage}</span>
             </button>
           )}
           <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverSelect} />
         </div>
         {coverFile && (
-          <p className="text-xs text-emerald-600 mt-1.5">New cover image selected — will save on submit</p>
+          <p className="text-xs text-emerald-600 mt-1.5">{t.profile.newCoverSelected}</p>
         )}
       </div>
 
       {/* Save result feedback */}
       {saveResult === 'success' && (
         <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">
-          Profile saved successfully!
+          {t.profile.savedSuccessfully}
         </div>
       )}
       {saveResult === 'partial' && (
         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
-          Profile saved locally. CRM sync will happen on next login.
+          {t.profile.savedLocally}
         </div>
       )}
 
@@ -584,7 +584,7 @@ export default function EditProfile() {
 
         {/* Display Name */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Name</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.displayName}</label>
           <div className="relative">
             <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -599,7 +599,7 @@ export default function EditProfile() {
 
         {/* Bio */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bio</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.bio}</label>
           <textarea
             rows={4}
             value={form.bio}
@@ -611,7 +611,7 @@ export default function EditProfile() {
 
         {/* Location */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Location</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.location}</label>
           <div className="relative">
             <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -626,7 +626,7 @@ export default function EditProfile() {
 
         {/* LinkedIn */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">LinkedIn URL</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.linkedInUrl}</label>
           <div className="relative">
             <ExternalLink size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -641,7 +641,7 @@ export default function EditProfile() {
 
         {/* Twitter */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Twitter / X Handle</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.twitterHandle}</label>
           <div className="relative">
             <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -656,7 +656,7 @@ export default function EditProfile() {
 
         {/* Skills */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Skills &amp; Expertise</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.skillsExpertise}</label>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {form.expertise.map(tag => (
               <span key={tag} className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
@@ -693,7 +693,7 @@ export default function EditProfile() {
           disabled={saving}
           className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-50"
         >
-          Cancel
+          {t.common.cancel}
         </button>
         <button
           onClick={handleSave}
@@ -701,7 +701,7 @@ export default function EditProfile() {
           className="flex-1 px-4 py-3 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {(saving || uploadingPhoto) && <Loader2 size={14} className="animate-spin" />}
-          {uploadingPhoto ? 'Uploading Photo...' : saving ? 'Saving...' : 'Save Changes'}
+          {uploadingPhoto ? t.profile.uploadingPhoto : saving ? t.profile.saving : t.profile.saveChanges}
         </button>
       </div>
     </div>

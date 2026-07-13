@@ -197,10 +197,10 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Department">
+            <Field label={t.founders.department}>
               <input type="text" value={form.department} onChange={set('department')} placeholder="Engineering" className={inputCls} />
             </Field>
-            <Field label="Lead Source">
+            <Field label={t.founders.leadSource}>
               <div className="relative">
                 <select value={form.leadSource} onChange={set('leadSource')} className={selectCls}>
                   <option value="">— Select —</option>
@@ -212,32 +212,32 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
           </div>
 
           {/* Section: Address */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Mailing Address</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">{t.founders.mailingAddress}</p>
 
-          <Field label="Street">
+          <Field label={t.founders.street}>
             <input type="text" value={form.mailingStreet} onChange={set('mailingStreet')} placeholder="123 Main Street" className={inputCls} />
           </Field>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="City">
+            <Field label={t.founders.city}>
               <input type="text" value={form.mailingCity} onChange={set('mailingCity')} placeholder="Chennai" className={inputCls} />
             </Field>
-            <Field label="State">
+            <Field label={t.founders.state}>
               <input type="text" value={form.mailingState} onChange={set('mailingState')} placeholder="Tamil Nadu" className={inputCls} />
             </Field>
-            <Field label="Zip Code">
+            <Field label={t.founders.zipCode}>
               <input type="text" value={form.mailingZip} onChange={set('mailingZip')} placeholder="600001" className={inputCls} />
             </Field>
           </div>
 
-          <Field label="Country">
+          <Field label={t.founders.country}>
             <input type="text" value={form.mailingCountry} onChange={set('mailingCountry')} placeholder="India" className={inputCls} />
           </Field>
 
           {/* Section: Description */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Additional</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">{t.founders.additional}</p>
 
-          <Field label="Description">
+          <Field label={t.founders.descriptionLabel}>
             <textarea value={form.description} onChange={set('description')} placeholder="Notes about this founder…" rows={3}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent resize-none"
             />
@@ -261,14 +261,14 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             onClick={handleSave}
             disabled={!canSave || saving}
             className="px-5 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            <UserPlus size={14} /> {saving ? 'Adding…' : 'Invite Applicant'}
+            <UserPlus size={14} /> {saving ? t.founders.adding : t.founders.inviteApplicant}
           </button>
         </div>
       </div>
@@ -279,6 +279,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
 // ─── Disable Confirmation Modal ─────────────────────────────────────────────
 
 function DisableModal({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
@@ -287,17 +288,17 @@ function DisableModal({ name, onConfirm, onCancel }: { name: string; onConfirm: 
           <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <AlertCircle size={20} className="text-red-500" />
           </div>
-          <h3 className="text-base font-bold text-gray-900">Disable User</h3>
+          <h3 className="text-base font-bold text-gray-900">{t.founders.disableUser}</h3>
         </div>
         <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-          Are you sure you want to disable this user? They will no longer be able to access the portal.
+          {t.founders.disableConfirm}
         </p>
         <div className="flex items-center gap-3 justify-end">
           <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-            No
+            {t.common.no}
           </button>
           <button onClick={onConfirm} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors">
-            Yes
+            {t.common.yes}
           </button>
         </div>
       </div>
@@ -307,13 +308,6 @@ function DisableModal({ name, onConfirm, onCancel }: { name: string; onConfirm: 
 
 // ─── Portal Status Badge + Toggle ───────────────────────────────────────────
 
-/** Status display label matching Zoho CRM terminology */
-function statusLabel(s: PortalUserStatus): string {
-  if (s === 'active') return 'Active';
-  if (s === 'disabled') return 'Disabled';
-  return 'Pending Invitation';
-}
-
 function PortalStatusToggle({
   founder, status, onStatusChange,
 }: {
@@ -321,8 +315,16 @@ function PortalStatusToggle({
   status: PortalUserStatus | null;
   onStatusChange: (email: string, newStatus: PortalUserStatus) => void;
 }) {
+  const { t } = useLanguage();
   const [showDisable, setShowDisable] = useState(false);
   const [reinviting, setReinviting] = useState(false);
+
+  /** Status display label matching Zoho CRM terminology */
+  const statusLabel = (s: PortalUserStatus): string => {
+    if (s === 'active') return t.founders.statusActive;
+    if (s === 'disabled') return t.founders.statusDisabled;
+    return t.founders.statusPendingInvitation;
+  };
 
   if (!status || !founder.email) return null;
 
@@ -415,7 +417,7 @@ function PortalStatusToggle({
             <button
               onClick={handleToggle}
               className="relative ml-1"
-              aria-label={status === 'active' ? 'Disable user' : 'Activate user'}
+              aria-label={status === 'active' ? t.founders.disableUserLabel : t.founders.activateUserLabel}
             >
               <div className={`w-7 h-4 rounded-full transition-colors ${status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                 <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${status === 'active' ? 'left-[14px]' : 'left-0.5'}`} />
@@ -429,7 +431,7 @@ function PortalStatusToggle({
             disabled={reinviting}
             className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors disabled:opacity-50"
           >
-            {reinviting ? 'Sending...' : 'Reinvite'}
+            {reinviting ? t.founders.sending : t.founders.reinvite}
           </button>
         )}
       </div>
@@ -440,6 +442,7 @@ function PortalStatusToggle({
 // ─── Founder Card ────────────────────────────────────────────────────────────
 
 function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { founder: CRMFounder; onDelete: (id: string) => void; portalStatus: PortalUserStatus | null; onStatusChange: (email: string, status: PortalUserStatus) => void }) {
+  const { t } = useLanguage();
   const [deleting, setDeleting] = useState(false);
   const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
   const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
@@ -472,7 +475,7 @@ function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { foun
               onClick={handleDelete}
               disabled={deleting}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all"
-              title="Remove founder"
+              title={t.founders.removeFounder}
             >
               <Trash2 size={13} />
             </button>
@@ -538,6 +541,7 @@ function FounderCard({ founder, onDelete, portalStatus, onStatusChange }: { foun
 // ─── Founder List Row ────────────────────────────────────────────────────────
 
 function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { founder: CRMFounder; onDelete: (id: string) => void; portalStatus: PortalUserStatus | null; onStatusChange: (email: string, status: PortalUserStatus) => void }) {
+  const { t } = useLanguage();
   const [deleting, setDeleting] = useState(false);
   const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
   const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
@@ -641,7 +645,7 @@ function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { found
         onClick={handleDelete}
         disabled={deleting}
         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all flex-shrink-0"
-        title="Remove founder"
+        title={t.founders.removeFounder}
       >
         <Trash2 size={13} />
       </button>
@@ -652,6 +656,7 @@ function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { found
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Founders() {
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [founders, setFounders]   = useState<CRMFounder[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -710,7 +715,7 @@ export default function Founders() {
         }
         setPortalStatuses(statuses);
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
+      .catch(err => setError(err instanceof Error ? err.message : t.common.error))
       .finally(() => setLoading(false));
   }
 
@@ -736,11 +741,11 @@ export default function Founders() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Applicants</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t.founders.title}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            Manage your applicant founders
+            {t.founders.description}
             {!loading && founders.length > 0 && (
-              <span className="ml-1.5 text-gray-300">· {founders.length} total</span>
+              <span className="ml-1.5 text-gray-300">· {founders.length} {t.founders.total}</span>
             )}
           </p>
         </div>
@@ -749,14 +754,14 @@ export default function Founders() {
             <button
               onClick={() => setView('grid')}
               className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Grid view"
+              title={t.founders.gridView}
             >
               <LayoutGrid size={15} />
             </button>
             <button
               onClick={() => setView('list')}
               className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-              title="List view"
+              title={t.founders.listView}
             >
               <List size={15} />
             </button>
@@ -766,7 +771,7 @@ export default function Founders() {
             disabled={!isConnected}
             className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <Plus size={15} /> Invite Applicant
+            <Plus size={15} /> {t.founders.inviteApplicant}
           </button>
         </div>
       </div>
@@ -776,10 +781,10 @@ export default function Founders() {
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to manage founders</p>
-            <p className="text-xs text-amber-600 mt-0.5">Sign in with Zoho CRM to get started.</p>
+            <p className="text-sm font-medium text-amber-800">{t.founders.connectCRM}</p>
+            <p className="text-xs text-amber-600 mt-0.5">{t.founders.connectCRMDesc}</p>
           </div>
-          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">Connect</Link>
+          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">{t.founders.connect}</Link>
         </div>
       )}
 
@@ -791,7 +796,7 @@ export default function Founders() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, email, company, city…"
+            placeholder={t.founders.searchPlaceholder}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
           />
         </div>
@@ -821,7 +826,7 @@ export default function Founders() {
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
           <p className="text-sm text-red-600 mb-3">{error}</p>
           <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
-            <RefreshCw size={12} /> Retry
+            <RefreshCw size={12} /> {t.activities.retry}
           </button>
         </div>
       )}
@@ -830,13 +835,13 @@ export default function Founders() {
       {!loading && !error && founders.length === 0 && isConnected && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl bg-white">
           <Users size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No applicants yet</p>
-          <p className="text-xs text-gray-400 mb-4">Invite applicants to manage your network.</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.founders.noApplicantsYet}</p>
+          <p className="text-xs text-gray-400 mb-4">{t.founders.noApplicantsDesc}</p>
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-2 text-sm font-semibold bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
           >
-            <Plus size={14} /> Invite First Applicant
+            <Plus size={14} /> {t.founders.inviteFirstApplicant}
           </button>
         </div>
       )}
@@ -845,7 +850,7 @@ export default function Founders() {
       {!loading && !error && founders.length > 0 && filtered.length === 0 && (
         <div className="text-center py-12">
           <Search size={24} className="text-gray-200 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">No applicants match "{search}"</p>
+          <p className="text-sm text-gray-500">{t.founders.noMatch} "{search}"</p>
         </div>
       )}
 
@@ -856,13 +861,13 @@ export default function Founders() {
             {/* Table header */}
             <div className="flex items-center gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
               <div className="w-8" /> {/* avatar spacer */}
-              <div className="w-48 flex-shrink-0">Name</div>
-              <div className="w-36 flex-shrink-0 hidden sm:block">Company</div>
-              <div className="flex-1 hidden md:block">Email</div>
-              <div className="w-36 flex-shrink-0 hidden lg:block">Phone</div>
-              <div className="w-40 flex-shrink-0 hidden xl:block">Location</div>
-              <div className="w-28 flex-shrink-0 hidden xl:block">Source</div>
-              <div className="w-36 flex-shrink-0 hidden sm:block">Status</div>
+              <div className="w-48 flex-shrink-0">{t.founders.headerName}</div>
+              <div className="w-36 flex-shrink-0 hidden sm:block">{t.founders.headerCompany}</div>
+              <div className="flex-1 hidden md:block">{t.founders.headerEmail}</div>
+              <div className="w-36 flex-shrink-0 hidden lg:block">{t.founders.headerPhone}</div>
+              <div className="w-40 flex-shrink-0 hidden xl:block">{t.founders.headerLocation}</div>
+              <div className="w-28 flex-shrink-0 hidden xl:block">{t.founders.headerSource}</div>
+              <div className="w-36 flex-shrink-0 hidden sm:block">{t.founders.headerStatus}</div>
               <div className="w-8" /> {/* delete spacer */}
             </div>
             {filtered.map(f => (

@@ -442,40 +442,40 @@ export default function FounderCompany() {
                 </>
               ) : (
                 <>
-                  <DisplayField label="Website" value={d.website} href={d.website} />
-                  <DisplayField label="Industry" value={d.industry} />
-                  <DisplayField label="Stage" value={d.stage} />
-                  <DisplayField label="Founded" value={d.foundedYear} />
+                  <DisplayField label={t.companyProfile.website} value={d.website} href={d.website} />
+                  <DisplayField label={t.companyProfile.industry} value={d.industry} />
+                  <DisplayField label={t.companyProfile.stage} value={d.stage} />
+                  <DisplayField label={t.companyProfile.founded} value={d.foundedYear} />
                   <div className="sm:col-span-2">
-                    <DisplayField label="Description" value={d.description} />
+                    <DisplayField label={t.companyProfile.description} value={d.description} />
                   </div>
                 </>
               )}
             </Section>
 
             {/* ── Team ── */}
-            <Section title="Founding Team" icon={Users} editing={editing} iconColor="text-amber-500" iconBg="bg-amber-50">
+            <Section title={t.companyProfile.foundingTeam} icon={Users} editing={editing} iconColor="text-amber-500" iconBg="bg-amber-50">
               {editing ? (
                 <>
                   <div className="sm:col-span-2">
-                    <EditField label="Founder(s)" field="founderNames" value={d.founderNames} onChange={handleChange} placeholder="e.g. Alice Smith (CEO), Bob Jones (CTO)" />
+                    <EditField label={t.companyProfile.founders} field="founderNames" value={d.founderNames} onChange={handleChange} placeholder="e.g. Alice Smith (CEO), Bob Jones (CTO)" />
                   </div>
-                  <EditField label="Total Team Size" field="teamSize" value={d.teamSize} onChange={handleChange} placeholder="12" />
-                  <EditField label="Open Roles" field="openRoles" value={d.openRoles} onChange={handleChange} placeholder="e.g. Senior Engineer, Head of Sales" />
+                  <EditField label={t.companyProfile.teamSize} field="teamSize" value={d.teamSize} onChange={handleChange} placeholder="12" />
+                  <EditField label={t.companyProfile.openRoles} field="openRoles" value={d.openRoles} onChange={handleChange} placeholder="e.g. Senior Engineer, Head of Sales" />
                 </>
               ) : (
                 <>
                   <div className="sm:col-span-2">
-                    <DisplayField label="Founder(s)" value={d.founderNames} />
+                    <DisplayField label={t.companyProfile.founders} value={d.founderNames} />
                   </div>
-                  <DisplayField label="Team Size" value={d.teamSize ? `${d.teamSize} people` : ''} />
-                  <DisplayField label="Open Roles" value={d.openRoles} />
+                  <DisplayField label={t.companyProfile.teamSize} value={d.teamSize ? `${d.teamSize} people` : ''} />
+                  <DisplayField label={t.companyProfile.openRoles} value={d.openRoles} />
                 </>
               )}
             </Section>
 
             {/* ── Product & Traction ── */}
-            <Section title="Product & Traction" icon={TrendingUp} editing={editing} iconColor="text-emerald-500" iconBg="bg-emerald-50">
+            <Section title={t.companyProfile.productTraction} icon={TrendingUp} editing={editing} iconColor="text-emerald-500" iconBg="bg-emerald-50">
               {editing ? (
                 <>
                   <div className="sm:col-span-2">
@@ -486,8 +486,8 @@ export default function FounderCompany() {
                   <EditField label="ARR ($)" field="arr" value={d.arr} onChange={handleChange} placeholder="600,000" />
                   <EditField label="Active Customers" field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
                   <EditField label="MoM Revenue Growth (%)" field="momGrowth" value={d.momGrowth} onChange={handleChange} placeholder="12" />
-                  <EditField label="Monthly Churn Rate (%)" field="churnRate" value={d.churnRate} onChange={handleChange} placeholder="2.5" />
-                  <EditField label="NPS Score" field="nps" value={d.nps} onChange={handleChange} placeholder="72" />
+                  <EditField label={t.companyProfile.monthlyChurn} field="churnRate" value={d.churnRate} onChange={handleChange} placeholder="2.5" />
+                  <EditField label={t.companyProfile.nps} field="nps" value={d.nps} onChange={handleChange} placeholder="72" />
                   <EditField label="Key Metric Value" field="keyMetric" value={d.keyMetric} onChange={handleChange} placeholder="4.2M" />
                   <EditField label="Key Metric Label" field="keyMetricLabel" value={d.keyMetricLabel} onChange={handleChange} placeholder="API calls / month" />
                 </>
@@ -523,113 +523,113 @@ export default function FounderCompany() {
                     </div>
                   )}
                   <div className="sm:col-span-2">
-                    <DisplayField label="Product" value={d.productDescription} />
+                    <DisplayField label={t.companyProfile.product} value={d.productDescription} />
                   </div>
-                  <DisplayField label="Monthly Churn" value={d.churnRate ? `${d.churnRate}%` : ''} />
-                  <DisplayField label="NPS" value={d.nps} />
+                  <DisplayField label={t.companyProfile.monthlyChurn} value={d.churnRate ? `${d.churnRate}%` : ''} />
+                  <DisplayField label={t.companyProfile.nps} value={d.nps} />
                   {d.keyMetric && <DisplayField label={d.keyMetricLabel || 'Key Metric'} value={d.keyMetric} />}
                 </>
               )}
             </Section>
 
             {/* ── Financials ── */}
-            <Section title="Financials & Funding" icon={DollarSign} editing={editing} iconColor="text-green-600" iconBg="bg-green-50">
+            <Section title={t.companyProfile.financialsFunding} icon={DollarSign} editing={editing} iconColor="text-green-600" iconBg="bg-green-50">
               {editing ? (
                 <>
-                  <EditField label="Total Raised ($)" field="totalRaised" value={d.totalRaised} onChange={handleChange} placeholder="2,500,000" />
-                  <EditField label="Last Round Size ($)" field="lastRoundSize" value={d.lastRoundSize} onChange={handleChange} placeholder="2,000,000" />
-                  <EditField label="Last Round Stage" field="lastRoundStage" value={d.lastRoundStage} onChange={handleChange} options={STAGES} />
-                  <EditField label="Last Round Date" field="lastRoundDate" value={d.lastRoundDate} onChange={handleChange} type="month" />
-                  <EditField label="Pre-Money Valuation ($)" field="preMoneyValuation" value={d.preMoneyValuation} onChange={handleChange} placeholder="10,000,000" />
-                  <EditField label="Monthly Burn ($)" field="monthlyBurn" value={d.monthlyBurn} onChange={handleChange} placeholder="120,000" />
-                  <EditField label="Runway (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="18" />
+                  <EditField label={`${t.companyProfile.totalRaised} ($)`} field="totalRaised" value={d.totalRaised} onChange={handleChange} placeholder="2,500,000" />
+                  <EditField label={`${t.companyProfile.lastRound} Size ($)`} field="lastRoundSize" value={d.lastRoundSize} onChange={handleChange} placeholder="2,000,000" />
+                  <EditField label={`${t.companyProfile.lastRound} Stage`} field="lastRoundStage" value={d.lastRoundStage} onChange={handleChange} options={STAGES} />
+                  <EditField label={`${t.companyProfile.lastRound} Date`} field="lastRoundDate" value={d.lastRoundDate} onChange={handleChange} type="month" />
+                  <EditField label={`${t.companyProfile.preMoneyValuation} ($)`} field="preMoneyValuation" value={d.preMoneyValuation} onChange={handleChange} placeholder="10,000,000" />
+                  <EditField label={`${t.companyProfile.monthlyBurn} ($)`} field="monthlyBurn" value={d.monthlyBurn} onChange={handleChange} placeholder="120,000" />
+                  <EditField label={t.companyProfile.runway} field="runway" value={d.runway} onChange={handleChange} placeholder="18" />
                   <div className="sm:col-span-2">
-                    <EditField label="Revenue Model" field="revenueModel" value={d.revenueModel} onChange={handleChange}
+                    <EditField label={t.companyProfile.revenueModel} field="revenueModel" value={d.revenueModel} onChange={handleChange}
                       placeholder="e.g. SaaS subscription — $99/mo per seat, enterprise contracts from $5K/mo" multiline />
                   </div>
                 </>
               ) : (
                 <>
-                  <DisplayField label="Total Raised" value={d.totalRaised ? `$${d.totalRaised}` : ''} />
-                  <DisplayField label="Last Round" value={d.lastRoundStage && d.lastRoundSize ? `${d.lastRoundStage} · $${d.lastRoundSize}` : (d.lastRoundSize || '')} />
-                  <DisplayField label="Pre-Money Valuation" value={d.preMoneyValuation ? `$${d.preMoneyValuation}` : ''} />
-                  <DisplayField label="Monthly Burn" value={d.monthlyBurn ? `$${d.monthlyBurn}` : ''} />
-                  <DisplayField label="Runway" value={d.runway ? `${d.runway} months` : ''} />
+                  <DisplayField label={t.companyProfile.totalRaised} value={d.totalRaised ? `$${d.totalRaised}` : ''} />
+                  <DisplayField label={t.companyProfile.lastRound} value={d.lastRoundStage && d.lastRoundSize ? `${d.lastRoundStage} · $${d.lastRoundSize}` : (d.lastRoundSize || '')} />
+                  <DisplayField label={t.companyProfile.preMoneyValuation} value={d.preMoneyValuation ? `$${d.preMoneyValuation}` : ''} />
+                  <DisplayField label={t.companyProfile.monthlyBurn} value={d.monthlyBurn ? `$${d.monthlyBurn}` : ''} />
+                  <DisplayField label={t.companyProfile.runway} value={d.runway ? `${d.runway} months` : ''} />
                   <div className="sm:col-span-2">
-                    <DisplayField label="Revenue Model" value={d.revenueModel} />
+                    <DisplayField label={t.companyProfile.revenueModel} value={d.revenueModel} />
                   </div>
                 </>
               )}
             </Section>
 
             {/* ── Market ── */}
-            <Section title="Market & Competition" icon={Target} editing={editing} iconColor="text-violet-500" iconBg="bg-violet-50">
+            <Section title={t.companyProfile.marketCompetition} icon={Target} editing={editing} iconColor="text-violet-500" iconBg="bg-violet-50">
               {editing ? (
                 <>
                   <div className="sm:col-span-2">
-                    <EditField label="Target Market" field="targetMarket" value={d.targetMarket} onChange={handleChange}
+                    <EditField label={t.companyProfile.targetMarket} field="targetMarket" value={d.targetMarket} onChange={handleChange}
                       placeholder="Who is your ideal customer? Industry, company size, geography…" multiline />
                   </div>
-                  <EditField label="TAM ($)" field="tam" value={d.tam} onChange={handleChange} placeholder="50B" />
-                  <EditField label="SAM ($)" field="sam" value={d.sam} onChange={handleChange} placeholder="5B" />
-                  <EditField label="SOM ($)" field="som" value={d.som} onChange={handleChange} placeholder="500M" />
+                  <EditField label={`${t.companyProfile.tam} ($)`} field="tam" value={d.tam} onChange={handleChange} placeholder="50B" />
+                  <EditField label={`${t.companyProfile.sam} ($)`} field="sam" value={d.sam} onChange={handleChange} placeholder="5B" />
+                  <EditField label={`${t.companyProfile.som} ($)`} field="som" value={d.som} onChange={handleChange} placeholder="500M" />
                   <div className="sm:col-span-2">
-                    <EditField label="Key Competitors" field="keyCompetitors" value={d.keyCompetitors} onChange={handleChange}
+                    <EditField label={t.companyProfile.competitors} field="keyCompetitors" value={d.keyCompetitors} onChange={handleChange}
                       placeholder="List your main competitors and how you compare" multiline />
                   </div>
                   <div className="sm:col-span-2">
-                    <EditField label="Your Differentiator / Moat" field="differentiator" value={d.differentiator} onChange={handleChange}
+                    <EditField label={t.companyProfile.moat} field="differentiator" value={d.differentiator} onChange={handleChange}
                       placeholder="What makes you unique and hard to copy?" multiline />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="sm:col-span-2">
-                    <DisplayField label="Target Market" value={d.targetMarket} />
+                    <DisplayField label={t.companyProfile.targetMarket} value={d.targetMarket} />
                   </div>
-                  <DisplayField label="TAM" value={d.tam} />
-                  <DisplayField label="SAM" value={d.sam} />
-                  <DisplayField label="SOM" value={d.som} />
+                  <DisplayField label={t.companyProfile.tam} value={d.tam} />
+                  <DisplayField label={t.companyProfile.sam} value={d.sam} />
+                  <DisplayField label={t.companyProfile.som} value={d.som} />
                   <div className="sm:col-span-2">
-                    <DisplayField label="Competitors" value={d.keyCompetitors} />
+                    <DisplayField label={t.companyProfile.competitors} value={d.keyCompetitors} />
                   </div>
                   <div className="sm:col-span-2">
-                    <DisplayField label="Moat / Differentiator" value={d.differentiator} />
+                    <DisplayField label={t.companyProfile.moat} value={d.differentiator} />
                   </div>
                 </>
               )}
             </Section>
 
             {/* ── Investor Relations ── */}
-            <Section title="Current Round & Investor Ask" icon={Shield} editing={editing} accent>
+            <Section title={t.companyProfile.currentRound} icon={Shield} editing={editing} accent>
               {editing ? (
                 <>
-                  <EditField label="Current Ask ($)" field="currentAsk" value={d.currentAsk} onChange={handleChange} placeholder="3,000,000" />
-                  <EditField label="Expected Runway after raise (months)" field="runway" value={d.runway} onChange={handleChange} placeholder="24" />
+                  <EditField label={`${t.companyProfile.currentAsk} ($)`} field="currentAsk" value={d.currentAsk} onChange={handleChange} placeholder="3,000,000" />
+                  <EditField label={t.companyProfile.runway} field="runway" value={d.runway} onChange={handleChange} placeholder="24" />
                   <div className="sm:col-span-2">
-                    <EditField label="Use of Funds" field="useOfFunds" value={d.useOfFunds} onChange={handleChange}
+                    <EditField label={t.companyProfile.useOfFunds} field="useOfFunds" value={d.useOfFunds} onChange={handleChange}
                       placeholder="e.g. 50% engineering hires, 30% sales & marketing, 20% infrastructure" multiline />
                   </div>
                   <div className="sm:col-span-2">
-                    <EditField label="Next 12-Month Milestones" field="nextMilestones" value={d.nextMilestones} onChange={handleChange}
+                    <EditField label={t.companyProfile.milestones12Month} field="nextMilestones" value={d.nextMilestones} onChange={handleChange}
                       placeholder="e.g. Reach $1M ARR, launch enterprise tier, hire 3 engineers" multiline />
                   </div>
                   <div className="sm:col-span-2">
-                    <EditField label="Key Risks" field="keyRisks" value={d.keyRisks} onChange={handleChange}
+                    <EditField label={t.companyProfile.keyRisks} field="keyRisks" value={d.keyRisks} onChange={handleChange}
                       placeholder="What are the biggest risks to the business and how are you mitigating them?" multiline />
                   </div>
                 </>
               ) : (
                 <>
-                  <DisplayField label="Current Ask" value={d.currentAsk ? `$${d.currentAsk}` : ''} />
+                  <DisplayField label={t.companyProfile.currentAsk} value={d.currentAsk ? `$${d.currentAsk}` : ''} />
                   <div className="sm:col-span-2">
-                    <DisplayField label="Use of Funds" value={d.useOfFunds} />
+                    <DisplayField label={t.companyProfile.useOfFunds} value={d.useOfFunds} />
                   </div>
                   <div className="sm:col-span-2">
-                    <DisplayField label="12-Month Milestones" value={d.nextMilestones} />
+                    <DisplayField label={t.companyProfile.milestones12Month} value={d.nextMilestones} />
                   </div>
                   <div className="sm:col-span-2">
-                    <DisplayField label="Key Risks" value={d.keyRisks} />
+                    <DisplayField label={t.companyProfile.keyRisks} value={d.keyRisks} />
                   </div>
                 </>
               )}
@@ -650,12 +650,12 @@ export default function FounderCompany() {
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: 'MRR',             value: fmt(data.mrr) },
-                  { label: 'ARR',             value: fmt(data.arr) },
-                  { label: 'Active Customers',value: data.activeCustomers || '—' },
-                  { label: 'MoM Growth',      value: data.momGrowth ? `${data.momGrowth}%` : '—' },
-                  { label: 'Churn Rate',      value: data.churnRate ? `${data.churnRate}%` : '—' },
-                  { label: 'NPS',             value: data.nps || '—' },
+                  { label: 'MRR',                          value: fmt(data.mrr) },
+                  { label: 'ARR',                          value: fmt(data.arr) },
+                  { label: 'Active Customers',             value: data.activeCustomers || '—' },
+                  { label: 'MoM Growth',                   value: data.momGrowth ? `${data.momGrowth}%` : '—' },
+                  { label: t.companyProfile.monthlyChurn,  value: data.churnRate ? `${data.churnRate}%` : '—' },
+                  { label: t.companyProfile.nps,           value: data.nps || '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                     <span className="text-xs text-gray-500">{label}</span>
@@ -675,12 +675,12 @@ export default function FounderCompany() {
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: 'Total Raised',    value: fmt(data.totalRaised) },
-                  { label: 'Last Round',      value: data.lastRoundStage || '—' },
-                  { label: 'Pre-Money Val.',  value: fmt(data.preMoneyValuation) },
-                  { label: 'Monthly Burn',    value: fmt(data.monthlyBurn) },
-                  { label: 'Runway',          value: data.runway ? `${data.runway} mo` : '—' },
-                  { label: 'Current Ask',     value: fmt(data.currentAsk) },
+                  { label: t.companyProfile.totalRaised,        value: fmt(data.totalRaised) },
+                  { label: t.companyProfile.lastRound,         value: data.lastRoundStage || '—' },
+                  { label: t.companyProfile.preMoneyValuation, value: fmt(data.preMoneyValuation) },
+                  { label: t.companyProfile.monthlyBurn,       value: fmt(data.monthlyBurn) },
+                  { label: t.companyProfile.runway,            value: data.runway ? `${data.runway} mo` : '—' },
+                  { label: t.companyProfile.currentAsk,        value: fmt(data.currentAsk) },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                     <span className="text-xs text-gray-500">{label}</span>
@@ -691,7 +691,7 @@ export default function FounderCompany() {
               {data.runway && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                    <span>Runway remaining</span>
+                    <span>{t.companyProfile.runway}</span>
                     <span className={parseInt(data.runway) >= 12 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
                       {data.runway} mo
                     </span>
@@ -717,9 +717,9 @@ export default function FounderCompany() {
                 </h3>
                 <div className="space-y-3">
                   {[
-                    { label: 'TAM', value: data.tam, color: 'bg-violet-500', width: '100%' },
-                    { label: 'SAM', value: data.sam, color: 'bg-indigo-400', width: '60%' },
-                    { label: 'SOM', value: data.som, color: 'bg-blue-300',   width: '25%' },
+                    { label: t.companyProfile.tam, value: data.tam, color: 'bg-violet-500', width: '100%' },
+                    { label: t.companyProfile.sam, value: data.sam, color: 'bg-indigo-400', width: '60%' },
+                    { label: t.companyProfile.som, value: data.som, color: 'bg-blue-300',   width: '25%' },
                   ].map(({ label, value, color, width }) => value ? (
                     <div key={label}>
                       <div className="flex justify-between text-xs mb-1.5">
@@ -754,7 +754,7 @@ export default function FounderCompany() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-gray-400 italic">No founders added yet</p>
+                  <p className="text-xs text-gray-400 italic">{t.common.notSet}</p>
                 )}
                 {data.teamSize && (
                   <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
