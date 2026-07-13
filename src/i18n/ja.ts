@@ -646,6 +646,19 @@ const ja: TranslationKeys = {
     untitled: '無題',
   },
 
+  // ─── Investor Founders Page ──────────────────────────────────────────────────
+  investorFounders: {
+    title: '創業者',
+    description: 'ポートフォリオ企業の創業者',
+    foundersCount: '名の創業者',
+    searchPlaceholder: '創業者、企業、業界、所在地で検索...',
+    loadingFounders: '創業者を読み込み中...',
+    noFoundersYet: 'まだ創業者がいません',
+    noFoundersDesc: '企業に創業者情報を追加すると、ここに表示されます。',
+    noMatch: '該当する創業者が見つかりません',
+    unknownFounder: '不明な創業者',
+  },
+
   // ─── Portfolio Page ──────────────────────────────────────────────────────────
   portfolioPage: {
     description: '投資先企業とポートフォリオのパフォーマンス',

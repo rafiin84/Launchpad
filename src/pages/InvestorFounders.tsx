@@ -9,10 +9,12 @@ import { cn } from '../lib/cn';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
+import { useLanguage } from '../context/LanguageContext';
 
 type ViewMode = 'list' | 'grid';
 
 function FounderRow({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null }) {
+  const { t } = useLanguage();
   return (
     <Link
       to={`/founders/${company.id}`}
@@ -24,7 +26,7 @@ function FounderRow({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl
       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-x-6 gap-y-0.5 items-center">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-            {company.founderName || 'Unknown Founder'}
+            {company.founderName || t.investorFounders.unknownFounder}
           </h3>
           {company.companyName && (
             <p className="text-xs text-gray-500 truncate flex items-center gap-1">
@@ -69,6 +71,7 @@ function FounderRow({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl
 }
 
 function FounderCard({ company, logoUrl }: { company: CRMPortfolioRecord; logoUrl?: string | null }) {
+  const { t } = useLanguage();
   return (
     <Link
       to={`/founders/${company.id}`}
@@ -80,7 +83,7 @@ function FounderCard({ company, logoUrl }: { company: CRMPortfolioRecord; logoUr
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-            {company.founderName || 'Unknown Founder'}
+            {company.founderName || t.investorFounders.unknownFounder}
           </h3>
           {company.companyName && (
             <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
@@ -143,6 +146,7 @@ function FounderCard({ company, logoUrl }: { company: CRMPortfolioRecord; logoUr
 }
 
 export default function InvestorFounders() {
+  const { t } = useLanguage();
   const [companies, setCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -182,11 +186,11 @@ export default function InvestorFounders() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Founders</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t.investorFounders.title}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            Founders from your companies
+            {t.investorFounders.description}
             {!loading && companies.length > 0 && (
-              <span className="ml-1.5 text-gray-300">· {companies.length} founders</span>
+              <span className="ml-1.5 text-gray-300">· {companies.length} {t.investorFounders.foundersCount}</span>
             )}
           </p>
         </div>
@@ -222,7 +226,7 @@ export default function InvestorFounders() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by founder, company, industry, location..."
+            placeholder={t.investorFounders.searchPlaceholder}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
           />
         </div>
@@ -232,7 +236,7 @@ export default function InvestorFounders() {
       {loading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-gray-400" />
-          <span className="ml-3 text-sm text-gray-500">Loading founders...</span>
+          <span className="ml-3 text-sm text-gray-500">{t.investorFounders.loadingFounders}</span>
         </div>
       )}
 
@@ -240,8 +244,8 @@ export default function InvestorFounders() {
       {!loading && companies.length === 0 && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl bg-white">
           <Users size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No founders yet</p>
-          <p className="text-xs text-gray-400">Founders will appear here once companies are added with founder information.</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.investorFounders.noFoundersYet}</p>
+          <p className="text-xs text-gray-400">{t.investorFounders.noFoundersDesc}</p>
         </div>
       )}
 
@@ -249,7 +253,7 @@ export default function InvestorFounders() {
       {!loading && companies.length > 0 && filtered.length === 0 && (
         <div className="text-center py-12">
           <Search size={24} className="text-gray-200 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">No founders match "{search}"</p>
+          <p className="text-sm text-gray-500">{t.investorFounders.noMatch} "{search}"</p>
         </div>
       )}
 

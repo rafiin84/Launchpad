@@ -658,6 +658,19 @@ const en = {
     untitled: 'Untitled',
   },
 
+  // ─── Investor Founders Page ──────────────────────────────────────────────────
+  investorFounders: {
+    title: 'Founders',
+    description: 'Founders from your companies',
+    foundersCount: 'founders',
+    searchPlaceholder: 'Search by founder, company, industry, location...',
+    loadingFounders: 'Loading founders...',
+    noFoundersYet: 'No founders yet',
+    noFoundersDesc: 'Founders will appear here once companies are added with founder information.',
+    noMatch: 'No founders match',
+    unknownFounder: 'Unknown Founder',
+  },
+
   // ─── Portfolio Page ──────────────────────────────────────────────────────────
   portfolioPage: {
     description: 'Your invested companies and portfolio performance',
