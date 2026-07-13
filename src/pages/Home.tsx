@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { generateInvestorInsights, type AIInsight } from '../services/aiEngine';
 import { AIBadge } from '../components/ui/AIBadge';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
@@ -36,24 +37,24 @@ const PIPELINE_STAGES_CONFIG: { id: string; label: string; color: string }[] = [
 
 // ─── Portfolio Growth Chart ────────────────────────────────────────────────────
 
-function PortfolioGrowthChart() {
+function PortfolioGrowthChart({ labels }: { labels: { title: string; desc: string } }) {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 min-h-[200px]">
       <TrendingUp size={28} className="text-gray-200" />
-      <p className="text-sm font-medium text-gray-500">Portfolio Value Over Time</p>
-      <p className="text-xs text-gray-400">Add portfolio companies with valuation data to track growth over time.</p>
+      <p className="text-sm font-medium text-gray-500">{labels.title}</p>
+      <p className="text-xs text-gray-400">{labels.desc}</p>
     </div>
   );
 }
 
 // ─── MOIC Placeholder ─────────────────────────────────────────────────────────
 
-function MoicChart() {
+function MoicChart({ labels }: { labels: { title: string; desc: string } }) {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-2 min-h-[200px]">
       <BarChart2 size={28} className="text-gray-200" />
-      <p className="text-sm font-medium text-gray-500">MOIC Chart</p>
-      <p className="text-xs text-gray-400">Add portfolio companies with investment data to see MOIC analytics.</p>
+      <p className="text-sm font-medium text-gray-500">{labels.title}</p>
+      <p className="text-xs text-gray-400">{labels.desc}</p>
     </div>
   );
 }
@@ -74,7 +75,7 @@ function ChartTooltip({ active, payload, label }: any) {
 
 // ─── Pipeline Funnel Chart (Donut — Recharts) ───────────────────────────────
 
-function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
+function PipelineFunnelChart({ apps, labels }: { apps: CRMApplication[]; labels: { title: string; sub: string; total: string } }) {
   const chartData = PIPELINE_STAGES_CONFIG.map(s => ({
     name: s.label,
     value: apps.filter(a => a.pipelineStage === s.id).length,
@@ -89,8 +90,8 @@ function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">Pipeline Funnel</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Applications per stage</p>
+        <h3 className="text-sm font-semibold text-gray-900">{labels.title}</h3>
+        <p className="text-xs text-gray-400 mt-0.5">{labels.sub}</p>
       </div>
 
       <div className="flex items-center gap-5">
@@ -120,7 +121,7 @@ function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
           {/* Centre label */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-2xl font-bold text-gray-900">{total}</span>
-            <span className="text-[10px] text-gray-400 -mt-0.5">Total</span>
+            <span className="text-[10px] text-gray-400 -mt-0.5">{labels.total}</span>
           </div>
         </div>
 
@@ -150,7 +151,7 @@ function PipelineFunnelChart({ apps }: { apps: CRMApplication[] }) {
 
 // ─── Funding Ask by Industry (Bar Chart — Recharts) ─────────────────────────
 
-function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
+function IndustryBreakdownChart({ apps, labels }: { apps: CRMApplication[]; labels: { title: string; sub: string; total: string; noData: string } }) {
   const byIndustry: Record<string, number> = {};
   apps.forEach(a => {
     const ind = a.industry || 'Unknown';
@@ -172,18 +173,18 @@ function IndustryBreakdownChart({ apps }: { apps: CRMApplication[] }) {
     <div className="bg-white border border-gray-100 rounded-2xl p-5">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Funding Ask by Industry</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Total requested per sector</p>
+          <h3 className="text-sm font-semibold text-gray-900">{labels.title}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">{labels.sub}</p>
         </div>
         {totalFunding > 0 && (
           <div className="text-right">
             <p className="text-lg font-bold text-gray-900">{fmt(totalFunding)}</p>
-            <p className="text-[10px] text-gray-400">Total</p>
+            <p className="text-[10px] text-gray-400">{labels.total}</p>
           </div>
         )}
       </div>
       {chartData.length === 0 ? (
-        <p className="text-xs text-gray-400 py-8 text-center">No data yet</p>
+        <p className="text-xs text-gray-400 py-8 text-center">{labels.noData}</p>
       ) : (
         <div style={{ width: '100%', height: 220 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -247,6 +248,7 @@ const STAGE_STYLES: Record<string, string> = {
 
 export default function Home() {
   const { currentUser, isFounder } = useAuth();
+  const { t } = useLanguage();
   const isConnected = !!loadToken();
 
   const [portfolio, setPortfolio] = useState<CRMPortfolioRecord[]>([]);
@@ -308,9 +310,9 @@ export default function Home() {
 
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return t.dashboard.goodMorning;
+    if (h < 17) return t.dashboard.goodAfternoon;
+    return t.dashboard.goodEvening;
   })();
 
   // Founders get their own dedicated dashboard
@@ -350,7 +352,7 @@ export default function Home() {
             </div>
           )}
           <p className="text-sm text-gray-500 mt-1 truncate">
-            Here's your portfolio at a glance ·{' '}
+            {t.investorDashboard.portfolioAtGlance} ·{' '}
             <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
             <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
           </p>
@@ -362,11 +364,11 @@ export default function Home() {
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
-            <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
+            <p className="text-sm font-medium text-amber-800">{t.investorDashboard.connectCRM}</p>
+            <p className="text-xs text-amber-600 mt-0.5">{t.investorDashboard.connectCRMDesc}</p>
           </div>
           <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">
-            Connect
+            {t.investorDashboard.connect}
           </Link>
         </div>
       )}
@@ -383,24 +385,24 @@ export default function Home() {
 
         // Chips that are also navigation links
         const linkedChips = [
-          { label: 'Total Invested',      value: fmt(totalDeployed),                path: '/portfolio',    icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio,   sub: 'across portfolio' },
-          { label: 'Company',             value: String(portfolio.length),           path: '/portfolio',    icon: <PieChart size={16} />,   accent: false, loading: loadingPortfolio,   sub: `${activeCount} active` },
-          { label: 'Applications',        value: String(applications.length),        path: '/applications', icon: <Inbox size={16} />,      accent: false, loading: loadingApps,        sub: 'submitted' },
-          { label: 'Founders',            value: String(foundersCount),              path: '/founders',     icon: <Building2 size={16} />,  accent: false, loading: loadingFounders,    sub: 'in portfolio' },
-          { label: 'Applicants',          value: String(applicantsCount),            path: '/applicants',   icon: <Users size={16} />,      accent: false, loading: loadingApplicants,  sub: 'portal users' },
+          { label: t.investorDashboard.totalInvested, value: fmt(totalDeployed),                path: '/portfolio',    icon: <DollarSign size={16} />, accent: true,  loading: loadingPortfolio,   sub: t.investorDashboard.acrossPortfolio },
+          { label: t.investorDashboard.company,       value: String(portfolio.length),           path: '/portfolio',    icon: <PieChart size={16} />,   accent: false, loading: loadingPortfolio,   sub: `${activeCount} ${t.investorDashboard.active}` },
+          { label: t.investorDashboard.applications,  value: String(applications.length),        path: '/applications', icon: <Inbox size={16} />,      accent: false, loading: loadingApps,        sub: t.investorDashboard.submitted },
+          { label: t.investorDashboard.founders,      value: String(foundersCount),              path: '/founders',     icon: <Building2 size={16} />,  accent: false, loading: loadingFounders,    sub: t.investorDashboard.inPortfolio },
+          { label: t.investorDashboard.applicants,    value: String(applicantsCount),            path: '/applicants',   icon: <Users size={16} />,      accent: false, loading: loadingApplicants,  sub: t.investorDashboard.portalUsers },
         ];
 
         // Static portfolio metric chips (no link)
         const staticChips: { label: string; value: string; sub: string; icon: React.ReactElement; color?: string }[] = [
-          { label: 'Total Deployed',   value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'capital invested',   icon: <DollarSign size={16} /> },
-          { label: 'Avg Ownership',    value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',                                 sub: 'per company',        icon: <Percent size={16} /> },
-          { label: 'Avg Investment',   value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: 'per company',        icon: <DollarSign size={16} /> },
-          { label: 'Entry Valuations', value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                                           sub: 'combined pre-money', icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
-          { label: 'Stage Mix',        value: `${seedCount}S / ${seriesACount}A`,                                                     sub: 'Seed / Series A',    icon: <Layers size={16} /> },
-          { label: 'Portfolio Value',  value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: 'at cost basis',      icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
-          { label: 'Active',           value: String(activeCount),                                                                    sub: 'active investments',  icon: <Award size={16} />,    color: 'text-amber-600' },
-          { label: 'Est. IRR',         value: '—',                                                                                    sub: 'add more data',      icon: <Target size={16} />,   color: 'text-emerald-600' },
-          { label: 'MOIC',             value: '—',                                                                                    sub: 'mark to market',     icon: <PieChart size={16} /> },
+          { label: t.investorDashboard.totalDeployed,   value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: t.investorDashboard.capitalInvested,   icon: <DollarSign size={16} /> },
+          { label: t.investorDashboard.avgOwnership,    value: avgOwnership > 0 ? `${avgOwnership.toFixed(1)}%` : '—',                                 sub: t.investorDashboard.perCompany,        icon: <Percent size={16} /> },
+          { label: t.investorDashboard.avgInvestment,   value: portfolio.length > 0 && totalDeployed > 0 ? fmt(totalDeployed / portfolio.length) : '—', sub: t.investorDashboard.perCompany,        icon: <DollarSign size={16} /> },
+          { label: t.investorDashboard.entryValuations, value: totalPreMoney > 0 ? fmt(totalPreMoney) : '—',                                           sub: t.investorDashboard.combinedPreMoney, icon: <TrendingUp size={16} />, color: 'text-emerald-600' },
+          { label: t.investorDashboard.stageMix,        value: `${seedCount}S / ${seriesACount}A`,                                                     sub: t.investorDashboard.seedSeriesA,    icon: <Layers size={16} /> },
+          { label: t.investorDashboard.portfolioValue,  value: totalDeployed > 0 ? fmt(totalDeployed) : '—',                                           sub: t.investorDashboard.atCostBasis,      icon: <BarChart2 size={16} />, color: 'text-indigo-600' },
+          { label: t.investorDashboard.active,          value: String(activeCount),                                                                    sub: t.investorDashboard.activeInvestments,  icon: <Award size={16} />,    color: 'text-amber-600' },
+          { label: t.investorDashboard.estIRR,          value: '—',                                                                                    sub: t.investorDashboard.addMoreData,      icon: <Target size={16} />,   color: 'text-emerald-600' },
+          { label: t.investorDashboard.moic,            value: '—',                                                                                    sub: t.investorDashboard.markToMarket,     icon: <PieChart size={16} /> },
         ];
 
         return (
@@ -443,16 +445,16 @@ export default function Home() {
 
       {/* Analytics section */}
       <div className="mb-8">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Performance Analytics</h2>
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">{t.investorDashboard.performanceAnalytics}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <PortfolioGrowthChart />
-          <MoicChart />
+          <PortfolioGrowthChart labels={{ title: t.investorDashboard.portfolioValueOverTime, desc: t.investorDashboard.portfolioValueOverTimeDesc }} />
+          <MoicChart labels={{ title: t.investorDashboard.moicChart, desc: t.investorDashboard.moicChartDesc }} />
         </div>
 
         {/* Recent Portfolio Companies — between chart rows */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Recent Portfolio Companies</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{t.investorDashboard.recentPortfolioCompanies}</h2>
             <Link to="/portfolio" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
               View all <ArrowUpRight size={12} />
             </Link>
@@ -470,9 +472,9 @@ export default function Home() {
           ) : recentPortfolio.length === 0 ? (
             <div className="bg-white border border-dashed border-gray-100 rounded-2xl p-8 text-center">
               <Building2 size={24} className="text-gray-200 mx-auto mb-2" />
-              <p className="text-xs text-gray-400 mb-3">No portfolio companies yet</p>
+              <p className="text-xs text-gray-400 mb-3">{t.investorDashboard.noPortfolioCompanies}</p>
               <Link to="/portfolio/new" className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg">
-                <Plus size={12} /> Add Company
+                <Plus size={12} /> {t.investorDashboard.addCompany}
               </Link>
             </div>
           ) : (
@@ -495,7 +497,7 @@ export default function Home() {
                     {company.investmentAmount && parseFloat(company.investmentAmount) > 0 && (
                       <div className="text-right flex-shrink-0">
                         <p className="text-sm font-bold text-gray-900">{formatCurrency(parseFloat(company.investmentAmount))}</p>
-                        <p className="text-xs text-gray-400">invested</p>
+                        <p className="text-xs text-gray-400">{t.investorDashboard.invested}</p>
                       </div>
                     )}
                   </div>
@@ -509,8 +511,8 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <PipelineFunnelChart apps={applications} />
-          <IndustryBreakdownChart apps={applications} />
+          <PipelineFunnelChart apps={applications} labels={{ title: t.investorDashboard.pipelineFunnel, sub: t.investorDashboard.applicationsPerStage, total: t.investorDashboard.total }} />
+          <IndustryBreakdownChart apps={applications} labels={{ title: t.investorDashboard.fundingAskByIndustry, sub: t.investorDashboard.totalRequestedPerSector, total: t.investorDashboard.total, noData: t.investorDashboard.noDataYet }} />
         </div>
       </div>
 
@@ -519,7 +521,7 @@ export default function Home() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles size={16} className="text-indigo-500" />
-            <h2 className="text-sm font-semibold text-gray-900">AI Insights</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{t.investorDashboard.aiInsights}</h2>
             <AIBadge />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

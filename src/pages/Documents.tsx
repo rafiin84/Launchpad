@@ -11,6 +11,7 @@ import {
   getDownloadUrl, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { loadUserName } from '../services/oauth';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -45,6 +46,7 @@ function formatDate(iso: string): string {
 
 export default function Documents() {
   const { isFounder, isInvestor } = useAuth();
+  const { t } = useLanguage();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,8 +136,8 @@ export default function Documents() {
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
-          title="Delete Document"
-          message="Are you sure you want to delete this document? This action cannot be undone."
+          title={t.documentsPage.deleteDocument}
+          message={t.documentsPage.deleteConfirm}
           onConfirm={handleDelete}
           onCancel={() => setPendingDeleteId(null)}
           deleting={deleting}
@@ -144,14 +146,14 @@ export default function Documents() {
 
       <div className="flex items-center justify-between mb-6">
         <PageHeader
-          title="Documents"
-          description="Secure document repository for your portfolio"
+          title={t.documentsPage.title}
+          description={t.documentsPage.description}
         />
         <Link
           to="/documents/new"
           className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0"
         >
-          <Plus size={14} /> Upload
+          <Plus size={14} /> {t.documentsPage.upload}
         </Link>
       </div>
 
@@ -159,8 +161,8 @@ export default function Documents() {
         <Lock size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-gray-600 leading-relaxed">
           {isFounder
-            ? 'Documents you upload are shared with your investor. Your investor may also upload documents for you to review.'
-            : 'Documents uploaded by founders are visible to you. Documents you upload are visible to all portal users.'}
+            ? t.documentsPage.founderSecurityNote
+            : t.documentsPage.investorSecurityNote}
         </p>
       </div>
 
@@ -210,24 +212,24 @@ export default function Documents() {
       {!loading && !error && visibleDocs.length === 0 && (
         <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <FileText size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No documents yet</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.documentsPage.noDocuments}</p>
           <p className="text-xs text-gray-400 mb-4">
             {isFounder
-              ? 'Upload pitch decks, financials, or legal documents to share with your investor.'
-              : 'Upload documents or wait for founders to share theirs.'}
+              ? t.documentsPage.founderNoDocsDesc
+              : t.documentsPage.investorNoDocsDesc}
           </p>
           <Link
             to="/documents/new"
             className="inline-flex items-center gap-1.5 text-xs font-medium bg-black text-white px-3 py-1.5 rounded-lg"
           >
-            <Plus size={12} /> Upload Document
+            <Plus size={12} /> {t.documentsPage.uploadDocument}
           </Link>
         </div>
       )}
 
       {!loading && !error && visibleDocs.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">All Documents ({visibleDocs.length})</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">{t.documentsPage.allDocuments} ({visibleDocs.length})</h2>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
             {visibleDocs.map((doc, i) => {
               const typeKey = normalizeType(doc.documentType);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
 import { loadCachedProfile } from '../services/crmAppUsers';
 
@@ -53,6 +54,7 @@ function loadExtra(appUser: Record<string, unknown> | null): ProfileExtra {
 /* ── Profile Page ───────────────────────────────────────────── */
 export default function Profile() {
   const { currentUser, role, logout, zohoEmail, zohoProfile, appUser, coverImage } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(() => loadExtra(appUser as unknown as Record<string, unknown> | null));
 
@@ -80,14 +82,14 @@ export default function Profile() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-5xl mx-auto">
 
       <PageHeader
-        title="Profile"
-        description="Your account details and personal information"
+        title={t.profile.title}
+        description={t.profile.description}
         action={
           <button
             onClick={() => navigate('/profile/edit')}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:border-gray-400 hover:bg-gray-50 transition-colors"
           >
-            <Edit3 size={14} /> Edit Profile
+            <Edit3 size={14} /> {t.profile.editProfile}
           </button>
         }
       />
@@ -195,7 +197,7 @@ export default function Profile() {
           {/* About */}
           {extra.bio && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">About</h3>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t.profile.about}</h3>
               <div className="space-y-3">
                 {extra.bio.split('\n\n').map((para, i) => (
                   <p key={i} className="text-sm text-gray-700 leading-relaxed">{para}</p>
@@ -207,9 +209,9 @@ export default function Profile() {
           {/* Quick stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Years Experience', value: '20+', icon: <Calendar size={14} className="text-indigo-400" /> },
-              { label: 'Companies Built', value: '3', icon: <Building2 size={14} className="text-emerald-400" /> },
-              { label: 'Startups Mentored', value: '50+', icon: <Briefcase size={14} className="text-amber-400" /> },
+              { label: t.profile.yearsExperience, value: '20+', icon: <Calendar size={14} className="text-indigo-400" /> },
+              { label: t.profile.companiesBuilt, value: '3', icon: <Building2 size={14} className="text-emerald-400" /> },
+              { label: t.profile.startupsMentored, value: '50+', icon: <Briefcase size={14} className="text-amber-400" /> },
             ].map(s => (
               <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
                 <div className="flex justify-center mb-1.5">{s.icon}</div>
@@ -222,13 +224,13 @@ export default function Profile() {
           {/* Empty state */}
           {!hasExtra && (
             <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-8 text-center">
-              <p className="text-sm text-gray-500 mb-1">Your profile is incomplete</p>
-              <p className="text-xs text-gray-400 mb-4">Add your bio, location, and skills</p>
+              <p className="text-sm text-gray-500 mb-1">{t.profile.profileIncomplete}</p>
+              <p className="text-xs text-gray-400 mb-4">{t.profile.addBioLocationSkills}</p>
               <button
                 onClick={() => navigate('/profile/edit')}
                 className="inline-flex items-center gap-2 text-sm font-medium bg-black text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
               >
-                <Edit3 size={13} /> Complete Profile
+                <Edit3 size={13} /> {t.profile.completeProfile}
               </button>
             </div>
           )}
@@ -237,14 +239,14 @@ export default function Profile() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Sign Out</p>
-                <p className="text-xs text-gray-400 mt-0.5">You'll be returned to the login screen</p>
+                <p className="text-sm font-semibold text-gray-900">{t.profile.signOut}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{t.profile.signOutDesc}</p>
               </div>
               <button
                 onClick={handleLogout}
                 className="inline-flex items-center gap-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2 rounded-xl transition-colors"
               >
-                <LogOut size={14} /> Sign Out
+                <LogOut size={14} /> {t.profile.signOut}
               </button>
             </div>
           </div>
@@ -256,7 +258,7 @@ export default function Profile() {
 
           {/* Current Company */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Current Company</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t.profile.currentCompany}</h3>
             <div className="space-y-4">
               {[
                 { name: 'Launchpad', role: 'Founder & CEO', period: '2024 – Present', color: 'bg-black' },
@@ -278,7 +280,7 @@ export default function Profile() {
           {/* Skills & Expertise */}
           {extra.expertise.length > 0 && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Skills &amp; Expertise</h3>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{t.profile.skillsExpertise}</h3>
               <div className="flex flex-wrap gap-2">
                 {extra.expertise.map(tag => (
                   <span key={tag} className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full font-medium">

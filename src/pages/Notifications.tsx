@@ -6,6 +6,7 @@ import {
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   getNotifications,
   getUnreadCount,
@@ -54,6 +55,7 @@ function relativeTime(timestamp: string): string {
 
 export default function Notifications() {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -91,8 +93,8 @@ export default function Notifications() {
       <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-4">
         <Bell className="w-7 h-7 text-gray-400" />
       </div>
-      <p className="text-sm font-semibold text-gray-900">No notifications yet</p>
-      <p className="mt-1 text-xs text-gray-500">You'll see updates here when activity happens</p>
+      <p className="text-sm font-semibold text-gray-900">{t.notifications.noNotifications}</p>
+      <p className="mt-1 text-xs text-gray-500">{t.notifications.noNotificationsDesc}</p>
     </div>
   );
 
@@ -149,8 +151,8 @@ export default function Notifications() {
   return (
     <div className="max-w-3xl mx-auto">
       <PageHeader
-        title="Notifications"
-        description="Stay updated on all activity"
+        title={t.notifications.title}
+        description={t.notifications.description}
         action={
           notifications.length > 0 ? (
             <div className="flex items-center gap-2">
@@ -160,7 +162,7 @@ export default function Notifications() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
-                  Mark all as read
+                  {t.notifications.markAllRead}
                 </button>
               )}
               <button
@@ -168,7 +170,7 @@ export default function Notifications() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-gray-200 rounded-lg hover:bg-red-50 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                Clear all
+                {t.notifications.clearAll}
               </button>
             </div>
           ) : undefined

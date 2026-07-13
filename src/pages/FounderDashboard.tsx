@@ -39,16 +39,25 @@ interface Milestone {
   dueDate: string;
 }
 
-const DEFAULT_KPIS: KPI[] = [
-  { key: 'mrr',      label: 'MRR',          value: '',  sub: 'monthly recurring revenue', prefix: '$',  accent: true },
-  { key: 'runway',   label: 'Runway',        value: '',  sub: 'months of cash left',       suffix: ' mo' },
-  { key: 'raised',   label: 'Total Raised',  value: '',  sub: 'capital raised to date',    prefix: '$' },
-  { key: 'burn',     label: 'Burn Rate',     value: '',  sub: 'per month',                 prefix: '$' },
-  { key: 'customers',label: 'Customers',     value: '',  sub: 'active paying customers' },
-  { key: 'growth',   label: 'MoM Growth',    value: '',  sub: 'revenue growth month-on-month', suffix: '%' },
-  { key: 'churn',    label: 'Churn',         value: '',  sub: 'monthly churn rate',        suffix: '%' },
-  { key: 'team',     label: 'Team Size',     value: '',  sub: 'full-time employees' },
-];
+function buildDefaultKpis(kpiT: { mrr: string; mrrSub: string; runway: string; runwaySub: string; totalRaised: string; totalRaisedSub: string; burnRate: string; burnRateSub: string; customers: string; customersSub: string; momGrowth: string; momGrowthSub: string; churn: string; churnSub: string; teamSize: string; teamSizeSub: string }): KPI[] {
+  return [
+    { key: 'mrr',      label: kpiT.mrr,        value: '',  sub: kpiT.mrrSub,        prefix: '$',  accent: true },
+    { key: 'runway',   label: kpiT.runway,      value: '',  sub: kpiT.runwaySub,     suffix: ' mo' },
+    { key: 'raised',   label: kpiT.totalRaised, value: '',  sub: kpiT.totalRaisedSub,prefix: '$' },
+    { key: 'burn',     label: kpiT.burnRate,    value: '',  sub: kpiT.burnRateSub,   prefix: '$' },
+    { key: 'customers',label: kpiT.customers,   value: '',  sub: kpiT.customersSub },
+    { key: 'growth',   label: kpiT.momGrowth,   value: '',  sub: kpiT.momGrowthSub,  suffix: '%' },
+    { key: 'churn',    label: kpiT.churn,       value: '',  sub: kpiT.churnSub,      suffix: '%' },
+    { key: 'team',     label: kpiT.teamSize,    value: '',  sub: kpiT.teamSizeSub },
+  ];
+}
+
+const DEFAULT_KPIS: KPI[] = buildDefaultKpis({
+  mrr: 'MRR', mrrSub: 'monthly recurring revenue', runway: 'Runway', runwaySub: 'months of cash left',
+  totalRaised: 'Total Raised', totalRaisedSub: 'capital raised to date', burnRate: 'Burn Rate', burnRateSub: 'per month',
+  customers: 'Customers', customersSub: 'active paying customers', momGrowth: 'MoM Growth', momGrowthSub: 'revenue growth month-on-month',
+  churn: 'Churn', churnSub: 'monthly churn rate', teamSize: 'Team Size', teamSizeSub: 'full-time employees',
+});
 
 const STORAGE_KPIS       = 'lp_founder_kpis';
 const STORAGE_MILESTONES = 'lp_founder_milestones';
@@ -188,7 +197,7 @@ function BurnBarChart({ data, color }: { data: number[]; color: string }) {
 }
 
 /** Horizontal runway gauge */
-function RunwayGauge({ months, maxMonths = 24 }: { months: number; maxMonths?: number }) {
+function RunwayGauge({ months, maxMonths = 24, currentRunwayLabel, monthsLabel }: { months: number; maxMonths?: number; currentRunwayLabel?: string; monthsLabel?: string }) {
   const pct = Math.min(months / maxMonths, 1);
   const color = months >= 12 ? '#10b981' : months >= 6 ? '#f59e0b' : '#ef4444';
   return (
@@ -200,8 +209,8 @@ function RunwayGauge({ months, maxMonths = 24 }: { months: number; maxMonths?: n
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct * 100}%`, backgroundColor: color }} />
       </div>
       <div className="flex justify-between mt-2">
-        <span className="text-xs text-gray-500">Current runway</span>
-        <span className="text-sm font-bold" style={{ color }}>{months} months</span>
+        <span className="text-xs text-gray-500">{currentRunwayLabel || 'Current runway'}</span>
+        <span className="text-sm font-bold" style={{ color }}>{months} {monthsLabel || 'months'}</span>
       </div>
     </div>
   );
@@ -582,8 +591,22 @@ export default function FounderDashboard() {
       )}
 
       {/* KPI Grid */}
+      {(() => {
+        const kpiLabels: Record<string, { label: string; sub: string }> = {
+          mrr: { label: t.kpi.mrr, sub: t.kpi.mrrSub },
+          runway: { label: t.kpi.runway, sub: t.kpi.runwaySub },
+          raised: { label: t.kpi.totalRaised, sub: t.kpi.totalRaisedSub },
+          burn: { label: t.kpi.burnRate, sub: t.kpi.burnRateSub },
+          customers: { label: t.kpi.customers, sub: t.kpi.customersSub },
+          growth: { label: t.kpi.momGrowth, sub: t.kpi.momGrowthSub },
+          churn: { label: t.kpi.churn, sub: t.kpi.churnSub },
+          team: { label: t.kpi.teamSize, sub: t.kpi.teamSizeSub },
+        };
+        return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-        {kpis.map(kpi => (
+        {kpis.map(kpi => {
+          const labels = kpiLabels[kpi.key] || { label: kpi.label, sub: kpi.sub };
+          return (
           <button
             key={kpi.key}
             onClick={() => setShowKPIEditor(true)}
@@ -598,11 +621,14 @@ export default function FounderDashboard() {
                 : <span className={cn('text-lg', kpi.accent ? 'text-gray-500' : 'text-gray-200')}>—</span>
               }
             </div>
-            <p className={cn('text-xs font-semibold', kpi.accent ? 'text-gray-300' : 'text-gray-700')}>{kpi.label}</p>
-            <p className={cn('text-xs mt-0.5', kpi.accent ? 'text-gray-500' : 'text-gray-400')}>{kpi.sub}</p>
+            <p className={cn('text-xs font-semibold', kpi.accent ? 'text-gray-300' : 'text-gray-700')}>{labels.label}</p>
+            <p className={cn('text-xs mt-0.5', kpi.accent ? 'text-gray-500' : 'text-gray-400')}>{labels.sub}</p>
           </button>
-        ))}
+          );
+        })}
       </div>
+        );
+      })()}
 
       {/* AI Insights */}
       {aiInsights.length > 0 && (
@@ -673,7 +699,7 @@ export default function FounderDashboard() {
                   : '—'}
               </span>
             </div>
-            <p className="text-xs text-gray-400 mb-3">Cumulative capital raised · last 6 months</p>
+            <p className="text-xs text-gray-400 mb-3">{t.dashboard.cumulativeCapitalRaised}</p>
             <AreaChart data={raisedTrend} color="#6366f1" gradientId="raised-grad" />
             <div className="flex justify-between mt-1">
               {months.map(m => <span key={m} className="text-[10px] text-gray-300">{m}</span>)}
@@ -692,7 +718,7 @@ export default function FounderDashboard() {
                   : '—'}
               </span>
             </div>
-            <p className="text-xs text-gray-400 mb-3">Monthly cash burn · last 6 months</p>
+            <p className="text-xs text-gray-400 mb-3">{t.dashboard.monthlyCashBurn}</p>
             <BurnBarChart data={burnTrend} color="#f97316" />
             <div className="flex justify-between mt-1">
               {months.map(m => <span key={m} className="text-[10px] text-gray-300">{m}</span>)}
@@ -710,11 +736,11 @@ export default function FounderDashboard() {
                 runwayVal >= 12 ? 'bg-emerald-50 text-emerald-700' :
                 runwayVal >= 6  ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
               )}>
-                {runwayVal === 0 ? 'Not set' : runwayVal >= 12 ? 'Healthy' : runwayVal >= 6 ? 'Watch' : 'Critical'}
+                {runwayVal === 0 ? t.dashboard.notSetStatus : runwayVal >= 12 ? t.dashboard.healthy : runwayVal >= 6 ? t.dashboard.watch : t.dashboard.critical}
               </span>
             </div>
-            <p className="text-xs text-gray-400 mb-3">Months of cash remaining at current burn</p>
-            <RunwayGauge months={runwayVal} maxMonths={24} />
+            <p className="text-xs text-gray-400 mb-3">{t.dashboard.monthsOfCashRemaining}</p>
+            <RunwayGauge months={runwayVal} maxMonths={24} currentRunwayLabel={t.dashboard.currentRunway} monthsLabel={t.dashboard.months} />
           </div>
 
         </div>

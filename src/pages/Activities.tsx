@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
@@ -108,6 +109,7 @@ function compressImage(file: File): Promise<string> {
 
 function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
+  const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded]       = useState(false);
@@ -229,7 +231,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
       >
         <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
         <div className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-400 select-none">
-          Share activities…
+          {t.activities.shareActivities}
         </div>
         <button
           onClick={e => { e.stopPropagation(); setExpanded(true); setShowImagePanel(true); }}
@@ -260,7 +262,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
           type="text"
           value={companyName}
           onChange={e => setCompanyName(e.target.value)}
-          placeholder="Company name"
+          placeholder={t.activities.companyName}
           className="text-xs text-gray-600 placeholder-gray-300 border-0 outline-none bg-transparent flex-1"
         />
       </div>
@@ -288,7 +290,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         type="text"
         value={title}
         onChange={e => setTitle(e.target.value)}
-        placeholder="Title"
+        placeholder={t.activities.titlePlaceholder}
         className="w-full text-sm font-semibold text-gray-900 placeholder-gray-300 border-0 outline-none mb-1"
         autoFocus
       />
@@ -297,7 +299,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
       <textarea
         value={content}
         onChange={e => setContent(e.target.value)}
-        placeholder={isInvestor ? "What do you want to share with your founders?" : "What do you want to share with your investor?"}
+        placeholder={isInvestor ? t.activities.investorPlaceholder : t.activities.founderPlaceholder}
         className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none border-0 outline-none leading-relaxed min-h-[90px]"
       />
 
@@ -327,14 +329,14 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
             {(['upload', 'url'] as const).map(m => (
               <button key={m} onClick={() => setImageMode(m)}
                 className={cn('text-xs px-2 py-1 rounded-lg font-medium transition-all', imageMode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
-                {m === 'upload' ? 'Upload' : 'URL'}
+                {m === 'upload' ? t.activities.upload : t.activities.url}
               </button>
             ))}
           </div>
           {imageMode === 'upload' ? (
             <button onClick={() => fileRef.current?.click()} disabled={compressing}
               className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
-              {compressing ? <><div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" /> Compressing…</> : <><Image size={14} /> Click to upload image</>}
+              {compressing ? <><div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" /> {t.activities.compressing}</> : <><Image size={14} /> {t.activities.clickToUpload}</>}
             </button>
           ) : (
             <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImagePreview(''); setImageData(''); }}
@@ -353,13 +355,13 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
             className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors',
               showImagePanel ? 'bg-gray-100 text-gray-700' : 'text-gray-500 hover:bg-gray-50')}
           >
-            <Image size={15} /> Photo
+            <Image size={15} /> {t.activities.photo}
           </button>
           <button
             onClick={() => { setImageMode('url'); setShowImagePanel(true); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors"
           >
-            <LinkIcon size={15} /> URL
+            <LinkIcon size={15} /> {t.activities.url}
           </button>
           <button
             onClick={handleGenerate}
@@ -367,22 +369,22 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-500 to-indigo-600 text-white hover:from-violet-600 hover:to-indigo-700 disabled:opacity-60 transition-all shadow-sm"
           >
             {generating ? (
-              <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating…</>
+              <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t.activities.generating}</>
             ) : (
-              <><Sparkles size={13} /> Generate with AI</>
+              <><Sparkles size={13} /> {t.activities.generateWithAI}</>
             )}
           </button>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             onClick={handlePost}
             disabled={!canPost || posting}
             className="px-5 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            <Send size={14} /> {posting ? 'Posting…' : 'Post'}
+            <Send size={14} /> {posting ? t.activities.posting : t.activities.post}
           </button>
         </div>
       </div>
@@ -533,6 +535,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
 
 export default function Activities() {
   const { currentUser, isFounder, isInvestor } = useAuth();
+  const { t } = useLanguage();
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -619,8 +622,8 @@ export default function Activities() {
       <div className="relative z-10 w-full max-w-5xl">
 
       <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-900">{isFounder ? 'My Activities' : 'Activities'}</h1>
-        <p className="text-sm text-gray-400 mt-0.5">What's happening across your portfolio network</p>
+        <h1 className="text-xl font-bold text-gray-900">{isFounder ? t.activities.title : t.activities.activitiesTitle}</h1>
+        <p className="text-sm text-gray-400 mt-0.5">{t.activities.subtitle}</p>
       </div>
 
       {/* Not connected */}
@@ -628,10 +631,10 @@ export default function Activities() {
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
-            <p className="text-xs text-amber-600 mt-0.5">Sign in with Zoho CRM to get started.</p>
+            <p className="text-sm font-medium text-amber-800">{t.investorDashboard.connectCRM}</p>
+            <p className="text-xs text-amber-600 mt-0.5">{t.investorDashboard.connectCRMDesc}</p>
           </div>
-          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">Connect</Link>
+          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg">{t.investorDashboard.connect}</Link>
         </div>
       )}
 
@@ -664,7 +667,7 @@ export default function Activities() {
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
           <p className="text-sm text-red-600 mb-3">{error}</p>
           <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
-            <RefreshCw size={12} /> Retry
+            <RefreshCw size={12} /> {t.activities.retry}
           </button>
         </div>
       )}
@@ -685,8 +688,8 @@ export default function Activities() {
       {!loading && !error && records.length === 0 && canFetch && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
           <Activity size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No activities yet</p>
-          <p className="text-xs text-gray-400">Use the composer above to share your first update.</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.activities.noActivities}</p>
+          <p className="text-xs text-gray-400">{t.activities.noActivitiesDesc}</p>
         </div>
       )}
 
@@ -716,7 +719,7 @@ export default function Activities() {
         <div className="bg-white border border-gray-100 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Clock size={13} className="text-gray-400" />
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Recent Activity</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.activities.recentActivity}</h3>
           </div>
           <div className="space-y-3">
             {RECENT_EVENTS.slice(0, 3).map((ev, i) => {
