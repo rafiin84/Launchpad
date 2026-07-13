@@ -220,7 +220,7 @@ function RunwayGauge({ months, maxMonths = 24, currentRunwayLabel, monthsLabel }
 
 export default function FounderDashboard() {
   const { currentUser, zohoEmail, portalSession } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isConnected = !!loadToken();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
 
@@ -486,8 +486,8 @@ export default function FounderDashboard() {
             <p className="text-sm text-gray-500 mt-0.5 truncate">
               {companyName ?? 'Launchpad'}
               {' · '}
-              <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-              <span className="sm:hidden">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              <span className="hidden sm:inline">{new Date().toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+              <span className="sm:hidden">{new Date().toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric' })}</span>
             </p>
           </div>
         </div>
@@ -800,7 +800,7 @@ export default function FounderDashboard() {
                       <p className={cn('text-xs leading-snug', m.done ? 'line-through text-gray-400' : 'text-gray-700')}>{m.text}</p>
                       {m.dueDate && (
                         <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                          <Clock size={10} /> {new Date(m.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          <Clock size={10} /> {new Date(m.dueDate).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric' })}
                         </p>
                       )}
                     </div>

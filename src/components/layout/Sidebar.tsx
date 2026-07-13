@@ -103,7 +103,7 @@ export function Sidebar() {
             <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
-              <p className="text-xs text-gray-500 capitalize truncate">{role}</p>
+              <p className="text-xs text-gray-500 capitalize truncate">{role === 'investor' ? t.login.investor : t.login.founder}</p>
             </div>
           </NavLink>
           <LanguageSelector variant="icon" />

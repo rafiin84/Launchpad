@@ -251,7 +251,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
         <div>
           <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
-          <p className="text-xs text-gray-500 capitalize">{currentUser.role}</p>
+          <p className="text-xs text-gray-500 capitalize">{currentUser.role === 'investor' ? t.login.investor : t.login.founder}</p>
         </div>
       </div>
 
@@ -269,20 +269,29 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
       {/* Activity type pills */}
       <div className="flex gap-2 flex-wrap mb-3">
-        {ACTIVITY_TYPES.map(t => (
-          <button
-            key={t.value}
-            onClick={() => setActivityType(t.value)}
-            className={cn(
-              'text-xs font-medium px-3 py-1 rounded-full border transition-all',
-              activityType === t.value
-                ? 'bg-black text-white border-black'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+        {(() => {
+          const typeLabels: Record<string, string> = {
+            win: `🏆 ${t.activities.win}`,
+            update: `📈 ${t.activities.update}`,
+            insight: `💡 ${t.activities.insight}`,
+            advice: `💬 ${t.activities.advice}`,
+            introduction: `🤝 ${t.activities.introduction}`,
+          };
+          return ACTIVITY_TYPES.map(at => (
+            <button
+              key={at.value}
+              onClick={() => setActivityType(at.value)}
+              className={cn(
+                'text-xs font-medium px-3 py-1 rounded-full border transition-all',
+                activityType === at.value
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+              )}
+            >
+              {typeLabels[at.value] || at.label}
+            </button>
+          ));
+        })()}
       </div>
 
       {/* Title */}
@@ -446,13 +455,19 @@ function groupAndSort(activities: CRMActivity[]): { label: string; items: CRMAct
 
 function ActivityCard({ activity }: { activity: CRMActivity }) {
   const { currentUser, founderCompanyName } = useAuth();
+  const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
   const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || activity.authorName || 'General';
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
   const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;
-  const tags = activity.tags ? activity.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const tags = activity.tags ? activity.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
   const cfg = TYPE_CONFIG[activity.activityType?.toLowerCase()] ?? { label: activity.activityType || 'Activity', bg: 'bg-gray-100', text: 'text-gray-600' };
+  const activityTypeLabels: Record<string, string> = {
+    win: t.activities.win, advice: t.activities.advice, insight: t.activities.insight,
+    update: t.activities.update, introduction: t.activities.introduction,
+  };
+  const typeLabel = activityTypeLabels[activity.activityType?.toLowerCase()] || cfg.label;
   const timeStr = formatDateTime(activity.createdTime);
 
   return (
@@ -469,7 +484,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
           <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
         </div>
         <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
-          {cfg.label}
+          {typeLabel}
         </span>
       </div>
 
