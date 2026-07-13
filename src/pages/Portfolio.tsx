@@ -22,6 +22,7 @@ import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { useLanguage } from '../context/LanguageContext';
 
 // ─── CRM Company Card ────────────────────────────────────────────────────────
 
@@ -198,6 +199,7 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Portfolio() {
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
@@ -270,7 +272,7 @@ export default function Portfolio() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {pendingDeleteId !== null && (
         <DeleteConfirmModal
-          title="Delete Portfolio Company"
+          title={`${t.common.delete} Portfolio Company`}
           message="Are you sure you want to delete this company record? This action cannot be undone."
           onConfirm={handleDeleteCRM}
           onCancel={() => setPendingDeleteId(null)}
@@ -280,7 +282,7 @@ export default function Portfolio() {
       {/* Constrained header */}
       <div className="w-full">
         <PageHeader
-          title="Portfolio"
+          title={t.nav.portfolio}
           description="Your invested companies and portfolio performance"
           action={
             <div className="hidden sm:flex items-center gap-2">
@@ -301,7 +303,7 @@ export default function Portfolio() {
                 </button>
               </div>
               <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-                <Plus size={15} /> Add Company
+                <Plus size={15} /> {t.investorDashboard.addCompany}
               </Link>
             </div>
           }
@@ -312,7 +314,7 @@ export default function Portfolio() {
       <div className="w-full">
         {/* Portfolio companies */}
         <div ref={companiesSectionRef} className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900">Portfolio Companies</h2>
+          <h2 className="text-sm font-semibold text-gray-900">{t.nav.portfolio} {t.nav.companies}</h2>
           {isConnected && (
             <button
               onClick={loadCRMData}
@@ -320,7 +322,7 @@ export default function Portfolio() {
               className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
             >
               <RefreshCw size={12} className={crmLoading ? 'animate-spin' : ''} />
-              {crmLoading ? 'Loading…' : 'Refresh'}
+              {crmLoading ? `${t.common.loading}…` : 'Refresh'}
             </button>
           )}
         </div>
@@ -354,7 +356,7 @@ export default function Portfolio() {
                   className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-white border border-red-200 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   {modulesLoading
-                    ? <><Loader2 size={12} className="animate-spin" /> Loading…</>
+                    ? <><Loader2 size={12} className="animate-spin" /> {t.common.loading}…</>
                     : <><RefreshCw size={12} /> Show my modules</>}
                 </button>
               )}
@@ -421,10 +423,10 @@ export default function Portfolio() {
         {isConnected && !crmLoading && crmCompanies.length === 0 && !crmError && (
           <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center mt-4">
             <Building2 size={28} className="text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-medium text-gray-500 mb-1">No records in Zoho CRM yet</p>
+            <p className="text-sm font-medium text-gray-500 mb-1">{t.investorDashboard.noPortfolioCompanies}</p>
             <p className="text-xs text-gray-400 mb-4">Add your first portfolio company to sync it to your CRM.</p>
             <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-              <Plus size={14} /> Add Company
+              <Plus size={14} /> {t.investorDashboard.addCompany}
             </Link>
           </div>
         )}

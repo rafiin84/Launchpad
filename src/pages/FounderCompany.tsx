@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   type CompanyData, EMPTY,
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
@@ -19,10 +20,11 @@ const INDUSTRIES = ['SaaS', 'Fintech', 'Healthtech', 'Edtech', 'E-commerce', 'Ma
 // ─── Field components ─────────────────────────────────────────────────────────
 
 function DisplayField({ label, value, href }: { label: string; value: string; href?: string }) {
+  const { t } = useLanguage();
   if (!value) return (
     <div>
       <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm text-gray-300 italic">Not set</p>
+      <p className="text-sm text-gray-300 italic">{t.common.notSet}</p>
     </div>
   );
   return (
@@ -110,6 +112,7 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
+  const { t } = useLanguage();
   const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
   const [searchParams] = useSearchParams();
   const queryEmail = searchParams.get('email');
@@ -262,10 +265,10 @@ export default function FounderCompany() {
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight truncate">
-                {d.name || 'Your Company'}
+                {d.name || t.companyProfile.yourCompany}
               </h1>
               <p className="text-xs sm:text-sm text-white/60 mt-0.5 max-w-md leading-relaxed line-clamp-2">
-                {d.tagline || 'Add your one-liner tagline'}
+                {d.tagline || t.companyProfile.addTagline}
               </p>
             </div>
           </div>
@@ -280,7 +283,7 @@ export default function FounderCompany() {
                     disabled={saving}
                     className="flex items-center gap-1.5 text-sm text-white/80 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
                   >
-                    <X size={14} /> Cancel
+                    <X size={14} /> {t.common.cancel}
                   </button>
                   <button
                     onClick={handleSave}
@@ -288,7 +291,7 @@ export default function FounderCompany() {
                     className="flex items-center gap-1.5 text-sm font-semibold text-white bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl hover:bg-white/25 transition-all disabled:opacity-50"
                   >
                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? `${t.common.loading}` : t.common.save}
                   </button>
                 </>
               ) : (
@@ -296,7 +299,7 @@ export default function FounderCompany() {
                   onClick={() => setEditing(true)}
                   className="flex items-center gap-1.5 text-sm font-medium text-white bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-xl hover:bg-white/20 transition-all"
                 >
-                  <Edit3 size={14} /> Edit Profile
+                  <Edit3 size={14} /> {t.companyProfile.editProfile}
                 </button>
               )
             )}
@@ -345,7 +348,7 @@ export default function FounderCompany() {
         {loading && (
           <div className="flex items-center justify-center py-16">
             <Loader2 size={24} className="animate-spin text-gray-400" />
-            <span className="ml-3 text-sm text-gray-500">Loading company profile...</span>
+            <span className="ml-3 text-sm text-gray-500">{t.common.loading}</span>
           </div>
         )}
 
@@ -394,14 +397,14 @@ export default function FounderCompany() {
           <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6 flex items-center gap-3">
             <Lightbulb size={16} className="text-amber-500 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-amber-900">Complete your company profile</p>
-              <p className="text-xs text-amber-600 mt-0.5">This is what your investor sees when they review your company data.</p>
+              <p className="text-sm font-medium text-amber-900">{t.companyProfile.completePrompt}</p>
+              <p className="text-xs text-amber-600 mt-0.5">{t.companyProfile.completePromptDesc}</p>
             </div>
             <button
               onClick={() => setEditing(true)}
               className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg whitespace-nowrap"
             >
-              Get Started
+              {t.companyProfile.getStarted}
             </button>
           </div>
         )}
@@ -422,18 +425,18 @@ export default function FounderCompany() {
           <div className="flex-1 min-w-0 space-y-4">
 
             {/* ── Overview ── */}
-            <Section title="Company Overview" icon={Building2} editing={editing} iconColor="text-indigo-500" iconBg="bg-indigo-50">
+            <Section title={t.companyProfile.companyOverview} icon={Building2} editing={editing} iconColor="text-indigo-500" iconBg="bg-indigo-50">
               {editing ? (
                 <>
                   <EditField label="Company Name" field="name" value={d.name} onChange={handleChange} placeholder="Acme Inc" />
                   <EditField label="Tagline" field="tagline" value={d.tagline} onChange={handleChange} placeholder="One-liner about your company" />
-                  <EditField label="Website" field="website" value={d.website} onChange={handleChange} placeholder="https://yourcompany.com" />
-                  <EditField label="Industry" field="industry" value={d.industry} onChange={handleChange} options={INDUSTRIES} />
-                  <EditField label="Stage" field="stage" value={d.stage} onChange={handleChange} options={STAGES} />
-                  <EditField label="Founded Year" field="foundedYear" value={d.foundedYear} onChange={handleChange} placeholder="2022" />
+                  <EditField label={t.companyProfile.website} field="website" value={d.website} onChange={handleChange} placeholder="https://yourcompany.com" />
+                  <EditField label={t.companyProfile.industry} field="industry" value={d.industry} onChange={handleChange} options={INDUSTRIES} />
+                  <EditField label={t.companyProfile.stage} field="stage" value={d.stage} onChange={handleChange} options={STAGES} />
+                  <EditField label={t.companyProfile.founded} field="foundedYear" value={d.foundedYear} onChange={handleChange} placeholder="2022" />
                   <EditField label="Location / HQ" field="location" value={d.location} onChange={handleChange} placeholder="San Francisco, CA" />
                   <div className="sm:col-span-2">
-                    <EditField label="Company Description" field="description" value={d.description} onChange={handleChange}
+                    <EditField label={t.companyProfile.description} field="description" value={d.description} onChange={handleChange}
                       placeholder="Describe what your company does, the problem you solve, and who you serve…" multiline />
                   </div>
                 </>

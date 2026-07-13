@@ -5,6 +5,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, Move,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Avatar } from '../components/ui/Avatar';
 import { updateAppUser, uploadAppUserPhoto, deleteAppUserPhoto, loadCachedProfile, cacheProfileLocally, serverSaveCoverImage } from '../services/crmAppUsers';
 import { saveUserName } from '../services/oauth';
@@ -46,6 +47,7 @@ function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
   onConfirm: (croppedDataUrl: string, croppedBlob: Blob) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -156,8 +158,8 @@ function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
         <div className="px-5 pt-5 pb-3">
-          <h3 className="text-base font-semibold text-gray-900">Adjust Profile Picture</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Drag to reposition. Scroll or use controls to zoom.</p>
+          <h3 className="text-base font-semibold text-gray-900">{t.profile.adjustProfilePicture}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{t.profile.adjustProfilePictureDesc}</p>
         </div>
 
         <div className="px-5">
@@ -224,14 +226,14 @@ function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors"
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"
             onClick={handleConfirm}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-xl transition-colors"
           >
-            Apply
+            {t.profile.apply}
           </button>
         </div>
       </div>
@@ -241,6 +243,7 @@ function ImageCropModal({ imageSrc, onConfirm, onCancel }: {
 
 export default function EditProfile() {
   const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession, isFounder } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
   const isPortal = isFounder;
@@ -458,7 +461,7 @@ export default function EditProfile() {
         onClick={() => navigate('/profile')}
         className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
       >
-        <ArrowLeft size={16} /> Back to Profile
+        <ArrowLeft size={16} /> {t.profile.backToProfile}
       </button>
 
       {/* Header with photo upload */}
@@ -475,13 +478,13 @@ export default function EditProfile() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Edit Profile</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t.profile.editProfile}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{form.name || currentUser.name}</p>
           {photoFile && (
-            <p className="text-xs text-emerald-600 mt-0.5">New photo selected — will upload on save</p>
+            <p className="text-xs text-emerald-600 mt-0.5">{t.profile.newPhotoSelected}</p>
           )}
           {removePhoto && !photoFile && (
-            <p className="text-xs text-red-500 mt-0.5">Photo will be removed on save</p>
+            <p className="text-xs text-red-500 mt-0.5">{t.profile.photoWillBeRemoved}</p>
           )}
           <div className="flex gap-2 mt-1.5">
             <button
@@ -489,7 +492,7 @@ export default function EditProfile() {
               onClick={() => fileRef.current?.click()}
               className="text-xs font-medium text-gray-600 hover:text-black transition-colors"
             >
-              {currentUser.avatar || photoPreview ? 'Change photo' : 'Upload photo'}
+              {currentUser.avatar || photoPreview ? t.profile.changePhoto : t.profile.uploadPhoto}
             </button>
             {(currentUser.avatar || photoPreview) && !removePhoto && (
               <button
@@ -497,7 +500,7 @@ export default function EditProfile() {
                 onClick={handleRemovePhoto}
                 className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
               >
-                Remove photo
+                {t.profile.removePhoto}
               </button>
             )}
             {removePhoto && !photoFile && (
@@ -506,7 +509,7 @@ export default function EditProfile() {
                 onClick={() => setRemovePhoto(false)}
                 className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
               >
-                Undo remove
+                {t.profile.undoRemove}
               </button>
             )}
           </div>
@@ -524,7 +527,7 @@ export default function EditProfile() {
 
       {/* Cover image upload */}
       <div className="mb-6">
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cover Image</label>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.coverImage}</label>
         <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-gray-200 group">
           {coverPreview ? (
             <>
@@ -536,7 +539,7 @@ export default function EditProfile() {
                   onClick={() => coverFileRef.current?.click()}
                   className="flex items-center gap-1 text-xs font-medium text-white bg-black/60 backdrop-blur-sm px-2.5 py-1.5 rounded-lg hover:bg-black/80 transition-colors"
                 >
-                  <ImagePlus size={12} /> Change
+                  <ImagePlus size={12} /> {t.profile.change}
                 </button>
                 <button
                   type="button"

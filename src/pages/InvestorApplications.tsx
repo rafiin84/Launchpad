@@ -6,6 +6,7 @@ import {
   BarChart3, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
   type InvestmentApplication,
@@ -103,6 +104,7 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
 
 export default function InvestorApplications() {
   const { isInvestor } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,8 +152,8 @@ export default function InvestorApplications() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="w-full">
         <PageHeader
-          title="Applications"
-          description="Review and manage founder applications"
+          title={t.nav.applications}
+          description={t.applications.title}
         />
       </div>
 
@@ -207,7 +209,7 @@ export default function InvestorApplications() {
       {/* Section header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-900">
-          Applications
+          {t.nav.applications}
           <span className="ml-2 text-xs font-medium text-gray-400">{filtered.length}</span>
         </h2>
       </div>
@@ -233,8 +235,8 @@ export default function InvestorApplications() {
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No applications yet</p>
-          <p className="text-xs text-gray-400">Applications submitted by founders will appear here.</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.common.noResults}</p>
+          <p className="text-xs text-gray-400">{t.applications.title}</p>
         </div>
       )}
 

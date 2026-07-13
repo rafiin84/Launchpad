@@ -16,6 +16,7 @@ import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { registerPortalUser, setPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
+import { useLanguage } from '../context/LanguageContext';
 
 // ─── Form Field Component ────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ const selectCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm 
 // ─── Invite Applicant Modal ───────────────────────────────────────────────────────
 
 function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (f: CRMFounder) => void }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState<CRMFounderFields>({
     salutation: '', firstName: '', lastName: '', email: '',
     secondaryEmail: '', phone: '', mobile: '', title: '',
@@ -60,14 +62,14 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
 
       // Step 1: Create contact (or find existing if duplicate)
       let id: string | null = null;
-      setInviteStatus('Creating contact...');
+      setInviteStatus(t.founders.creatingContact);
       try {
         id = await createCRMFounder(form);
       } catch (createErr) {
         const msg = createErr instanceof Error ? createErr.message : String(createErr);
         console.warn('[Invite] Create failed, checking for existing contact:', msg);
         if (form.email) {
-          setInviteStatus('Contact may already exist, looking up...');
+          setInviteStatus(t.founders.contactMayExist);
           id = await findContactByEmail(form.email);
         }
         if (!id) {
@@ -80,7 +82,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       // Step 2: Send invitation email
       let inviteFailed = false;
       if (form.email) {
-        setInviteStatus('Sending invitation...');
+        setInviteStatus(t.founders.sendingInvitation);
         try {
           const result = await sendInviteEmail(id, form.email, displayName);
           setInviteStatus(result.message);
@@ -118,7 +120,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         onClose();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add founder');
+      setError(err instanceof Error ? err.message : t.founders.failedToAddFounder);
       setInviteStatus('');
     } finally { setSaving(false); }
   }
@@ -133,7 +135,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
               <UserPlus size={16} className="text-indigo-600" />
             </div>
-            <h2 className="text-base font-bold text-gray-900">Invite Applicant</h2>
+            <h2 className="text-base font-bold text-gray-900">{t.founders.inviteApplicant}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <X size={16} className="text-gray-400" />
@@ -144,10 +146,10 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         <div className="space-y-4">
 
           {/* Section: Basic Info */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Basic Information</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t.founders.basicInformation}</p>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Salutation">
+            <Field label={t.founders.salutation}>
               <div className="relative">
                 <select value={form.salutation} onChange={set('salutation')} className={selectCls}>
                   <option value="">—</option>
@@ -156,40 +158,40 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             </Field>
-            <Field label="First Name">
+            <Field label={t.founders.firstName}>
               <input type="text" value={form.firstName} onChange={set('firstName')} placeholder="John" className={inputCls} autoFocus />
             </Field>
-            <Field label="Last Name" required>
+            <Field label={t.founders.lastName} required>
               <input type="text" value={form.lastName} onChange={set('lastName')} placeholder="Doe" className={inputCls} />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Email">
+            <Field label={t.profile.email}>
               <input type="email" value={form.email} onChange={set('email')} placeholder="john@company.com" className={inputCls} />
             </Field>
-            <Field label="Secondary Email">
+            <Field label={t.founders.secondaryEmail}>
               <input type="email" value={form.secondaryEmail} onChange={set('secondaryEmail')} placeholder="john.personal@email.com" className={inputCls} />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone">
+            <Field label={t.profile.phone}>
               <input type="tel" value={form.phone} onChange={set('phone')} placeholder="+91 98400 00000" className={inputCls} />
             </Field>
-            <Field label="Mobile">
+            <Field label={t.founders.mobile}>
               <input type="tel" value={form.mobile} onChange={set('mobile')} placeholder="+91 98400 00000" className={inputCls} />
             </Field>
           </div>
 
           {/* Section: Company Info */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Company Details</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">{t.founders.companyDetails}</p>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Company">
+            <Field label={t.founders.company}>
               <input type="text" value={form.company} onChange={set('company')} placeholder="Startup Inc." className={inputCls} />
             </Field>
-            <Field label="Title / Designation">
+            <Field label={t.founders.titleDesignation}>
               <input type="text" value={form.title} onChange={set('title')} placeholder="CEO & Co-founder" className={inputCls} />
             </Field>
           </div>
