@@ -249,7 +249,11 @@ const en = {
     en: 'English',
     ja: '日本語',
   },
-} as const;
+};
 
-export type TranslationKeys = typeof en;
-export default en;
+type DeepStringify<T> = {
+  [K in keyof T]: T[K] extends Record<string, unknown> ? DeepStringify<T[K]> : string;
+};
+
+export type TranslationKeys = DeepStringify<typeof en>;
+export default en as TranslationKeys;
