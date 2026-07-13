@@ -148,7 +148,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
       });
       if (listRes.status === 204) return res.status(200).json({ documents: [] });
-      if (!listRes.ok) throw new Error(`CRM GET ${listRes.status}: ${await listRes.text()}`);
+      if (!listRes.ok) {
+        const errorText = await listRes.text();
+        console.error(`[/api/documents] CRM GET failed (${listRes.status}):`, errorText);
+        if (listRes.status === 400 || listRes.status === 404) {
+          return res.status(200).json({ documents: [], warning: 'My_Documents module may not exist in CRM' });
+        }
+        throw new Error(`CRM GET ${listRes.status}: ${errorText}`);
+      }
       const listJson = await listRes.json() as { data?: Array<Record<string, unknown>> };
       const documents = (listJson.data || []).map(fromRecord);
       return res.status(200).json({ documents });

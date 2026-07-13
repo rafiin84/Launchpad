@@ -203,7 +203,7 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             <Field label={t.founders.leadSource}>
               <div className="relative">
                 <select value={form.leadSource} onChange={set('leadSource')} className={selectCls}>
-                  <option value="">— Select —</option>
+                  <option value="">{t.common.select}</option>
                   {LEAD_SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />

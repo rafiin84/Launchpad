@@ -23,20 +23,22 @@ function formatCurrency(amount: number): string {
   return `$${amount}`;
 }
 
-function relativeTime(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diff = now - then;
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function createRelativeTime(t: { activities: { justNow: string; minutesAgo: string; hoursAgo: string; yesterday: string; daysAgo: string } }, language: string) {
+  return function relativeTime(iso: string): string {
+    const now = Date.now();
+    const then = new Date(iso).getTime();
+    const diff = now - then;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return t.activities.justNow;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t.activities.minutesAgo.replace('{n}', String(minutes));
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t.activities.hoursAgo.replace('{n}', String(hours));
+    const days = Math.floor(hours / 24);
+    if (days === 1) return t.activities.yesterday;
+    if (days < 7) return t.activities.daysAgo.replace('{n}', String(days));
+    return new Date(iso).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric' });
+  };
 }
 
 // ─── Status & stage styling ───────────────────────────────────────────────────
@@ -120,7 +122,8 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
 
 export default function InvestorApplications() {
   const { isInvestor } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const relativeTime = createRelativeTime(t, language);
   const navigate = useNavigate();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [loading, setLoading] = useState(true);

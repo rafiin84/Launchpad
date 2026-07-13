@@ -32,30 +32,33 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; bg: string;
 
 // ─── Relative time helper ────────────────────────────────────────────────────
 
-function relativeTime(timestamp: string): string {
-  const now = Date.now();
-  const then = new Date(timestamp).getTime();
-  const diffMs = now - then;
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
+function createRelativeTime(t: { activities: { justNow: string; minutesAgo: string; hoursAgo: string; yesterday: string; daysAgo: string } }, language: string) {
+  return function relativeTime(timestamp: string): string {
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    const diffMs = now - then;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
 
-  if (diffSec < 60) return 'Just now';
-  if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? 's' : ''} ago`;
-  if (diffDay === 1) return 'Yesterday';
-  if (diffDay < 7) return `${diffDay} days ago`;
+    if (diffSec < 60) return t.activities.justNow;
+    if (diffMin < 60) return t.activities.minutesAgo.replace('{n}', String(diffMin));
+    if (diffHr < 24) return t.activities.hoursAgo.replace('{n}', String(diffHr));
+    if (diffDay === 1) return t.activities.yesterday;
+    if (diffDay < 7) return t.activities.daysAgo.replace('{n}', String(diffDay));
 
-  const d = new Date(timestamp);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const d = new Date(timestamp);
+    return d.toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric' });
+  };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function Notifications() {
   const { currentUser } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const relativeTime = createRelativeTime(t, language);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 

@@ -6,6 +6,8 @@ import {
   Star, Send, Inbox, X, Check, Clock, Info, Download,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import type { TranslationKeys } from '../i18n';
 import {
   getApplicationById,
   updateApplicationStatus,
@@ -31,50 +33,54 @@ function formatCurrency(amount: number): string {
   return `$${amount}`;
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: TranslationKeys, language: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'Just now';
+  if (seconds < 60) return t.activities.justNow;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60) return t.activities.minutesAgo.replace('{n}', String(minutes));
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t.activities.hoursAgo.replace('{n}', String(hours));
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (days === 1) return t.activities.yesterday;
+  if (days < 7) return t.activities.daysAgo.replace('{n}', String(days));
+  return new Date(iso).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric' });
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; bg: string }> = {
-  draft:                { label: 'Draft',              color: 'text-gray-600',    bg: 'bg-gray-100' },
-  submitted:            { label: 'Submitted',          color: 'text-blue-600',    bg: 'bg-blue-50' },
-  under_review:         { label: 'Under Review',       color: 'text-indigo-600',  bg: 'bg-indigo-50' },
-  interested:           { label: 'Interested',         color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  more_info_requested:  { label: 'More Info',          color: 'text-amber-600',   bg: 'bg-amber-50' },
-  documents_requested:  { label: 'Docs Requested',     color: 'text-yellow-600',  bg: 'bg-yellow-50' },
-  shortlisted:          { label: 'Shortlisted',        color: 'text-purple-600',  bg: 'bg-purple-50' },
-  meeting_scheduled:    { label: 'Meeting',            color: 'text-violet-600',  bg: 'bg-violet-50' },
-  due_diligence:        { label: 'Due Diligence',      color: 'text-orange-600',  bg: 'bg-orange-50' },
-  on_hold:              { label: 'On Hold',            color: 'text-slate-600',   bg: 'bg-slate-100' },
-  approved:             { label: 'Approved',           color: 'text-green-600',   bg: 'bg-green-50' },
-  invested:             { label: 'Invested',           color: 'text-green-700',   bg: 'bg-green-100' },
-  rejected:             { label: 'Rejected',           color: 'text-red-600',     bg: 'bg-red-50' },
-};
+function getStatusConfig(t: TranslationKeys): Record<ApplicationStatus, { label: string; color: string; bg: string }> {
+  return {
+    draft:                { label: t.applicationTracker.statusDraft,         color: 'text-gray-600',    bg: 'bg-gray-100' },
+    submitted:            { label: t.applicationTracker.statusSubmitted,     color: 'text-blue-600',    bg: 'bg-blue-50' },
+    under_review:         { label: t.applicationTracker.statusUnderReview,   color: 'text-indigo-600',  bg: 'bg-indigo-50' },
+    interested:           { label: t.applicationTracker.statusInterested,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    more_info_requested:  { label: t.applicationTracker.statusMoreInfo,      color: 'text-amber-600',   bg: 'bg-amber-50' },
+    documents_requested:  { label: t.applicationTracker.statusDocsRequested, color: 'text-yellow-600',  bg: 'bg-yellow-50' },
+    shortlisted:          { label: t.applicationTracker.statusShortlisted,   color: 'text-purple-600',  bg: 'bg-purple-50' },
+    meeting_scheduled:    { label: t.applicationTracker.statusMeeting,       color: 'text-violet-600',  bg: 'bg-violet-50' },
+    due_diligence:        { label: t.applicationTracker.statusDueDiligence,  color: 'text-orange-600',  bg: 'bg-orange-50' },
+    on_hold:              { label: t.applicationTracker.statusOnHold,       color: 'text-slate-600',   bg: 'bg-slate-100' },
+    approved:             { label: t.applicationTracker.statusApproved,     color: 'text-green-600',   bg: 'bg-green-50' },
+    invested:             { label: t.applicationTracker.statusInvested,     color: 'text-green-700',   bg: 'bg-green-100' },
+    rejected:             { label: t.applicationTracker.statusRejected,     color: 'text-red-600',     bg: 'bg-red-50' },
+  };
+}
 
-const NOTIFICATION_MESSAGES: Record<string, (companyName: string, investorName: string) => { title: string; message: string }> = {
-  approved:            (c, i) => ({ title: 'Application Approved', message: `Congratulations! Your application for ${c} has been approved by ${i}.` }),
-  rejected:            (c, i) => ({ title: 'Application Rejected', message: `Your application for ${c} has been reviewed and was not selected to move forward.` }),
-  on_hold:             (c, i) => ({ title: 'Application On Hold', message: `Your application for ${c} has been placed on hold. The investor will follow up soon.` }),
-  more_info_requested: (c, i) => ({ title: 'Additional Information Requested', message: `${i} has requested additional information for your application (${c}). Please check your application and provide the requested details.` }),
-  documents_requested: (c, i) => ({ title: 'Documents Requested', message: `${i} has requested additional documents for your application (${c}). Please upload the required documents.` }),
-  meeting_scheduled:   (c, i) => ({ title: 'Meeting Scheduled', message: `${i} would like to schedule a meeting to discuss your application for ${c}. Please check for further details.` }),
-  shortlisted:         (c, i) => ({ title: 'Application Shortlisted', message: `Great news! Your application for ${c} has been shortlisted by ${i} for further evaluation.` }),
-  under_review:        (c, i) => ({ title: 'Application Under Review', message: `Your application for ${c} is now being actively reviewed by the investment team.` }),
-  interested:          (c, i) => ({ title: 'Investor Interested', message: `${i} has expressed interest in your application for ${c}.` }),
-  due_diligence:       (c, i) => ({ title: 'Due Diligence Started', message: `Your application for ${c} has moved to due diligence review.` }),
-};
+function getNotificationMessages(t: TranslationKeys): Record<string, (companyName: string, investorName: string) => { title: string; message: string }> {
+  return {
+    approved:            (c, i) => ({ title: t.notificationMessages.approvedTitle, message: t.notificationMessages.approvedMessage.replace('{c}', c).replace('{i}', i) }),
+    rejected:            (c, i) => ({ title: t.notificationMessages.rejectedTitle, message: t.notificationMessages.rejectedMessage.replace('{c}', c) }),
+    on_hold:             (c, i) => ({ title: t.notificationMessages.onHoldTitle, message: t.notificationMessages.onHoldMessage.replace('{c}', c) }),
+    more_info_requested: (c, i) => ({ title: t.notificationMessages.moreInfoTitle, message: t.notificationMessages.moreInfoMessage.replace('{i}', i).replace('{c}', c) }),
+    documents_requested: (c, i) => ({ title: t.notificationMessages.docsRequestedTitle, message: t.notificationMessages.docsRequestedMessage.replace('{i}', i).replace('{c}', c) }),
+    meeting_scheduled:   (c, i) => ({ title: t.notificationMessages.meetingScheduledTitle, message: t.notificationMessages.meetingScheduledMessage.replace('{i}', i).replace('{c}', c) }),
+    shortlisted:         (c, i) => ({ title: t.notificationMessages.shortlistedTitle, message: t.notificationMessages.shortlistedMessage.replace('{c}', c).replace('{i}', i) }),
+    under_review:        (c, i) => ({ title: t.notificationMessages.underReviewTitle, message: t.notificationMessages.underReviewMessage.replace('{c}', c) }),
+    interested:          (c, i) => ({ title: t.notificationMessages.interestedTitle, message: t.notificationMessages.interestedMessage.replace('{i}', i).replace('{c}', c) }),
+    due_diligence:       (c, i) => ({ title: t.notificationMessages.dueDiligenceTitle, message: t.notificationMessages.dueDiligenceMessage.replace('{c}', c) }),
+  };
+}
 
 const STAGE_COLORS: Record<string, { color: string; bg: string }> = {
   Idea:        { color: 'text-gray-600',    bg: 'bg-gray-100' },
@@ -87,7 +93,9 @@ const STAGE_COLORS: Record<string, { color: string; bg: string }> = {
 };
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.submitted;
+  const { t } = useLanguage();
+  const statusConfig = getStatusConfig(t);
+  const cfg = statusConfig[status] ?? statusConfig.submitted;
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full', cfg.color, cfg.bg)}>
       {cfg.label}
@@ -96,10 +104,11 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
 }
 
 function StageBadge({ stage }: { stage: string }) {
+  const { t } = useLanguage();
   const cfg = STAGE_COLORS[stage] ?? { color: 'text-gray-600', bg: 'bg-gray-100' };
   return (
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.color, cfg.bg)}>
-      {stage || 'Unknown'}
+      {stage || t.common.notSet}
     </span>
   );
 }
@@ -107,6 +116,7 @@ function StageBadge({ stage }: { stage: string }) {
 // ─── Video embed ──────────────────────────────────────────────────────────────
 
 function VideoEmbed({ url }: { url: string }) {
+  const { t } = useLanguage();
   if (!url) return null;
   try {
     const u = new URL(url);
@@ -137,7 +147,7 @@ function VideoEmbed({ url }: { url: string }) {
   } catch { /* not a valid URL */ }
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-      <Play size={12} /> Watch Demo Video <ExternalLink size={10} />
+      <Play size={12} /> {t.applicationDetail.watchDemoVideo} <ExternalLink size={10} />
     </a>
   );
 }
@@ -192,6 +202,7 @@ function RequestDocsModal({
   onSubmit: (docs: RequestedDocument[]) => void;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const alreadyRequested = new Set(existingDocs.map(d => d.type));
   const [selected, setSelected] = useState<Set<string>>(new Set(alreadyRequested));
   const [customDoc, setCustomDoc] = useState('');
@@ -226,8 +237,8 @@ function RequestDocsModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">Request Documents</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Select the documents you need from the founder</p>
+            <h3 className="text-sm font-bold text-gray-900">{t.applicationDetail.requestDocumentsTitle}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{t.applicationDetail.requestDocumentsDesc}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
             <X size={16} className="text-gray-400" />

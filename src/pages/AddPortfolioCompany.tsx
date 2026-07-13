@@ -8,17 +8,18 @@ import { cn } from '../lib/cn';
 import { savePortfolioCompany } from '../services/store';
 import { createCRMPortfolioRecord } from '../services/crmPortfolio';
 import { loadToken } from '../services/oauth';
+import { useLanguage } from '../context/LanguageContext';
 
 // ---------------------------------------------------------------------------
 // LogoUpload
 // ---------------------------------------------------------------------------
 interface LogoUploadProps {
-  label?: string;
+  label: string;
   value: string;
   onChange: (dataUrl: string) => void;
 }
 
-function LogoUpload({ label = 'Company Logo', value, onChange }: LogoUploadProps) {
+function LogoUpload({ label, value, onChange }: LogoUploadProps) {
   const ref = useRef<HTMLInputElement>(null);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -46,7 +47,7 @@ function LogoUpload({ label = 'Company Logo', value, onChange }: LogoUploadProps
         ) : (
           <>
             <Upload className="w-5 h-5 text-gray-400" />
-            <span className="text-xs text-gray-400 text-center leading-tight px-1">Upload logo</span>
+            <span className="text-xs text-gray-400 text-center leading-tight px-1">{label}</span>
           </>
         )}
       </button>
@@ -77,13 +78,6 @@ const stageOptions = [
   { value: 'series-c', label: 'Series C' },
   { value: 'growth', label: 'Growth' },
   { value: 'pre-ipo', label: 'Pre-IPO' },
-];
-
-const statusOptions = [
-  { value: 'active', label: 'Active' },
-  { value: 'exited', label: 'Exited' },
-  { value: 'written-off', label: 'Written Off' },
-  { value: 'follow-on', label: 'Follow-On' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -120,15 +114,15 @@ const empty: FormState = {
   status: '', notes: '', founderName: '', founderEmail: '', founderLinkedin: '', founderPhone: '',
 };
 
-function validate(f: FormState): Record<string, string> {
+function validate(f: FormState, t: any): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!f.companyName.trim()) e.companyName = 'Company name is required';
-  if (!f.industry) e.industry = 'Industry is required';
-  if (!f.stage) e.stage = 'Stage is required';
-  if (!f.shortDescription.trim()) e.shortDescription = 'Short description is required';
-  if (!f.investmentAmount.trim()) e.investmentAmount = 'Investment amount is required';
-  if (!f.investmentDate) e.investmentDate = 'Investment date is required';
-  if (!f.status) e.status = 'Status is required';
+  if (!f.companyName.trim()) e.companyName = t.addPortfolio.nameRequired;
+  if (!f.industry) e.industry = t.addPortfolio.industryRequired;
+  if (!f.stage) e.stage = t.addPortfolio.stageRequired;
+  if (!f.shortDescription.trim()) e.shortDescription = t.addPortfolio.descriptionRequired;
+  if (!f.investmentAmount.trim()) e.investmentAmount = t.addPortfolio.amountRequired;
+  if (!f.investmentDate) e.investmentDate = t.addPortfolio.dateRequired;
+  if (!f.status) e.status = t.addPortfolio.statusRequired;
   return e;
 }
 
@@ -137,11 +131,19 @@ function validate(f: FormState): Record<string, string> {
 // ---------------------------------------------------------------------------
 export default function AddPortfolioCompany() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [form, setForm] = useState<FormState>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const isConnected = !!loadToken();
+
+  const statusOptions = [
+    { value: 'active', label: t.addPortfolio.statusActive },
+    { value: 'exited', label: t.addPortfolio.statusExited },
+    { value: 'written-off', label: t.addPortfolio.statusWrittenOff },
+    { value: 'follow-on', label: t.addPortfolio.statusFollowOn },
+  ];
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -152,7 +154,7 @@ export default function AddPortfolioCompany() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validate(form);
+    const errs = validate(form, t);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setSubmitting(true);
@@ -178,17 +180,17 @@ export default function AddPortfolioCompany() {
         {/* Back nav */}
         <Link to="/portfolio" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors">
           <ArrowLeft className="w-4 h-4" />
-          Back to Portfolio
+          {t.addPortfolio.backToPortfolio}
         </Link>
 
-        <PageHeader title="Add Portfolio Company" description="Record a new investment in your portfolio." />
+        <PageHeader title={t.addPortfolio.addPortfolioCompany} description={t.addPortfolio.addDescription} />
 
         {/* CRM connection status */}
         <div className={`flex items-center gap-2 rounded-xl px-4 py-3 mb-4 text-xs font-medium ${isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500' : 'bg-amber-400'}`} />
           {isConnected
-            ? 'Connected to Zoho CRM — data will be saved directly to your Portfolio module.'
-            : 'Not connected to Zoho CRM — data will be saved locally. Go to Login to connect.'}
+            ? t.addPortfolio.crmConnected
+            : t.addPortfolio.crmNotConnected}
         </div>
 
         {apiError && (
@@ -201,64 +203,64 @@ export default function AddPortfolioCompany() {
         <form onSubmit={handleSubmit} noValidate>
           {/* Company Info */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">Company Info</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.addPortfolio.companyInfo}</p>
             <div className="mb-4">
-              <LogoUpload value={form.logo} onChange={(v) => setForm((p) => ({ ...p, logo: v }))} />
+              <LogoUpload label={t.addPortfolio.uploadLogo} value={form.logo} onChange={(v) => setForm((p) => ({ ...p, logo: v }))} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Company Name *" value={form.companyName} onChange={set('companyName')} error={errors.companyName} placeholder="Acme Inc." />
-              <Input label="Website" type="url" value={form.website} onChange={set('website')} placeholder="https://acme.com" />
-              <Input label="Location" value={form.location} onChange={set('location')} placeholder="San Francisco, CA" />
-              <Select label="Industry *" value={form.industry} onChange={set('industry')} options={industryOptions} placeholder="Select industry" error={errors.industry} />
-              <Select label="Company Stage *" value={form.stage} onChange={set('stage')} options={stageOptions} placeholder="Select stage" error={errors.stage} />
-              <Input label="Founded Year" type="number" value={form.foundedYear} onChange={set('foundedYear')} placeholder="2020" />
-              <Input label="Team Size" type="number" value={form.teamSize} onChange={set('teamSize')} placeholder="25" />
-              <Input label="Short Description *" value={form.shortDescription} onChange={set('shortDescription')} error={errors.shortDescription} placeholder="One-line pitch" className="sm:col-span-2" />
+              <Input label={`${t.addPortfolio.companyName} *`} value={form.companyName} onChange={set('companyName')} error={errors.companyName} placeholder="Acme Inc." />
+              <Input label={t.addPortfolio.website} type="url" value={form.website} onChange={set('website')} placeholder="https://acme.com" />
+              <Input label={t.addPortfolio.location} value={form.location} onChange={set('location')} placeholder="San Francisco, CA" />
+              <Select label={`${t.addPortfolio.industry} *`} value={form.industry} onChange={set('industry')} options={industryOptions} placeholder={t.addPortfolio.industry} error={errors.industry} />
+              <Select label={`${t.addPortfolio.companyStage} *`} value={form.stage} onChange={set('stage')} options={stageOptions} placeholder={t.addPortfolio.companyStage} error={errors.stage} />
+              <Input label={t.addPortfolio.foundedYear} type="number" value={form.foundedYear} onChange={set('foundedYear')} placeholder="2020" />
+              <Input label={t.addPortfolio.teamSize} type="number" value={form.teamSize} onChange={set('teamSize')} placeholder="25" />
+              <Input label={`${t.addPortfolio.shortDescription} *`} value={form.shortDescription} onChange={set('shortDescription')} error={errors.shortDescription} placeholder="" className="sm:col-span-2" />
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4">
-              <Textarea label="Full Description" value={form.fullDescription} onChange={set('fullDescription')} placeholder="Describe the company, its mission, and market opportunity..." rows={4} />
-              <Input label="Tags" value={form.tags} onChange={set('tags')} placeholder="e.g. fintech, b2b, saas — comma separated" />
+              <Textarea label={t.addPortfolio.fullDescription} value={form.fullDescription} onChange={set('fullDescription')} placeholder="" rows={4} />
+              <Input label={t.addPortfolio.tags} value={form.tags} onChange={set('tags')} placeholder="" />
             </div>
           </div>
 
           {/* Investment Details */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">Investment Details</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.addPortfolio.investmentDetails}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Investment Amount *" type="number" value={form.investmentAmount} onChange={set('investmentAmount')} error={errors.investmentAmount} placeholder="500000" />
-              <Input label="Investment Date *" type="date" value={form.investmentDate} onChange={set('investmentDate')} error={errors.investmentDate} />
-              <Input label="Pre-Money Valuation" type="number" value={form.preMoneyValuation} onChange={set('preMoneyValuation')} placeholder="5000000" />
-              <Input label="Ownership %" type="number" value={form.ownershipPct} onChange={set('ownershipPct')} placeholder="10.00" step="0.01" />
-              <Select label="Status *" value={form.status} onChange={set('status')} options={statusOptions} placeholder="Select status" error={errors.status} className="sm:col-span-2" />
+              <Input label={`${t.addPortfolio.investmentAmount} *`} type="number" value={form.investmentAmount} onChange={set('investmentAmount')} error={errors.investmentAmount} placeholder="500000" />
+              <Input label={`${t.addPortfolio.investmentDate} *`} type="date" value={form.investmentDate} onChange={set('investmentDate')} error={errors.investmentDate} />
+              <Input label={t.addPortfolio.preMoneyValuation} type="number" value={form.preMoneyValuation} onChange={set('preMoneyValuation')} placeholder="5000000" />
+              <Input label={t.addPortfolio.ownershipPct} type="number" value={form.ownershipPct} onChange={set('ownershipPct')} placeholder="10.00" step="0.01" />
+              <Select label={`${t.addPortfolio.status} *`} value={form.status} onChange={set('status')} options={statusOptions} placeholder={t.addPortfolio.status} error={errors.status} className="sm:col-span-2" />
             </div>
             <div className="mt-4">
-              <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Any notes about this investment..." rows={3} />
+              <Textarea label={t.addPortfolio.notes} value={form.notes} onChange={set('notes')} placeholder="" rows={3} />
             </div>
           </div>
 
           {/* Founder Info */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">Founder Info</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.addPortfolio.founderInfo}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Founder Name" value={form.founderName} onChange={set('founderName')} placeholder="Jane Doe" />
-              <Input label="Founder Email" type="email" value={form.founderEmail} onChange={set('founderEmail')} placeholder="jane@acme.com" />
-              <Input label="Founder LinkedIn" value={form.founderLinkedin} onChange={set('founderLinkedin')} placeholder="https://linkedin.com/in/..." />
-              <Input label="Founder Phone" type="tel" value={form.founderPhone} onChange={set('founderPhone')} placeholder="+1 555 000 0000" />
+              <Input label={t.addPortfolio.founderName} value={form.founderName} onChange={set('founderName')} placeholder="Jane Doe" />
+              <Input label={t.addPortfolio.founderEmail} type="email" value={form.founderEmail} onChange={set('founderEmail')} placeholder="jane@acme.com" />
+              <Input label={t.addPortfolio.founderLinkedIn} value={form.founderLinkedin} onChange={set('founderLinkedin')} placeholder="https://linkedin.com/in/..." />
+              <Input label={t.addPortfolio.founderPhone} type="tel" value={form.founderPhone} onChange={set('founderPhone')} placeholder="+1 555 000 0000" />
             </div>
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-3 pt-2 pb-8">
             <Link to="/portfolio">
-              <Button type="button" variant="outline" disabled={submitting}>Cancel</Button>
+              <Button type="button" variant="outline" disabled={submitting}>{t.common.cancel}</Button>
             </Link>
             <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Loader2 size={14} className="animate-spin" />
-                  Saving to CRM…
+                  {t.addPortfolio.savingToCRM}
                 </span>
-              ) : 'Add to Portfolio'}
+              ) : t.addPortfolio.addToPortfolio}
             </Button>
           </div>
         </form>

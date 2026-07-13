@@ -37,16 +37,16 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, language: string): string {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(iso).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch { return ''; }
 }
 
 export default function Documents() {
   const { isFounder, isInvestor } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -135,8 +135,8 @@ export default function Documents() {
   };
 
   const typeCounts = visibleDocs.reduce<Record<string, number>>((acc, d) => {
-    const t = normalizeType(d.documentType);
-    acc[t] = (acc[t] ?? 0) + 1;
+    const dt = normalizeType(d.documentType);
+    acc[dt] = (acc[dt] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -185,7 +185,7 @@ export default function Documents() {
                 <Icon size={20} />
               </div>
               <p className="text-sm font-semibold text-gray-900">{typeLabels[type] || meta.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{count} document{count !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{count} {count === 1 ? t.addPortfolio.documentSingular : t.addPortfolio.documentCount}</p>
             </div>
           );
         })}
@@ -294,7 +294,7 @@ export default function Documents() {
                         {doc.createdTime && (
                           <>
                             <span className="text-gray-200">·</span>
-                            <span className="text-xs text-gray-400">{formatDate(doc.createdTime)}</span>
+                            <span className="text-xs text-gray-400">{formatDate(doc.createdTime, language)}</span>
                           </>
                         )}
                       </div>
@@ -305,7 +305,7 @@ export default function Documents() {
                       onClick={() => handleView(doc)}
                       disabled={viewing === doc.id}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
-                      title="View"
+                      title={t.documentsPage.view}
                     >
                       <Eye size={14} className={viewing === doc.id ? 'animate-pulse' : ''} />
                     </button>
@@ -313,14 +313,14 @@ export default function Documents() {
                       onClick={() => handleDownload(doc)}
                       disabled={downloading === doc.id}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                      title="Download"
+                      title={t.documentsPage.download}
                     >
                       <Download size={14} className={downloading === doc.id ? 'animate-pulse' : ''} />
                     </button>
                     <button
                       onClick={() => setPendingDeleteId(doc.id)}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="Delete"
+                      title={t.common.delete}
                     >
                       <Trash2 size={13} />
                     </button>

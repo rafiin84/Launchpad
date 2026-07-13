@@ -11,9 +11,11 @@ import { getCRMFounder, deleteCRMFounder, sendInviteEmail, checkPortalStatus, ty
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
+import { useLanguage } from '../context/LanguageContext';
 import type { UserRole } from '../types';
 
 export default function FounderDetail() {
+  const { t, language } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [founder, setFounder] = useState<CRMFounder | null>(null);
@@ -85,9 +87,9 @@ export default function FounderDetail() {
             .catch(() => {});
         }
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load founder'))
+      .catch(err => setError(err instanceof Error ? err.message : t.founderDetail.failedToLoad))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async () => {
     if (!id) return;
@@ -107,7 +109,7 @@ export default function FounderDetail() {
     setInviting(true);
     setInviteResult(null);
     try {
-      const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+      const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || t.founderDetail.defaultUser;
       const result = await sendInviteEmail(id, founder.email, displayName);
       const isResend = portalStatus !== null;
 
@@ -123,14 +125,18 @@ export default function FounderDetail() {
       setPortalStatus('invited');
 
       const statusMsg = isResend
-        ? 'Re-invitation sent — a new invite has been sent to the user.'
-        : `${result.message} — User registered as ${inviteRole}.`;
+        ? t.founderDetail.reInvitationSent
+        : t.founderDetail.userRegisteredAs.replace('{message}', result.message).replace('{role}', inviteRole);
       setInviteResult({ type: 'success', message: statusMsg });
 
       addNotification({
         type: 'invitation_sent',
-        title: isResend ? 'Portal Invitation Re-sent' : 'Portal Invitation Sent',
-        message: `${displayName} (${founder.email}) was ${isResend ? 're-' : ''}invited to the portal as ${inviteRole}.`,
+        title: isResend ? t.founderDetail.portalInvitationResent : t.founderDetail.portalInvitationSent,
+        message: t.founderDetail.userWasInvited
+          .replace('{name}', displayName)
+          .replace('{email}', founder.email)
+          .replace('{reinvited}', isResend ? t.founderDetail.reinvitedPrefix : '')
+          .replace('{role}', inviteRole),
         actor: 'Admin',
         actorRole: 'investor',
         targetRole: 'founder',
@@ -138,7 +144,7 @@ export default function FounderDetail() {
       });
       window.dispatchEvent(new Event('notifications-updated'));
     } catch (err) {
-      setInviteResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invitation' });
+      setInviteResult({ type: 'error', message: err instanceof Error ? err.message : t.founderDetail.failedToSendInvitation });
     } finally {
       setInviting(false);
     }
@@ -150,11 +156,11 @@ export default function FounderDetail() {
     setPortalUserStatus(founder.email, 'active');
     setPortalStatus('active');
 
-    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || t.founderDetail.defaultUser;
     addNotification({
       type: 'user_activated',
-      title: 'User Activated',
-      message: `${founderName}'s portal access has been activated.`,
+      title: t.founderDetail.userActivated,
+      message: t.founderDetail.userActivatedMessage.replace('{name}', founderName),
       actor: 'Admin',
       actorRole: 'investor',
       targetRole: 'founder',
@@ -170,11 +176,11 @@ export default function FounderDetail() {
     setPortalStatus('disabled');
     setShowDisableModal(false);
 
-    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'User';
+    const founderName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || t.founderDetail.defaultUser;
     addNotification({
       type: 'user_deactivated',
-      title: 'User Disabled',
-      message: `${founderName}'s portal access has been disabled.`,
+      title: t.founderDetail.userDisabled,
+      message: t.founderDetail.userDisabledMessage.replace('{name}', founderName),
       actor: 'Admin',
       actorRole: 'investor',
       targetRole: 'founder',
@@ -222,30 +228,30 @@ export default function FounderDetail() {
     return (
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <Link to="/applicants" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
-          <ArrowLeft size={15} /> Applicants
+          <ArrowLeft size={15} /> {t.founderDetail.applicants}
         </Link>
         <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
           <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
-          <p className="text-sm font-medium text-red-700">{error || 'Founder not found'}</p>
+          <p className="text-sm font-medium text-red-700">{error || t.founderDetail.founderNotFound}</p>
         </div>
       </div>
     );
   }
 
-  const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
-  const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || 'Unnamed';
+  const fullName = [founder.salutation, founder.firstName, founder.lastName].filter(Boolean).join(' ') || t.founderDetail.unnamed;
+  const displayName = [founder.firstName, founder.lastName].filter(Boolean).join(' ') || t.founderDetail.unnamed;
   const location = [founder.mailingCity, founder.mailingState, founder.mailingCountry].filter(Boolean).join(', ');
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
   const joined = founder.createdTime
-    ? new Date(founder.createdTime).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    ? new Date(founder.createdTime).toLocaleDateString(language === 'ja' ? 'ja-JP' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null;
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 pb-12">
       {showDeleteModal && (
         <DeleteConfirmModal
-          title="Delete Founder"
-          message={`Are you sure you want to remove "${displayName}"? This action cannot be undone.`}
+          title={t.founderDetail.deleteFounder}
+          message={t.founderDetail.deleteConfirm.replace('{name}', displayName)}
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteModal(false)}
           deleting={deleting}
@@ -261,23 +267,23 @@ export default function FounderDetail() {
               <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
                 <AlertCircle size={20} className="text-red-500" />
               </div>
-              <h3 className="text-base font-bold text-gray-900">Disable User</h3>
+              <h3 className="text-base font-bold text-gray-900">{t.founderDetail.disableUser}</h3>
             </div>
             <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Are you sure you want to disable this user? They will no longer be able to access the portal.
+              {t.founderDetail.disableConfirm}
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
                 onClick={() => setShowDisableModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
               >
-                No
+                {t.founderDetail.no}
               </button>
               <button
                 onClick={handleDisable}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors"
               >
-                Yes
+                {t.founderDetail.yes}
               </button>
             </div>
           </div>
@@ -287,7 +293,7 @@ export default function FounderDetail() {
       {/* Back link */}
       <div className="pt-6 pb-4">
         <Link to="/applicants" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
-          <ArrowLeft size={15} /> Applicants
+          <ArrowLeft size={15} /> {t.founderDetail.applicants}
         </Link>
       </div>
 
@@ -306,7 +312,7 @@ export default function FounderDetail() {
             onClick={() => setShowDeleteModal(true)}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-red-500/70 backdrop-blur-sm border border-red-400/50 px-3 py-1.5 rounded-xl hover:bg-red-500/90 transition-colors"
           >
-            <Trash2 size={13} /> <span className="hidden sm:inline">Delete</span>
+            <Trash2 size={13} /> <span className="hidden sm:inline">{t.founderDetail.delete}</span>
           </button>
         </div>
 
@@ -340,22 +346,22 @@ export default function FounderDetail() {
               className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all bg-black text-white hover:bg-gray-800 disabled:opacity-50"
             >
               {inviting ? (
-                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+                <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t.founderDetail.sending}</>
               ) : (
-                <><Send size={14} /> Send Portal Invitation</>
+                <><Send size={14} /> {t.founderDetail.sendPortalInvitation}</>
               )}
             </button>
           ) : portalStatus === 'invited' ? (
             /* Invited but not yet activated — show status badge + mark active button */
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                <Clock size={12} /> Invited
+                <Clock size={12} /> {t.founderDetail.invited}
               </span>
               <button
                 onClick={handleActivate}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
-                <CheckCircle size={13} /> Mark Active
+                <CheckCircle size={13} /> {t.founderDetail.markActive}
               </button>
             </div>
           ) : (
@@ -371,7 +377,7 @@ export default function FounderDetail() {
               <div className={`relative w-9 h-5 rounded-full transition-colors ${portalStatus === 'active' ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${portalStatus === 'active' ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
-              {portalStatus === 'active' ? 'Active' : 'Disabled'}
+              {portalStatus === 'active' ? t.founderDetail.active : t.founderDetail.disabled}
             </button>
           )
         )}
@@ -393,7 +399,7 @@ export default function FounderDetail() {
 
           {/* Contact Information */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-5">Contact Information</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-5">{t.founderDetail.contactInformation}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {founder.email && (
                 <div className="flex items-start gap-3">
@@ -401,7 +407,7 @@ export default function FounderDetail() {
                     <Mail size={14} className="text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Email</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.email}</p>
                     <a href={`mailto:${founder.email}`} className="text-sm text-indigo-600 hover:underline">
                       {founder.email}
                     </a>
@@ -414,7 +420,7 @@ export default function FounderDetail() {
                     <Mail size={14} className="text-violet-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Secondary Email</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.secondaryEmail}</p>
                     <a href={`mailto:${founder.secondaryEmail}`} className="text-sm text-indigo-600 hover:underline">
                       {founder.secondaryEmail}
                     </a>
@@ -427,7 +433,7 @@ export default function FounderDetail() {
                     <Phone size={14} className="text-emerald-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Phone</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.phone}</p>
                     <a href={`tel:${founder.phone}`} className="text-sm text-gray-700 hover:underline">
                       {founder.phone}
                     </a>
@@ -440,7 +446,7 @@ export default function FounderDetail() {
                     <Phone size={14} className="text-amber-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Mobile</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.mobile}</p>
                     <a href={`tel:${founder.mobile}`} className="text-sm text-gray-700 hover:underline">
                       {founder.mobile}
                     </a>
@@ -453,7 +459,7 @@ export default function FounderDetail() {
                     <MapPin size={14} className="text-rose-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Location</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.location}</p>
                     <p className="text-sm text-gray-700">{location}</p>
                   </div>
                 </div>
@@ -464,7 +470,7 @@ export default function FounderDetail() {
                     <Calendar size={14} className="text-gray-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Added</p>
+                    <p className="text-xs text-gray-400 mb-0.5">{t.founderDetail.added}</p>
                     <p className="text-sm text-gray-700">{joined}</p>
                   </div>
                 </div>
@@ -475,7 +481,7 @@ export default function FounderDetail() {
           {/* Description */}
           {founder.description && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Description</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.founderDetail.description}</h3>
               <div className="space-y-2">
                 {founder.description.split('\n').filter(Boolean).map((para, i) => (
                   <p key={i} className="text-sm text-gray-600 leading-relaxed">{para}</p>
