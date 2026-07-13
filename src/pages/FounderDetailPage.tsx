@@ -9,6 +9,7 @@ import { getCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmP
 import { fetchCompanyProfile, type CompanyData, EMPTY } from '../services/companyProfile';
 import { Avatar } from '../components/ui/Avatar';
 import { loadToken } from '../services/oauth';
+import { useLanguage } from '../context/LanguageContext';
 
 function fmt(val: string, prefix = '$') {
   if (!val) return '';
@@ -62,6 +63,7 @@ type Tab = 'profile' | 'business' | 'pitch';
 export default function FounderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [company, setCompany] = useState<CRMPortfolioRecord | null>(null);
   const [profile, setProfile] = useState<CompanyData>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -100,7 +102,7 @@ export default function FounderDetailPage() {
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-gray-400" />
-          <span className="ml-3 text-sm text-gray-500">Loading founder details...</span>
+          <span className="ml-3 text-sm text-gray-500">{t.founderDetailPage.loadingDetails}</span>
         </div>
       </div>
     );
@@ -110,10 +112,10 @@ export default function FounderDetailPage() {
     return (
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <Link to="/founders" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
-          <ArrowLeft size={14} /> Founders
+          <ArrowLeft size={14} /> {t.founderDetailPage.backToFounders}
         </Link>
         <div className="text-center py-16 bg-white border border-gray-100 rounded-2xl">
-          <p className="text-sm text-gray-500">{error || 'Founder not found'}</p>
+          <p className="text-sm text-gray-500">{error || t.founderDetailPage.notFound}</p>
         </div>
       </div>
     );
@@ -124,16 +126,16 @@ export default function FounderDetailPage() {
   const hasProfile = p.name || p.description || p.productDescription;
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'profile', label: 'Company Profile' },
-    { key: 'business', label: 'Business Details' },
-    { key: 'pitch', label: 'Pitch & Funding' },
+    { key: 'profile', label: t.founderDetailPage.tabProfile },
+    { key: 'business', label: t.founderDetailPage.tabBusiness },
+    { key: 'pitch', label: t.founderDetailPage.tabPitch },
   ];
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Back */}
       <Link to="/founders" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
-        <ArrowLeft size={14} /> Founders
+        <ArrowLeft size={14} /> {t.founderDetailPage.backToFounders}
       </Link>
 
       {/* Hero */}
@@ -178,7 +180,7 @@ export default function FounderDetailPage() {
           {c.website && (
             <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer"
               className="text-xs bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 hover:bg-white/30">
-              <Globe size={10} /> Website
+              <Globe size={10} /> {t.founderDetailPage.website}
             </a>
           )}
         </div>
@@ -186,15 +188,15 @@ export default function FounderDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1">
-        {tabs.map(t => (
+        {tabs.map(tab => (
           <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
             className={`flex-1 text-xs font-medium py-2 px-3 rounded-lg transition-all ${
-              activeTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -203,36 +205,36 @@ export default function FounderDetailPage() {
       {activeTab === 'profile' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Section title="Company Overview" icon={Building2}>
+            <Section title={t.founderDetailPage.companyOverview} icon={Building2}>
               <div className="space-y-4">
-                <Field label="Company Name" value={p.name || c.companyName} />
-                <Field label="Tagline" value={p.tagline} />
-                <Field label="Description" value={p.description || c.fullDescription || c.shortDescription} />
+                <Field label={t.founderDetailPage.companyName} value={p.name || c.companyName} />
+                <Field label={t.founderDetailPage.tagline} value={p.tagline} />
+                <Field label={t.founderDetailPage.description} value={p.description || c.fullDescription || c.shortDescription} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Industry" value={p.industry || c.industry} />
-                  <Field label="Stage" value={p.stage || c.stage} />
-                  <Field label="Founded" value={p.foundedYear || c.foundedYear} />
-                  <Field label="Location" value={p.location || c.location} />
+                  <Field label={t.founderDetailPage.industry} value={p.industry || c.industry} />
+                  <Field label={t.founderDetailPage.stage} value={p.stage || c.stage} />
+                  <Field label={t.founderDetailPage.founded} value={p.foundedYear || c.foundedYear} />
+                  <Field label={t.founderDetailPage.location} value={p.location || c.location} />
                 </div>
-                <Field label="Website" value={p.website || c.website} href={p.website || c.website} />
+                <Field label={t.founderDetailPage.website} value={p.website || c.website} href={p.website || c.website} />
               </div>
             </Section>
 
-            <Section title="Founding Team" icon={Users}>
+            <Section title={t.founderDetailPage.foundingTeam} icon={Users}>
               <div className="space-y-4">
-                <Field label="Founder Names" value={p.founderNames || c.founderName} />
+                <Field label={t.founderDetailPage.founderNames} value={p.founderNames || c.founderName} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Team Size" value={p.teamSize || c.teamSize} />
-                  <Field label="Open Roles" value={p.openRoles} />
+                  <Field label={t.founderDetailPage.teamSize} value={p.teamSize || c.teamSize} />
+                  <Field label={t.founderDetailPage.openRoles} value={p.openRoles} />
                 </div>
               </div>
             </Section>
 
-            <Section title="Product & Traction" icon={Lightbulb}>
+            <Section title={t.founderDetailPage.productTraction} icon={Lightbulb}>
               <div className="space-y-4">
-                <Field label="Product Description" value={p.productDescription} />
-                <Field label="Revenue Model" value={p.revenueModel} />
-                <Field label="Target Market" value={p.targetMarket} />
+                <Field label={t.founderDetailPage.productDescription} value={p.productDescription} />
+                <Field label={t.founderDetailPage.revenueModel} value={p.revenueModel} />
+                <Field label={t.founderDetailPage.targetMarket} value={p.targetMarket} />
               </div>
             </Section>
           </div>
@@ -241,13 +243,13 @@ export default function FounderDetailPage() {
           <div className="space-y-6">
             {/* Key Metrics */}
             <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Key Metrics</h3>
+              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.keyMetrics}</h3>
               <div className="grid grid-cols-2 gap-2">
                 <MetricCard label="MRR" value={fmt(p.mrr)} color="text-emerald-600" />
                 <MetricCard label="ARR" value={fmt(p.arr)} color="text-indigo-600" />
-                <MetricCard label="Customers" value={p.activeCustomers} color="text-purple-600" />
-                <MetricCard label="MoM Growth" value={p.momGrowth ? `${p.momGrowth}%` : ''} color="text-blue-600" />
-                <MetricCard label="Churn Rate" value={p.churnRate ? `${p.churnRate}%` : ''} color="text-red-500" />
+                <MetricCard label={t.founderDetailPage.customers} value={p.activeCustomers} color="text-purple-600" />
+                <MetricCard label={t.founderDetailPage.momGrowth} value={p.momGrowth ? `${p.momGrowth}%` : ''} color="text-blue-600" />
+                <MetricCard label={t.founderDetailPage.churnRate} value={p.churnRate ? `${p.churnRate}%` : ''} color="text-red-500" />
                 <MetricCard label="NPS" value={p.nps} color="text-amber-600" />
               </div>
             </div>
@@ -255,12 +257,12 @@ export default function FounderDetailPage() {
             {/* Investment */}
             {(c.investmentAmount || c.investmentDate || c.preMoneyValuation) && (
               <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Investment</h3>
+                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.investment}</h3>
                 <div className="space-y-3">
-                  <Field label="Amount" value={c.investmentAmount ? fmt(c.investmentAmount) : ''} />
-                  <Field label="Date" value={c.investmentDate} />
-                  <Field label="Pre-Money Valuation" value={c.preMoneyValuation ? fmt(c.preMoneyValuation) : ''} />
-                  <Field label="Ownership" value={c.ownershipPct ? `${c.ownershipPct}%` : ''} />
+                  <Field label={t.founderDetailPage.amount} value={c.investmentAmount ? fmt(c.investmentAmount) : ''} />
+                  <Field label={t.founderDetailPage.date} value={c.investmentDate} />
+                  <Field label={t.founderDetailPage.preMoneyValuation} value={c.preMoneyValuation ? fmt(c.preMoneyValuation) : ''} />
+                  <Field label={t.founderDetailPage.ownership} value={c.ownershipPct ? `${c.ownershipPct}%` : ''} />
                 </div>
               </div>
             )}
@@ -268,7 +270,7 @@ export default function FounderDetailPage() {
             {/* Notes */}
             {c.notes && (
               <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Notes</h3>
+                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.notes}</h3>
                 <p className="text-sm text-gray-700 whitespace-pre-line">{c.notes}</p>
               </div>
             )}
@@ -279,37 +281,37 @@ export default function FounderDetailPage() {
       {activeTab === 'business' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Section title="Financials & Funding" icon={DollarSign}>
+            <Section title={t.founderDetailPage.financialsFunding} icon={DollarSign}>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Total Raised" value={fmt(p.totalRaised)} />
-                  <Field label="Last Round Size" value={fmt(p.lastRoundSize)} />
-                  <Field label="Last Round Stage" value={p.lastRoundStage} />
-                  <Field label="Last Round Date" value={p.lastRoundDate} />
-                  <Field label="Pre-Money Valuation" value={fmt(p.preMoneyValuation)} />
-                  <Field label="Monthly Burn" value={fmt(p.monthlyBurn)} />
+                  <Field label={t.founderDetailPage.totalRaised} value={fmt(p.totalRaised)} />
+                  <Field label={t.founderDetailPage.lastRoundSize} value={fmt(p.lastRoundSize)} />
+                  <Field label={t.founderDetailPage.lastRoundStage} value={p.lastRoundStage} />
+                  <Field label={t.founderDetailPage.lastRoundDate} value={p.lastRoundDate} />
+                  <Field label={t.founderDetailPage.preMoneyValuation} value={fmt(p.preMoneyValuation)} />
+                  <Field label={t.founderDetailPage.monthlyBurn} value={fmt(p.monthlyBurn)} />
                 </div>
-                <Field label="Runway" value={p.runway} />
+                <Field label={t.founderDetailPage.runway} value={p.runway} />
               </div>
             </Section>
 
-            <Section title="Market & Competition" icon={Target}>
+            <Section title={t.founderDetailPage.marketCompetition} icon={Target}>
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <Field label="TAM" value={fmt(p.tam)} />
                   <Field label="SAM" value={fmt(p.sam)} />
                   <Field label="SOM" value={fmt(p.som)} />
                 </div>
-                <Field label="Target Market" value={p.targetMarket} />
-                <Field label="Key Competitors" value={p.keyCompetitors} />
-                <Field label="Differentiator" value={p.differentiator} />
+                <Field label={t.founderDetailPage.targetMarket} value={p.targetMarket} />
+                <Field label={t.founderDetailPage.keyCompetitors} value={p.keyCompetitors} />
+                <Field label={t.founderDetailPage.differentiator} value={p.differentiator} />
               </div>
             </Section>
           </div>
 
           <div className="space-y-6">
             <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Market Size</h3>
+              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.marketSize}</h3>
               <div className="space-y-2">
                 <MetricCard label="TAM" value={fmt(p.tam)} color="text-indigo-600" />
                 <MetricCard label="SAM" value={fmt(p.sam)} color="text-blue-600" />
@@ -318,11 +320,11 @@ export default function FounderDetailPage() {
             </div>
 
             <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Funding Snapshot</h3>
+              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.fundingSnapshot}</h3>
               <div className="space-y-2">
-                <MetricCard label="Total Raised" value={fmt(p.totalRaised)} color="text-emerald-600" />
-                <MetricCard label="Monthly Burn" value={fmt(p.monthlyBurn)} color="text-red-500" />
-                <MetricCard label="Runway" value={p.runway} color="text-amber-600" />
+                <MetricCard label={t.founderDetailPage.totalRaised} value={fmt(p.totalRaised)} color="text-emerald-600" />
+                <MetricCard label={t.founderDetailPage.monthlyBurn} value={fmt(p.monthlyBurn)} color="text-red-500" />
+                <MetricCard label={t.founderDetailPage.runway} value={p.runway} color="text-amber-600" />
               </div>
             </div>
           </div>
@@ -332,16 +334,16 @@ export default function FounderDetailPage() {
       {activeTab === 'pitch' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Section title="Current Round & Investor Ask" icon={Shield}>
+            <Section title={t.founderDetailPage.currentRoundAsk} icon={Shield}>
               <div className="space-y-4">
-                <Field label="Current Ask" value={p.currentAsk} />
-                <Field label="Use of Funds" value={p.useOfFunds} />
-                <Field label="Key Risks" value={p.keyRisks} />
+                <Field label={t.founderDetailPage.currentAsk} value={p.currentAsk} />
+                <Field label={t.founderDetailPage.useOfFunds} value={p.useOfFunds} />
+                <Field label={t.founderDetailPage.keyRisks} value={p.keyRisks} />
               </div>
             </Section>
 
             {(p.description || c.fullDescription) && (
-              <Section title="Full Description" icon={FileText}>
+              <Section title={t.founderDetailPage.fullDescription} icon={FileText}>
                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                   {p.description || c.fullDescription}
                 </p>
@@ -351,19 +353,19 @@ export default function FounderDetailPage() {
 
           <div className="space-y-6">
             <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Next Milestones</h3>
+              <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.nextMilestones}</h3>
               {p.nextMilestones ? (
                 <p className="text-sm text-gray-700 whitespace-pre-line">{p.nextMilestones}</p>
               ) : (
-                <p className="text-sm text-gray-300 italic">Not set</p>
+                <p className="text-sm text-gray-300 italic">{t.founderDetailPage.notSet}</p>
               )}
             </div>
 
             {c.tags && (
               <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Tags</h3>
+                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">{t.founderDetailPage.tags}</h3>
                 <div className="flex flex-wrap gap-1.5">
-                  {c.tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                  {c.tags.split(',').map(tg => tg.trim()).filter(Boolean).map(tag => (
                     <span key={tag} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">
                       {tag}
                     </span>
