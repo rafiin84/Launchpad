@@ -3,6 +3,7 @@ import { Rocket, Search, Plus, LayoutGrid, List } from 'lucide-react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Avatar } from '../ui/Avatar';
 import { NotificationBell } from '../ui/NotificationBell';
+import { LanguageSelector } from '../ui/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
 
 export function MobileHeader() {
@@ -62,6 +63,7 @@ export function MobileHeader() {
         <div className="flex items-center gap-1">
           {isHome && (
             <>
+              <LanguageSelector variant="icon" />
               <NotificationBell size={18} />
               <Link to="/profile">
                 <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />

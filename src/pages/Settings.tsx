@@ -4,6 +4,8 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { LanguageSelector } from '../components/ui/LanguageSelector';
 import { cn } from '../lib/cn';
 import {
   fetchActivityPermissions,
@@ -129,6 +131,7 @@ function ActivitySettings() {
 
 export default function Settings() {
   const { currentUser, isInvestor } = useAuth();
+  const { t } = useLanguage();
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -138,7 +141,12 @@ export default function Settings() {
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <PageHeader title="Settings" description="Manage your account and preferences" />
+      <PageHeader title={t.settings.title} description="Manage your account and preferences" />
+
+      {/* Language */}
+      <SettingsSection title={t.settings.language} description={t.settings.languageDesc}>
+        <LanguageSelector variant="full" />
+      </SettingsSection>
 
       {/* Profile */}
       <SettingsSection title="Profile" description="Update your public profile information">

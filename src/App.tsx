@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <BrowserRouter>
+      <LanguageProvider>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -124,6 +126,7 @@ export default function App() {
           </Route>
         </Routes>
       </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
     </ErrorBoundary>
   );

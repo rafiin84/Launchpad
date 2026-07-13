@@ -3,23 +3,21 @@ import type { ElementType } from 'react';
 import {
   Home,
   Inbox,
-  TrendingUp,
-  Building2,
   PieChart,
   FileText,
   Rocket,
   LayoutDashboard,
   LogOut,
   Rss,
-  MessageSquare,
-  BookOpen,
-  ArrowLeftRight,
+  Building2,
   Users,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Avatar } from '../ui/Avatar';
 import { NotificationBell } from '../ui/NotificationBell';
+import { LanguageSelector } from '../ui/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface NavItem {
   label: string;
@@ -27,28 +25,29 @@ interface NavItem {
   icon: ElementType;
 }
 
-const investorNav: NavItem[] = [
-  { label: 'Dashboard',    path: '/',             icon: LayoutDashboard },
-  { label: 'Activities',   path: '/activities',   icon: Rss },
-  { label: 'Company',      path: '/portfolio',    icon: PieChart },
-  { label: 'Applications', path: '/applications', icon: Inbox },
-  { label: 'Founders',     path: '/founders',     icon: Building2 },
-  { label: 'Applicants',   path: '/applicants',   icon: Users },
-  { label: 'Documents',    path: '/documents',    icon: FileText },
-];
-
-const founderNav: NavItem[] = [
-  { label: 'Dashboard',    path: '/',                   icon: Home },
-  { label: 'My Activities', path: '/activities',         icon: Rss },
-  { label: 'Applications', path: '/applications/track',  icon: Inbox },
-  { label: 'Company',      path: '/company',             icon: Building2 },
-  { label: 'Documents',    path: '/documents',           icon: FileText },
-];
-
 export function Sidebar() {
   const { currentUser, role, isInvestor, logout } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const investorNav: NavItem[] = [
+    { label: t.nav.dashboard,     path: '/',             icon: LayoutDashboard },
+    { label: t.nav.myActivities,  path: '/activities',   icon: Rss },
+    { label: t.nav.company,       path: '/portfolio',    icon: PieChart },
+    { label: t.nav.applications,  path: '/applications', icon: Inbox },
+    { label: t.nav.founders,      path: '/founders',     icon: Building2 },
+    { label: t.nav.applications,  path: '/applicants',   icon: Users },
+    { label: t.nav.documents,     path: '/documents',    icon: FileText },
+  ];
+
+  const founderNav: NavItem[] = [
+    { label: t.nav.dashboard,     path: '/',                   icon: Home },
+    { label: t.nav.myActivities,  path: '/activities',         icon: Rss },
+    { label: t.nav.applications,  path: '/applications/track', icon: Inbox },
+    { label: t.nav.company,       path: '/company',            icon: Building2 },
+    { label: t.nav.documents,     path: '/documents',          icon: FileText },
+  ];
 
   const navItems = isInvestor ? investorNav : founderNav;
 
@@ -107,6 +106,7 @@ export function Sidebar() {
               <p className="text-xs text-gray-500 capitalize truncate">{role}</p>
             </div>
           </NavLink>
+          <LanguageSelector variant="icon" />
           <NotificationBell />
         </div>
         <button
@@ -114,7 +114,7 @@ export function Sidebar() {
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
         >
           <LogOut size={15} />
-          Sign out
+          {t.nav.logout}
         </button>
       </div>
     </aside>

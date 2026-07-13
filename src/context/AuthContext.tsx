@@ -11,6 +11,7 @@ import {
   type AppUser,
 } from '../services/crmAppUsers';
 import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
+import { useLanguage } from './LanguageContext';
 
 export interface ZohoProfile {
   email: string | null;
@@ -98,6 +99,7 @@ function getInitialState(): { role: UserRole; isLoggedIn: boolean } {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { applyFromCRM } = useLanguage();
   const initial = getInitialState();
   const [role, setRole] = useState<UserRole>(initial.role);
   const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
@@ -274,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUserName(found.name);
                 saveUserName(found.name);
               }
+              if (found.languagePreference) applyFromCRM(found.languagePreference);
               gotPortalPhoto = await fetchAvatarFromAppUsers(found.id, emailForLookup);
             }
           } catch { /* ok */ }
@@ -371,6 +374,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Use appUser name only if it's a real name (not generic placeholder)
             const isAppUserNameReal = found.name && found.name !== 'User' && found.name !== 'Founder' && found.name !== 'Investor';
             if (isAppUserNameReal) setUserName(found.name);
+            if (found.languagePreference) applyFromCRM(found.languagePreference);
 
             // Fetch photo from appusers record image API
             const gotPhoto = await fetchAvatarFromAppUsers(found.id, user.email);
@@ -484,9 +488,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAppUser(found);
         setAppUserRecordId(found.id);
         if (found.name) setUserName(found.name);
+        if (found.languagePreference) applyFromCRM(found.languagePreference);
       }
     } catch { /* ok */ }
-  }, [zohoEmail, appUser?.email]);
+  }, [zohoEmail, appUser?.email, applyFromCRM]);
 
   return (
     <AuthContext.Provider

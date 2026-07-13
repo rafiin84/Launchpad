@@ -3,10 +3,12 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home, MoreHorizontal, Users, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Avatar } from '../ui/Avatar';
 
 export function BottomNav() {
   const { isInvestor, currentUser } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [showMore, setShowMore] = useState(false);
@@ -27,30 +29,30 @@ export function BottomNav() {
   }, [showMore]);
 
   const founderItems = [
-    { label: 'Dashboard',    path: '/',                    icon: Home },
-    { label: 'My Activities', path: '/activities',          icon: Rss },
-    { label: 'Applications', path: '/applications/track',   icon: Inbox },
-    { label: 'Company',      path: '/company',              icon: Building2 },
+    { label: t.nav.dashboard,     path: '/',                    icon: Home },
+    { label: t.nav.myActivities,  path: '/activities',          icon: Rss },
+    { label: t.nav.applications,  path: '/applications/track',  icon: Inbox },
+    { label: t.nav.company,       path: '/company',             icon: Building2 },
   ];
 
   const investorItems = [
-    { label: 'Dashboard',    path: '/',              icon: LayoutDashboard },
-    { label: 'Activities',   path: '/activities',    icon: Rss },
-    { label: 'Company',      path: '/portfolio',     icon: PieChart },
-    { label: 'Applications', path: '/applications', icon: Inbox },
+    { label: t.nav.dashboard,     path: '/',              icon: LayoutDashboard },
+    { label: t.nav.myActivities,  path: '/activities',    icon: Rss },
+    { label: t.nav.company,       path: '/portfolio',     icon: PieChart },
+    { label: t.nav.applications,  path: '/applications',  icon: Inbox },
   ];
 
   const founderMoreItems = [
-    { label: 'Documents',    path: '/documents',          icon: FileText, desc: 'Files and attachments' },
-    { label: 'Notifications', path: '/notifications',     icon: Inbox,    desc: 'Activity updates' },
-    { label: 'Profile',      path: '/profile',            icon: User,     desc: 'Your account settings' },
+    { label: t.nav.documents,      path: '/documents',      icon: FileText, desc: '' },
+    { label: t.nav.notifications,  path: '/notifications',  icon: Inbox,    desc: '' },
+    { label: t.nav.profile,        path: '/profile',        icon: User,     desc: '' },
   ];
 
   const investorMoreItems = [
-    { label: 'Documents',  path: '/documents',  icon: FileText, desc: 'Files and attachments' },
-    { label: 'Founders',   path: '/founders',   icon: Building2, desc: 'Founder companies' },
-    { label: 'Applicants', path: '/applicants',  icon: Users,    desc: 'Applicant founders' },
-    { label: 'Profile',    path: '/profile',     icon: User,     desc: 'Your account settings' },
+    { label: t.nav.documents,  path: '/documents',  icon: FileText, desc: '' },
+    { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
+    { label: t.nav.applications, path: '/applicants', icon: Users,   desc: '' },
+    { label: t.nav.profile,    path: '/profile',     icon: User,     desc: '' },
   ];
 
   const items = isInvestor ? investorItems : founderItems;
@@ -91,7 +93,7 @@ export function BottomNav() {
                 <Avatar src={currentUser.avatar} name={currentUser.name} size="md" />
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-semibold text-gray-900 truncate">{currentUser.name}</p>
-                  <p className="text-xs text-gray-500 capitalize">View Profile</p>
+                  <p className="text-xs text-gray-500 capitalize">{t.profile.viewProfile}</p>
                 </div>
                 <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
               </button>
@@ -139,7 +141,7 @@ export function BottomNav() {
                 onClick={() => setShowMore(false)}
                 className="w-full py-3 text-sm font-semibold text-gray-500 bg-gray-100 rounded-2xl active:bg-gray-200 transition-colors"
               >
-                Cancel
+                {t.common.cancel}
               </button>
             </div>
           </div>
@@ -180,7 +182,7 @@ export function BottomNav() {
             )}
           >
             <MoreHorizontal size={22} strokeWidth={moreIsActive ? 2.2 : 1.6} />
-            <span className={cn('text-[10px] font-medium', moreIsActive && 'font-semibold')}>More</span>
+            <span className={cn('text-[10px] font-medium', moreIsActive && 'font-semibold')}>{t.nav.more}</span>
           </button>
         </div>
       </nav>

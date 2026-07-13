@@ -29,6 +29,7 @@ const FIELD_MAP: Record<string, string> = {
   state:      'State',
   country:    'Country',
   coverImage: 'Cover_Image',
+  languagePreference: 'Language_Preference',
 };
 
 interface ProfileRecord {
@@ -62,6 +63,7 @@ function fromCRM(r: Record<string, unknown>): ProfileRecord {
     jobTitle: s('Job_Title'),
     state: s('State'),
     country: s('Country'),
+    languagePreference: s('Language_Preference'),
   };
 }
 

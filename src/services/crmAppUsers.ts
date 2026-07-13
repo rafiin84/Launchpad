@@ -61,6 +61,7 @@ const FIELD_MAP = {
   jobTitle:    'Job_Title',      // Single-line
   state:       'State',          // Single-line
   country:     'Country',        // Single-line
+  languagePreference: 'Language_Preference', // Picklist — en, ja, etc.
 } as const;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -81,6 +82,7 @@ export interface AppUser {
   jobTitle: string;
   state: string;
   country: string;
+  languagePreference: string;
 }
 
 export type AppUserFields = Omit<AppUser, 'id'>;
@@ -111,6 +113,7 @@ function fromRecord(r: ZohoRecord): AppUser {
     jobTitle:    str(r, FIELD_MAP.jobTitle),
     state:       str(r, FIELD_MAP.state),
     country:     str(r, FIELD_MAP.country),
+    languagePreference: str(r, FIELD_MAP.languagePreference),
   };
 }
 
@@ -130,6 +133,7 @@ function toPayload(fields: Partial<AppUserFields>): Record<string, unknown> {
   if (fields.jobTitle !== undefined)   payload[FIELD_MAP.jobTitle]   = fields.jobTitle;
   if (fields.state !== undefined)      payload[FIELD_MAP.state]      = fields.state;
   if (fields.country !== undefined)    payload[FIELD_MAP.country]    = fields.country;
+  if (fields.languagePreference !== undefined) payload[FIELD_MAP.languagePreference] = fields.languagePreference;
   return payload;
 }
 
@@ -299,6 +303,7 @@ export async function findAppUserByEmail(email: string): Promise<AppUser | null>
       role: user.role, bio: user.bio, location: user.location, linkedIn: user.linkedIn,
       twitter: user.twitter, expertise: user.expertise, zohoUserId: user.zohoUserId,
       jobTitle: user.jobTitle, state: user.state, country: user.country,
+      languagePreference: user.languagePreference,
     });
     return user;
   } catch {
@@ -446,6 +451,7 @@ async function serverGetProfile(email: string): Promise<{ profile: AppUser | nul
     linkedIn: s('linkedIn'), twitter: s('twitter'),
     expertise: expertiseRaw ? expertiseRaw.split(',').map((x: string) => x.trim()).filter(Boolean) : [],
     zohoUserId: s('zohoUserId'), jobTitle: s('jobTitle'), state: s('state'), country: s('country'),
+    languagePreference: s('languagePreference'),
   };
   return { profile: user, recordId: json.recordId || user.id };
 }

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
@@ -210,6 +211,7 @@ function RunwayGauge({ months, maxMonths = 24 }: { months: number; maxMonths?: n
 
 export default function FounderDashboard() {
   const { currentUser, zohoEmail, portalSession } = useAuth();
+  const { t } = useLanguage();
   const isConnected = !!loadToken();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
 
@@ -314,9 +316,9 @@ export default function FounderDashboard() {
 
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return t.dashboard.goodMorning;
+    if (h < 17) return t.dashboard.goodAfternoon;
+    return t.dashboard.goodEvening;
   })();
 
   // Derive numeric values from KPI state for charts
@@ -385,9 +387,9 @@ export default function FounderDashboard() {
               <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Rocket size={32} className="text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Welcome to Launchpad!</h2>
+              <h2 className="text-2xl font-bold text-white">{t.welcome.title}</h2>
               <p className="text-white/80 text-sm mt-2">
-                Your investor portal is ready. Here's how to get started.
+                {t.welcome.subtitle}
               </p>
             </div>
 
@@ -398,8 +400,8 @@ export default function FounderDashboard() {
                   <Building2 size={16} className="text-indigo-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Set up your company profile</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Add your company details, metrics, and logo so investors can review your data.</p>
+                  <p className="text-sm font-semibold text-gray-900">{t.welcome.step1Title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t.welcome.step1Desc}</p>
                 </div>
               </div>
 
@@ -408,8 +410,8 @@ export default function FounderDashboard() {
                   <FileText size={16} className="text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Submit your application</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Fill out the investment application so your investor can take the next steps.</p>
+                  <p className="text-sm font-semibold text-gray-900">{t.welcome.step2Title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t.welcome.step2Desc}</p>
                 </div>
               </div>
 
@@ -418,9 +420,9 @@ export default function FounderDashboard() {
                   <BookmarkCheck size={16} className="text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Bookmark your login page</p>
+                  <p className="text-sm font-semibold text-gray-900">{t.welcome.step3Title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    For future logins, always use this URL:
+                    {t.welcome.step3Desc}
                   </p>
                   <div className="mt-1.5 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
                     <Globe size={13} className="text-gray-400 flex-shrink-0" />
@@ -436,13 +438,13 @@ export default function FounderDashboard() {
                 onClick={() => { dismissWelcome(); navigate('/company'); }}
                 className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-xl transition-colors"
               >
-                <Building2 size={16} /> Set Up Company Profile
+                <Building2 size={16} /> {t.welcome.setupButton}
               </button>
               <button
                 onClick={dismissWelcome}
                 className="w-full text-sm font-medium text-gray-500 hover:text-gray-700 px-4 py-2 rounded-xl transition-colors"
               >
-                I'll explore on my own
+                {t.welcome.exploreButton}
               </button>
             </div>
           </div>
@@ -484,7 +486,7 @@ export default function FounderDashboard() {
           onClick={() => setShowKPIEditor(true)}
           className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:border-gray-400 px-3 py-2 rounded-xl transition-all"
         >
-          <Edit3 size={14} /> Update KPIs
+          <Edit3 size={14} /> {t.dashboard.updateKPIs}
         </button>
       </div>
 
@@ -496,23 +498,22 @@ export default function FounderDashboard() {
               <Rocket size={20} className="text-indigo-600" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Complete your company profile</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-1">{t.dashboard.completeProfile}</h2>
               <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                Set up your company profile and add your key metrics.
-                Your investors will see this data on their dashboard.
+                {t.dashboard.completeProfileDesc}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
                   to="/company"
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors"
                 >
-                  <Building2 size={13} /> Set Up Company Profile
+                  <Building2 size={13} /> {t.dashboard.setupCompanyProfile}
                 </Link>
                 <button
                   onClick={() => setShowKPIEditor(true)}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-4 py-2 rounded-lg transition-colors"
                 >
-                  <Edit3 size={13} /> Add Your KPIs
+                  <Edit3 size={13} /> {t.dashboard.addYourKPIs}
                 </button>
               </div>
             </div>
@@ -525,11 +526,11 @@ export default function FounderDashboard() {
         <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-4 mb-6">
           <AlertCircle size={16} className="text-indigo-500 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-indigo-900">{emptyCount} KPI{emptyCount > 1 ? 's' : ''} not set yet</p>
-            <p className="text-xs text-indigo-600 mt-0.5">Keep your investor dashboard up to date with your latest numbers.</p>
+            <p className="text-sm font-medium text-indigo-900">{t.dashboard.kpisNotSet.replace('{count}', String(emptyCount)).replace('{s}', emptyCount > 1 ? 's' : '')}</p>
+            <p className="text-xs text-indigo-600 mt-0.5">{t.dashboard.kpisNudge}</p>
           </div>
           <button onClick={() => setShowKPIEditor(true)} className="text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-            Fill in KPIs
+            {t.dashboard.fillInKPIs}
           </button>
         </div>
       )}
@@ -542,15 +543,15 @@ export default function FounderDashboard() {
               <Inbox size={20} className="text-amber-600" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900 mb-1">You have not submitted an application yet</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-1">{t.dashboard.noApplicationYet}</h2>
               <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                Submit your investment application so investors can review your company and take the next steps.
+                {t.dashboard.noApplicationDesc}
               </p>
               <Link
                 to="/applications/apply"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-lg transition-colors"
               >
-                <FileText size={13} /> Submit Application
+                <FileText size={13} /> {t.dashboard.submitApplication}
               </Link>
             </div>
           </div>
@@ -565,15 +566,15 @@ export default function FounderDashboard() {
               <Edit3 size={20} className="text-blue-600" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-bold text-gray-900 mb-1">Complete your application</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-1">{t.dashboard.completeApplication}</h2>
               <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                You have a saved draft. Pick up where you left off and submit it to your investor.
+                {t.dashboard.completeApplicationDesc}
               </p>
               <Link
                 to="/applications/apply"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
               >
-                <ArrowRight size={13} /> Continue Application
+                <ArrowRight size={13} /> {t.dashboard.continueApplication}
               </Link>
             </div>
           </div>
@@ -608,7 +609,7 @@ export default function FounderDashboard() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={14} className="text-indigo-500" />
-            <h2 className="text-sm font-semibold text-gray-900">AI Insights</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{t.dashboard.aiInsights}</h2>
             <AIBadge />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -664,7 +665,7 @@ export default function FounderDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <TrendingUp size={14} className="text-indigo-500" /> Total Raised
+                <TrendingUp size={14} className="text-indigo-500" /> {t.dashboard.totalRaised}
               </h2>
               <span className="text-lg font-bold text-gray-900">
                 {totalRaisedVal > 0
@@ -683,7 +684,7 @@ export default function FounderDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <Flame size={14} className="text-orange-400" /> Burn Rate
+                <Flame size={14} className="text-orange-400" /> {t.dashboard.burnRate}
               </h2>
               <span className="text-lg font-bold text-gray-900">
                 {burnVal > 0
@@ -702,7 +703,7 @@ export default function FounderDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <BarChart2 size={14} className="text-emerald-500" /> Runway
+                <BarChart2 size={14} className="text-emerald-500" /> {t.dashboard.runway}
               </h2>
               <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full',
                 runwayVal === 0 ? 'bg-gray-100 text-gray-500' :
@@ -724,7 +725,7 @@ export default function FounderDashboard() {
           {/* Milestones */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Target size={14} className="text-indigo-500" /> Milestones
+              <Target size={14} className="text-indigo-500" /> {t.dashboard.milestones}
             </h3>
 
             {/* Add milestone */}
@@ -734,7 +735,7 @@ export default function FounderDashboard() {
                 value={newMilestone}
                 onChange={e => setNewMilestone(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addMilestone()}
-                placeholder="Add a milestone…"
+                placeholder={t.dashboard.addMilestone}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black"
               />
               <div className="flex gap-2">
@@ -755,7 +756,7 @@ export default function FounderDashboard() {
             </div>
 
             {milestones.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-3">No milestones yet</p>
+              <p className="text-xs text-gray-400 text-center py-3">{t.dashboard.noMilestones}</p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {milestones.map(m => (
@@ -789,14 +790,14 @@ export default function FounderDashboard() {
           {/* Quick actions */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Flame size={14} className="text-orange-400" /> Quick Actions
+              <Flame size={14} className="text-orange-400" /> {t.dashboard.quickActions}
             </h3>
             <div className="space-y-0.5">
               {[
-                { label: 'Post an update',   path: '/activities/new', icon: Zap },
-                { label: 'View Activities',  path: '/activities',     icon: Zap },
-                { label: 'Company Profile',  path: '/company',        icon: Users },
-                { label: 'Upload Document',  path: '/documents/new',  icon: DollarSign },
+                { label: t.dashboard.postUpdate,      path: '/activities/new', icon: Zap },
+                { label: t.dashboard.viewActivities,  path: '/activities',     icon: Zap },
+                { label: t.nav.company,               path: '/company',        icon: Users },
+                { label: t.dashboard.uploadDocument,   path: '/documents/new',  icon: DollarSign },
               ].map(action => {
                 const Icon = action.icon;
                 return (
@@ -814,14 +815,14 @@ export default function FounderDashboard() {
           {/* Investor CTA */}
           <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white">
             <TrendingUp size={20} className="text-white/70 mb-2" />
-            <p className="text-sm font-bold mb-1">Keep your investor updated</p>
+            <p className="text-sm font-bold mb-1">{t.dashboard.keepInvestorUpdated}</p>
             <p className="text-xs text-indigo-200 mb-3 leading-relaxed">
-              Regular updates build trust. Share wins, key metrics, and asks.
+              {t.dashboard.regularUpdates}
             </p>
             <Link to="/activities/new"
               className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
             >
-              <Plus size={12} /> Post Update
+              <Plus size={12} /> {t.dashboard.postUpdate}
             </Link>
           </div>
 
