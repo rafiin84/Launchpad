@@ -324,12 +324,9 @@ export default function FounderDashboard() {
   })();
 
   useEffect(() => {
-    setPageTitle(
-      `${greeting}, ${currentUser.name.split(' ')[0]} 👋`,
-      companyName ?? 'Launchpad'
-    );
+    setPageTitle(null);
     return () => setPageTitle(null);
-  }, [t, greeting, companyName, currentUser.name]);
+  }, []);
 
   // Derive numeric values from KPI state for charts
   const parseNum = (key: string) => {
@@ -461,11 +458,40 @@ export default function FounderDashboard() {
         </div>
       )}
 
-      {/* Action bar */}
-      <div className="flex items-center justify-end mb-6">
+      {/* Greeting with avatar */}
+      <div className="flex items-center gap-5 mb-6">
+        <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white shadow flex-shrink-0 relative bg-indigo-100">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-indigo-700 font-bold text-sm">
+              {currentUser.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+            </span>
+          </div>
+          {currentUser.avatar && (
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
+              className="relative w-full h-full object-cover bg-white"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              onLoad={(e) => { const img = e.currentTarget; if (img.naturalWidth < 4 || img.naturalHeight < 4) img.style.display = 'none'; }}
+            />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            {greeting}, {currentUser.name.split(' ')[0]} 👋
+          </h1>
+          {companyName && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={12} className="text-gray-500" />
+              </div>
+              <span className="text-sm font-medium text-gray-600 truncate">{companyName}</span>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => setShowKPIEditor(true)}
-          className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:border-gray-400 px-3 py-2 rounded-xl transition-all"
+          className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:border-gray-400 px-3 py-2 rounded-xl transition-all flex-shrink-0"
         >
           <Edit3 size={14} /> {t.dashboard.updateKPIs}
         </button>
