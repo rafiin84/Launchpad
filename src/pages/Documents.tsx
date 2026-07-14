@@ -154,10 +154,10 @@ export default function Documents() {
         />
       )}
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5">
+      <div className="flex items-center gap-3 mb-6 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5">
           <Lock size={14} className="text-gray-400 flex-shrink-0" />
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
             {isFounder
               ? t.documentsPage.founderSecurityNote
               : t.documentsPage.investorSecurityNote}
@@ -165,7 +165,7 @@ export default function Documents() {
         </div>
         <Link
           to="/documents/new"
-          className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0"
+          className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0 whitespace-nowrap"
         >
           <Plus size={14} /> {t.documentsPage.upload}
         </Link>
