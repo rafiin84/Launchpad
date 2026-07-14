@@ -417,36 +417,36 @@ function formatDateTime(iso: string): string {
   return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + ' at ' + formatTime(iso);
 }
 
-function getDateGroup(iso: string): string {
-  if (!iso) return 'Earlier';
+function getDateGroupKey(iso: string): 'today' | 'yesterday' | 'earlier' {
+  if (!iso) return 'earlier';
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return 'Earlier';
+  if (isNaN(d.getTime())) return 'earlier';
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
   const actDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (actDate.getTime() === today.getTime()) return 'Today';
-  if (actDate.getTime() === yesterday.getTime()) return 'Yesterday';
-  return 'Earlier';
+  if (actDate.getTime() === today.getTime()) return 'today';
+  if (actDate.getTime() === yesterday.getTime()) return 'yesterday';
+  return 'earlier';
 }
 
-function groupAndSort(activities: CRMActivity[]): { label: string; items: CRMActivity[] }[] {
+function groupAndSort(activities: CRMActivity[]): { key: string; items: CRMActivity[] }[] {
   const sorted = [...activities].sort((a, b) => {
     const ta = a.createdTime ? new Date(a.createdTime).getTime() : 0;
     const tb = b.createdTime ? new Date(b.createdTime).getTime() : 0;
     return tb - ta;
   });
-  const groups: { label: string; items: CRMActivity[] }[] = [];
-  const order = ['Today', 'Yesterday', 'Earlier'];
+  const groups: { key: string; items: CRMActivity[] }[] = [];
+  const order = ['today', 'yesterday', 'earlier'];
   const map = new Map<string, CRMActivity[]>();
   for (const a of sorted) {
-    const g = getDateGroup(a.createdTime);
+    const g = getDateGroupKey(a.createdTime);
     if (!map.has(g)) map.set(g, []);
     map.get(g)!.push(a);
   }
-  for (const label of order) {
-    const items = map.get(label);
-    if (items?.length) groups.push({ label, items });
+  for (const key of order) {
+    const items = map.get(key);
+    if (items?.length) groups.push({ key, items });
   }
   return groups;
 }
@@ -603,12 +603,12 @@ export default function Activities() {
   function timeAgo(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t.activities.justNow;
+    if (mins < 60) return t.activities.minutesAgo.replace('{n}', String(mins));
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
+    if (hrs < 24) return t.activities.hoursAgo.replace('{n}', String(hrs));
     const days = Math.floor(hrs / 24);
-    return `${days}d ago`;
+    return t.activities.daysAgo.replace('{n}', String(days));
   }
 
   const RECENT_EVENTS = records.slice(0, 5).map(r => {
@@ -714,9 +714,9 @@ export default function Activities() {
       {!loading && !error && records.length > 0 && (
         <div className="mt-4 space-y-6">
           {groupAndSort(records).map(group => (
-            <div key={group.label}>
+            <div key={group.key}>
               <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{group.label}</h2>
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.activities[group.key as 'today' | 'yesterday' | 'earlier']}</h2>
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
               <div className="grid grid-cols-1 gap-4">
