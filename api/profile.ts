@@ -67,18 +67,19 @@ function fromCRM(r: Record<string, unknown>): ProfileRecord {
   };
 }
 
-async function findByEmail(token: string, email: string): Promise<{ id: string; record: ProfileRecord } | null> {
+async function findAllByEmail(token: string, email: string): Promise<Array<{ id: string; record: ProfileRecord }>> {
   const url = `${ZOHO_API_BASE}/crm/v2/${MODULE}/search?criteria=(Email:equals:${email})`;
   const res = await fetch(url, {
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
-  if (res.status === 204) return null;
-  if (!res.ok) return null;
+  if (res.status === 204 || !res.ok) return [];
   const json = await res.json() as { data?: Array<Record<string, unknown>> };
-  const rec = json.data?.[0];
-  if (!rec) return null;
-  const profile = fromCRM(rec);
-  return { id: profile.id, record: profile };
+  return (json.data || []).map(rec => ({ id: fromCRM(rec).id, record: fromCRM(rec) }));
+}
+
+async function findByEmail(token: string, email: string): Promise<{ id: string; record: ProfileRecord } | null> {
+  const all = await findAllByEmail(token, email);
+  return all[0] || null;
 }
 
 async function upsertProfile(token: string, fields: Record<string, unknown>): Promise<string> {
@@ -199,15 +200,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const wantPhoto = req.query.photo === '1';
       if (!email) return res.status(400).json({ error: 'email query param required' });
 
-      const result = await findByEmail(token, email);
-      if (!result) return res.status(200).json({ profile: null });
+      const allResults = await findAllByEmail(token, email);
+      if (allResults.length === 0) return res.status(200).json({ profile: null });
 
       if (wantPhoto) {
-        const photoUrl = await fetchPhoto(token, result.id);
-        return res.status(200).json({ photo: photoUrl });
+        for (const r of allResults) {
+          const photoUrl = await fetchPhoto(token, r.id);
+          if (photoUrl) return res.status(200).json({ photo: photoUrl });
+        }
+        return res.status(200).json({ photo: null });
       }
 
-      return res.status(200).json({ profile: result.record, recordId: result.id });
+      return res.status(200).json({ profile: allResults[0].record, recordId: allResults[0].id });
     }
 
     // PUT — update profile fields
