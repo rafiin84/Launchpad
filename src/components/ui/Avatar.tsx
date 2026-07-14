@@ -48,17 +48,21 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
     setImgError(false);
   }, [src]);
 
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth < 4 || img.naturalHeight < 4) setImgError(true);
+  };
+
   return (
     <div
       className={cn(
         'relative flex-shrink-0 rounded-full overflow-hidden',
         sizes[size],
         ring && 'ring-2 ring-white',
-        getColor(name).split(' ')[0], // background color as fallback
+        getColor(name).split(' ')[0],
         className
       )}
     >
-      {/* Initials — always behind */}
       <div className={cn('absolute inset-0 flex items-center justify-center font-semibold', getColor(name))}>
         {getInitials(name)}
       </div>
@@ -68,6 +72,7 @@ export function Avatar({ src, name, size = 'md', className, ring }: AvatarProps)
           alt={name}
           className="relative w-full h-full object-cover bg-white"
           onError={() => setImgError(true)}
+          onLoad={handleLoad}
         />
       )}
     </div>
