@@ -154,22 +154,21 @@ export default function Documents() {
         />
       )}
 
-      <div className="flex items-center justify-end mb-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex-1 flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5">
+          <Lock size={14} className="text-gray-400 flex-shrink-0" />
+          <p className="text-xs text-gray-500 leading-relaxed">
+            {isFounder
+              ? t.documentsPage.founderSecurityNote
+              : t.documentsPage.investorSecurityNote}
+          </p>
+        </div>
         <Link
           to="/documents/new"
           className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0"
         >
           <Plus size={14} /> {t.documentsPage.upload}
         </Link>
-      </div>
-
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
-        <Lock size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-gray-600 leading-relaxed">
-          {isFounder
-            ? t.documentsPage.founderSecurityNote
-            : t.documentsPage.investorSecurityNote}
-        </p>
       </div>
 
       {/* Category cards */}

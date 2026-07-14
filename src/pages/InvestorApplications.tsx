@@ -183,19 +183,19 @@ export default function InvestorApplications() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Search + Filter Tabs */}
-      <div className="mb-6 space-y-4">
-        <div className="relative w-full sm:w-80">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder={t.investorApplications.searchPlaceholder}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
           />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 sm:ml-auto">
           {FILTER_TABS.map(tab => (
             <button
               key={tab.id}
