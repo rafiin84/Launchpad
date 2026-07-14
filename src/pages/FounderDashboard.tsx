@@ -290,29 +290,20 @@ export default function FounderDashboard() {
 
   useEffect(() => {
     const founderName = currentUser.name?.trim().toLowerCase() || '';
-    getApplications(false, userEmail || undefined).then(apps => {
-      const submitted = apps.filter(a => a.status !== 'draft');
-      const drafts = apps.filter(a => a.status === 'draft');
+    const email = userEmail?.toLowerCase() || '';
+    getApplications(false).then(apps => {
+      const mine = apps.filter(a =>
+        (email && (a.founderEmail?.toLowerCase() === email || a.submittedByEmail?.toLowerCase() === email)) ||
+        (founderName && (a.founderName?.trim().toLowerCase() === founderName || a.submittedBy?.trim().toLowerCase() === founderName))
+      );
+      const submitted = mine.filter(a => a.status !== 'draft');
+      const drafts = mine.filter(a => a.status === 'draft');
       if (submitted.length > 0) {
         setHasApplication(true);
         setHasDraftApplication(false);
-        return;
-      }
-      if (drafts.length > 0) {
-        setHasDraftApplication(true);
-      }
-      // Email-based check found nothing — try name-based fallback
-      if (founderName) {
-        getApplications(false).then(allApps => {
-          const match = allApps.some(a =>
-            a.status !== 'draft' &&
-            (a.founderName?.trim().toLowerCase() === founderName ||
-             a.submittedBy?.trim().toLowerCase() === founderName)
-          );
-          setHasApplication(match);
-        }).catch(() => setHasApplication(false));
       } else {
         setHasApplication(false);
+        setHasDraftApplication(drafts.length > 0);
       }
     }).catch(() => setHasApplication(false));
   }, [userEmail, currentUser.name]);
