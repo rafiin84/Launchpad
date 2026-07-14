@@ -8,6 +8,7 @@ import {
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { usePageTitle } from '../context/PageTitleContext';
 import {
   type CompanyData, EMPTY,
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
@@ -113,6 +114,7 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 
 export default function FounderCompany() {
   const { t } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
   const [searchParams] = useSearchParams();
   const queryEmail = searchParams.get('email');
@@ -130,6 +132,7 @@ export default function FounderCompany() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { setPageTitle(t.nav.companyProfile); return () => setPageTitle(null); }, [t]);
   useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   useEffect(() => {

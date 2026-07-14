@@ -12,8 +12,8 @@ import {
   type InvestmentApplication,
   type ApplicationStatus,
 } from '../services/investmentApplications';
-import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
+import { usePageTitle } from '../context/PageTitleContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +123,7 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
 export default function InvestorApplications() {
   const { isInvestor } = useAuth();
   const { t, language } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const relativeTime = createRelativeTime(t, language);
   const navigate = useNavigate();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
@@ -150,6 +151,7 @@ export default function InvestorApplications() {
     setLoading(false);
   }, [isInvestor]);
 
+  useEffect(() => { setPageTitle(t.nav.applications, t.applications.title); return () => setPageTitle(null); }, [t]);
   useEffect(() => { load(); }, [load]);
 
   // ── Filtering ─────────────────────────────────────────────────────────────
@@ -180,13 +182,6 @@ export default function InvestorApplications() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <div className="w-full">
-        <PageHeader
-          title={t.nav.applications}
-          description={t.applications.title}
-        />
-      </div>
-
       {/* Search + Filter Tabs */}
       <div className="mb-6 space-y-4">
         <div className="relative w-full sm:w-80">

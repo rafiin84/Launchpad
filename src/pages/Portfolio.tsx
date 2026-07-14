@@ -15,8 +15,8 @@ import {
   List,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { usePageTitle } from '../context/PageTitleContext';
 import { fetchCRMPortfolio, deleteCRMPortfolioRecord, setPortfolioModuleOverride, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { fetchZohoModules, type ZohoModule } from '../services/zohoApi';
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
@@ -202,6 +202,7 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
 
 export default function Portfolio() {
   const { t, language } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const setView = (v: 'grid' | 'list') =>
@@ -244,6 +245,8 @@ export default function Portfolio() {
     loadCRMData();
   };
 
+  useEffect(() => { setPageTitle(t.nav.portfolio, t.portfolioPage.description); return () => setPageTitle(null); }, [t]);
+
   useEffect(() => {
     loadCRMData();
     fetchAllCompanyProfiles().then(profiles => {
@@ -281,35 +284,29 @@ export default function Portfolio() {
           deleting={deleting}
         />
       )}
-      {/* Constrained header */}
-      <div className="w-full">
-        <PageHeader
-          title={t.nav.portfolio}
-          description={t.portfolioPage.description}
-          action={
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setView('grid')}
-                  className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                  title={t.portfolioPage.gridView}
-                >
-                  <LayoutGrid size={15} />
-                </button>
-                <button
-                  onClick={() => setView('list')}
-                  className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
-                  title={t.portfolioPage.listView}
-                >
-                  <List size={15} />
-                </button>
-              </div>
-              <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-                <Plus size={15} /> {t.investorDashboard.addCompany}
-              </Link>
-            </div>
-          }
-        />
+      {/* Action bar */}
+      <div className="w-full flex items-center justify-end mb-4">
+        <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2 transition-colors ${view === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              title={t.portfolioPage.gridView}
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`p-2 transition-colors ${view === 'list' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              title={t.portfolioPage.listView}
+            >
+              <List size={15} />
+            </button>
+          </div>
+          <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus size={15} /> {t.investorDashboard.addCompany}
+          </Link>
+        </div>
       </div>
 
       {/* Everything else constrained to max-w-5xl */}

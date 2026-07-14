@@ -4,8 +4,8 @@ import {
   Building2, Trash2, AlertCircle, RefreshCw, Download, User, Eye,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { PageHeader } from '../components/layout/PageHeader';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { usePageTitle } from '../context/PageTitleContext';
 import {
   fetchCRMDocuments, deleteCRMDocument, fetchDocumentAttachments,
   getDownloadUrl, type CRMDocument,
@@ -47,6 +47,7 @@ function formatDate(iso: string, language: string): string {
 export default function Documents() {
   const { isFounder, isInvestor } = useAuth();
   const { t, language } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -72,6 +73,7 @@ export default function Documents() {
       .finally(() => setLoading(false));
   };
 
+  useEffect(() => { setPageTitle(t.documentsPage.title, t.documentsPage.description); return () => setPageTitle(null); }, [t]);
   useEffect(() => { load(); }, []);
 
   const myName = (loadUserName() || '').trim().toLowerCase();
@@ -152,11 +154,7 @@ export default function Documents() {
         />
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <PageHeader
-          title={t.documentsPage.title}
-          description={t.documentsPage.description}
-        />
+      <div className="flex items-center justify-end mb-6">
         <Link
           to="/documents/new"
           className="inline-flex items-center gap-1.5 text-sm font-medium bg-black text-white px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors flex-shrink-0"

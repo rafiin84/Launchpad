@@ -18,8 +18,8 @@ import {
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
-import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
+import { usePageTitle } from '../context/PageTitleContext';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -716,6 +716,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
 
 export default function FounderApplicationTracker() {
   const { t } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const { currentUser, isInvestor } = useAuth();
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -728,6 +729,7 @@ export default function FounderApplicationTracker() {
     setLoading(false);
   }, [isInvestor, currentUser?.email]);
 
+  useEffect(() => { setPageTitle(t.applicationTracker.myApplication, t.applicationTracker.trackDescription); return () => setPageTitle(null); }, [t]);
   useEffect(() => { loadApps(); }, [loadApps]);
 
   const drafts = applications.filter(a => a.status === 'draft');
@@ -749,20 +751,16 @@ export default function FounderApplicationTracker() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <PageHeader
-        title={t.applicationTracker.myApplication}
-        description={t.applicationTracker.trackDescription}
-        action={
-          allowNewApplication ? (
-            <Link
-              to="/applications/apply"
-              className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
-            >
-              <Plus size={14} /> {applications.some(a => a.status === 'rejected') ? t.applicationTracker.reApply : t.applicationTracker.newApplication}
-            </Link>
-          ) : null
-        }
-      />
+      {allowNewApplication && (
+        <div className="flex justify-end mb-4">
+          <Link
+            to="/applications/apply"
+            className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            <Plus size={14} /> {applications.some(a => a.status === 'rejected') ? t.applicationTracker.reApply : t.applicationTracker.newApplication}
+          </Link>
+        </div>
+      )}
 
       {/* Loading state */}
       {loading && (

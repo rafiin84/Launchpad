@@ -17,6 +17,7 @@ import { cn } from '../lib/cn';
 import { registerPortalUser, setPortalUserStatus, type PortalUserStatus } from '../services/portalUsers';
 import { addNotification } from '../services/notifications';
 import { useLanguage } from '../context/LanguageContext';
+import { usePageTitle } from '../context/PageTitleContext';
 
 // ─── Form Field Component ────────────────────────────────────────────────────
 
@@ -657,6 +658,7 @@ function FounderRow({ founder, onDelete, portalStatus, onStatusChange }: { found
 
 export default function Founders() {
   const { t } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const [searchParams, setSearchParams] = useSearchParams();
   const [founders, setFounders]   = useState<CRMFounder[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -668,6 +670,8 @@ export default function Founders() {
   const setView = (v: 'grid' | 'list') =>
     setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('view', v); return p; });
   const isConnected = !!loadToken();
+
+  useEffect(() => { setPageTitle(t.founders.title, t.founders.description); return () => setPageTitle(null); }, [t]);
 
   // Listen for mobile header "+" button
   useEffect(() => {
@@ -738,16 +742,12 @@ export default function Founders() {
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-      {/* Header */}
+      {/* Controls */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{t.founders.title}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {t.founders.description}
-            {!loading && founders.length > 0 && (
-              <span className="ml-1.5 text-gray-300">· {founders.length} {t.founders.total}</span>
-            )}
-          </p>
+          {!loading && founders.length > 0 && (
+            <p className="text-sm text-gray-400">{founders.length} {t.founders.total}</p>
+          )}
         </div>
         <div className="hidden md:flex items-center gap-3">
           <div className="flex rounded-xl overflow-hidden border border-gray-200">

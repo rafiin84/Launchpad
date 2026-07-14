@@ -10,6 +10,7 @@ import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortf
 import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { CompanyLogo } from '../components/ui/CompanyLogo';
 import { useLanguage } from '../context/LanguageContext';
+import { usePageTitle } from '../context/PageTitleContext';
 
 type ViewMode = 'list' | 'grid';
 
@@ -147,11 +148,14 @@ function FounderCard({ company, logoUrl }: { company: CRMPortfolioRecord; logoUr
 
 export default function InvestorFounders() {
   const { t } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const [companies, setCompanies] = useState<CRMPortfolioRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('list');
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
+
+  useEffect(() => { setPageTitle(t.investorFounders.title, t.investorFounders.description); return () => setPageTitle(null); }, [t]);
 
   useEffect(() => {
     fetchCRMPortfolio()
@@ -183,16 +187,14 @@ export default function InvestorFounders() {
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* Header */}
+      {/* Controls */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{t.investorFounders.title}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {t.investorFounders.description}
-            {!loading && companies.length > 0 && (
-              <span className="ml-1.5 text-gray-300">· {companies.length} {t.investorFounders.foundersCount}</span>
-            )}
-          </p>
+          {!loading && companies.length > 0 && (
+            <p className="text-sm text-gray-400">
+              {companies.length} {t.investorFounders.foundersCount}
+            </p>
+          )}
         </div>
         {!loading && companies.length > 0 && (
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
