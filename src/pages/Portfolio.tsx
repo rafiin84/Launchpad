@@ -13,6 +13,7 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
+  Search,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
@@ -215,6 +216,7 @@ export default function Portfolio() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [logoMap, setLogoMap] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
   const isConnected = !!loadToken();
 
   // Ref for the Portfolio Companies section
@@ -285,8 +287,18 @@ export default function Portfolio() {
         />
       )}
       {/* Action bar */}
-      <div className="w-full flex items-center justify-end mb-4">
-        <div className="hidden sm:flex items-center gap-2">
+      <div className="w-full flex items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder={t.portfolioPage.searchPlaceholder}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
+          />
+        </div>
+        <div className="hidden sm:flex items-center gap-2 ml-auto">
           <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden">
             <button
               onClick={() => setView('grid')}
@@ -407,17 +419,26 @@ export default function Portfolio() {
           </div>
         )}
 
-        {view === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {crmCompanies.map(c => (
-              <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} />
-            ))}
-          </div>
-        ) : (
-          crmCompanies.length > 0 && (
-            <PortfolioTable companies={crmCompanies} onDelete={setPendingDeleteId} logoMap={logoMap} />
-          )
-        )}
+        {(() => {
+          const q = search.toLowerCase().trim();
+          const filtered = q
+            ? crmCompanies.filter(c =>
+                [c.companyName, c.industry, c.stage, c.location, c.founderName, c.tags]
+                  .some(f => f?.toLowerCase().includes(q))
+              )
+            : crmCompanies;
+          return view === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filtered.map(c => (
+                <CRMCompanyCard key={c.id} c={c} onDelete={setPendingDeleteId} logoUrl={logoMap[c.founderEmail?.toLowerCase() || ''] || logoMap[c.companyName?.toLowerCase() || '']} />
+              ))}
+            </div>
+          ) : (
+            filtered.length > 0 && (
+              <PortfolioTable companies={filtered} onDelete={setPendingDeleteId} logoMap={logoMap} />
+            )
+          );
+        })()}
 
         {isConnected && !crmLoading && crmCompanies.length === 0 && !crmError && (
           <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center mt-4">

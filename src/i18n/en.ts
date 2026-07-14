@@ -749,6 +749,7 @@ const en = {
     selectModule: 'Click the correct module below to connect it as your Portfolio module:',
     selectionSaved: 'This saves your selection. The app will retry immediately.',
     noCompaniesDesc: 'Add your first portfolio company to sync it to your CRM.',
+    searchPlaceholder: 'Search companies...',
     deleteTitle: 'Delete Portfolio Company',
     deleteMessage: 'Are you sure you want to delete this company record? This action cannot be undone.',
   },

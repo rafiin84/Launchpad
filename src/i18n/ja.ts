@@ -737,6 +737,7 @@ const ja: TranslationKeys = {
     selectModule: '以下から正しいモジュールを選択して、ポートフォリオモジュールとして接続してください：',
     selectionSaved: '選択内容が保存されます。アプリはすぐに再試行します。',
     noCompaniesDesc: '最初のポートフォリオ企業を追加してCRMに同期しましょう。',
+    searchPlaceholder: '企業を検索...',
     deleteTitle: 'ポートフォリオ企業を削除',
     deleteMessage: 'この企業レコードを削除してもよろしいですか？この操作は元に戻せません。',
   },
