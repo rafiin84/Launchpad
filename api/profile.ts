@@ -116,6 +116,7 @@ async function fetchPhoto(token: string, recordId: string): Promise<string | nul
   if (!res.ok) return null;
   const blob = await res.blob();
   const buffer = Buffer.from(await blob.arrayBuffer());
+  if (buffer.byteLength < 200) return null;
   const base64 = buffer.toString('base64');
   const mime = res.headers.get('content-type') || 'image/jpeg';
   return `data:${mime};base64,${base64}`;

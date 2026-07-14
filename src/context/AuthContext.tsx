@@ -141,24 +141,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(LEGACY_AVATAR_KEY);
       localStorage.removeItem(LEGACY_COVER_KEY);
       const cachedAvatar = localStorage.getItem(avatarKey(currentEmail));
-      if (cachedAvatar && !avatarUrl) setAvatarUrl(cachedAvatar);
+      if (cachedAvatar && !avatarUrl) {
+        const isB64 = cachedAvatar.startsWith('data:image/');
+        const tooSmall = isB64 && (() => { try { return atob(cachedAvatar.split(',')[1] || '').length < 200; } catch { return true; } })();
+        if (!tooSmall) setAvatarUrl(cachedAvatar);
+        else try { localStorage.removeItem(avatarKey(currentEmail)); } catch { /* ok */ }
+      }
       const cachedCover = localStorage.getItem(coverKey(currentEmail));
       if (cachedCover && !coverImage) setCoverImageState(cachedCover);
     } catch { /* ok */ }
   }, [currentEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reject tiny placeholder images (e.g. 1x1 transparent PNGs from CRM)
+  const isValidAvatarData = useCallback((dataUrl: string) => {
+    if (!dataUrl.startsWith('data:image/')) return true;
+    const b64 = dataUrl.split(',')[1];
+    if (!b64) return false;
+    try { return atob(b64).length >= 200; } catch { return false; }
+  }, []);
+
   // Fetch photo from appusers record image API
   const fetchAvatarFromAppUsers = useCallback(async (recordId: string, email?: string) => {
     try {
       const dataUrl = await fetchAppUserPhoto(recordId, email);
-      if (dataUrl) {
+      if (dataUrl && isValidAvatarData(dataUrl)) {
         setAvatarUrl(dataUrl);
         try { localStorage.setItem(avatarKey(email), dataUrl); } catch { /* ok */ }
         return true;
       }
     } catch { /* fallback below */ }
     return false;
-  }, []);
+  }, [isValidAvatarData]);
 
   // Fetch Zoho profile data once on login
   useEffect(() => {
@@ -288,7 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const res = await fetch(`/api/profile?email=${encodeURIComponent(emailForLookup)}&photo=1`);
             if (res.ok) {
               const json = await res.json() as { photo?: string | null };
-              if (json.photo) {
+              if (json.photo && isValidAvatarData(json.photo)) {
                 setAvatarUrl(json.photo);
                 try { localStorage.setItem(avatarKey(emailForLookup), json.photo); } catch { /* ok */ }
               }

@@ -132,8 +132,9 @@ export default function Profile() {
                   <img
                     src={currentUser.avatar}
                     alt={currentUser.name}
-                    className="relative w-full h-full object-cover object-center"
+                    className="relative w-full h-full object-cover object-center bg-white"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    onLoad={(e) => { const img = e.currentTarget; if (img.naturalWidth < 4 || img.naturalHeight < 4) img.style.display = 'none'; }}
                   />
                 )}
               </div>
