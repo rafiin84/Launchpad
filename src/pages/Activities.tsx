@@ -9,6 +9,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { usePageTitle } from '../context/PageTitleContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
@@ -551,6 +552,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
 export default function Activities() {
   const { currentUser, isFounder, isInvestor } = useAuth();
   const { t } = useLanguage();
+  const { setPageTitle } = usePageTitle();
   const [records, setRecords] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -558,6 +560,14 @@ export default function Activities() {
   const [mySharePublic, setMySharePublic] = useState(false);
   const isConnected = !!loadToken();
   const canFetch = isConnected || isFounder;
+
+  useEffect(() => {
+    setPageTitle(
+      isFounder ? t.activities.title : t.activities.activitiesTitle,
+      t.activities.subtitle,
+    );
+    return () => setPageTitle(null);
+  }, [t, isFounder]);
 
   const postVisibility = isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only');
 
@@ -625,12 +635,6 @@ export default function Activities() {
 
   return (
     <div className="min-h-screen">
-      {/* Page header — above background */}
-      <div className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-4 bg-gray-50">
-        <h1 className="text-xl font-bold text-gray-900">{isFounder ? t.activities.title : t.activities.activitiesTitle}</h1>
-        <p className="text-sm text-gray-400 mt-0.5">{t.activities.subtitle}</p>
-      </div>
-
       <div className="flex-1 py-6 px-4 sm:px-6 lg:px-8 relative"
         style={{
           backgroundImage: `url("https://images.unsplash.com/photo-1518655048521-f130df041f66?fm=jpg&q=80&w=1920&auto=format&fit=crop")`,
