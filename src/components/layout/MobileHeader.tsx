@@ -1,6 +1,6 @@
 import React from 'react';
-import { Rocket, Search, Plus, LayoutGrid, List } from 'lucide-react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Rocket, Search, Plus, LayoutGrid, List, ArrowLeft } from 'lucide-react';
+import { Link, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Avatar } from '../ui/Avatar';
 import { NotificationBell } from '../ui/NotificationBell';
 import { LanguageSelector } from '../ui/LanguageSelector';
@@ -9,12 +9,34 @@ import { useAuth } from '../../context/AuthContext';
 export function MobileHeader() {
   const { currentUser, isFounder } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Hide on detail / edit / new sub-pages (any path with 2+ segments)
-  // Allow specific 2-segment paths like /applications/track, /applications/review, /applications/apply
   const segments = location.pathname.split('/').filter(Boolean);
   const allowedTwoSegment = ['/applications/track', '/applications/review', '/applications/apply'];
+
+  // Founder / applicant detail pages — show back-arrow header
+  const isFounderDetail   = segments[0] === 'founders'   && segments.length === 2;
+  const isApplicantDetail = segments[0] === 'applicants' && segments.length === 2;
+  if (isFounderDetail || isApplicantDetail) {
+    const backPath = isApplicantDetail ? '/applicants' : '/founders';
+    const title    = isApplicantDetail ? 'Applicant' : 'Founder';
+    return (
+      <header className="sticky top-0 z-30 bg-white border-b border-gray-100 md:hidden">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button
+            onClick={() => navigate(backPath)}
+            className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft size={18} className="text-gray-600" />
+          </button>
+          <span className="text-base font-semibold text-gray-900">{title}</span>
+        </div>
+      </header>
+    );
+  }
+
+  // Hide on all other detail / edit / new sub-pages
   if (segments.length >= 2 && !allowedTwoSegment.includes(location.pathname)) return null;
 
   const isHome         = location.pathname === '/' || location.pathname === '/dashboard';
