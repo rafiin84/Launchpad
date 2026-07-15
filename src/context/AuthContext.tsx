@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
 import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName, loadPortalLoginEmail } from '../services/oauth';
 import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
+import { ZOHO_HOSTS } from '../config/auth';
 import {
   findAppUserByEmail, fetchAppUserPhoto,
   loadCachedRecordId, clearCachedRecordId,
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAvatarUrl(accountsUser.picture);
                 try { localStorage.setItem(avatarKey(accountsUser.email), accountsUser.picture); } catch { /* ok */ }
               } else if (accountsUser.zuid) {
-                setAvatarUrl(`https://profile.zoho.in/file?ID=${accountsUser.zuid}&fs=medium`);
+                setAvatarUrl(`${ZOHO_HOSTS.profileCdn}/file?ID=${accountsUser.zuid}&fs=medium`);
               }
             }
           } catch { /* ok */ }
@@ -411,10 +412,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAvatarUrl(photoUrl);
           try { localStorage.setItem(avatarKey(user.email), photoUrl); } catch { /* ok */ }
         } else if (zuid) {
-          setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
+          setAvatarUrl(`${ZOHO_HOSTS.profileCdn}/file?ID=${zuid}&fs=medium`);
         }
       } catch {
-        if (zuid) setAvatarUrl(`https://profile.zoho.in/file?ID=${zuid}&fs=medium`);
+        if (zuid) setAvatarUrl(`${ZOHO_HOSTS.profileCdn}/file?ID=${zuid}&fs=medium`);
       }
     }).catch(() => {});
   }, [isLoggedIn, fetchAvatarFromAppUsers]);

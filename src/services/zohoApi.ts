@@ -1,17 +1,18 @@
 // Zoho CRM API client — calls Zoho APIs directly using the access token from localStorage.
 
 import { loadToken, loadApiDomain, loadRole } from './oauth';
+import { ZOHO_HOSTS } from '../config/auth';
 
 function buildCrmUrl(apiPath: string): string {
-  return `https://www.zohoapis.in${apiPath}`;
+  return `${ZOHO_HOSTS.crmApi}${apiPath}`;
 }
 
 function buildAccountsUrl(apiPath: string): string {
-  return `https://accounts.zoho.in${apiPath}`;
+  return `${ZOHO_HOSTS.accounts}${apiPath}`;
 }
 
 function buildPortalCrmUrl(apiPath: string): string {
-  return `https://launchpad.zcrmportals.in${apiPath}`;
+  return `${ZOHO_HOSTS.portalCrm}${apiPath}`;
 }
 
 function isPortalUser(): boolean {
@@ -29,7 +30,7 @@ function plainAuthHeader(): HeadersInit {
 function authHeader(): HeadersInit {
   const headers = plainAuthHeader();
   if (isPortalUser()) {
-    return { ...headers, 'x-crmportal': 'launchpad' };
+    return { ...headers, 'x-crmportal': ZOHO_HOSTS.portalName };
   }
   return headers;
 }
@@ -40,7 +41,7 @@ function jsonHeaders(): HeadersInit {
     ...plainAuthHeader(),
   };
   if (isPortalUser()) {
-    return { ...headers, 'x-crmportal': 'launchpad' };
+    return { ...headers, 'x-crmportal': ZOHO_HOSTS.portalName };
   }
   return headers;
 }

@@ -2,6 +2,8 @@
 // Generic Zoho OAuth (Implicit Flow)
 // Supports both Admin/Investor (Zoho CRM) and Founder (Portal) login flows.
 
+import { INVESTOR_AUTH, FOUNDER_AUTH } from '../config/auth';
+
 export interface PendingToken {
   token: string;
   expiresAt: number;
@@ -15,62 +17,30 @@ const API_DOMAIN_KEY = 'zoho_api_domain';
 let pendingToken: PendingToken | null = null;
 
 // -----------------------------------------------------------------------------
-// Configuration — Admin / Investor (Zoho CRM OAuth)
+// Configuration — re-exported from src/config/auth.ts
 // -----------------------------------------------------------------------------
 
 export const OAuthConfig = {
-  clientId: "1000.W21LK1JSFRB4E6QED3ZRY9PQ21VWJY",
-  authEndpoint: "https://accounts.zoho.in/oauth/v2/auth",
-  accountsApi: "https://accounts.zoho.in",
-
-  scopes: [
-    "AaaServer.profile.READ",
-    "ZohoCRM.modules.ALL",
-    "ZohoCRM.users.ALL",
-    "ZohoCRM.org.ALL",
-    "ZohoCRM.settings.ALL",
-    "ZohoCRM.bulk.ALL",
-    "ZohoCRM.notifications.ALL",
-    "ZohoCRM.coql.READ",
-    "ZohoCRM.Files.CREATE",
-    "ZohoCRM.Files.READ",
-  ],
-
-  callbackPath: "/callback",
-  responseType: "token",
-  accessType: "online",
-  prompt: "consent",
-
-  storage: {
-    tokenKey: "zoho_access_token",
-    expiryKey: "zoho_token_expiry",
-  },
+  clientId:     INVESTOR_AUTH.clientId,
+  authEndpoint: INVESTOR_AUTH.authEndpoint,
+  accountsApi:  'https://accounts.zoho.in',
+  scopes:       [...INVESTOR_AUTH.scopes],
+  callbackPath: INVESTOR_AUTH.callbackPath,
+  responseType: INVESTOR_AUTH.responseType,
+  accessType:   INVESTOR_AUTH.accessType,
+  prompt:       INVESTOR_AUTH.prompt,
+  storage:      { ...INVESTOR_AUTH.storage },
 };
 
-// -----------------------------------------------------------------------------
-// Configuration — Founder (Zoho CRM Client Portal OAuth)
-// -----------------------------------------------------------------------------
-
 export const PortalOAuthConfig = {
-  clientId: "50043237302.OS46TUFOUQ59JFF2P9JNPZF7VJTCRY",
-  portalId: "50043237302",
-  // authEndpoint: "https://accounts.zohoportal.in/clientoauth/v2",
-  authEndpoint: "https://launchpad.zcrmportals.in",
-
-  scopes: [
-    "ZohoCRM.modules.ALL",
-    "ZohoCRM.settings.ALL",
-    "ZohoCRM.coql.READ",
-    "ZohoCRM.users.ALL",
-    "ZohoCRM.org.ALL",
-    "ZohoCRM.Files.CREATE",
-    "ZohoCRM.Files.READ",
-  ],
-
-  callbackPath: "/portal/callback",
-  responseType: "token",
-  accessType: "offline",
-  prompt: "consent",
+  clientId:     FOUNDER_AUTH.clientId,
+  portalId:     FOUNDER_AUTH.portalId,
+  authEndpoint: FOUNDER_AUTH.authEndpoint,
+  scopes:       [...FOUNDER_AUTH.scopes],
+  callbackPath: FOUNDER_AUTH.callbackPath,
+  responseType: FOUNDER_AUTH.responseType,
+  accessType:   FOUNDER_AUTH.accessType,
+  prompt:       FOUNDER_AUTH.prompt,
 };
 
 // -----------------------------------------------------------------------------
