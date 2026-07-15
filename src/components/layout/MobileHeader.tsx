@@ -22,7 +22,7 @@ export function MobileHeader() {
   const isPortfolio    = location.pathname === '/portfolio';
   const isSearchOnly   = location.pathname === '/activities';
   const isDocuments    = location.pathname === '/documents';
-  const isFounders     = location.pathname === '/founders';
+  const isFounders     = location.pathname === '/founders' || location.pathname === '/applicants';
 
   const view = (searchParams.get('view') as 'grid' | 'list') || 'list';
   const toggleView = (v: 'grid' | 'list') =>
@@ -121,19 +121,6 @@ export function MobileHeader() {
             >
               <Plus size={18} className="text-gray-600" />
             </Link>
-          )}
-
-          {isApplications && !isFounder && (
-            <>
-              <button
-                className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-                title="Invite Applicant"
-                onClick={() => window.dispatchEvent(new CustomEvent('open-invite-applicant'))}
-              >
-                <Plus size={18} className="text-gray-600" />
-              </button>
-              <ViewToggle />
-            </>
           )}
 
           {isFounders && (
