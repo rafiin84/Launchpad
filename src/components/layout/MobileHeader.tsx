@@ -113,9 +113,9 @@ export function MobileHeader() {
             </>
           )}
 
-          {isApplications && (
+          {isApplications && isFounder && (
             <Link
-              to={isFounder ? "/applications/apply" : "/applications/new"}
+              to="/applications/apply"
               className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
               title="Add Application"
             >
