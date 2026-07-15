@@ -59,6 +59,7 @@ const ja: TranslationKeys = {
     dashboard: 'ダッシュボード',
     myActivities: 'マイアクティビティ',
     applications: '申請',
+    applicants: '申請者',
     company: '会社',
     portfolio: 'ポートフォリオ',
     founders: '創業者',

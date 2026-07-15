@@ -57,6 +57,7 @@ const en = {
     dashboard: 'Dashboard',
     myActivities: 'My Activities',
     applications: 'Applications',
+    applicants: 'Applicants',
     company: 'Company',
     portfolio: 'Portfolio',
     founders: 'Founders',

@@ -51,7 +51,7 @@ export function BottomNav() {
   const investorMoreItems = [
     { label: t.nav.documents,  path: '/documents',  icon: FileText, desc: '' },
     { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
-    { label: t.nav.applications, path: '/applicants', icon: Users,   desc: '' },
+    { label: t.nav.applicants,   path: '/applicants', icon: Users,   desc: '' },
     { label: t.nav.profile,    path: '/profile',     icon: User,     desc: '' },
   ];
 
