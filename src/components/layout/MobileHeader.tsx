@@ -123,6 +123,19 @@ export function MobileHeader() {
             </Link>
           )}
 
+          {isApplications && !isFounder && (
+            <>
+              <button
+                className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                title="Invite Applicant"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-invite-applicant'))}
+              >
+                <Plus size={18} className="text-gray-600" />
+              </button>
+              <ViewToggle />
+            </>
+          )}
+
           {isFounders && (
             <>
               <button
