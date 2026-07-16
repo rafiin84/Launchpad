@@ -372,6 +372,10 @@ export async function serverSaveCoverImage(_email: string, _dataUrl: string): Pr
   return false;
 }
 
+export async function serverGetCoverImage(_email: string): Promise<string> {
+  return '';
+}
+
 /**
  * Full profile sync: called on login.
  * 1. Upserts basic user data from Zoho /users API
