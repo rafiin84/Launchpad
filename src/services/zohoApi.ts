@@ -642,3 +642,50 @@ export async function findModuleApiName(keyword: string): Promise<string | null>
   );
   return found?.api_name ?? null;
 }
+
+export async function zohoGetAttachments(
+  module: string,
+  recordId: string,
+): Promise<Array<{ id: string; File_Name: string; Size: string }>> {
+  const token = loadToken();
+  if (!token) return [];
+  const res = await fetch(buildCrmUrl(`/crm/v2/${module}/${recordId}/Attachments`), {
+    headers: authHeader(),
+  });
+  if (res.status === 204) return [];
+  if (!res.ok) return [];
+  const json = await res.json() as { data?: Array<{ id: string; File_Name: string; Size: string }> };
+  return json.data || [];
+}
+
+export async function zohoDownloadAttachment(
+  module: string,
+  recordId: string,
+  attachmentId: string,
+): Promise<Blob | null> {
+  const token = loadToken();
+  if (!token) return null;
+  const res = await fetch(
+    buildCrmUrl(`/crm/v2/${module}/${recordId}/Attachments/${attachmentId}`),
+    { headers: { 'Authorization': `Zoho-oauthtoken ${token}` } },
+  );
+  if (!res.ok) return null;
+  return res.blob();
+}
+
+export async function zohoUploadAttachment(
+  module: string,
+  recordId: string,
+  file: Blob,
+  fileName: string,
+): Promise<boolean> {
+  const token = ensureToken();
+  const formData = new FormData();
+  formData.append('file', file, fileName);
+  const res = await fetch(buildCrmUrl(`/crm/v2/${module}/${recordId}/Attachments`), {
+    method: 'POST',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    body: formData,
+  });
+  return res.ok;
+}

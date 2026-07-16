@@ -1,12 +1,9 @@
 /**
  * investmentApplications.ts
  *
- * Hybrid service for investment applications:
- * - Investors (CRM users): read/write directly from Zoho CRM via client-side tokens
- * - Founders (portal users): read/write via /api/applications serverless proxy
- *   which uses admin refresh token to access CRM on their behalf
- *
- * All public functions are async to support CRM/API calls.
+ * Client-only service for investment applications.
+ * All reads/writes go directly to Zoho CRM via client-side tokens.
+ * Drafts are saved to localStorage only.
  */
 
 import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
@@ -315,85 +312,7 @@ function generateLocalId(): string {
   return `app_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ─── Server proxy API (for founders — uses admin token server-side) ────────
-
-interface ProxyListResponse {
-  data?: ZohoRecord[];
-  info?: { more_records: boolean };
-  code?: string;
-  message?: string;
-}
-
-interface ProxyCUDResponse {
-  data?: Array<{ code: string; status: string; message: string; details: { id: string } }>;
-  code?: string;
-  message?: string;
-}
-
-async function proxyGetAll(): Promise<InvestmentApplication[]> {
-  try {
-    const res = await fetch('/api/applications');
-    if (res.status === 204) return [];
-    const json: ProxyListResponse = await res.json();
-    if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
-    return (json.data ?? []).map(fromCrmRecord);
-  } catch (err) {
-    console.warn('[proxyGetAll] Failed, falling back to local:', err);
-    return loadLocal();
-  }
-}
-
-async function proxyGetById(id: string): Promise<InvestmentApplication | null> {
-  try {
-    const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`);
-    if (res.status === 204 || res.status === 404) return null;
-    const json: ProxyListResponse = await res.json();
-    if (!res.ok) return null;
-    const record = json.data?.[0];
-    return record ? fromCrmRecord(record) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function proxyCreate(payload: Record<string, unknown>): Promise<string> {
-  const res = await fetch('/api/applications', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: [payload] }),
-  });
-  const json: ProxyCUDResponse = await res.json();
-  const result = json.data?.[0];
-  if (!result || result.code !== 'SUCCESS') {
-    throw new Error(result?.message || json.message || 'Create failed');
-  }
-  return result.details.id;
-}
-
-async function proxyUpdate(id: string, payload: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: [{ id, ...payload }] }),
-  });
-  const json: ProxyCUDResponse = await res.json();
-  const result = json.data?.[0];
-  if (!result || result.code !== 'SUCCESS') {
-    throw new Error(result?.message || json.message || 'Update failed');
-  }
-}
-
-async function proxyDelete(id: string): Promise<void> {
-  const res = await fetch(`/api/applications?id=${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({})) as { message?: string };
-    throw new Error(json.message || `Delete failed: ${res.status}`);
-  }
-}
-
-// ─── CRM direct API (for investors with client-side tokens) ────────────────
+// ─── CRM direct API ────────────────────────────────────────────────────────
 
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
@@ -437,60 +356,45 @@ async function crmDeleteApp(id: string): Promise<void> {
   } catch { /* silent */ }
 }
 
-// ─── Public API (unified) ──────────────────────────────────────────────────
-// The `isInvestor` parameter determines the data path:
-//   - Investors: direct CRM API with client-side tokens
-//   - Founders: /api/applications serverless proxy (admin token server-side)
-//     + localStorage for drafts only
+// ─── Public API ────────────────────────────────────────────────────────────
 
 /**
  * Fetch all applications.
- * Investors: direct CRM (all applications).
- * Founders: server proxy filtered to the founder's own email + local drafts.
+ * Investors: all applications from CRM.
+ * Founders: CRM applications filtered to the founder's email + local drafts.
  */
 export async function getApplications(isInvestor: boolean, founderEmail?: string): Promise<InvestmentApplication[]> {
-  if (isInvestor) {
-    return crmGetAll();
-  }
-
-  // Founder: fetch from server proxy (CRM via admin token) + merge local drafts
-  const [serverApps, localDrafts] = await Promise.all([
-    proxyGetAll(),
+  const [crmApps, localDrafts] = await Promise.all([
+    crmGetAll(),
     Promise.resolve(loadLocalDrafts()),
   ]);
 
-  // Filter to only this founder's applications
+  if (isInvestor) return crmApps;
+
   const email = founderEmail?.toLowerCase();
-  const myServerApps = email
-    ? serverApps.filter(a =>
+  const myApps = email
+    ? crmApps.filter(a =>
         a.founderEmail?.toLowerCase() === email ||
         a.submittedByEmail?.toLowerCase() === email
       )
-    : serverApps;
+    : crmApps;
 
   const myLocalDrafts = email
     ? localDrafts.filter(d =>
         d.founderEmail?.toLowerCase() === email ||
         d.submittedByEmail?.toLowerCase() === email ||
-        !d.founderEmail // drafts with no email yet belong to current user
+        !d.founderEmail
       )
     : localDrafts;
 
-  // Merge: server apps + any local-only drafts (not yet in CRM)
-  const serverIds = new Set(myServerApps.map(a => a.id));
+  const serverIds = new Set(myApps.map(a => a.id));
   const uniqueDrafts = myLocalDrafts.filter(d => !serverIds.has(d.id));
-  const all = [...uniqueDrafts, ...myServerApps];
-
+  const all = [...uniqueDrafts, ...myApps];
   return all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 /**
  * Check if a founder can submit a new application.
- * Rules:
- *  - First application: always allowed
- *  - If rejected: one re-apply allowed
- *  - If approved/active: no new application
- *  - Max 1 re-apply total (2 submitted apps max)
  */
 export function canApplyAgain(applications: InvestmentApplication[]): boolean {
   const submitted = applications.filter(a => a.status !== 'draft');
@@ -501,14 +405,9 @@ export function canApplyAgain(applications: InvestmentApplication[]): boolean {
 
 /** Fetch a single application by ID. */
 export async function getApplicationById(id: string, isInvestor: boolean): Promise<InvestmentApplication | null> {
-  if (isInvestor) {
-    return crmGetById(id);
-  }
-
-  // Founder: check local drafts first, then server
   const local = loadLocal().find(a => a.id === id);
   if (local) return local;
-  return proxyGetById(id);
+  return crmGetById(id);
 }
 
 /** Fetch applications by status. */
@@ -545,17 +444,11 @@ export async function getApplicationsByFounder(email: string, isInvestor: boolea
 
 /**
  * Create a new investment application.
- * Investors: creates directly in CRM via client-side token.
- * Founders: drafts saved locally; submitted apps go to CRM via server proxy.
+ * Drafts are saved to localStorage. Submitted apps go directly to CRM.
  */
 export async function createApplication(fields: InvestmentApplicationFields, isInvestor: boolean): Promise<InvestmentApplication> {
-  if (isInvestor) {
-    return crmCreate(fields);
-  }
-
   const now = new Date().toISOString();
 
-  // Founder: drafts stay in localStorage only — max one draft per user
   if (fields.status === 'draft') {
     const existing = loadLocal();
     const existingDraft = existing.find(a => a.status === 'draft');
@@ -579,63 +472,29 @@ export async function createApplication(fields: InvestmentApplicationFields, isI
     return app;
   }
 
-  // Founder submitting: write to CRM via server proxy
-  try {
-    const payload = toCrmPayload(fields);
-    const crmId = await proxyCreate(payload);
-    return { ...fields, id: crmId, submittedAt: now, updatedAt: now };
-  } catch (err) {
-    // Fallback: save locally if server is unreachable
-    console.warn('Server proxy create failed, saving locally:', err);
-    const app: InvestmentApplication = {
-      ...fields,
-      id: generateLocalId(),
-      submittedAt: now,
-      updatedAt: now,
-    };
-    const existing = loadLocal();
-    saveLocal([app, ...existing]);
-    return app;
-  }
+  return crmCreate(fields);
 }
 
 /**
  * Update an existing application.
- * Investors: updates in CRM. Founders: drafts updated locally, others via server proxy.
  */
 export async function updateApplication(
   id: string,
   updates: Partial<InvestmentApplication>,
   isInvestor: boolean
 ): Promise<InvestmentApplication | null> {
-  if (isInvestor) {
-    return crmUpdate(id, updates);
-  }
-
-  // Founder: check if this is a local draft
   const localApps = loadLocal();
   const localIdx = localApps.findIndex(a => a.id === id);
 
-  // If it's a local draft being submitted, create in CRM instead of updating
   if (localIdx !== -1 && localApps[localIdx].status === 'draft' && updates.status && updates.status !== 'draft') {
     const merged = { ...localApps[localIdx], ...updates, updatedAt: new Date().toISOString() };
-    try {
-      const payload = toCrmPayload(merged);
-      const crmId = await proxyCreate(payload);
-      // Remove from local drafts
-      localApps.splice(localIdx, 1);
-      saveLocal(localApps);
-      return { ...merged, id: crmId };
-    } catch (err) {
-      console.warn('Server proxy submit failed:', err);
-      // Update locally as fallback
-      localApps[localIdx] = { ...merged, id };
-      saveLocal(localApps);
-      return localApps[localIdx];
-    }
+    const payload = toCrmPayload(merged);
+    const crmId = await zohoCreate(CRM_MODULE, payload);
+    localApps.splice(localIdx, 1);
+    saveLocal(localApps);
+    return { ...merged, id: crmId };
   }
 
-  // If it's a local draft staying as draft, update locally
   if (localIdx !== -1) {
     const updated: InvestmentApplication = {
       ...localApps[localIdx],
@@ -648,18 +507,11 @@ export async function updateApplication(
     return updated;
   }
 
-  // It's a CRM record — update via server proxy
-  try {
-    const payload = toCrmPayload(updates);
-    await proxyUpdate(id, payload);
-    return proxyGetById(id);
-  } catch {
-    return null;
-  }
+  return crmUpdate(id, updates);
 }
 
 /**
- * Update the status of an application (typically by investor).
+ * Update the status of an application.
  */
 export async function updateApplicationStatus(
   id: string,
@@ -678,8 +530,7 @@ export async function updateApplicationStatus(
 }
 
 /**
- * Approve an application: set status to 'approved' and create a Portfolio record
- * so the founder appears on the Founders page.
+ * Approve an application: set status to 'approved' and create a Portfolio record.
  */
 export interface ApprovalDetails {
   investmentAmount: string;
@@ -698,10 +549,8 @@ export async function approveApplication(
   const app = await getApplicationById(id, isInvestor);
   if (!app) return null;
 
-  // 1. Update status to approved
   const updated = await updateApplicationStatus(id, 'approved', reviewerName, isInvestor);
 
-  // 2. Create a Portfolio record from the application data (skip if already exists)
   if (isInvestor) {
     try {
       const { createCRMPortfolioRecord, fetchCRMPortfolio } = await import('./crmPortfolio');
@@ -747,21 +596,12 @@ export async function approveApplication(
 
 /** Delete an application. */
 export async function deleteApplication(id: string, isInvestor: boolean): Promise<void> {
-  if (isInvestor) {
-    return crmDeleteApp(id);
-  }
-
-  // Founder: remove local draft if exists
   const all = loadLocal();
   const filtered = all.filter(a => a.id !== id);
   if (filtered.length !== all.length) {
     saveLocal(filtered);
   }
-
-  // Also delete from CRM via server proxy
-  try {
-    await proxyDelete(id);
-  } catch { /* silent — may not exist in CRM */ }
+  await crmDeleteApp(id);
 }
 
 // ─── Requested Documents helpers ──────────────────────────────────────────

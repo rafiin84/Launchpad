@@ -17,11 +17,12 @@ import {
   type ZohoRecord,
 } from './zohoApi';
 import { loadToken, loadRole } from './oauth';
+import { ZOHO_HOSTS } from '../config/auth';
 
 async function zohoDeleteRecordPhoto(module: string, recordId: string): Promise<boolean> {
   const token = loadToken();
   if (!token) return false;
-  const base = import.meta.env.DEV ? `/zoho-crm-proxy` : 'https://www.zohoapis.in';
+  const base = import.meta.env.DEV ? `/zoho-crm-proxy` : ZOHO_HOSTS.crmApi;
   const res = await fetch(`${base}/crm/v2/${module}/${recordId}/photo`, {
     method: 'DELETE',
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
@@ -33,7 +34,7 @@ const isDev = import.meta.env.DEV;
 
 function crmUrl(apiPath: string): string {
   if (isDev) return `/zoho-crm-proxy${apiPath}`;
-  return `https://www.zohoapis.in${apiPath}`;
+  return `${ZOHO_HOSTS.crmApi}${apiPath}`;
 }
 
 function crmHeaders(): Record<string, string> {
@@ -152,7 +153,6 @@ function getCachedModuleStatus(): ModuleStatus | null {
     const raw = localStorage.getItem(MODULE_STATUS_KEY);
     if (!raw) return null;
     const status = JSON.parse(raw) as ModuleStatus;
-    // Only trust the cache for MODULE_CHECK_INTERVAL
     if (Date.now() - status.checkedAt < MODULE_CHECK_INTERVAL) return status;
     return null;
   } catch { return null; }
@@ -176,7 +176,6 @@ export async function isModuleAvailable(): Promise<boolean> {
   if (!token) return false;
 
   try {
-    // Try fetching the module metadata — if it returns 200, the module exists
     const url = crmUrl(`/crm/v2/settings/modules/${MODULE}`);
     const res = await fetch(url, { headers: crmHeaders() });
     const available = res.ok;
@@ -211,9 +210,6 @@ export function clearCachedRecordId() {
 }
 
 // ─── localStorage fallback for profile data ─────────────────────────────────
-// When the appusers module isn't available yet, we persist profile edits
-// in localStorage so users don't lose data. On next login, if the module
-// becomes available, the cached data is synced up.
 
 const PROFILE_CACHE_KEY = 'lp_appuser_profile_cache';
 
@@ -239,23 +235,17 @@ export function clearCachedProfile() {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+function isPortalUser(): boolean {
+  return loadRole() === 'founder' && !loadToken();
+}
+
 /**
  * Upsert (insert-or-update) the current user into the appusers module.
  * Uses Email as the duplicate check field.
  * Returns the record ID, or null if the module isn't available.
  */
 export async function syncAppUser(fields: Partial<AppUserFields> & { email: string }): Promise<string | null> {
-  // Always cache locally as backup
   cacheProfileLocally(fields);
-
-  // Always try server API first (works for portal users AND investors)
-  try {
-    const ok = await serverUpdateProfile(fields.email, fields);
-    if (ok) {
-      const result = await serverGetProfile(fields.email);
-      if (result.recordId) { cacheRecordId(result.recordId); return result.recordId; }
-    }
-  } catch { /* fall through to direct CRM */ }
 
   if (isPortalUser()) return null;
 
@@ -278,16 +268,6 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
  * Returns null if not found or module unavailable.
  */
 export async function findAppUserByEmail(email: string): Promise<AppUser | null> {
-  // Always try server API first — works for both portal users and investors
-  try {
-    const result = await serverGetProfile(email);
-    if (result.profile) {
-      cacheRecordId(result.recordId || result.profile.id);
-      cacheProfileLocally(result.profile);
-      return result.profile;
-    }
-  } catch { /* fall through to direct CRM */ }
-
   if (isPortalUser()) return null;
 
   const available = await isModuleAvailable();
@@ -317,16 +297,7 @@ export async function findAppUserByEmail(email: string): Promise<AppUser | null>
  * Returns true if CRM update succeeded, false otherwise.
  */
 export async function updateAppUser(recordId: string, fields: Partial<AppUserFields>, email?: string): Promise<boolean> {
-  // Always update local cache
   cacheProfileLocally(fields);
-
-  // Always try server API first (works for portal users AND investors)
-  if (email) {
-    try {
-      const ok = await serverUpdateProfile(email, fields);
-      if (ok) return true;
-    } catch { /* fall through to direct CRM */ }
-  }
 
   if (isPortalUser()) return false;
 
@@ -349,26 +320,6 @@ export async function updateAppUser(recordId: string, fields: Partial<AppUserFie
  * Returns true if upload succeeded, false otherwise.
  */
 export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName = 'photo.jpg', email?: string): Promise<boolean> {
-  // Portal users: convert to base64 and upload via server
-  if (isPortalUser() && email) {
-    try {
-      const dataUrl = await blobToDataUrl(file);
-      return await serverUploadPhoto(email, dataUrl);
-    } catch (err) {
-      console.warn('[AppUsers] Server photo upload failed:', err);
-      return false;
-    }
-  }
-
-  // Also try server API if email is available (fallback for portal users with token)
-  if (email) {
-    try {
-      const dataUrl = await blobToDataUrl(file);
-      const ok = await serverUploadPhoto(email, dataUrl);
-      if (ok) return true;
-    } catch { /* fall through to direct CRM */ }
-  }
-
   const available = await isModuleAvailable();
   if (!available) {
     console.warn('[AppUsers] Module unavailable — cannot upload photo.');
@@ -384,35 +335,11 @@ export async function uploadAppUserPhoto(recordId: string, file: Blob, fileName 
   }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
  * Fetch the appusers record's photo as a data: URL.
  * Returns null if no photo is set or module unavailable.
  */
 export async function fetchAppUserPhoto(recordId: string, email?: string): Promise<string | null> {
-  // Portal users: use server API
-  if (isPortalUser() && email) {
-    try {
-      return await serverGetPhoto(email);
-    } catch { return null; }
-  }
-
-  // Try server API first if email is available (works for portal users with token too)
-  if (email) {
-    try {
-      const photo = await serverGetPhoto(email);
-      if (photo) return photo;
-    } catch { /* fall through to direct CRM */ }
-  }
-
   const available = await isModuleAvailable();
   if (!available) return null;
 
@@ -423,89 +350,26 @@ export async function fetchAppUserPhoto(recordId: string, email?: string): Promi
  * Delete the profile photo from the appusers record.
  */
 export async function deleteAppUserPhoto(recordId: string, email?: string): Promise<boolean> {
-  if (email) {
-    try {
-      const ok = await serverDeletePhoto(email);
-      if (ok) return true;
-    } catch { /* fall through */ }
-  }
   if (isPortalUser()) return false;
   const available = await isModuleAvailable();
   if (!available) return false;
   return zohoDeleteRecordPhoto(MODULE, recordId);
 }
 
-// ─── Server API fallback (for portal users without direct CRM token) ────────
-
-async function serverGetProfile(email: string): Promise<{ profile: AppUser | null; recordId: string | null }> {
-  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-  if (!res.ok) return { profile: null, recordId: null };
-  const json = await res.json() as { profile?: Record<string, unknown> | null; recordId?: string };
-  if (!json.profile) return { profile: null, recordId: null };
-  const p = json.profile;
-  const s = (k: string) => (p[k] == null ? '' : String(p[k]));
-  const expertiseRaw = s('expertise');
-  const user: AppUser = {
-    id: s('id'), name: s('name'), email: s('email'), phone: s('phone') || '',
-    mobile: s('mobile') || '', role: s('role'), bio: s('bio'), location: s('location'),
-    linkedIn: s('linkedIn'), twitter: s('twitter'),
-    expertise: expertiseRaw ? expertiseRaw.split(',').map((x: string) => x.trim()).filter(Boolean) : [],
-    zohoUserId: s('zohoUserId'), jobTitle: s('jobTitle'), state: s('state'), country: s('country'),
-    languagePreference: s('languagePreference'),
-  };
-  return { profile: user, recordId: json.recordId || user.id };
+/**
+ * Stub export for callers that previously used the server API.
+ * No longer calls /api/profile — returns false as a no-op.
+ */
+export async function serverDeletePhoto(_email: string): Promise<boolean> {
+  return false;
 }
 
-async function serverUpdateProfile(email: string, fields: Partial<AppUserFields>): Promise<boolean> {
-  const payload: Record<string, unknown> = { ...fields };
-  if (fields.expertise) payload.expertise = fields.expertise.join(', ');
-  const res = await fetch('/api/profile', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, fields: payload }),
-  });
-  return res.ok;
-}
-
-async function serverUploadPhoto(email: string, dataUrl: string): Promise<boolean> {
-  const res = await fetch('/api/profile', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, type: 'photo', data: dataUrl }),
-  });
-  return res.ok;
-}
-
-async function serverGetPhoto(email: string): Promise<string | null> {
-  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}&photo=1`);
-  if (!res.ok) return null;
-  const json = await res.json() as { photo?: string | null };
-  return json.photo || null;
-}
-
-export async function serverDeletePhoto(email: string): Promise<boolean> {
-  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
-  return res.ok;
-}
-
-export async function serverGetCoverImage(email: string): Promise<string | null> {
-  const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
-  if (!res.ok) return null;
-  const json = await res.json() as { profile?: { coverImage?: string } | null };
-  return json.profile?.coverImage || null;
-}
-
-export async function serverSaveCoverImage(email: string, dataUrl: string): Promise<boolean> {
-  const res = await fetch('/api/profile', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, type: 'cover', data: dataUrl }),
-  });
-  return res.ok;
-}
-
-function isPortalUser(): boolean {
-  return loadRole() === 'founder' && !loadToken();
+/**
+ * Stub export for callers that previously used the server API.
+ * No longer calls /api/profile — returns false as a no-op.
+ */
+export async function serverSaveCoverImage(_email: string, _dataUrl: string): Promise<boolean> {
+  return false;
 }
 
 /**
@@ -527,7 +391,6 @@ export async function fullProfileSync(
   },
   role: string,
 ): Promise<{ recordId: string | null; appUser: AppUser | null }> {
-  // Merge locally cached profile data with Zoho user data
   const cached = loadCachedProfile();
   const fields: Partial<AppUserFields> & { email: string } = {
     email:       zohoUserData.email,
@@ -539,7 +402,6 @@ export async function fullProfileSync(
     jobTitle:    zohoUserData.jobTitle || cached?.jobTitle || '',
     state:       zohoUserData.state || cached?.state || '',
     country:     zohoUserData.country || cached?.country || '',
-    // Preserve CRM/locally-edited fields — don't overwrite with blanks
     ...(cached?.bio ? { bio: cached.bio } : {}),
     ...(cached?.location ? { location: cached.location } : {}),
     ...(cached?.linkedIn ? { linkedIn: cached.linkedIn } : {}),
@@ -549,7 +411,6 @@ export async function fullProfileSync(
 
   const recordId = await syncAppUser(fields);
 
-  // Now fetch the full record back to get the merged data
   let appUser: AppUser | null = null;
   if (recordId) {
     appUser = await findAppUserByEmail(zohoUserData.email);

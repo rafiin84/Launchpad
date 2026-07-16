@@ -8,7 +8,7 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
   fetchCRMDocuments, deleteCRMDocument, fetchDocumentAttachments,
-  getDownloadUrl, type CRMDocument,
+  downloadAttachment, viewAttachment, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -116,13 +116,7 @@ export default function Documents() {
         return;
       }
       const att = attachments[0];
-      const url = getDownloadUrl(doc.id, att.id);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = att.File_Name || doc.fileName || 'document';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      await downloadAttachment(doc.id, att.id, att.File_Name || doc.fileName || 'document');
     } catch {
       alert('Failed to download. Please try again.');
     } finally {
@@ -139,8 +133,7 @@ export default function Documents() {
         return;
       }
       const att = attachments[0];
-      const url = getDownloadUrl(doc.id, att.id);
-      window.open(url, '_blank');
+      await viewAttachment(doc.id, att.id);
     } catch {
       alert('Failed to open document. Please try again.');
     } finally {
