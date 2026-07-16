@@ -6,7 +6,10 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalList, portalCreate, type ZohoRecord } from './zohoApi';
+import { loadRole } from './oauth';
+
+function isFounder(): boolean { return loadRole() === 'founder'; }
 
 const STORAGE_KEY = 'lp_investment_applications';
 const MAX_APPLICATIONS = 200;
@@ -316,11 +319,11 @@ function generateLocalId(): string {
 
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
-    const records = await zohoList(CRM_MODULE, {
-      per_page: '200',
-      sort_by: 'Modified_Time',
-      sort_order: 'desc',
-    });
+    const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
+    // Portal tokens only work on zcrmportals.in — use portalList for founders
+    const records = isFounder()
+      ? await portalList(CRM_MODULE, params)
+      : await zohoList(CRM_MODULE, params);
     return records.map(fromCrmRecord);
   } catch {
     return [];
@@ -339,7 +342,9 @@ async function crmGetById(id: string): Promise<InvestmentApplication | null> {
 async function crmCreate(fields: InvestmentApplicationFields): Promise<InvestmentApplication> {
   const now = new Date().toISOString();
   const payload = toCrmPayload(fields);
-  const crmId = await zohoCreate(CRM_MODULE, payload);
+  const crmId = isFounder()
+    ? await portalCreate(CRM_MODULE, payload)
+    : await zohoCreate(CRM_MODULE, payload);
   return { ...fields, id: crmId, submittedAt: now, updatedAt: now };
 }
 

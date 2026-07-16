@@ -10,7 +10,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
-import { loadToken } from '../services/oauth';
+import { loadToken, loadRole } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import { generateFounderInsights, type AIInsight } from '../services/aiEngine';
@@ -237,6 +237,7 @@ export default function FounderDashboard() {
   const [hasDraftApplication, setHasDraftApplication] = useState(false);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem(WELCOME_KEY));
+  const isPortalFounder = loadRole() === 'founder';
   const navigate = useNavigate();
 
   useEffect(() => {

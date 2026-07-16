@@ -173,16 +173,22 @@ function isFounder(): boolean {
 }
 
 async function searchFounders(email: string): Promise<import('./zohoApi').ZohoRecord[]> {
-  const criteria = `(Email:equals:${email})`;
-  // Founders use portal tokens — try portal domain first, then standard CRM
   if (isFounder()) {
+    // Portal tokens only work on zcrmportals.in.
+    // portalList returns the portal user's own records automatically — no email filter needed.
     try {
-      const records = await portalSearch('Founders', criteria);
+      const records = await portalList('Founders', { per_page: '1', fields: ALL_CRM_FIELDS });
+      if (records.length > 0) return records;
+    } catch { /* try search next */ }
+    // Fallback: portal search with explicit email criteria
+    try {
+      const records = await portalSearch('Founders', `(Email:equals:${email})`);
       if (records.length > 0) return records;
     } catch { /* fall through */ }
+    return [];
   }
-  // Investors use standard domain; founders fall back here if portal search failed
-  return zohoSearch('Founders', criteria);
+  // Investors use standard CRM domain
+  return zohoSearch('Founders', `(Email:equals:${email})`);
 }
 
 async function upsertFounder(payload: Record<string, unknown>): Promise<void> {
