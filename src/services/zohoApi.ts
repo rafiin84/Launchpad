@@ -288,6 +288,22 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
   return json.data ?? [];
 }
 
+// ─── COQL query — returns textarea fields that list endpoint omits ────────────
+
+export async function zohoCoql(query: string): Promise<ZohoRecord[]> {
+  ensureToken();
+  const url = buildCrmUrl('/crm/v2.1/coql');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { ...plainAuthHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ select_query: query }),
+  });
+  if (res.status === 204) return [];
+  const json = await res.json() as { data?: ZohoRecord[]; message?: string; code?: string };
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  return json.data ?? [];
+}
+
 // ─── Record Image API ─────────────────────────────────────────────────────────
 
 export async function zohoUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {

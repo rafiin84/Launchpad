@@ -1,4 +1,5 @@
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoCoql, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
 
@@ -64,6 +65,20 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
 }
 
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
+  // Investors use COQL which returns textarea fields (Content, Activity_Image_Data)
+  // that the standard list endpoint silently omits.
+  // Portal founders fall back to zohoList + local-cache backfill (COQL rejects portal tokens).
+  if (loadRole() !== 'founder') {
+    try {
+      const coqlFields = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Created_Time, Modified_Time';
+      const records = await zohoCoql(
+        `SELECT ${coqlFields} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
+      );
+      return records.map(fromRecord);
+    } catch (err) {
+      console.warn('[Activities] COQL failed, falling back to list:', err);
+    }
+  }
   const records = await zohoList(MODULE, {
     per_page: '200',
     sort_by: 'Created_Time',
