@@ -287,6 +287,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'All CRM strategies failed' });
     }
 
+    if (req.method === 'DELETE') {
+      const id = req.query.id as string;
+      if (!id) return res.status(400).json({ error: 'id query param required' });
+
+      const adminToken = await getAdminToken().catch(() => null);
+      if (adminToken) {
+        try {
+          const delRes = await fetch(`${ZOHO_API_BASE}/crm/v2/${MODULE}/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Zoho-oauthtoken ${adminToken}` },
+          });
+          if (!delRes.ok) throw new Error(`CRM DELETE ${delRes.status}: ${await delRes.text()}`);
+          return res.status(200).json({ success: true });
+        } catch (e) {
+          console.warn('[activities] Admin DELETE failed:', e);
+        }
+      }
+
+      if (clientToken) {
+        try {
+          const delRes = await fetch(`${PORTAL_CRM_BASE}/crm/v2/${MODULE}/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Zoho-oauthtoken ${clientToken}` },
+          });
+          if (!delRes.ok) throw new Error(`CRM DELETE ${delRes.status}: ${await delRes.text()}`);
+          return res.status(200).json({ success: true });
+        } catch (e) {
+          console.warn('[activities] Portal DELETE failed:', e);
+        }
+      }
+
+      return res.status(500).json({ error: 'All DELETE strategies failed' });
+    }
+
     if (req.method === 'PUT') {
       const action = req.query.action as string;
       const adminToken = await getAdminToken().catch(() => null);

@@ -4,7 +4,7 @@ import {
   Activity, AlertCircle, RefreshCw, Building2,
   Image, X, Send, Link as LinkIcon,
   PlusCircle, DollarSign, FileText, Users, TrendingUp, MessageSquare, Upload, Clock,
-  Sparkles,
+  Sparkles, Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +14,7 @@ import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
-import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions } from '../services/sharedActivities';
+import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions, deleteSharedActivity } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
@@ -454,10 +454,12 @@ function groupAndSort(activities: CRMActivity[]): { key: string; items: CRMActiv
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
-function ActivityCard({ activity }: { activity: CRMActivity }) {
-  const { currentUser, founderCompanyName } = useAuth();
+function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete?: (id: string) => void }) {
+  const { currentUser, founderCompanyName, isInvestor } = useAuth();
   const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
+  const canDelete = isOwnPost || isInvestor;
+  const [deleting, setDeleting] = useState(false);
   const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || activity.authorName || 'General';
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
@@ -476,7 +478,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
       to={`/activities/${activity.id}`}
       className="block bg-white border border-gray-100 rounded-2xl overflow-hidden hover:border-gray-200 hover:shadow-sm transition-all"
     >
-      {/* Header row: company | type badge */}
+      {/* Header row: company | type badge | delete */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -484,9 +486,25 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
           </div>
           <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
         </div>
-        <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
-          {typeLabel}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
+            {typeLabel}
+          </span>
+          {canDelete && onDelete && (
+            <button
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!confirm('Delete this activity?')) return;
+                setDeleting(true);
+                try { await deleteSharedActivity(activity.id); onDelete(activity.id); } catch { /* swallow */ } finally { setDeleting(false); }
+              }}
+              disabled={deleting}
+              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={13} className={deleting ? 'animate-pulse' : ''} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body */}
@@ -599,6 +617,10 @@ export default function Activities() {
 
   const handlePost = (activity: CRMActivity) => {
     setRecords(prev => [activity, ...prev]);
+  };
+
+  const handleDelete = (id: string) => {
+    setRecords(prev => prev.filter(r => r.id !== id));
   };
 
   const RECENT_TYPE_STYLE: Record<string, { icon: typeof Activity; color: string }> = {
@@ -725,7 +747,7 @@ export default function Activities() {
               </div>
               <div className="grid grid-cols-1 gap-4">
                 {group.items.map(activity => (
-                  <ActivityCard key={activity.id} activity={activity} />
+                  <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} />
                 ))}
               </div>
             </div>

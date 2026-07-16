@@ -457,6 +457,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { localStorage.removeItem(coverKey(email)); } catch { /* ok */ }
     try { localStorage.removeItem(LEGACY_AVATAR_KEY); } catch { /* ok */ }
     try { localStorage.removeItem(LEGACY_COVER_KEY); } catch { /* ok */ }
+    try { localStorage.removeItem('lp_shared_activities'); } catch { /* ok */ }
     setAvatarUrl('');
     setCoverImageState('');
     setUserName(null);
