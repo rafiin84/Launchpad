@@ -91,9 +91,17 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
 
     if (activities.length === 0) return filterByVisibility(localActivities, myLocalIds);
 
+    // Build a map of locally cached times so we can fill in missing CRM timestamps.
+    // The portal API often omits Created_Time for portal users.
+    const localTimeById = new Map(localActivities.map(a => [a.id, a.createdTime]));
+
     const serverIds = new Set(activities.map(a => a.id));
     const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
-    const merged = [...localOnly, ...activities];
+    const withTimes = activities.map(a => ({
+      ...a,
+      createdTime: a.createdTime || localTimeById.get(a.id) || '',
+    }));
+    const merged = [...localOnly, ...withTimes];
     saveLocal(merged);
     return filterByVisibility(merged, myLocalIds);
   } catch (err) {
