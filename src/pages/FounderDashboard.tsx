@@ -306,17 +306,23 @@ export default function FounderDashboard() {
         setHasApplication(false);
         setHasDraftApplication(drafts.length > 0);
       }
-    }).catch(() => setHasApplication(false));
+    }).catch(() => setHasApplication(null)); // null = unknown (CRM unreachable), don't show banner
   }, [userEmail, currentUser.name]);
 
-  // Auto-dismiss welcome modal for returning users who already have profile or application in CRM
+  // Portal founders are always invited users — never show the "new user" welcome modal.
+  // Also auto-dismiss once CRM confirms they have an existing profile or application.
   useEffect(() => {
     if (!showWelcome) return;
+    if (isPortalFounder) {
+      localStorage.setItem(WELCOME_KEY, '1');
+      setShowWelcome(false);
+      return;
+    }
     if (profileComplete === true || hasApplication === true) {
       localStorage.setItem(WELCOME_KEY, '1');
       setShowWelcome(false);
     }
-  }, [profileComplete, hasApplication, showWelcome]);
+  }, [profileComplete, hasApplication, showWelcome, isPortalFounder]);
 
   useEffect(() => {
     const insights = generateFounderInsights(
@@ -507,8 +513,8 @@ export default function FounderDashboard() {
         </button>
       </div>
 
-      {/* Company profile incomplete banner */}
-      {profileComplete === false && (
+      {/* Company profile incomplete banner — hidden for portal founders (CRM module may not be portal-accessible) */}
+      {profileComplete === false && !isPortalFounder && (
         <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
@@ -552,8 +558,8 @@ export default function FounderDashboard() {
         </div>
       )}
 
-      {/* Application not submitted banner */}
-      {hasApplication === false && (
+      {/* Application not submitted banner — hidden for portal founders (CRM module may not be portal-accessible) */}
+      {hasApplication === false && !isPortalFounder && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -576,7 +582,7 @@ export default function FounderDashboard() {
       )}
 
       {/* Draft application banner — shown when founder has a saved but unsubmitted draft */}
-      {hasApplication === false && hasDraftApplication && (
+      {hasApplication === false && hasDraftApplication && !isPortalFounder && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
