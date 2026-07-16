@@ -9,7 +9,7 @@
  */
 
 import { loadRole } from './oauth';
-import { zohoCreate, zohoSearch } from './zohoApi';
+import { zohoCreate, zohoList } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
 const MAX_NOTIFICATIONS = 100;
@@ -76,11 +76,14 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
 // ─── CRM helpers ───────────────────────────────────────────────────────────
 
 async function fetchFromServer(role: string): Promise<AppNotification[]> {
-  const records = await zohoSearch(
-    'My_Activities',
-    `(Activity_Type:equals:notification)and(Activity_Tags:equals:${role})`
-  );
-  return records.map(r => fromCRM(r as Record<string, unknown>));
+  // Activity_Type is not a searchable field — fetch all and filter client-side
+  const records = await zohoList('My_Activities', {
+    per_page: '200',
+    fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
+  });
+  return records
+    .filter(r => String(r['Activity_Type'] ?? '') === 'notification' && String(r['Activity_Tags'] ?? '') === role)
+    .map(r => fromCRM(r as Record<string, unknown>));
 }
 
 async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<AppNotification | null> {
