@@ -6,7 +6,7 @@
  * localStorage is used as local cache and offline fallback.
  */
 
-import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalSearch, portalUpsert } from './zohoApi';
+import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalList, portalSearch, portalUpsert } from './zohoApi';
 import { loadRole } from './oauth';
 
 export interface CompanyData {

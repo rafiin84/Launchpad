@@ -58,26 +58,24 @@ function generateLocalId(): string {
 
 function filterByVisibility(activities: CRMActivity[], localIds: Set<string>): CRMActivity[] {
   const role = loadRole();
-  const isInvestor = role === 'investor';
   const myName = (loadUserName() || '').trim().toLowerCase();
 
   return activities.filter(a => {
     if (a.activityType?.toLowerCase() === 'notification') return false;
 
-    // Investor sees everything
-    if (isInvestor) return true;
+    // Investors see everything
+    if (role === 'investor') return true;
 
-    // Always show investor posts
-    if (a.authorRole?.toLowerCase() === 'investor') return true;
+    // Portal founders: show all non-notification activities the CRM returned.
+    // The CRM portal already scopes what records are accessible — no need to
+    // re-filter here. Only hide another founder's activity if it was explicitly
+    // marked investor_only AND was not created by the current user.
+    const isOwnPost = localIds.has(a.id) || (myName && a.authorName?.trim().toLowerCase() === myName);
+    const isInvestorOnly = a.visibility?.toLowerCase() === 'investor_only';
 
-    // Always show activities the current user created (by local cache ID or name match)
-    if (localIds.has(a.id)) return true;
-    if (myName && a.authorName?.trim().toLowerCase() === myName) return true;
-
-    // Other founder posts: only if explicitly public
-    if (a.visibility?.toLowerCase() === 'public') return true;
-
-    return false;
+    if (isOwnPost) return true;
+    if (isInvestorOnly) return false;
+    return true;
   });
 }
 
