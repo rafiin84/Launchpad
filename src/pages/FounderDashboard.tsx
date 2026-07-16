@@ -390,8 +390,8 @@ export default function FounderDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 px-6 py-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="bg-black px-6 py-8 text-center">
+              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Rocket size={32} className="text-white" />
               </div>
               <h2 className="text-2xl font-bold text-white">{t.welcome.title}</h2>
@@ -403,8 +403,8 @@ export default function FounderDashboard() {
             {/* Steps */}
             <div className="px-6 py-5 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Building2 size={16} className="text-indigo-600" />
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Building2 size={16} className="text-gray-700" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{t.welcome.step1Title}</p>
@@ -413,8 +413,8 @@ export default function FounderDashboard() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <FileText size={16} className="text-purple-600" />
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText size={16} className="text-gray-700" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{t.welcome.step2Title}</p>
@@ -423,8 +423,8 @@ export default function FounderDashboard() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <BookmarkCheck size={16} className="text-emerald-600" />
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <BookmarkCheck size={16} className="text-gray-700" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{t.welcome.step3Title}</p>
@@ -433,7 +433,7 @@ export default function FounderDashboard() {
                   </p>
                   <div className="mt-1.5 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
                     <Globe size={13} className="text-gray-400 flex-shrink-0" />
-                    <code className="text-xs text-indigo-600 font-medium truncate">launchpad-iota-ten.vercel.app/login</code>
+                    <code className="text-xs text-gray-700 font-medium truncate">launchpad-iota-ten.vercel.app/login</code>
                   </div>
                 </div>
               </div>
@@ -443,7 +443,7 @@ export default function FounderDashboard() {
             <div className="px-6 pb-6 flex flex-col gap-2">
               <button
                 onClick={() => { dismissWelcome(); navigate('/company'); }}
-                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-3 rounded-xl transition-colors"
+                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white bg-black hover:bg-gray-800 px-4 py-3 rounded-xl transition-colors"
               >
                 <Building2 size={16} /> {t.welcome.setupButton}
               </button>
