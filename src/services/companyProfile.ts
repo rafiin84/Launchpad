@@ -2,9 +2,11 @@
  * companyProfile.ts
  *
  * Client-side service for founder company profiles.
- * Saves to CRM via /api/company (admin token on Vercel),
- * with localStorage as local cache and offline fallback.
+ * All CRM calls go directly to Zoho via zohoApi.ts — no /api/* server proxy.
+ * localStorage is used as local cache and offline fallback.
  */
+
+import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto } from './zohoApi';
 
 export interface CompanyData {
   name: string;
@@ -56,6 +58,83 @@ export const EMPTY: CompanyData = {
   currentAsk: '', useOfFunds: '', keyRisks: '', nextMilestones: '',
 };
 
+// ─── CRM field mapping ───────────────────────────────────────────────────────
+
+// CRM field name → client key
+const CRM_TO_CLIENT: Record<string, keyof CompanyData> = {
+  Company_Name:        'name',
+  Tagline:             'tagline',
+  Description:         'description',
+  Website:             'website',
+  Industry:            'industry',
+  Stage:               'stage',
+  Founded_Year:        'foundedYear',
+  Location:            'location',
+  Founder_Names:       'founderNames',
+  Team_Size:           'teamSize',
+  Open_Roles:          'openRoles',
+  Product_Description: 'productDescription',
+  MRR:                 'mrr',
+  ARR:                 'arr',
+  Active_Customers:    'activeCustomers',
+  MoM_Growth:          'momGrowth',
+  Churn_Rate:          'churnRate',
+  NPS:                 'nps',
+  Key_Metric:          'keyMetric',
+  Key_Metric_Label:    'keyMetricLabel',
+  Total_Raised:        'totalRaised',
+  Last_Round_Size:     'lastRoundSize',
+  Last_Round_Stage:    'lastRoundStage',
+  Last_Round_Date:     'lastRoundDate',
+  Pre_Money_Valuation: 'preMoneyValuation',
+  Monthly_Burn:        'monthlyBurn',
+  Runway:              'runway',
+  Revenue_Model:       'revenueModel',
+  TAM:                 'tam',
+  SAM:                 'sam',
+  SOM:                 'som',
+  Target_Market:       'targetMarket',
+  Key_Competitors:     'keyCompetitors',
+  Differentiator:      'differentiator',
+  Current_Ask:         'currentAsk',
+  Use_of_Funds:        'useOfFunds',
+  Key_Risks:           'keyRisks',
+  Next_Milestones:     'nextMilestones',
+};
+
+// All CRM field names for list queries
+const ALL_CRM_FIELDS = ['Email', ...Object.keys(CRM_TO_CLIENT)].join(',');
+
+// client key → CRM field name (reverse map)
+const CLIENT_TO_CRM: Record<string, string> = {};
+for (const [crmKey, clientKey] of Object.entries(CRM_TO_CLIENT)) {
+  CLIENT_TO_CRM[clientKey] = crmKey;
+}
+
+function crmRecordToData(record: Record<string, unknown>): CompanyData {
+  const data: CompanyData = { ...EMPTY };
+  for (const [crmKey, clientKey] of Object.entries(CRM_TO_CLIENT)) {
+    const val = record[crmKey];
+    if (val != null) {
+      data[clientKey] = String(val);
+    }
+  }
+  return data;
+}
+
+function dataToCrmPayload(data: CompanyData): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  for (const [clientKey, crmKey] of Object.entries(CLIENT_TO_CRM)) {
+    const val = data[clientKey as keyof CompanyData];
+    if (val !== undefined) {
+      payload[crmKey] = val;
+    }
+  }
+  return payload;
+}
+
+// ─── localStorage helpers ─────────────────────────────────────────────────────
+
 const STORAGE_PREFIX = 'lp_founder_company_';
 
 function storageKey(email: string): string {
@@ -76,27 +155,49 @@ function saveLocal(email: string, d: CompanyData) {
   localStorage.setItem(storageKey(email), JSON.stringify(d));
 }
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
 export interface CompanyProfileResult {
   data: CompanyData;
   logo: string | null;
 }
+
+export interface SaveResult {
+  success: boolean;
+  crmSynced: boolean;
+}
+
+// ─── Internal sync ─────────────────────────────────────────────────────────────
+
+function syncToCrm(email: string, data: CompanyData): void {
+  const payload = { ...dataToCrmPayload(data), Email: email };
+  zohoUpsert('Founders', payload, ['Email']).then(result => {
+    console.log('[CompanyProfile] Auto-sync result:', result.action);
+  }).catch(err => {
+    console.warn('[CompanyProfile] Auto-sync failed:', err);
+  });
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function fetchCompanyProfile(email: string): Promise<CompanyProfileResult> {
   let crmData: CompanyData | null = null;
   let logo: string | null = null;
 
   try {
-    const res = await fetch(`/api/company?email=${encodeURIComponent(email)}`);
-    if (res.ok) {
-      const json = await res.json() as { data?: Record<string, unknown>; logo?: string | null };
-      if (json.data) {
-        crmData = { ...EMPTY, ...(json.data as Partial<CompanyData>) };
-        saveLocal(email, crmData);
-      }
-      logo = json.logo || null;
+    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    if (records.length > 0) {
+      const record = records[0];
+      crmData = crmRecordToData(record as Record<string, unknown>);
+      saveLocal(email, crmData);
+
+      // Try to get logo
+      try {
+        logo = await zohoGetRecordPhoto('Founders', record.id);
+      } catch { /* no logo */ }
     }
   } catch (err) {
-    console.warn('[CompanyProfile] API fetch failed, using localStorage:', err);
+    console.warn('[CompanyProfile] CRM fetch failed, using localStorage:', err);
   }
 
   if (crmData) return { data: crmData, logo };
@@ -109,43 +210,52 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
   return { data: local, logo: null };
 }
 
-function syncToCrm(email: string, data: CompanyData) {
-  fetch('/api/company', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, data }),
-  }).then(res => {
-    console.log('[CompanyProfile] Auto-sync result:', res.ok ? 'success' : res.status);
-  }).catch(err => {
-    console.warn('[CompanyProfile] Auto-sync failed:', err);
-  });
+export async function saveCompanyProfile(email: string, data: CompanyData): Promise<SaveResult> {
+  saveLocal(email, data);
+  window.dispatchEvent(new Event('founder-company-updated'));
+
+  try {
+    const payload = { ...dataToCrmPayload(data), Email: email };
+    await zohoUpsert('Founders', payload, ['Email']);
+    return { success: true, crmSynced: true };
+  } catch (err) {
+    console.warn('[CompanyProfile] CRM save error:', err);
+    return { success: true, crmSynced: false };
+  }
 }
 
 export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; data: CompanyData; logo: string | null }>> {
   try {
-    const res = await fetch('/api/company?all=true');
-    if (res.ok) {
-      const json = await res.json() as { profiles?: Array<{ email: string; data: Record<string, unknown>; logo?: string | null }> };
-      return (json.profiles ?? []).map(p => ({
-        email: p.email,
-        data: { ...EMPTY, ...(p.data as Partial<CompanyData>) },
-        logo: p.logo || null,
-      }));
-    }
+    const records = await zohoList('Founders', {
+      per_page: '200',
+      sort_by: 'Modified_Time',
+      sort_order: 'desc',
+      fields: ALL_CRM_FIELDS,
+    });
+
+    const results = await Promise.all(records.map(async record => {
+      const r = record as Record<string, unknown>;
+      const email = String(r.Email || '');
+      const data = crmRecordToData(r);
+      let logo: string | null = null;
+      try {
+        logo = await zohoGetRecordPhoto('Founders', record.id);
+      } catch { /* no logo */ }
+      return { email, data, logo };
+    }));
+
+    return results;
   } catch (err) {
-    console.warn('[CompanyProfile] API fetch all failed:', err);
+    console.warn('[CompanyProfile] CRM fetch all failed:', err);
+    return [];
   }
-  return [];
 }
 
 export async function fetchCompanyLogo(email: string): Promise<string | null> {
   try {
-    const res = await fetch(`/api/company?email=${encodeURIComponent(email)}&action=getLogo`, {
-      method: 'PUT',
-    });
-    if (!res.ok) return null;
-    const json = await res.json() as { logo?: string | null };
-    return json.logo || null;
+    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    if (!records.length) return null;
+    return await zohoGetRecordPhoto('Founders', records[0].id);
   } catch {
     return null;
   }
@@ -153,39 +263,26 @@ export async function fetchCompanyLogo(email: string): Promise<string | null> {
 
 export async function uploadCompanyLogo(email: string, logoDataUrl: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/company', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, logo: logoDataUrl }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    if (!records.length) return false;
 
-export interface SaveResult {
-  success: boolean;
-  crmSynced: boolean;
-}
+    const recordId = records[0].id;
 
-export async function saveCompanyProfile(email: string, data: CompanyData): Promise<SaveResult> {
-  saveLocal(email, data);
-  window.dispatchEvent(new Event('founder-company-updated'));
-
-  try {
-    const res = await fetch('/api/company', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, data }),
-    });
-    if (res.ok) {
-      return { success: true, crmSynced: true };
+    // Convert dataUrl to Blob
+    const [meta, base64] = logoDataUrl.split(',');
+    const mimeMatch = meta.match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
-    console.warn('[CompanyProfile] API save failed:', res.status);
-    return { success: true, crmSynced: false };
+    const blob = new Blob([bytes], { type: mime });
+
+    await zohoUploadRecordPhoto('Founders', recordId, blob, 'logo.jpg');
+    return true;
   } catch (err) {
-    console.warn('[CompanyProfile] API save error:', err);
-    return { success: true, crmSynced: false };
+    console.warn('[CompanyProfile] Logo upload failed:', err);
+    return false;
   }
 }

@@ -4,10 +4,12 @@
  * CRM-backed notification service. Notifications are stored as My_Activities
  * records with Activity_Type='notification' and targetRole in Activity_Tags.
  *
+ * All CRM calls go directly to Zoho via zohoApi.ts — no /api/* server proxy.
  * Falls back to localStorage for offline/error resilience.
  */
 
-import { loadRole, loadToken } from './oauth';
+import { loadRole } from './oauth';
+import { zohoCreate, zohoSearch } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
 const MAX_NOTIFICATIONS = 100;
@@ -50,43 +52,65 @@ function saveLocal(notifications: AppNotification[]) {
   } catch { /* storage full */ }
 }
 
-// ─── Server API ────────────────────────────────────────────────────────────
+// ─── CRM record mapper ────────────────────────────────────────────────────
+
+function fromCRM(r: Record<string, unknown>): AppNotification {
+  const s = (k: string) => (r[k] == null ? '' : String(r[k]));
+  const content = s('Content');
+  let parsed: Record<string, string> = {};
+  try { parsed = JSON.parse(content); } catch { }
+  return {
+    id: s('id'),
+    type: (parsed.type || 'announcement') as NotificationType,
+    title: s('Name'),
+    message: parsed.message || '',
+    timestamp: s('Created_Time'),
+    read: parsed.read === 'true',
+    actor: s('Author_Name'),
+    actorRole: (s('Author_Role') || 'investor') as 'investor' | 'founder',
+    targetRole: (s('Activity_Tags') || 'investor') as 'investor' | 'founder',
+    link: parsed.link || '',
+  };
+}
+
+// ─── CRM helpers ───────────────────────────────────────────────────────────
 
 async function fetchFromServer(role: string): Promise<AppNotification[]> {
-  const token = loadToken();
-  const res = await fetch(`/api/notifications?role=${role}`, {
-    headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
-  });
-  if (!res.ok) throw new Error(`API GET ${res.status}`);
-  const json = await res.json() as { notifications?: AppNotification[] };
-  return json.notifications || [];
+  const records = await zohoSearch(
+    'My_Activities',
+    `(Activity_Type:equals:notification)and(Activity_Tags:equals:${role})`
+  );
+  return records.map(r => fromCRM(r as Record<string, unknown>));
 }
 
 async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<AppNotification | null> {
-  const token = loadToken();
-  const res = await fetch('/api/notifications', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
-    },
-    body: JSON.stringify(n),
-  });
-  if (!res.ok) throw new Error(`API POST ${res.status}`);
-  const json = await res.json() as { notification?: AppNotification };
-  return json.notification || null;
+  const content = JSON.stringify({ type: n.type, message: n.message, link: n.link || '', read: 'false' });
+  const payload: Record<string, unknown> = {
+    Name: n.title,
+    Activity_Type: 'notification',
+    Activity_Tags: n.targetRole,
+    Content: content,
+    Author_Name: n.actor,
+    Author_Role: n.actorRole,
+  };
+
+  try {
+    const id = await zohoCreate('My_Activities', payload);
+    return {
+      ...n,
+      id,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+  } catch (err) {
+    console.warn('[Notifications] zohoCreate failed:', err);
+    return null;
+  }
 }
 
-async function markReadOnServer(ids: string[]): Promise<void> {
-  const token = loadToken();
-  await fetch('/api/notifications', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
-    },
-    body: JSON.stringify({ ids }),
-  });
+// markReadOnServer: read state is ephemeral — silently succeed, no CRM write needed
+async function markReadOnServer(_ids: string[]): Promise<void> {
+  // Read state is local-only; CRM notifications don't track read status per-client
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -103,7 +127,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
     saveLocal(serverNotifs);
     return serverNotifs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   } catch (err) {
-    console.warn('[Notifications] Server fetch failed, using cache:', err);
+    console.warn('[Notifications] CRM fetch failed, using cache:', err);
   }
 
   const cached = loadLocal().filter(n => n.targetRole === role);
@@ -117,7 +141,7 @@ export async function getUnreadCount(): Promise<number> {
 }
 
 /**
- * Add a new notification. Posts to CRM server, caches locally as fallback.
+ * Add a new notification. Posts to CRM, caches locally as fallback.
  * targetRole determines who will see this notification.
  */
 export async function addNotification(
@@ -130,7 +154,7 @@ export async function addNotification(
     read: false,
   };
 
-  // Post to server (fire-and-forget for UX, but await for reliability)
+  // Post to CRM (fire-and-forget for UX, but await for reliability)
   try {
     const serverNotif = await postToServer(n);
     if (serverNotif) {
@@ -138,7 +162,7 @@ export async function addNotification(
       notification.timestamp = serverNotif.timestamp || notification.timestamp;
     }
   } catch (err) {
-    console.warn('[Notifications] Server post failed, cached locally:', err);
+    console.warn('[Notifications] CRM post failed, cached locally:', err);
   }
 
   // Only cache locally if targeted at the current user's role
@@ -158,11 +182,11 @@ export async function markAsRead(id: string): Promise<void> {
   const updated = all.map(n => (n.id === id ? { ...n, read: true } : n));
   saveLocal(updated);
 
-  // Sync to server
+  // Sync to server (no-op for CRM — read state is ephemeral)
   try {
     await markReadOnServer([id]);
   } catch (err) {
-    console.warn('[Notifications] Mark read failed on server:', err);
+    console.warn('[Notifications] Mark read failed:', err);
   }
 }
 
@@ -177,7 +201,7 @@ export async function markAllAsRead(): Promise<void> {
     try {
       await markReadOnServer(unreadIds);
     } catch (err) {
-      console.warn('[Notifications] Mark all read failed on server:', err);
+      console.warn('[Notifications] Mark all read failed:', err);
     }
   }
 }

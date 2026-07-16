@@ -5,12 +5,14 @@
  * - Investor sees ALL activities
  * - Portal user sees: own posts + investor posts (public) + other portal users'
  *   posts only if those users have Share_Activities_Public enabled
+ *
+ * All CRM calls go directly to Zoho via zohoApi.ts — no /api/* server proxy.
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
 import { fetchCRMActivities, createCRMActivity, deleteCRMActivity } from './crmActivities';
-import { loadToken } from './oauth';
-import { loadRole, loadUserName } from './oauth';
+import { loadToken, loadRole, loadUserName } from './oauth';
+import { ZOHO_HOSTS } from '../config/auth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
@@ -77,55 +79,10 @@ function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
   });
 }
 
-async function fetchViaApi(): Promise<CRMActivity[]> {
-  const token = loadToken();
-  const res = await fetch('/api/activities', {
-    headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
-  });
-  if (!res.ok) throw new Error(`API GET ${res.status}`);
-  const json = await res.json() as { activities?: Array<Record<string, unknown>>, _strategy?: string };
-  console.log('[Activities] API strategy:', json._strategy);
-  if (json._strategy === 'none') throw new Error('API returned no activities (no working strategy)');
-  return (json.activities || []).map(fromApiRecord);
-}
-
-async function postViaApi(fields: CRMActivityFields): Promise<string> {
-  const token = loadToken();
-  const res = await fetch('/api/activities', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
-    },
-    body: JSON.stringify(fields),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API POST ${res.status}: ${body}`);
-  }
-  const json = await res.json() as { activity?: { id: string } };
-  if (!json.activity?.id) throw new Error('No activity id in API response');
-  return json.activity.id;
-}
-
 export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
 
-  // Try API endpoint first (has admin token on Vercel for full visibility)
-  try {
-    const activities = await fetchViaApi();
-    console.log('[Activities] Fetched via API:', activities.length);
-
-    const serverIds = new Set(activities.map(a => a.id));
-    const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
-    const merged = [...localOnly, ...activities];
-    saveLocal(merged);
-    return filterByVisibility(merged);
-  } catch (err) {
-    console.warn('[Activities] API fetch failed, trying direct CRM:', err);
-  }
-
-  // Fallback: direct CRM call (works for portal users with x-crmportal)
+  // Direct CRM call (works for both investor and portal users)
   try {
     const activities = await fetchCRMActivities();
     console.log('[Activities] Fetched from CRM (direct):', activities.length);
@@ -138,7 +95,7 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
     saveLocal(merged);
     return filterByVisibility(merged);
   } catch (err) {
-    console.warn('[Activities] Direct CRM fetch also failed:', err);
+    console.warn('[Activities] CRM fetch failed, using local cache:', err);
     return filterByVisibility(localActivities);
   }
 }
@@ -147,24 +104,13 @@ export async function postSharedActivity(fields: CRMActivityFields): Promise<CRM
   let id: string | null = null;
   let lastError: string | null = null;
 
-  // Try API endpoint first (admin token creates with full field access)
+  // Direct CRM call
   try {
-    id = await postViaApi(fields);
-    console.log('[Activities] Posted via API, id:', id);
+    id = await createCRMActivity(fields);
+    console.log('[Activities] Posted to CRM (direct), id:', id);
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
-    console.warn('[Activities] API post failed, trying direct CRM:', err);
-  }
-
-  // Fallback: direct CRM call
-  if (!id) {
-    try {
-      id = await createCRMActivity(fields);
-      console.log('[Activities] Posted to CRM (direct), id:', id);
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
-      console.warn('[Activities] Direct CRM post also failed:', err);
-    }
+    console.warn('[Activities] Direct CRM post failed:', err);
   }
 
   const synced = !!id;
@@ -209,10 +155,7 @@ export async function syncUnsyncedActivities(): Promise<number> {
     };
 
     let newId: string | null = null;
-    try { newId = await postViaApi(fields); } catch { /* continue */ }
-    if (!newId) {
-      try { newId = await createCRMActivity(fields); } catch { /* continue */ }
-    }
+    try { newId = await createCRMActivity(fields); } catch { /* continue */ }
 
     if (newId) {
       activity.id = newId;
@@ -234,29 +177,52 @@ export interface ActivityPermission {
   shareActivitiesPublic: boolean;
 }
 
+function isPortalUser(): boolean {
+  return loadRole() === 'founder';
+}
+
+function buildAuthHeaders(): HeadersInit {
+  const token = loadToken();
+  const headers: HeadersInit = token
+    ? { 'Authorization': `Zoho-oauthtoken ${token}` }
+    : {};
+  if (isPortalUser()) {
+    return { ...headers, 'x-crmportal': 'launchpad' };
+  }
+  return headers;
+}
+
 export async function fetchActivityPermissions(): Promise<ActivityPermission[]> {
   const token = loadToken();
-  const res = await fetch('/api/activities?action=getPermissions', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
-    },
-  });
-  if (!res.ok) throw new Error(`GET permissions ${res.status}`);
-  const json = await res.json() as { permissions: ActivityPermission[] };
-  return json.permissions;
+  if (!token) throw new Error('Not authenticated');
+
+  const url = `${ZOHO_HOSTS.crmApi}/crm/v2/Contacts?per_page=200&fields=Full_Name,Email,Share_Activities_Public`;
+  const res = await fetch(url, { headers: buildAuthHeaders() });
+  if (!res.ok) throw new Error(`GET Contacts permissions ${res.status}`);
+
+  const json = await res.json() as { data?: Array<Record<string, unknown>> };
+  const contacts = json.data || [];
+
+  return contacts.map(c => ({
+    id: String(c.id || ''),
+    name: String(c.Full_Name || ''),
+    email: String(c.Email || ''),
+    shareActivitiesPublic: Boolean(c.Share_Activities_Public),
+  }));
 }
 
 export async function setActivityPermission(contactId: string, share: boolean): Promise<void> {
   const token = loadToken();
-  const res = await fetch('/api/activities?action=setPermission', {
+  if (!token) throw new Error('Not authenticated');
+
+  const url = `${ZOHO_HOSTS.crmApi}/crm/v2/Contacts`;
+  const res = await fetch(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {}),
+      ...buildAuthHeaders(),
     },
-    body: JSON.stringify({ contactId, share }),
+    body: JSON.stringify({ data: [{ id: contactId, Share_Activities_Public: share }] }),
   });
-  if (!res.ok) throw new Error(`SET permission ${res.status}`);
+  if (!res.ok) throw new Error(`PUT Contact permission ${res.status}`);
 }
