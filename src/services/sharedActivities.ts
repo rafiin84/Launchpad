@@ -56,7 +56,7 @@ function generateLocalId(): string {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
+function filterByVisibility(activities: CRMActivity[], localIds: Set<string>): CRMActivity[] {
   const role = loadRole();
   const isInvestor = role === 'investor';
   const myName = (loadUserName() || '').trim().toLowerCase();
@@ -67,12 +67,14 @@ function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
     // Investor sees everything
     if (isInvestor) return true;
 
-    // Portal user sees:
-    // 1. Investor posts (always visible to portal users)
-    // 2. Their own posts (always)
-    // 3. Other portal user posts ONLY if visibility is explicitly 'public'
+    // Always show investor posts
     if (a.authorRole?.toLowerCase() === 'investor') return true;
+
+    // Always show activities the current user created (by local cache ID or name match)
+    if (localIds.has(a.id)) return true;
     if (myName && a.authorName?.trim().toLowerCase() === myName) return true;
+
+    // Other founder posts: only if explicitly public
     if (a.visibility?.toLowerCase() === 'public') return true;
 
     return false;
@@ -81,22 +83,24 @@ function filterByVisibility(activities: CRMActivity[]): CRMActivity[] {
 
 export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   const localActivities = loadLocal();
+  // IDs of activities created by this user (saved locally when posted)
+  const myLocalIds = new Set(localActivities.map(a => a.id).filter(id => !id.startsWith('local_')));
 
   // Direct CRM call (works for both investor and portal users)
   try {
     const activities = await fetchCRMActivities();
     console.log('[Activities] Fetched from CRM (direct):', activities.length);
 
-    if (activities.length === 0) return filterByVisibility(localActivities);
+    if (activities.length === 0) return filterByVisibility(localActivities, myLocalIds);
 
     const serverIds = new Set(activities.map(a => a.id));
     const localOnly = localActivities.filter(a => a.id.startsWith('local_') && !serverIds.has(a.id));
     const merged = [...localOnly, ...activities];
     saveLocal(merged);
-    return filterByVisibility(merged);
+    return filterByVisibility(merged, myLocalIds);
   } catch (err) {
     console.warn('[Activities] CRM fetch failed, using local cache:', err);
-    return filterByVisibility(localActivities);
+    return filterByVisibility(localActivities, myLocalIds);
   }
 }
 

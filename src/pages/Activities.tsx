@@ -588,7 +588,7 @@ export default function Activities() {
     return () => setPageTitle(null);
   }, [t, isFounder]);
 
-  const postVisibility = isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only');
+  const postVisibility = 'public';
 
   const load = () => {
     if (!canFetch) { setLoading(false); return; }
