@@ -116,6 +116,25 @@ export async function zohoList(module: string, params: Record<string, string> = 
   return json.data ?? [];
 }
 
+// Same as zohoList but uses plain auth (no x-crmportal header).
+// Used by portal founders to fetch My_Activities without portal user-scoping,
+// so investor-posted activities are included in the response.
+export async function zohoListUnscoped(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
+  ensureToken();
+  const qs = new URLSearchParams(params).toString();
+  const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
+  const url = buildCrmUrl(apiPath);
+
+  const res = await fetch(url, { headers: plainAuthHeader() });
+  if (res.status === 204) return [];
+
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  assertNoZohoError(json, res.status);
+
+  return json.data ?? [];
+}
+
 export async function zohoGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
   ensureToken();
   const qs = fields ? `?fields=${fields}` : '';

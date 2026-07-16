@@ -1,4 +1,4 @@
-import { zohoList, zohoCoql, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -68,7 +68,15 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
   // Investors use COQL which returns textarea fields (Content, Activity_Image_Data)
   // that the standard list endpoint silently omits.
   // Portal founders fall back to zohoList + local-cache backfill (COQL rejects portal tokens).
+  const listParams = {
+    per_page: '200',
+    sort_by: 'Created_Time',
+    sort_order: 'desc',
+    fields: ALL_FIELDS,
+  };
+
   if (loadRole() !== 'founder') {
+    // Investors: use COQL which returns textarea fields (Content, Activity_Image_Data)
     try {
       const coqlFields = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Created_Time, Modified_Time';
       const records = await zohoCoql(
@@ -78,14 +86,18 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
     } catch (err) {
       console.warn('[Activities] COQL failed, falling back to list:', err);
     }
+    return (await zohoList(MODULE, listParams)).map(fromRecord);
   }
-  const records = await zohoList(MODULE, {
-    per_page: '200',
-    sort_by: 'Created_Time',
-    sort_order: 'desc',
-    fields: ALL_FIELDS,
-  });
-  return records.map(fromRecord);
+
+  // Portal founders: try without portal-scoping header first so investor-posted
+  // activities are included. Falls back to portal-scoped list if that fails.
+  try {
+    const records = await zohoListUnscoped(MODULE, listParams);
+    if (records.length > 0) return records.map(fromRecord);
+  } catch (err) {
+    console.warn('[Activities] Unscoped list failed, falling back to portal-scoped:', err);
+  }
+  return (await zohoList(MODULE, listParams)).map(fromRecord);
 }
 
 export async function createCRMActivity(fields: CRMActivityFields): Promise<string> {
