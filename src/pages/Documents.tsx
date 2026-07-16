@@ -53,6 +53,7 @@ export default function Documents() {
   const [error, setError] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
 
@@ -93,6 +94,17 @@ export default function Documents() {
       setDocs(prev => prev.filter(d => d.id !== pendingDeleteId));
     } catch { /* swallow */ }
     finally { setDeleting(false); setPendingDeleteId(null); }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm(`Delete all ${visibleDocs.length} documents? This cannot be undone.`)) return;
+    setClearingAll(true);
+    try {
+      await Promise.allSettled(visibleDocs.map(d => deleteCRMDocument(d.id)));
+      setDocs([]);
+    } finally {
+      setClearingAll(false);
+    }
   };
 
   const handleDownload = async (doc: CRMDocument) => {
@@ -234,7 +246,19 @@ export default function Documents() {
 
       {!loading && !error && visibleDocs.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">{t.documentsPage.allDocuments} ({visibleDocs.length})</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-900">{t.documentsPage.allDocuments} ({visibleDocs.length})</h2>
+            {isInvestor && (
+              <button
+                onClick={handleClearAll}
+                disabled={clearingAll}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={12} className={clearingAll ? 'animate-pulse' : ''} />
+                {clearingAll ? 'Deleting...' : `Clear All (${visibleDocs.length})`}
+              </button>
+            )}
+          </div>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
             {visibleDocs.map((doc, i) => {
               const typeKey = normalizeType(doc.documentType);

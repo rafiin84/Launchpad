@@ -14,7 +14,7 @@ import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields,
 } from '../services/crmActivities';
-import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions, deleteSharedActivity } from '../services/sharedActivities';
+import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions, deleteSharedActivity, deleteAllSharedActivities } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { generateAIActivities } from '../services/aiEngine';
@@ -575,6 +575,7 @@ export default function Activities() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [syncWarning, setSyncWarning] = useState('');
+  const [clearingAll, setClearingAll] = useState(false);
   const [mySharePublic, setMySharePublic] = useState(false);
   const isConnected = !!loadToken();
   const canFetch = isConnected || isFounder;
@@ -621,6 +622,17 @@ export default function Activities() {
 
   const handleDelete = (id: string) => {
     setRecords(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm(`Delete all ${records.length} activities? This cannot be undone.`)) return;
+    setClearingAll(true);
+    try {
+      await deleteAllSharedActivities(records.map(r => r.id));
+      setRecords([]);
+    } finally {
+      setClearingAll(false);
+    }
   };
 
   const RECENT_TYPE_STYLE: Record<string, { icon: typeof Activity; color: string }> = {
@@ -733,6 +745,20 @@ export default function Activities() {
           <Activity size={28} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">{t.activities.noActivities}</p>
           <p className="text-xs text-gray-400">{t.activities.noActivitiesDesc}</p>
+        </div>
+      )}
+
+      {/* Clear All — investor only */}
+      {!loading && !error && records.length > 0 && isInvestor && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={handleClearAll}
+            disabled={clearingAll}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={12} className={clearingAll ? 'animate-pulse' : ''} />
+            {clearingAll ? 'Deleting...' : `Clear All (${records.length})`}
+          </button>
         </div>
       )}
 

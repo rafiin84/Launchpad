@@ -8,7 +8,7 @@
  */
 
 import type { CRMActivity, CRMActivityFields } from './crmActivities';
-import { fetchCRMActivities, createCRMActivity } from './crmActivities';
+import { fetchCRMActivities, createCRMActivity, deleteCRMActivity } from './crmActivities';
 import { loadToken } from './oauth';
 import { loadRole, loadUserName } from './oauth';
 
@@ -181,22 +181,16 @@ export async function postSharedActivity(fields: CRMActivityFields): Promise<CRM
 }
 
 export async function deleteSharedActivity(id: string): Promise<void> {
-  // Remove from localStorage cache immediately
   const local = loadLocal();
   saveLocal(local.filter(a => a.id !== id));
-
   if (id.startsWith('local_')) return;
+  await deleteCRMActivity(id);
+}
 
-  // Delete from CRM via API
-  const token = loadToken();
-  const res = await fetch(`/api/activities?id=${id}`, {
-    method: 'DELETE',
-    headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`DELETE ${res.status}: ${body}`);
-  }
+export async function deleteAllSharedActivities(ids: string[]): Promise<void> {
+  saveLocal([]);
+  const crmIds = ids.filter(id => !id.startsWith('local_'));
+  await Promise.allSettled(crmIds.map(id => deleteCRMActivity(id)));
 }
 
 export async function syncUnsyncedActivities(): Promise<number> {
