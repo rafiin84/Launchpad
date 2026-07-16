@@ -6,7 +6,8 @@
  * localStorage is used as local cache and offline fallback.
  */
 
-import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto } from './zohoApi';
+import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalSearch, portalUpsert } from './zohoApi';
+import { loadRole } from './oauth';
 
 export interface CompanyData {
   name: string;
@@ -167,12 +168,39 @@ export interface SaveResult {
   crmSynced: boolean;
 }
 
+function isFounder(): boolean {
+  return loadRole() === 'founder';
+}
+
+async function searchFounders(email: string): Promise<import('./zohoApi').ZohoRecord[]> {
+  const criteria = `(Email:equals:${email})`;
+  // Founders use portal tokens — try portal domain first, then standard CRM
+  if (isFounder()) {
+    try {
+      const records = await portalSearch('Founders', criteria);
+      if (records.length > 0) return records;
+    } catch { /* fall through */ }
+  }
+  // Investors use standard domain; founders fall back here if portal search failed
+  return zohoSearch('Founders', criteria);
+}
+
+async function upsertFounder(payload: Record<string, unknown>): Promise<void> {
+  if (isFounder()) {
+    try {
+      await portalUpsert('Founders', payload, ['Email']);
+      return;
+    } catch { /* fall through */ }
+  }
+  await zohoUpsert('Founders', payload, ['Email']);
+}
+
 // ─── Internal sync ─────────────────────────────────────────────────────────────
 
 function syncToCrm(email: string, data: CompanyData): void {
   const payload = { ...dataToCrmPayload(data), Email: email };
-  zohoUpsert('Founders', payload, ['Email']).then(result => {
-    console.log('[CompanyProfile] Auto-sync result:', result.action);
+  upsertFounder(payload).then(() => {
+    console.log('[CompanyProfile] Auto-sync done');
   }).catch(err => {
     console.warn('[CompanyProfile] Auto-sync failed:', err);
   });
@@ -185,13 +213,12 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
   let logo: string | null = null;
 
   try {
-    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    const records = await searchFounders(email);
     if (records.length > 0) {
       const record = records[0];
       crmData = crmRecordToData(record as Record<string, unknown>);
       saveLocal(email, crmData);
 
-      // Try to get logo
       try {
         logo = await zohoGetRecordPhoto('Founders', record.id);
       } catch { /* no logo */ }
@@ -216,7 +243,7 @@ export async function saveCompanyProfile(email: string, data: CompanyData): Prom
 
   try {
     const payload = { ...dataToCrmPayload(data), Email: email };
-    await zohoUpsert('Founders', payload, ['Email']);
+    await upsertFounder(payload);
     return { success: true, crmSynced: true };
   } catch (err) {
     console.warn('[CompanyProfile] CRM save error:', err);

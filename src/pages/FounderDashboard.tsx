@@ -258,7 +258,7 @@ export default function FounderDashboard() {
             setKPIs(populated);
           }
         }
-      }).catch(() => setProfileComplete(false));
+      }).catch(() => setProfileComplete(null)); // null = unknown, don't show banner on error
     }
 
     // Also try CRM org API for company name fallback
@@ -307,6 +307,15 @@ export default function FounderDashboard() {
       }
     }).catch(() => setHasApplication(false));
   }, [userEmail, currentUser.name]);
+
+  // Auto-dismiss welcome modal for returning users who already have profile or application in CRM
+  useEffect(() => {
+    if (!showWelcome) return;
+    if (profileComplete === true || hasApplication === true) {
+      localStorage.setItem(WELCOME_KEY, '1');
+      setShowWelcome(false);
+    }
+  }, [profileComplete, hasApplication, showWelcome]);
 
   useEffect(() => {
     const insights = generateFounderInsights(
@@ -499,10 +508,10 @@ export default function FounderDashboard() {
 
       {/* Company profile incomplete banner */}
       {profileComplete === false && (
-        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-2xl px-6 py-5 mb-6">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Rocket size={20} className="text-indigo-600" />
+            <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
+              <Rocket size={20} className="text-white" />
             </div>
             <div className="flex-1">
               <h2 className="text-base font-bold text-gray-900 mb-1">{t.dashboard.completeProfile}</h2>
@@ -512,13 +521,13 @@ export default function FounderDashboard() {
               <div className="flex flex-wrap gap-2">
                 <Link
                   to="/company"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-black hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors"
                 >
                   <Building2 size={13} /> {t.dashboard.setupCompanyProfile}
                 </Link>
                 <button
                   onClick={() => setShowKPIEditor(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-4 py-2 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg transition-colors"
                 >
                   <Edit3 size={13} /> {t.dashboard.addYourKPIs}
                 </button>

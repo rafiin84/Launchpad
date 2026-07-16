@@ -643,6 +643,50 @@ export async function findModuleApiName(keyword: string): Promise<string | null>
   return found?.api_name ?? null;
 }
 
+export async function portalSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
+  ensureToken();
+  const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  const url = buildPortalCrmUrl(apiPath);
+  const res = await fetch(url, { headers: authHeader() });
+  if (res.status === 204) return [];
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  return json.data ?? [];
+}
+
+export async function portalUpdate(module: string, id: string, data: Record<string, unknown>): Promise<void> {
+  ensureToken();
+  const url = buildPortalCrmUrl(`/crm/v2/${module}/${id}`);
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ data: [{ id, ...data }] }),
+  });
+  const json: ZohoCUDResponse = await res.json();
+  if (json.code && json.code !== 'SUCCESS') throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') throw new ZohoApiError(res.status, result?.message ?? 'Update failed', result?.code ?? '');
+}
+
+export async function portalUpsert(
+  module: string,
+  data: Record<string, unknown>,
+  duplicateCheckFields: string[],
+): Promise<{ id: string; action: 'insert' | 'update' }> {
+  ensureToken();
+  const url = buildPortalCrmUrl(`/crm/v2/${module}/upsert`);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ data: [data], duplicate_check_fields: duplicateCheckFields }),
+  });
+  const json: ZohoCUDResponse = await res.json();
+  if (json.code && json.code !== 'SUCCESS') throw new ZohoApiError(res.status, json.message ?? json.code, json.code);
+  const result = json.data?.[0];
+  if (!result || result.code !== 'SUCCESS') throw new ZohoApiError(res.status, result?.message ?? 'Upsert failed', result?.code ?? '');
+  return { id: result.details.id, action: (result as unknown as { action: string }).action === 'update' ? 'update' : 'insert' };
+}
+
 export async function zohoGetAttachments(
   module: string,
   recordId: string,
