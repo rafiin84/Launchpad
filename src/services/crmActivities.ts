@@ -50,12 +50,12 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     imageUrl:     str(FIELD_MAP.imageUrl),
     imageData:    str(FIELD_MAP.imageData),
     visibility:   str(FIELD_MAP.visibility),
-    createdTime:  str('Created_Time'),
+    createdTime:  str('Created_Time') || str('Modified_Time'),
   };
 }
 
 // Explicitly list all fields — Zoho omits large textarea fields from default list responses
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Created_Time';
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Created_Time,Modified_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);

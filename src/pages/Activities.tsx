@@ -512,14 +512,13 @@ function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete?
         {activity.title && (
           <h3 className="text-sm font-bold text-gray-900 mb-1 leading-snug">{activity.title}</h3>
         )}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex flex-col gap-0.5 mb-2">
           {activity.authorName && (
-            <p className="text-xs text-gray-400">{activity.authorName}</p>
+            <p className="text-xs font-medium text-gray-500">{activity.authorName}</p>
           )}
-          {activity.authorName && timeStr && <span className="text-xs text-gray-300">·</span>}
           {timeStr && (
             <p className="text-xs text-gray-400 flex items-center gap-1">
-              <Clock size={11} className="text-gray-300" />
+              <Clock size={11} className="text-gray-400" />
               {timeStr}
             </p>
           )}
