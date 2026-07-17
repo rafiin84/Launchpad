@@ -89,22 +89,13 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
     return (await zohoList(MODULE, listParams)).map(fromRecord);
   }
 
-  // Portal founders: fetch the full list (now returns all records since portal
-  // is configured for "All Records"). Then backfill textarea fields (Content,
-  // Activity_Image_Data) via individual GETs for any record missing content.
-  let raw: ZohoRecord[] = [];
-  try {
-    raw = await zohoListUnscoped(MODULE, listParams);
-    if (raw.length === 0) throw new Error('empty');
-  } catch {
-    try { raw = await zohoList(MODULE, listParams); } catch (err) {
-      console.warn('[Activities] List failed:', err);
-    }
-  }
-
+  // Portal founders: fetch all activities via portal (now shows "All Records"
+  // including investor posts). Then backfill textarea fields (Content,
+  // Activity_Image_Data) via individual GETs for any record missing content,
+  // since the list endpoint never returns textarea fields.
+  const raw = await zohoList(MODULE, listParams);
   const activities = raw.map(fromRecord);
 
-  // Individual GETs return textarea fields — fetch for records with empty content.
   const missing = activities.filter(a => !a.content && !a.id.startsWith('local_'));
   if (missing.length > 0) {
     const fetched = await Promise.allSettled(
