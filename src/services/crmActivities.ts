@@ -64,51 +64,47 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
   return fromRecord(record);
 }
 
+const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Created_Time, Modified_Time';
+
+async function fetchViaCoql(): Promise<CRMActivity[]> {
+  const records = await zohoCoql(
+    `SELECT ${COQL_FIELDS} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
+  );
+  return records.map(fromRecord);
+}
+
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
-  // Investors use COQL which returns textarea fields (Content, Activity_Image_Data)
-  // that the standard list endpoint silently omits.
-  // Portal founders fall back to zohoList + local-cache backfill (COQL rejects portal tokens).
+  // COQL returns all records (respects CRM data sharing "All") AND includes
+  // textarea fields (Content, Activity_Image_Data) in one request.
+  // Try for both roles; portal tokens may or may not support COQL.
+  try {
+    const activities = await fetchViaCoql();
+    if (activities.length > 0) return activities;
+  } catch (err) {
+    console.warn('[Activities] COQL failed, falling back to list:', err);
+  }
+
+  // Fallback: list endpoint (omits textarea fields) + individual GETs for content.
   const listParams = {
     per_page: '200',
     sort_by: 'Created_Time',
     sort_order: 'desc',
     fields: ALL_FIELDS,
   };
-
-  if (loadRole() !== 'founder') {
-    // Investors: use COQL which returns textarea fields (Content, Activity_Image_Data)
-    try {
-      const coqlFields = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Created_Time, Modified_Time';
-      const records = await zohoCoql(
-        `SELECT ${coqlFields} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
-      );
-      return records.map(fromRecord);
-    } catch (err) {
-      console.warn('[Activities] COQL failed, falling back to list:', err);
-    }
-    return (await zohoList(MODULE, listParams)).map(fromRecord);
-  }
-
-  // Portal founders: fetch all activities via portal (now shows "All Records"
-  // including investor posts). Then backfill textarea fields (Content,
-  // Activity_Image_Data) via individual GETs for any record missing content,
-  // since the list endpoint never returns textarea fields.
   const raw = await zohoList(MODULE, listParams);
   const activities = raw.map(fromRecord);
 
   const missing = activities.filter(a => !a.content && !a.id.startsWith('local_'));
-  if (missing.length > 0) {
-    const fetched = await Promise.allSettled(
-      missing.slice(0, 50).map(a => zohoGetById(MODULE, a.id, ALL_FIELDS))
-    );
-    const byId = new Map<string, CRMActivity>();
-    fetched.forEach((r, i) => {
-      if (r.status === 'fulfilled' && r.value) byId.set(missing[i].id, fromRecord(r.value));
-    });
-    return activities.map(a => byId.get(a.id) ?? a);
-  }
+  if (missing.length === 0) return activities;
 
-  return activities;
+  const fetched = await Promise.allSettled(
+    missing.slice(0, 50).map(a => zohoGetById(MODULE, a.id, ALL_FIELDS))
+  );
+  const byId = new Map<string, CRMActivity>();
+  fetched.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value) byId.set(missing[i].id, fromRecord(r.value));
+  });
+  return activities.map(a => byId.get(a.id) ?? a);
 }
 
 export async function createCRMActivity(fields: CRMActivityFields): Promise<string> {
