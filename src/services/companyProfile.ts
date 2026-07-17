@@ -262,10 +262,8 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
   if (crmData) return { data: crmData, logo };
 
   const local = loadLocal(email);
-  if (local.name) {
-    console.log('[CompanyProfile] Auto-syncing local data to CRM for', email);
-    syncToCrm(email, local);
-  }
+  // Do NOT auto-sync here — let the user explicitly save to avoid duplicate records
+  // when the portal module was recently configured or the token just became valid.
   return { data: local, logo: null };
 }
 
