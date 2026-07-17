@@ -61,9 +61,12 @@ export const EMPTY: CompanyData = {
 
 // ─── CRM field mapping ───────────────────────────────────────────────────────
 
+// Module: Founder_Companies (API name). "Name" is the system name field (Company Name label).
+const MODULE = 'Founder_Companies';
+
 // CRM field name → client key
 const CRM_TO_CLIENT: Record<string, keyof CompanyData> = {
-  Company_Name:        'name',
+  Name:                'name',
   Tagline:             'tagline',
   Description:         'description',
   Website:             'website',
@@ -188,18 +191,18 @@ async function searchFounders(email: string): Promise<import('./zohoApi').ZohoRe
     // Portal tokens only work on zcrmportals.in.
     // portalList returns the portal user's own records automatically — no email filter needed.
     try {
-      const records = await portalList('Founders', { per_page: '1', fields: ALL_CRM_FIELDS });
+      const records = await portalList(MODULE, { per_page: '1', fields: ALL_CRM_FIELDS });
       if (records.length > 0) return records;
     } catch { /* try search next */ }
     // Fallback: portal search with explicit email criteria
     try {
-      const records = await portalSearch('Founders', `(Email:equals:${email})`);
+      const records = await portalSearch(MODULE, `(Email:equals:${email})`);
       if (records.length > 0) return records;
     } catch { /* fall through */ }
     return [];
   }
   // Investors use standard CRM domain
-  return zohoSearch('Founders', `(Email:equals:${email})`);
+  return zohoSearch(MODULE, `(Email:equals:${email})`);
 }
 
 async function upsertFounder(email: string, payload: Record<string, unknown>): Promise<void> {
@@ -207,12 +210,12 @@ async function upsertFounder(email: string, payload: Record<string, unknown>): P
     // Prefer direct PUT to the known record ID — portal always allows updating own record.
     const recordId = loadCrmId(email);
     if (recordId) {
-      await portalUpdate('Founders', recordId, payload);
+      await portalUpdate(MODULE, recordId, payload);
       return;
     }
     // No cached ID yet — try upsert (creates or updates by email).
     try {
-      const result = await portalUpsert('Founders', payload, ['Email']);
+      const result = await portalUpsert(MODULE, payload, ['Email']);
       saveCrmId(email, result.id);
       return;
     } catch (err) {
@@ -220,7 +223,7 @@ async function upsertFounder(email: string, payload: Record<string, unknown>): P
     }
     return;
   }
-  await zohoUpsert('Founders', payload, ['Email']);
+  await zohoUpsert(MODULE, payload, ['Email']);
 }
 
 // ─── Internal sync ─────────────────────────────────────────────────────────────
@@ -249,7 +252,7 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
       saveCrmId(email, record.id); // cache record ID for direct updates
 
       try {
-        logo = await zohoGetRecordPhoto('Founders', record.id);
+        logo = await zohoGetRecordPhoto(MODULE, record.id);
       } catch { /* no logo */ }
     }
   } catch (err) {
@@ -282,7 +285,7 @@ export async function saveCompanyProfile(email: string, data: CompanyData): Prom
 
 export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; data: CompanyData; logo: string | null }>> {
   try {
-    const records = await zohoList('Founders', {
+    const records = await zohoList(MODULE, {
       per_page: '200',
       sort_by: 'Modified_Time',
       sort_order: 'desc',
@@ -295,7 +298,7 @@ export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; 
       const data = crmRecordToData(r);
       let logo: string | null = null;
       try {
-        logo = await zohoGetRecordPhoto('Founders', record.id);
+        logo = await zohoGetRecordPhoto(MODULE, record.id);
       } catch { /* no logo */ }
       return { email, data, logo };
     }));
@@ -309,9 +312,9 @@ export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; 
 
 export async function fetchCompanyLogo(email: string): Promise<string | null> {
   try {
-    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
     if (!records.length) return null;
-    return await zohoGetRecordPhoto('Founders', records[0].id);
+    return await zohoGetRecordPhoto(MODULE, records[0].id);
   } catch {
     return null;
   }
@@ -319,7 +322,7 @@ export async function fetchCompanyLogo(email: string): Promise<string | null> {
 
 export async function uploadCompanyLogo(email: string, logoDataUrl: string): Promise<boolean> {
   try {
-    const records = await zohoSearch('Founders', `(Email:equals:${email})`);
+    const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
     if (!records.length) return false;
 
     const recordId = records[0].id;
@@ -335,7 +338,7 @@ export async function uploadCompanyLogo(email: string, logoDataUrl: string): Pro
     }
     const blob = new Blob([bytes], { type: mime });
 
-    await zohoUploadRecordPhoto('Founders', recordId, blob, 'logo.jpg');
+    await zohoUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
     return true;
   } catch (err) {
     console.warn('[CompanyProfile] Logo upload failed:', err);
