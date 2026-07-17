@@ -1,4 +1,4 @@
-import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -123,7 +123,8 @@ export async function createCRMActivity(fields: CRMActivityFields): Promise<stri
     const raw = (fields as Record<string, string>)[formKey] ?? '';
     if (raw !== '') payload[crmKey] = raw;
   }
-  return zohoCreate(MODULE, payload);
+  const isFounder = loadRole() === 'founder';
+  return isFounder ? portalCreate(MODULE, payload) : zohoCreate(MODULE, payload);
 }
 
 export async function updateCRMActivity(id: string, fields: CRMActivityFields): Promise<void> {
