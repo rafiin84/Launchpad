@@ -6,7 +6,7 @@
  * localStorage is used as local cache and offline fallback.
  */
 
-import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalList, portalSearch, portalUpsert } from './zohoApi';
+import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalList, portalSearch, portalUpsert, portalUpdate } from './zohoApi';
 import { loadRole } from './oauth';
 
 export interface CompanyData {
@@ -137,6 +137,7 @@ function dataToCrmPayload(data: CompanyData): Record<string, unknown> {
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
 const STORAGE_PREFIX = 'lp_founder_company_';
+const ID_PREFIX = 'lp_founder_crm_id_';
 
 function storageKey(email: string): string {
   return `${STORAGE_PREFIX}${email.toLowerCase()}`;
@@ -154,6 +155,16 @@ function loadLocal(email: string): CompanyData {
 function saveLocal(email: string, d: CompanyData) {
   if (!email) return;
   localStorage.setItem(storageKey(email), JSON.stringify(d));
+}
+
+function saveCrmId(email: string, id: string) {
+  if (!email || !id) return;
+  localStorage.setItem(`${ID_PREFIX}${email.toLowerCase()}`, id);
+}
+
+function loadCrmId(email: string): string | null {
+  if (!email) return null;
+  return localStorage.getItem(`${ID_PREFIX}${email.toLowerCase()}`);
 }
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -191,12 +202,23 @@ async function searchFounders(email: string): Promise<import('./zohoApi').ZohoRe
   return zohoSearch('Founders', `(Email:equals:${email})`);
 }
 
-async function upsertFounder(payload: Record<string, unknown>): Promise<void> {
+async function upsertFounder(email: string, payload: Record<string, unknown>): Promise<void> {
   if (isFounder()) {
-    try {
-      await portalUpsert('Founders', payload, ['Email']);
+    // Prefer direct PUT to the known record ID — portal always allows updating own record.
+    const recordId = loadCrmId(email);
+    if (recordId) {
+      await portalUpdate('Founders', recordId, payload);
       return;
-    } catch { /* fall through */ }
+    }
+    // No cached ID yet — try upsert (creates or updates by email).
+    try {
+      const result = await portalUpsert('Founders', payload, ['Email']);
+      saveCrmId(email, result.id);
+      return;
+    } catch (err) {
+      console.warn('[CompanyProfile] portalUpsert failed:', err);
+    }
+    return;
   }
   await zohoUpsert('Founders', payload, ['Email']);
 }
@@ -205,7 +227,7 @@ async function upsertFounder(payload: Record<string, unknown>): Promise<void> {
 
 function syncToCrm(email: string, data: CompanyData): void {
   const payload = { ...dataToCrmPayload(data), Email: email };
-  upsertFounder(payload).then(() => {
+  upsertFounder(email, payload).then(() => {
     console.log('[CompanyProfile] Auto-sync done');
   }).catch(err => {
     console.warn('[CompanyProfile] Auto-sync failed:', err);
@@ -224,6 +246,7 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
       const record = records[0];
       crmData = crmRecordToData(record as Record<string, unknown>);
       saveLocal(email, crmData);
+      saveCrmId(email, record.id); // cache record ID for direct updates
 
       try {
         logo = await zohoGetRecordPhoto('Founders', record.id);
@@ -249,7 +272,7 @@ export async function saveCompanyProfile(email: string, data: CompanyData): Prom
 
   try {
     const payload = { ...dataToCrmPayload(data), Email: email };
-    await upsertFounder(payload);
+    await upsertFounder(email, payload);
     return { success: true, crmSynced: true };
   } catch (err) {
     console.warn('[CompanyProfile] CRM save error:', err);
