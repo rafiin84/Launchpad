@@ -6,7 +6,7 @@
  * localStorage is used as local cache and offline fallback.
  */
 
-import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalList, portalSearch, portalUpsert, portalUpdate } from './zohoApi';
+import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalUploadRecordPhoto, portalGetRecordPhoto, portalList, portalSearch, portalUpsert, portalUpdate } from './zohoApi';
 import { loadRole } from './oauth';
 
 export interface CompanyData {
@@ -252,7 +252,9 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
       saveCrmId(email, record.id); // cache record ID for direct updates
 
       try {
-        logo = await zohoGetRecordPhoto(MODULE, record.id);
+        logo = isFounder()
+          ? await portalGetRecordPhoto(MODULE, record.id)
+          : await zohoGetRecordPhoto(MODULE, record.id);
       } catch { /* no logo */ }
     }
   } catch (err) {
@@ -296,7 +298,9 @@ export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; 
       const data = crmRecordToData(r);
       let logo: string | null = null;
       try {
-        logo = await zohoGetRecordPhoto(MODULE, record.id);
+        logo = isFounder()
+          ? await portalGetRecordPhoto(MODULE, record.id)
+          : await zohoGetRecordPhoto(MODULE, record.id);
       } catch { /* no logo */ }
       return { email, data, logo };
     }));
@@ -310,6 +314,13 @@ export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; 
 
 export async function fetchCompanyLogo(email: string): Promise<string | null> {
   try {
+    const recordId = loadCrmId(email);
+    if (recordId) {
+      return isFounder()
+        ? await portalGetRecordPhoto(MODULE, recordId)
+        : await zohoGetRecordPhoto(MODULE, recordId);
+    }
+    // Fallback: search by email (investor path)
     const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
     if (!records.length) return null;
     return await zohoGetRecordPhoto(MODULE, records[0].id);
@@ -320,23 +331,30 @@ export async function fetchCompanyLogo(email: string): Promise<string | null> {
 
 export async function uploadCompanyLogo(email: string, logoDataUrl: string): Promise<boolean> {
   try {
-    const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
-    if (!records.length) return false;
+    let recordId = loadCrmId(email);
+    if (!recordId) {
+      // Try to find the record and cache its ID first
+      const records = await (isFounder()
+        ? portalList(MODULE, { per_page: '1', fields: 'Email' })
+        : zohoSearch(MODULE, `(Email:equals:${email})`));
+      if (!records.length) return false;
+      recordId = records[0].id;
+      saveCrmId(email, recordId);
+    }
 
-    const recordId = records[0].id;
-
-    // Convert dataUrl to Blob
     const [meta, base64] = logoDataUrl.split(',');
     const mimeMatch = meta.match(/data:([^;]+)/);
     const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const blob = new Blob([bytes], { type: mime });
 
-    await zohoUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
+    if (isFounder()) {
+      await portalUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
+    } else {
+      await zohoUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
+    }
     return true;
   } catch (err) {
     console.warn('[CompanyProfile] Logo upload failed:', err);

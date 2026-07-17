@@ -385,6 +385,45 @@ export async function zohoGetRecordPhoto(module: string, recordId: string): Prom
   }
 }
 
+export async function portalUploadRecordPhoto(module: string, recordId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
+  const token = ensureToken();
+  const formData = new FormData();
+  formData.append('file', file, fileName);
+  const res = await fetch(buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/photo`), {
+    method: 'POST',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName },
+    body: formData,
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
+    throw new ZohoApiError(res.status, json.message ?? 'Photo upload failed', json.code ?? '');
+  }
+}
+
+export async function portalGetRecordPhoto(module: string, recordId: string): Promise<string | null> {
+  const token = loadToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/photo`), {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName },
+    });
+    if (!res.ok || res.status === 204) return null;
+    const blob = await res.blob();
+    if (!blob.size || blob.type.includes('json') || blob.type.includes('html')) return null;
+    return new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result?.startsWith('data:') ? result : null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ─── Current user ─────────────────────────────────────────────────────────────
 
 export interface ZohoCurrentUser {
