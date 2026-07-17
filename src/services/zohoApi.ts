@@ -231,6 +231,20 @@ export async function portalList(module: string, params: Record<string, string> 
   return json.data ?? [];
 }
 
+export async function portalGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
+  ensureToken();
+  const qs = fields ? `?fields=${encodeURIComponent(fields)}` : '';
+  const url = buildPortalCrmUrl(`/crm/v2/${module}/${id}${qs}`);
+
+  const res = await fetch(url, { headers: authHeader() });
+  if (res.status === 204 || res.status === 404) return null;
+
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+
+  return json.data?.[0] ?? null;
+}
+
 export async function portalCreate(module: string, data: Record<string, unknown>): Promise<string> {
   ensureToken();
   const url = buildPortalCrmUrl(`/crm/v2/${module}`);

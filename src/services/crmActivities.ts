@@ -1,4 +1,4 @@
-import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalGetById, zohoCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -84,21 +84,31 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
     console.warn('[Activities] COQL failed, falling back to list:', err);
   }
 
-  // Fallback: list endpoint (omits textarea fields) + individual GETs for content.
+  // Fallback: list endpoint + individual GETs for missing textarea fields.
+  // Founders use zcrmportals.in (portal domain) so the portal field config applies.
+  // Investors use www.zohoapis.in (standard CRM domain).
+  const isFounder = loadRole() === 'founder';
   const listParams = {
     per_page: '200',
     sort_by: 'Created_Time',
     sort_order: 'desc',
     fields: ALL_FIELDS,
   };
-  const raw = await zohoList(MODULE, listParams);
+
+  const raw = isFounder
+    ? await portalList(MODULE, listParams)
+    : await zohoList(MODULE, listParams);
   const activities = raw.map(fromRecord);
 
   const missing = activities.filter(a => !a.content && !a.id.startsWith('local_'));
   if (missing.length === 0) return activities;
 
   const fetched = await Promise.allSettled(
-    missing.slice(0, 50).map(a => zohoGetById(MODULE, a.id, ALL_FIELDS))
+    missing.slice(0, 50).map(a =>
+      isFounder
+        ? portalGetById(MODULE, a.id, ALL_FIELDS)
+        : zohoGetById(MODULE, a.id, ALL_FIELDS)
+    )
   );
   const byId = new Map<string, CRMActivity>();
   fetched.forEach((r, i) => {
