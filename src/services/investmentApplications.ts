@@ -6,8 +6,8 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalList, portalCreate, type ZohoRecord } from './zohoApi';
-import { loadRole } from './oauth';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalList, portalCreate, portalSearch, type ZohoRecord } from './zohoApi';
+import { loadRole, loadPortalLoginEmail } from './oauth';
 
 function isFounder(): boolean { return loadRole() === 'founder'; }
 
@@ -320,14 +320,36 @@ function generateLocalId(): string {
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
     const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
-    // Portal tokens only work on zcrmportals.in — use portalList for founders
-    const records = isFounder()
-      ? await portalList(CRM_MODULE, params)
-      : await zohoList(CRM_MODULE, params);
-    return records.map(fromCrmRecord);
+    if (!isFounder()) {
+      const records = await zohoList(CRM_MODULE, params);
+      return records.map(fromCrmRecord);
+    }
+
+    // For portal founders: portalList only returns records the user created themselves.
+    // Applications created by an admin on the founder's behalf won't appear there.
+    // So we merge portalList results with a portalSearch by Founder_Email to catch
+    // admin-created applications (e.g. approved applications created by the investor).
+    const [listRecords, searchRecords] = await Promise.allSettled([
+      portalList(CRM_MODULE, params),
+      portalSearch(CRM_MODULE, `(Founder_Email:equals:${loadFounderEmail()})`),
+    ]);
+
+    const seen = new Set<string>();
+    const merged: ZohoRecord[] = [];
+    for (const r of [
+      ...(listRecords.status === 'fulfilled' ? listRecords.value : []),
+      ...(searchRecords.status === 'fulfilled' ? searchRecords.value : []),
+    ]) {
+      if (!seen.has(r.id)) { seen.add(r.id); merged.push(r); }
+    }
+    return merged.map(fromCrmRecord);
   } catch {
     return [];
   }
+}
+
+function loadFounderEmail(): string {
+  return loadPortalLoginEmail()?.toLowerCase() ?? '';
 }
 
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {
