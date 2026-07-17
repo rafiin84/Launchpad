@@ -88,7 +88,6 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
   // Fallback: list endpoint + individual GETs for missing textarea fields.
   // Founders use zcrmportals.in (portal domain) so the portal field config applies.
   // Investors use www.zohoapis.in (standard CRM domain).
-  const isFounder = loadRole() === 'founder';
   const listParams = {
     per_page: '200',
     sort_by: 'Created_Time',
