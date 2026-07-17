@@ -74,14 +74,15 @@ async function fetchViaCoql(): Promise<CRMActivity[]> {
 }
 
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
-  // COQL returns all records (respects CRM data sharing "All") AND includes
-  // textarea fields (Content, Activity_Image_Data) in one request.
-  // Try for both roles; portal tokens may or may not support COQL.
-  try {
-    const activities = await fetchViaCoql();
-    if (activities.length > 0) return activities;
-  } catch (err) {
-    console.warn('[Activities] COQL failed, falling back to list:', err);
+  // COQL works for investors (standard CRM domain) but NOT for portal users.
+  const isFounder = loadRole() === 'founder';
+  if (!isFounder) {
+    try {
+      const activities = await fetchViaCoql();
+      if (activities.length > 0) return activities;
+    } catch (err) {
+      console.warn('[Activities] COQL failed, falling back to list:', err);
+    }
   }
 
   // Fallback: list endpoint + individual GETs for missing textarea fields.
