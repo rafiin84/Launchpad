@@ -140,7 +140,7 @@ function dataToCrmPayload(data: CompanyData): Record<string, unknown> {
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
 const STORAGE_PREFIX = 'lp_founder_company_';
-const ID_PREFIX = 'lp_founder_crm_id_';
+const ID_PREFIX = 'lp_fc_crm_id_'; // fc = Founder_Companies (changed from lp_founder_crm_id_ to avoid stale Founders module IDs)
 
 function storageKey(email: string): string {
   return `${STORAGE_PREFIX}${email.toLowerCase()}`;
