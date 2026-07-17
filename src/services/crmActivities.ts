@@ -89,15 +89,35 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
     return (await zohoList(MODULE, listParams)).map(fromRecord);
   }
 
-  // Portal founders: try without portal-scoping header first so investor-posted
-  // activities are included. Falls back to portal-scoped list if that fails.
+  // Portal founders: fetch the full list (now returns all records since portal
+  // is configured for "All Records"). Then backfill textarea fields (Content,
+  // Activity_Image_Data) via individual GETs for any record missing content.
+  let raw: ZohoRecord[] = [];
   try {
-    const records = await zohoListUnscoped(MODULE, listParams);
-    if (records.length > 0) return records.map(fromRecord);
-  } catch (err) {
-    console.warn('[Activities] Unscoped list failed, falling back to portal-scoped:', err);
+    raw = await zohoListUnscoped(MODULE, listParams);
+    if (raw.length === 0) throw new Error('empty');
+  } catch {
+    try { raw = await zohoList(MODULE, listParams); } catch (err) {
+      console.warn('[Activities] List failed:', err);
+    }
   }
-  return (await zohoList(MODULE, listParams)).map(fromRecord);
+
+  const activities = raw.map(fromRecord);
+
+  // Individual GETs return textarea fields — fetch for records with empty content.
+  const missing = activities.filter(a => !a.content && !a.id.startsWith('local_'));
+  if (missing.length > 0) {
+    const fetched = await Promise.allSettled(
+      missing.slice(0, 50).map(a => zohoGetById(MODULE, a.id, ALL_FIELDS))
+    );
+    const byId = new Map<string, CRMActivity>();
+    fetched.forEach((r, i) => {
+      if (r.status === 'fulfilled' && r.value) byId.set(missing[i].id, fromRecord(r.value));
+    });
+    return activities.map(a => byId.get(a.id) ?? a);
+  }
+
+  return activities;
 }
 
 export async function createCRMActivity(fields: CRMActivityFields): Promise<string> {
