@@ -1,4 +1,4 @@
-import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalListUnscoped, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoListUnscoped, zohoCoql, portalCoql, zohoGetById, portalList, portalListUnscoped, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -73,9 +73,28 @@ async function fetchViaCoql(): Promise<CRMActivity[]> {
   return records.map(fromRecord);
 }
 
+async function fetchViaPortalCoql(): Promise<CRMActivity[]> {
+  const records = await portalCoql(
+    `SELECT ${COQL_FIELDS} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
+  );
+  return records.map(fromRecord);
+}
+
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
-  // COQL works for investors (standard CRM domain) but NOT for portal users.
   const isFounder = loadRole() === 'founder';
+
+  // For founders: try portal COQL first — returns ALL records including investor posts.
+  // Falls back to portalListUnscoped, then portalList.
+  if (isFounder) {
+    try {
+      const activities = await fetchViaPortalCoql();
+      if (activities.length > 0) return activities;
+    } catch (err) {
+      console.warn('[Activities] Portal COQL failed, falling back to list:', err);
+    }
+  }
+
+  // For investors: use standard COQL (includes textarea fields, all records).
   if (!isFounder) {
     try {
       const activities = await fetchViaCoql();

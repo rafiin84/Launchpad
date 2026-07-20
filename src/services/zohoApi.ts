@@ -342,6 +342,21 @@ export async function zohoSearch(module: string, criteria: string): Promise<Zoho
 
 // ─── COQL query — returns textarea fields that list endpoint omits ────────────
 
+// Portal-domain COQL — for portal user tokens that can't reach www.zohoapis.in
+export async function portalCoql(query: string): Promise<ZohoRecord[]> {
+  ensureToken();
+  const url = buildPortalCrmUrl('/crm/v2.1/coql');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { ...plainAuthHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ select_query: query }),
+  });
+  if (res.status === 204) return [];
+  const json = await res.json() as { data?: ZohoRecord[]; message?: string; code?: string };
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  return json.data ?? [];
+}
+
 export async function zohoCoql(query: string): Promise<ZohoRecord[]> {
   ensureToken();
   const url = buildCrmUrl('/crm/v2.1/coql');
