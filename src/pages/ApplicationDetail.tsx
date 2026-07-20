@@ -22,6 +22,8 @@ import {
   type ApprovalDetails,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
+import { zohoDownloadAttachment, portalDownloadAttachment } from '../services/zohoApi';
+import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -947,6 +949,24 @@ export default function ApplicationDetail() {
     setActionLoading(null);
   };
 
+  const handleDownloadAttachment = async (recordId: string, attachmentId: string, fileName: string) => {
+    try {
+      const isFounderRole = loadRole() === 'founder';
+      const blob = isFounderRole
+        ? await portalDownloadAttachment('Applications', recordId, attachmentId)
+        : await zohoDownloadAttachment('Applications', recordId, attachmentId);
+      if (!blob) { alert('Could not download file.'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Download failed. Please try again.');
+    }
+  };
+
   const handleScheduleMeeting = async (data: { meetingDate: string; meetingLocation: string; meetingLink: string; meetingAgenda: string }) => {
     if (!app || !id) return;
     setShowMeetingModal(false);
@@ -1365,9 +1385,9 @@ export default function ApplicationDetail() {
                       {doc.status === 'submitted' ? (
                         <>
                           {doc.attachmentId && (
-                            <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                            <button onClick={() => handleDownloadAttachment(id!, doc.attachmentId!, doc.fileName || 'document')} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
                               <Download size={9} /> {t.applicationDetail.view}
-                            </a>
+                            </button>
                           )}
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
                             <Check size={9} /> {t.applicationDetail.submittedStatus}
@@ -1376,9 +1396,9 @@ export default function ApplicationDetail() {
                       ) : doc.status === 'uploaded' ? (
                         <>
                           {doc.attachmentId && (
-                            <a href={`/api/attachments?id=${id}&attachmentId=${doc.attachmentId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                            <button onClick={() => handleDownloadAttachment(id!, doc.attachmentId!, doc.fileName || 'document')} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
                               <Download size={9} /> {t.applicationDetail.view}
-                            </a>
+                            </button>
                           )}
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
                             <Check size={9} /> {t.applicationDetail.uploadedStatus}

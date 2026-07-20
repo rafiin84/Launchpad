@@ -18,6 +18,8 @@ import {
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
+import { portalUploadAttachment, zohoUploadAttachment } from '../services/zohoApi';
+import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
 
@@ -269,17 +271,6 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
     setTimeout(() => fileInputRef.current?.click(), 0);
   };
 
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !uploadTarget) return;
@@ -287,19 +278,11 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
     setUploading(uploadTarget);
     setUploadError(null);
     try {
-      const base64 = await fileToBase64(file);
-      const uploadRes = await fetch(`/api/attachments?id=${encodeURIComponent(app.id)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: `[${uploadTarget}] ${file.name}`, fileData: base64, mimeType: file.type }),
-      });
-      const responseText = await uploadRes.text();
-      let uploadJson: any;
-      try { uploadJson = JSON.parse(responseText); } catch {
-        throw new Error(uploadRes.status === 413 ? 'File too large. Max size is 10MB.' : `Upload failed (${uploadRes.status}): ${responseText.slice(0, 100)}`);
-      }
-      if (!uploadRes.ok) throw new Error(uploadJson?.error || `Upload failed (${uploadRes.status})`);
-      const attachmentId = uploadJson?.data?.[0]?.details?.id || '';
+      const fileName = `[${uploadTarget}] ${file.name}`;
+      const isFounderRole = loadRole() === 'founder';
+      const attachmentId = isFounderRole
+        ? await portalUploadAttachment('Applications', app.id, file, fileName)
+        : await zohoUploadAttachment('Applications', app.id, file, fileName);
 
       const updatedDocs = localDocs.map(d =>
         d.type === uploadTarget

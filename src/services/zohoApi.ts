@@ -844,7 +844,7 @@ export async function zohoUploadAttachment(
   recordId: string,
   file: Blob,
   fileName: string,
-): Promise<boolean> {
+): Promise<string> {
   const token = ensureToken();
   const formData = new FormData();
   formData.append('file', file, fileName);
@@ -853,5 +853,41 @@ export async function zohoUploadAttachment(
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
     body: formData,
   });
-  return res.ok;
+  if (!res.ok) throw new ZohoApiError(res.status, 'Attachment upload failed', '');
+  const json = await res.json() as { data?: Array<{ details: { id: string } }> };
+  return json.data?.[0]?.details?.id ?? '';
+}
+
+export async function portalUploadAttachment(
+  module: string,
+  recordId: string,
+  file: Blob,
+  fileName: string,
+): Promise<string> {
+  const token = ensureToken();
+  const formData = new FormData();
+  formData.append('file', file, fileName);
+  const res = await fetch(buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/Attachments`), {
+    method: 'POST',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName },
+    body: formData,
+  });
+  if (!res.ok) throw new ZohoApiError(res.status, 'Attachment upload failed', '');
+  const json = await res.json() as { data?: Array<{ details: { id: string } }> };
+  return json.data?.[0]?.details?.id ?? '';
+}
+
+export async function portalDownloadAttachment(
+  module: string,
+  recordId: string,
+  attachmentId: string,
+): Promise<Blob | null> {
+  const token = loadToken();
+  if (!token) return null;
+  const res = await fetch(
+    buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/Attachments/${attachmentId}`),
+    { headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName } },
+  );
+  if (!res.ok) return null;
+  return res.blob();
 }
