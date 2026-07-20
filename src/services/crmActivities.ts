@@ -1,4 +1,4 @@
-import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoListUnscoped, zohoCoql, zohoGetById, portalList, portalListUnscoped, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -95,9 +95,20 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
     fields: ALL_FIELDS,
   };
 
-  const raw = isFounder
-    ? await portalList(MODULE, listParams)
-    : await zohoList(MODULE, listParams);
+  // portalListUnscoped omits x-crmportal header so the response includes ALL
+  // records (investor posts included), not just the portal user's own records.
+  // Fall back to portalList if unscoped returns nothing or errors.
+  let raw: ZohoRecord[] = [];
+  if (isFounder) {
+    try {
+      raw = await portalListUnscoped(MODULE, listParams);
+    } catch {
+      raw = await portalList(MODULE, listParams);
+    }
+    if (raw.length === 0) raw = await portalList(MODULE, listParams);
+  } else {
+    raw = await zohoList(MODULE, listParams);
+  }
   const activities = raw.map(fromRecord);
 
   const missing = activities.filter(a => !a.content && !a.id.startsWith('local_'));
@@ -105,9 +116,7 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
 
   const fetched = await Promise.allSettled(
     missing.slice(0, 50).map(a =>
-      isFounder
-        ? portalGetById(MODULE, a.id, ALL_FIELDS)
-        : zohoGetById(MODULE, a.id, ALL_FIELDS)
+      zohoGetById(MODULE, a.id, ALL_FIELDS)
     )
   );
   const byId = new Map<string, CRMActivity>();

@@ -231,6 +231,25 @@ export async function portalList(module: string, params: Record<string, string> 
   return json.data ?? [];
 }
 
+// Same as portalList but without the x-crmportal header.
+// On zcrmportals.in, omitting the portal header returns ALL records the token
+// can access (not just portal-scoped own records), which includes investor posts.
+export async function portalListUnscoped(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
+  ensureToken();
+  const qs = new URLSearchParams(params).toString();
+  const apiPath = `/crm/v2/${module}${qs ? `?${qs}` : ''}`;
+  const url = buildPortalCrmUrl(apiPath);
+
+  const res = await fetch(url, { headers: plainAuthHeader() });
+  if (res.status === 204) return [];
+
+  const json: ZohoListResponse = await res.json();
+  if (!res.ok) throw new ZohoApiError(res.status, json.message ?? `HTTP ${res.status}`, json.code ?? '');
+  assertNoZohoError(json, res.status);
+
+  return json.data ?? [];
+}
+
 export async function portalGetById(module: string, id: string, fields?: string): Promise<ZohoRecord | null> {
   ensureToken();
   const qs = fields ? `?fields=${encodeURIComponent(fields)}` : '';
