@@ -9,7 +9,7 @@
  */
 
 import { loadRole } from './oauth';
-import { zohoCreate, zohoList } from './zohoApi';
+import { zohoCreate, zohoList, portalListUnscoped } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
 const MAX_NOTIFICATIONS = 100;
@@ -34,6 +34,7 @@ export interface AppNotification {
   actorRole: 'investor' | 'founder';
   targetRole: 'investor' | 'founder';
   link?: string;
+  requestedDocs?: string[];
 }
 
 // ─── localStorage cache ────────────────────────────────────────────────────
@@ -57,37 +58,41 @@ function saveLocal(notifications: AppNotification[]) {
 function fromCRM(r: Record<string, unknown>): AppNotification {
   const s = (k: string) => (r[k] == null ? '' : String(r[k]));
   const content = s('Content');
-  let parsed: Record<string, string> = {};
+  let parsed: Record<string, unknown> = {};
   try { parsed = JSON.parse(content); } catch { }
   return {
     id: s('id'),
-    type: (parsed.type || 'announcement') as NotificationType,
+    type: ((parsed.type as string) || 'announcement') as NotificationType,
     title: s('Name'),
-    message: parsed.message || '',
+    message: (parsed.message as string) || '',
     timestamp: s('Created_Time'),
     read: parsed.read === 'true',
     actor: s('Author_Name'),
     actorRole: (s('Author_Role') || 'investor') as 'investor' | 'founder',
     targetRole: (s('Activity_Tags') || 'investor') as 'investor' | 'founder',
-    link: parsed.link || '',
+    link: (parsed.link as string) || '',
+    requestedDocs: Array.isArray(parsed.requestedDocs) ? parsed.requestedDocs as string[] : undefined,
   };
 }
 
 // ─── CRM helpers ───────────────────────────────────────────────────────────
 
 async function fetchFromServer(role: string): Promise<AppNotification[]> {
-  // Activity_Type is not a searchable field — fetch all and filter client-side
-  const records = await zohoList('My_Activities', {
+  // Founders are portal users — use portal-scoped API; investors use admin token
+  const params = {
     per_page: '200',
     fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
-  });
+  };
+  const records = role === 'founder'
+    ? await portalListUnscoped('My_Activities', params)
+    : await zohoList('My_Activities', params);
   return records
     .filter(r => String(r['Activity_Type'] ?? '') === 'notification' && String(r['Activity_Tags'] ?? '') === role)
     .map(r => fromCRM(r as Record<string, unknown>));
 }
 
 async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<AppNotification | null> {
-  const content = JSON.stringify({ type: n.type, message: n.message, link: n.link || '', read: 'false' });
+  const content = JSON.stringify({ type: n.type, message: n.message, link: n.link || '', read: 'false', ...(n.requestedDocs ? { requestedDocs: n.requestedDocs } : {}) });
   const payload: Record<string, unknown> = {
     Name: n.title,
     Activity_Type: 'notification',
