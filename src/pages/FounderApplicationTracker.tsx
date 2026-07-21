@@ -254,6 +254,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 // Falls back to a generic upload if no doc list found.
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
+  const [investorName, setInvestorName] = useState<string>('');
   const [uploaded, setUploaded] = useState<Record<string, { fileName: string; attachmentId: string }>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +269,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
           (n.requestedDocs?.length || n.message.toLowerCase().includes('requested the following documents')))
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
       if (!docsNotif) return;
+      setInvestorName(docsNotif.actor || '');
       if (docsNotif.requestedDocs?.length) {
         setDocTypes(docsNotif.requestedDocs);
       } else {
@@ -337,11 +339,17 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
   return (
     <div className="mt-3 border-t border-gray-100 pt-3">
-      <div className="flex items-center gap-1.5 mb-2.5">
+      <div className="flex items-center gap-1.5 mb-1.5">
         <Upload size={12} className="text-yellow-600" />
-        <p className="text-[10px] font-semibold text-yellow-600 uppercase tracking-wider">Requested Documents</p>
+        <p className="text-[10px] font-semibold text-yellow-600 uppercase tracking-wider">Documents Requested</p>
         <span className="text-[10px] text-gray-400 ml-auto">{Object.keys(uploaded).length}/{displayDocs.length} uploaded</span>
       </div>
+      {investorName && (
+        <p className="text-[11px] text-gray-500 mb-2">
+          <span className="font-medium text-gray-700">{investorName}</span> has requested:{' '}
+          <span className="font-medium text-gray-800">{displayDocs.join(', ')}</span>
+        </p>
+      )}
       <div className="space-y-2">
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
         {displayDocs.map(docType => {
