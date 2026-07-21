@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle, Edit2,
   TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
-  Upload, Check, Send, AlertCircle,
+  Upload, Check, Send, AlertCircle, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,14 +11,15 @@ import {
   getApplications,
   canApplyAgain,
   updateApplication,
+  deleteApplication,
   parseRequestedDocuments,
   stringifyRequestedDocuments,
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
 } from '../services/investmentApplications';
-import { addNotification } from '../services/notifications';
-import { portalUploadAttachment, zohoUploadAttachment } from '../services/zohoApi';
+import { addNotification, getNotifications } from '../services/notifications';
+import { portalUploadAttachment, zohoUploadAttachment, portalGetById } from '../services/zohoApi';
 import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -249,6 +250,128 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
   );
 }
 
+// Shows per-doc upload buttons sourced from the investor's notification.
+// Falls back to a generic upload if no doc list found.
+function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
+  const [docTypes, setDocTypes] = useState<string[]>([]);
+  const [uploaded, setUploaded] = useState<Record<string, { fileName: string; attachmentId: string }>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeDocType, setActiveDocType] = useState<string | null>(null);
+
+  // Load requested doc types from the investor's notification
+  useEffect(() => {
+    getNotifications().then(notifications => {
+      const docsNotif = notifications
+        .filter(n => n.actorRole === 'investor' && n.message.includes(app.companyName) &&
+          (n.requestedDocs?.length || n.message.toLowerCase().includes('requested the following documents')))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      if (!docsNotif) return;
+      if (docsNotif.requestedDocs?.length) {
+        setDocTypes(docsNotif.requestedDocs);
+      } else {
+        // Fallback: parse doc names from message string.
+        // Format: "...has requested the following documents for {company}: Doc1, Doc2, Doc3"
+        const match = docsNotif.message.match(/:\s*([^:]+)$/);
+        if (match) {
+          const docs = match[1].split(',').map(d => d.trim()).filter(Boolean);
+          if (docs.length > 0) setDocTypes(docs);
+        }
+      }
+    }).catch(() => {});
+  }, [app.companyName]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeDocType) return;
+    setUploading(activeDocType);
+    setError(null);
+    try {
+      const fileName = `[${activeDocType}] ${file.name}`;
+      const attachmentId = await portalUploadAttachment('Applications', app.id, file, fileName);
+      const newUploaded = { ...uploaded, [activeDocType]: { fileName: file.name, attachmentId } };
+      setUploaded(newUploaded);
+
+      // Save all uploaded docs + status to CRM immediately
+      const allDocs: RequestedDocument[] = docTypes.length > 0
+        ? docTypes.map(t => {
+            const u = newUploaded[t];
+            return u
+              ? { type: t, status: 'submitted' as const, fileName: u.fileName, attachmentId: u.attachmentId }
+              : { type: t, status: 'pending' as const };
+          })
+        : [{ type: activeDocType, status: 'submitted' as const, fileName: file.name, attachmentId }];
+
+      await updateApplication(app.id, {
+        requestedDocuments: stringifyRequestedDocuments(allDocs),
+        status: 'under_review' as ApplicationStatus,
+      }, false);
+
+      addNotification({
+        type: 'company_update',
+        title: 'Document Uploaded',
+        message: `${app.founderName || 'Founder'} uploaded "${activeDocType}" for ${app.companyName}`,
+        actor: app.founderName || 'Founder',
+        actorRole: 'founder',
+        targetRole: 'investor',
+        link: `/applications/${app.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
+    }
+    setUploading(null);
+    setActiveDocType(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const triggerUpload = (docType: string) => {
+    setActiveDocType(docType);
+    setError(null);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  };
+
+  const displayDocs = docTypes.length > 0 ? docTypes : ['Document'];
+
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <Upload size={12} className="text-yellow-600" />
+        <p className="text-[10px] font-semibold text-yellow-600 uppercase tracking-wider">Requested Documents</p>
+        <span className="text-[10px] text-gray-400 ml-auto">{Object.keys(uploaded).length}/{displayDocs.length} uploaded</span>
+      </div>
+      <div className="space-y-2">
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+        {displayDocs.map(docType => {
+          const done = uploaded[docType];
+          const isUploading = uploading === docType;
+          return (
+            <div key={docType} className={cn('flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 border text-xs', done ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100')}>
+              <div className="flex items-center gap-2 min-w-0">
+                {done ? <Check size={12} className="text-green-500 flex-shrink-0" /> : <Upload size={12} className="text-gray-400 flex-shrink-0" />}
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{docType}</p>
+                  {done && <p className="text-[10px] text-gray-400 truncate">{done.fileName}</p>}
+                </div>
+              </div>
+              <button
+                onClick={() => triggerUpload(docType)}
+                disabled={isUploading}
+                className={cn('flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-50', done ? 'text-green-700 bg-green-100 hover:bg-green-200' : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200')}
+              >
+                <Upload size={9} /> {isUploading ? 'Saving…' : done ? 'Replace' : 'Upload'}
+              </button>
+            </div>
+          );
+        })}
+        {error && <p className="text-[11px] text-red-500">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const { t } = useLanguage();
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
@@ -263,7 +386,14 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
     setLocalDocs(parseRequestedDocuments(app.requestedDocuments));
   }, [app.requestedDocuments]);
 
-  if (localDocs.length === 0) return null;
+  // If no specific doc types came from CRM (portal field permission issue),
+  // fall back to generic upload UI.
+  if (localDocs.length === 0) {
+    if (app.status === 'documents_requested') {
+      return <GenericDocUpload app={app} onRefresh={onRefresh} />;
+    }
+    return null;
+  }
 
   const handleFileSelect = (docType: string) => {
     setUploadTarget(docType);
@@ -436,7 +566,7 @@ function DocumentUploadSection({ app, onRefresh }: { app: InvestmentApplication;
 
 const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
 
-function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void }) {
+function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void }) {
   const { t } = useLanguage();
   const cfg = STATUS_CONFIG[app.status] ?? STATUS_CONFIG.submitted;
   const isDraft = app.status === 'draft';
@@ -532,12 +662,22 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
       {/* Actions */}
       <div className="flex items-center gap-2">
         {isDraft ? (
-          <Link
-            to={`/applications/apply?edit=${app.id}`}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <FileText size={12} /> {t.applicationTracker.continueEditing}
-          </Link>
+          <>
+            <Link
+              to={`/applications/apply?edit=${app.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <FileText size={12} /> {t.applicationTracker.continueEditing}
+            </Link>
+            {onDelete && (
+              <button
+                onClick={() => { if (window.confirm('Delete this draft?')) onDelete(); }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            )}
+          </>
         ) : (
           <>
             <button
@@ -658,6 +798,13 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh }: { app: Investme
               <DocumentUploadSection app={app} onRefresh={onRefresh} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* When collapsed and docs requested, show upload section directly */}
+      {!expanded && !isDraft && app.status === 'documents_requested' && (
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <DocumentUploadSection app={app} onRefresh={onRefresh} />
         </div>
       )}
 
@@ -817,6 +964,7 @@ export default function FounderApplicationTracker() {
                     expanded={expandedId === app.id}
                     onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
                     onRefresh={loadApps}
+                    onDelete={async () => { await deleteApplication(app.id, false); loadApps(); }}
                   />
                 ))}
               </div>
