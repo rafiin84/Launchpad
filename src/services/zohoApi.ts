@@ -765,9 +765,10 @@ export async function findModuleApiName(keyword: string): Promise<string | null>
   return found?.api_name ?? null;
 }
 
-export async function portalSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
+export async function portalSearch(module: string, criteria: string, fields?: string): Promise<ZohoRecord[]> {
   ensureToken();
-  const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  const qs = new URLSearchParams({ criteria, ...(fields ? { fields } : {}) }).toString();
+  const apiPath = `/crm/v2/${module}/search?${qs}`;
   const url = buildPortalCrmUrl(apiPath);
   const res = await fetch(url, { headers: authHeader() });
   if (res.status === 204) return [];
@@ -872,7 +873,12 @@ export async function portalUploadAttachment(
     headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName },
     body: formData,
   });
-  if (!res.ok) throw new ZohoApiError(res.status, 'Attachment upload failed', '');
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const msg = (errJson.message as string) || String(errJson.code ?? '') || `HTTP ${res.status}`;
+    console.error('[portalUploadAttachment] error', res.status, errJson);
+    throw new ZohoApiError(res.status, `Attachment upload failed: ${msg}`, String(errJson.code ?? ''));
+  }
   const json = await res.json() as { data?: Array<{ details: { id: string } }> };
   return json.data?.[0]?.details?.id ?? '';
 }

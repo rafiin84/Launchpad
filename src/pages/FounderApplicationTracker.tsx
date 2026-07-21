@@ -264,10 +264,12 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   // Load requested doc types from the investor's notification
   useEffect(() => {
     getNotifications().then(notifications => {
+      console.log('[GenericDocUpload] all notifications:', notifications.map(n => ({ actor: n.actor, actorRole: n.actorRole, msg: n.message, requestedDocs: n.requestedDocs })));
       const docsNotif = notifications
         .filter(n => n.actorRole === 'investor' && n.message.includes(app.companyName) &&
           (n.requestedDocs?.length || n.message.toLowerCase().includes('requested the following documents')))
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      console.log('[GenericDocUpload] matched notif:', docsNotif);
       if (!docsNotif) return;
       setInvestorName(docsNotif.actor || '');
       if (docsNotif.requestedDocs?.length) {
