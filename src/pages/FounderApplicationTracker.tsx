@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle, Edit2,
@@ -19,7 +19,6 @@ import {
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
-import { portalUploadAttachmentPlain } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
 
@@ -256,24 +255,21 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [investorName, setInvestorName] = useState<string>('');
-  // per-doc submitted state: what the founder has provided (file or link)
-  const [submitted, setSubmitted] = useState<Record<string, { display: string; href: string }>>({});
+  const [submitted, setSubmitted] = useState<Record<string, string>>({}); // docType -> share link
   const [links, setLinks] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<string | null>(null);       // docType currently saving/uploading
+  const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [fileTarget, setFileTarget] = useState<string | null>(null);
 
-  // Load requested doc types + any already-submitted files/links from the record.
+  // Load requested doc types + any already-submitted links from the record.
   useEffect(() => {
     if (app.reviewedBy) setInvestorName(app.reviewedBy);
     const parsed = parseRequestedDocuments(app.requestedDocuments);
     if (parsed.length > 0) {
       setDocTypes(parsed.map(d => d.type));
-      const pre: Record<string, { display: string; href: string }> = {};
+      const pre: Record<string, string> = {};
       parsed.forEach(d => {
-        if (d.link) pre[d.type] = { display: d.link, href: d.link };
-        else if (d.attachmentId) pre[d.type] = { display: d.fileName || d.type, href: d.attachmentId };
+        const url = d.link || d.attachmentId; // attachmentId held the link in older records
+        if (url && /^https?:\/\//i.test(url)) pre[d.type] = url;
       });
       setSubmitted(pre);
     } else {
@@ -281,77 +277,43 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     }
   }, [app.requestedDocuments, app.reviewedBy]);
 
-  // Persist the full doc list to CRM after one doc changes, and notify the investor.
-  const persist = async (docType: string, entry: { display: string; href: string; isLink: boolean }) => {
-    const next = { ...submitted, [docType]: { display: entry.display, href: entry.href } };
-    setSubmitted(next);
-    const allDocs: RequestedDocument[] = docTypes.map(t => {
-      const s = next[t];
-      if (!s) return { type: t, status: 'pending' as const };
-      const isLink = /^https?:\/\//i.test(s.href);
-      return isLink
-        ? { type: t, status: 'submitted' as const, fileName: s.display, link: s.href }
-        : { type: t, status: 'submitted' as const, fileName: s.display, attachmentId: s.href };
-    });
-    await updateApplication(app.id, {
-      requestedDocuments: stringifyRequestedDocuments(allDocs),
-      status: 'under_review' as ApplicationStatus,
-    }, false);
-    addNotification({
-      type: 'company_update',
-      title: 'Document Submitted',
-      message: `${app.founderName || 'Founder'} submitted "${docType}" for ${app.companyName}`,
-      actor: app.founderName || 'Founder',
-      actorRole: 'founder',
-      targetRole: 'investor',
-      link: `/applications/${app.id}`,
-    });
-    window.dispatchEvent(new Event('notifications-updated'));
-    onRefresh();
-  };
-
-  const setDocError = (docType: string, msg: string) =>
-    setErrors(prev => ({ ...prev, [docType]: msg }));
-
   const handleSubmitLink = async (docType: string) => {
     const link = (links[docType] || '').trim();
     if (!link) return;
+    if (!/^https?:\/\//i.test(link)) {
+      setErrors(prev => ({ ...prev, [docType]: 'Enter a full link starting with https://' }));
+      return;
+    }
     setBusy(docType);
-    setDocError(docType, '');
+    setErrors(prev => ({ ...prev, [docType]: '' }));
     try {
-      await persist(docType, { display: link, href: link, isLink: true });
+      const next = { ...submitted, [docType]: link };
+      setSubmitted(next);
+      const allDocs: RequestedDocument[] = docTypes.map(t => (
+        next[t]
+          ? { type: t, status: 'submitted' as const, fileName: t, link: next[t] }
+          : { type: t, status: 'pending' as const }
+      ));
+      await updateApplication(app.id, {
+        requestedDocuments: stringifyRequestedDocuments(allDocs),
+        status: 'under_review' as ApplicationStatus,
+      }, false);
+      addNotification({
+        type: 'company_update',
+        title: 'Document Submitted',
+        message: `${app.founderName || 'Founder'} submitted "${docType}" for ${app.companyName}`,
+        actor: app.founderName || 'Founder',
+        actorRole: 'founder',
+        targetRole: 'investor',
+        link: `/applications/${app.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
       setLinks(prev => { const n = { ...prev }; delete n[docType]; return n; });
+      onRefresh();
     } catch (err) {
-      setDocError(docType, err instanceof Error ? err.message : 'Failed to save.');
+      setErrors(prev => ({ ...prev, [docType]: err instanceof Error ? err.message : 'Failed to save.' }));
     }
     setBusy(null);
-  };
-
-  const triggerFile = (docType: string) => {
-    setFileTarget(docType);
-    setDocError(docType, '');
-    setTimeout(() => fileInputRef.current?.click(), 0);
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    const docType = fileTarget;
-    if (!file || !docType) return;
-    setBusy(docType);
-    setDocError(docType, '');
-    try {
-      const attachmentId = await portalUploadAttachmentPlain('Applications', app.id, file, `[${docType}] ${file.name}`);
-      await persist(docType, { display: file.name, href: attachmentId, isLink: false });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // Portal often blocks the Attachments API — guide the user to the link option.
-      setDocError(docType, /not supported|API_NOT_SUPPORTED/i.test(msg)
-        ? 'File upload is not allowed on the portal — paste a share link instead.'
-        : `Upload failed: ${msg}`);
-    }
-    setBusy(null);
-    setFileTarget(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Nothing to show unless the investor actually requested documents.
@@ -369,13 +331,14 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
         <span className="text-[10px] text-gray-400 ml-auto">{doneCount}/{displayDocs.length} submitted</span>
       </div>
       {investorName && (
-        <p className="text-[11px] text-gray-500 mb-2">
+        <p className="text-[11px] text-gray-500 mb-1.5">
           <span className="font-medium text-gray-700">{investorName}</span> has requested:{' '}
           <span className="font-medium text-gray-800">{displayDocs.join(', ')}</span>
         </p>
       )}
-      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange}
-        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.zip" />
+      <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
+        Upload each file to Google Drive / Dropbox / OneDrive, set sharing to “anyone with the link can view”, then paste the link below.
+      </p>
       <div className="space-y-2">
         {displayDocs.map(docType => {
           const done = submitted[docType];
@@ -384,45 +347,31 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
           return (
             <div key={docType} className={cn('rounded-xl px-3 py-2.5 border text-xs', done ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100')}>
               <div className="flex items-center gap-2 mb-1.5">
-                {done ? <Check size={12} className="text-green-500 flex-shrink-0" /> : <Upload size={12} className="text-gray-400 flex-shrink-0" />}
+                {done ? <Check size={12} className="text-green-500 flex-shrink-0" /> : <FileText size={12} className="text-gray-400 flex-shrink-0" />}
                 <p className="font-medium text-gray-800 flex-1 truncate">{docType}</p>
                 {done && <span className="text-[10px] text-green-600 font-semibold">Submitted</span>}
               </div>
               {done ? (
-                <a href={/^https?:\/\//i.test(done.href) ? done.href : undefined} target="_blank" rel="noopener noreferrer"
+                <a href={done} target="_blank" rel="noopener noreferrer"
                   className="text-[10px] text-indigo-500 hover:underline truncate block">
-                  {done.display}
+                  {done}
                 </a>
               ) : (
-                <div className="space-y-1.5">
-                  {/* Option 1 — upload a file */}
-                  <div className="flex gap-1.5 items-center">
-                    <span className="text-[10px] text-gray-400 flex-1">Upload a file</span>
-                    <button
-                      onClick={() => triggerFile(docType)}
-                      disabled={isBusy}
-                      className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-40 transition-colors"
-                    >
-                      <Upload size={9} /> {isBusy && fileTarget === docType ? 'Uploading…' : 'Upload'}
-                    </button>
-                  </div>
-                  {/* Option 2 — paste a share link */}
-                  <div className="flex gap-1.5 items-center">
-                    <input
-                      type="url"
-                      placeholder="…or paste Google Drive / Dropbox link"
-                      value={links[docType] || ''}
-                      onChange={e => setLinks(prev => ({ ...prev, [docType]: e.target.value }))}
-                      className="flex-1 text-[11px] px-2 py-1 rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-300 min-w-0"
-                    />
-                    <button
-                      onClick={() => handleSubmitLink(docType)}
-                      disabled={isBusy || !(links[docType] || '').trim()}
-                      className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-40 transition-colors"
-                    >
-                      <Send size={9} /> Submit
-                    </button>
-                  </div>
+                <div className="flex gap-1.5 items-center">
+                  <input
+                    type="url"
+                    placeholder="Paste share link (https://…)"
+                    value={links[docType] || ''}
+                    onChange={e => setLinks(prev => ({ ...prev, [docType]: e.target.value }))}
+                    className="flex-1 text-[11px] px-2 py-1 rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-300 min-w-0"
+                  />
+                  <button
+                    onClick={() => handleSubmitLink(docType)}
+                    disabled={isBusy || !(links[docType] || '').trim()}
+                    className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-40 transition-colors"
+                  >
+                    <Send size={9} /> {isBusy ? 'Saving…' : 'Submit'}
+                  </button>
                 </div>
               )}
               {err && <p className="text-[10px] text-red-500 mt-1">{err}</p>}
