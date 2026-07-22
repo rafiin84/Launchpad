@@ -363,6 +363,21 @@ function loadFounderEmail(): string {
   return (loadPortalLoginEmail() || loadPortalSession()?.email || '').toLowerCase();
 }
 
+// TEMP diagnostic — surfaces the resolved founder email + raw COQL result/error.
+export async function debugFounderFetch(): Promise<{ email: string; role: string; count: number; error: string; sample: string }> {
+  const email = loadFounderEmail();
+  const role = loadRole() || '';
+  try {
+    const fields = COQL_SELECT_FIELDS.slice(0, 5).join(',');
+    const records = await portalCoql(
+      `SELECT ${fields} FROM ${CRM_MODULE} WHERE Founder_Email = '${email}' ORDER BY Modified_Time DESC LIMIT 200`
+    );
+    return { email, role, count: records.length, error: '', sample: JSON.stringify(records[0] || {}).slice(0, 200) };
+  } catch (err) {
+    return { email, role, count: -1, error: err instanceof Error ? `${err.name}: ${err.message}` : String(err), sample: '' };
+  }
+}
+
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {
   try {
     const r = await zohoGetById(CRM_MODULE, id);

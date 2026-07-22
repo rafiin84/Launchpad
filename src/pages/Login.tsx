@@ -118,20 +118,7 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Info note */}
-          <div className="flex items-start gap-3 bg-gray-50 border border-gray-100 rounded-2xl p-4">
-            <ShieldCheck size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-gray-500 leading-relaxed">
-              <strong>{t.login.investor}:</strong> {t.login.investorSignIn}
-              <br />
-              <strong>{t.login.founder}:</strong> {t.login.founderSignIn}
-            </p>
-          </div>
         </div>
-
-        <p className="text-xs text-gray-400 mt-10 text-center max-w-sm">
-          {t.login.confidential}
-        </p>
       </div>
     </div>
   );

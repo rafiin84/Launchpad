@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken,
-  saveUserName, clearRole, saveRole, saveApiDomain,
+  saveUserName, clearRole, saveRole, saveApiDomain, savePortalLoginEmail,
 } from '../services/oauth';
 import { clearModuleStatusCache } from '../services/crmAppUsers';
 import { savePortalSession, clearPortalSession, findPortalUser, seedKnownPortalUsers } from '../services/portalUsers';
@@ -136,6 +136,7 @@ export default function PortalCallback() {
 
   function finishLogin(email: string, displayName: string, contactId: string, zuid: string) {
     saveLastPortalEmail(email);
+    savePortalLoginEmail(email);
     if (isReal(displayName)) {
       saveUserName(displayName);
     }

@@ -2,7 +2,7 @@
 // Generic Zoho OAuth (Implicit Flow)
 // Supports both Admin/Investor (Zoho CRM) and Founder (Portal) login flows.
 
-import { INVESTOR_AUTH, FOUNDER_AUTH } from '../config/auth';
+import { INVESTOR_AUTH, FOUNDER_AUTH, ZOHO_HOSTS } from '../config/auth';
 
 export interface PendingToken {
   token: string;
@@ -23,7 +23,7 @@ let pendingToken: PendingToken | null = null;
 export const OAuthConfig = {
   clientId:     INVESTOR_AUTH.clientId,
   authEndpoint: INVESTOR_AUTH.authEndpoint,
-  accountsApi:  'https://accounts.zoho.in',
+  accountsApi:  ZOHO_HOSTS.accounts,
   scopes:       [...INVESTOR_AUTH.scopes],
   callbackPath: INVESTOR_AUTH.callbackPath,
   responseType: INVESTOR_AUTH.responseType,

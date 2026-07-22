@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
+  debugFounderFetch,
   canApplyAgain,
   updateApplication,
   deleteApplication,
@@ -866,12 +867,19 @@ export default function FounderApplicationTracker() {
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [debug, setDebug] = useState<string>('');
 
   const loadApps = useCallback(async () => {
     setLoading(true);
     const all = await getApplications(isInvestor, currentUser?.email);
     setApplications(all);
     setLoading(false);
+    if (!isInvestor && all.filter(a => a.status !== 'draft').length === 0) {
+      try {
+        const d = await debugFounderFetch();
+        setDebug(`email="${d.email}" role="${d.role}" count=${d.count} err="${d.error}" sample=${d.sample}`);
+      } catch (e) { setDebug(String(e)); }
+    }
   }, [isInvestor, currentUser?.email]);
 
   useEffect(() => { setPageTitle(t.applicationTracker.myApplication, t.applicationTracker.trackDescription); return () => setPageTitle(null); }, [t]);
@@ -921,6 +929,9 @@ export default function FounderApplicationTracker() {
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">{t.applicationTracker.noApplicationYet}</p>
           <p className="text-xs text-gray-400 mb-5">{t.applicationTracker.noApplicationDesc}</p>
+          {debug && (
+            <p className="text-[10px] text-red-400 mb-5 font-mono px-4 break-all max-w-2xl mx-auto">{debug}</p>
+          )}
           <Link
             to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"

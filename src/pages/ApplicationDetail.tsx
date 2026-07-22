@@ -909,6 +909,7 @@ export default function ApplicationDetail() {
         actorRole: 'investor',
         targetRole: 'founder',
         link: '/applications/track',
+        requestedDocs: docs.map(d => d.type),
       });
       window.dispatchEvent(new Event('notifications-updated'));
       await loadApp();
