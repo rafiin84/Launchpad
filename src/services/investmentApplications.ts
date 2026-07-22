@@ -362,6 +362,22 @@ function loadFounderEmail(): string {
   return (loadPortalLoginEmail() || loadPortalSession()?.email || '').toLowerCase();
 }
 
+// TEMP diagnostic — does the fields param work, and do custom fields come back?
+export async function debugFounderFields(): Promise<string> {
+  const short = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 40);
+  let withFields = '', plain = '', keys = '';
+  try {
+    const r = await portalList(CRM_MODULE, { per_page: '5', fields: ALL_CRM_FIELDS });
+    withFields = `ok(${r.length}) meet=${r[0]?.['Meeting_Date'] ?? 'null'} reqDocs=${r[0]?.['Requested_Documents'] ? 'yes' : 'no'}`;
+  } catch (e) { withFields = `ERR:${short(e)}`; }
+  try {
+    const r = await portalList(CRM_MODULE, { per_page: '5' });
+    keys = Object.keys(r[0] || {}).join(',').slice(0, 200);
+    plain = `ok(${r.length})`;
+  } catch (e) { plain = `ERR:${short(e)}`; }
+  return `withFields=[${withFields}] | plain=[${plain}] | plainKeys=[${keys}]`;
+}
+
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {
   try {
     const r = await zohoGetById(CRM_MODULE, id);
