@@ -328,6 +328,10 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   };
 
   const triggerFile = (docType: string) => {
+    if (!uploadEnabled) {
+      setErr(docType, 'Direct upload needs a one-time setup — paste a share link below for now.');
+      return;
+    }
     setFileTarget(docType);
     setErr(docType, '');
     setTimeout(() => fileInputRef.current?.click(), 0);
@@ -396,18 +400,16 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
                 </a>
               ) : (
                 <div className="space-y-1.5">
-                  {uploadEnabled && (
-                    <div className="flex gap-1.5 items-center">
-                      <span className="text-[10px] text-gray-400 flex-1">Upload from your device</span>
-                      <button
-                        onClick={() => triggerFile(docType)}
-                        disabled={isBusy}
-                        className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-40 transition-colors"
-                      >
-                        <Upload size={9} /> {isBusy && fileTarget === docType ? 'Uploading…' : 'Upload'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-1.5 items-center">
+                    <span className="text-[10px] text-gray-400 flex-1">Upload from your device</span>
+                    <button
+                      onClick={() => triggerFile(docType)}
+                      disabled={isBusy}
+                      className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 disabled:opacity-40 transition-colors"
+                    >
+                      <Upload size={9} /> {isBusy && fileTarget === docType ? 'Uploading…' : 'Upload'}
+                    </button>
+                  </div>
                   <div className="flex gap-1.5 items-center">
                     <input
                       type="url"
