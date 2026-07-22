@@ -68,3 +68,18 @@ export const ZOHO_HOSTS = {
   // CRM portal identifier sent in the x-crmportal header
   portalName: 'launchpad',
 } as const;
+
+// Cloudinary unsigned upload — lets portal (founder) users upload files directly
+// from the browser (Zoho blocks the CRM Attachments API for portal users).
+// This is a pure client-side upload: the unsigned preset is public by design,
+// so NO API secret is exposed. Create a free account at cloudinary.com, then:
+//   Settings → Upload → Add upload preset → Signing mode: Unsigned → Save
+// and paste the cloud name + preset name below (or set the VITE_ env vars).
+export const CLOUDINARY = {
+  cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+  uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '',
+};
+
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(CLOUDINARY.cloudName && CLOUDINARY.uploadPreset);
+}
