@@ -9,7 +9,7 @@
  */
 
 import { loadRole } from './oauth';
-import { zohoCreate, zohoList, portalList, portalListUnscoped } from './zohoApi';
+import { zohoCreate, zohoList, portalList, portalListUnscoped, portalCreate } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
 const MAX_NOTIFICATIONS = 100;
@@ -109,7 +109,13 @@ async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'
   };
 
   try {
-    const id = await zohoCreate('My_Activities', payload);
+    // Founders are portal users and cannot call the admin create API (zohoCreate).
+    // Use portalCreate so founder-originated notifications (e.g. document submitted)
+    // actually reach CRM and the investor sees them.
+    const isFounder = loadRole() === 'founder';
+    const id = isFounder
+      ? await portalCreate('My_Activities', payload)
+      : await zohoCreate('My_Activities', payload);
     return {
       ...n,
       id,
@@ -117,7 +123,7 @@ async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'
       read: false,
     };
   } catch (err) {
-    console.warn('[Notifications] zohoCreate failed:', err);
+    console.warn('[Notifications] create failed:', err);
     return null;
   }
 }
