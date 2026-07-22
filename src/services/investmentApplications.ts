@@ -334,11 +334,11 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
     // Applications created by an admin on the founder's behalf won't appear there.
     // So we merge portalList results with a portalSearch by Founder_Email to catch
     // admin-created applications (e.g. approved applications created by the investor).
-    // Pass all field names explicitly so the portal API returns custom fields like Requested_Documents.
-    const portalParams = { ...params, fields: ALL_CRM_FIELDS };
+    // Do NOT pass custom fields= param — portal API rejects requests with unknown/restricted fields.
+    // Requested_Documents is fetched separately via portalCoql in GenericDocUpload.
     const [listRecords, searchRecords] = await Promise.allSettled([
-      portalList(CRM_MODULE, portalParams),
-      portalSearch(CRM_MODULE, `(Founder_Email:equals:${loadFounderEmail()})`, ALL_CRM_FIELDS),
+      portalList(CRM_MODULE, params),
+      portalSearch(CRM_MODULE, `(Founder_Email:equals:${loadFounderEmail()})`),
     ]);
 
     const seen = new Set<string>();
