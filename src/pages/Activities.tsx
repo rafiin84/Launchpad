@@ -21,6 +21,7 @@ import { generateAIActivities } from '../services/aiEngine';
 import { fetchCRMPortfolio } from '../services/crmPortfolio';
 import { fetchCRMDeals } from '../services/crmDeals';
 import { addNotification } from '../services/notifications';
+import { uploadFile, canUploadFiles } from '../services/fileUpload';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
 
@@ -166,10 +167,28 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
     if (!file) return;
     setCompressing(true);
     try {
-      const compressed = await compressImage(file);
-      setImageData(compressed);
-      setImagePreview(compressed);
-      setImageUrl('');
+      if (canUploadFiles()) {
+        // Full-resolution upload to Cloudinary — no compression, no blur.
+        // Store the URL (small) instead of a heavily-compressed base64.
+        const url = await uploadFile(file);
+        setImageUrl(url);
+        setImageData('');
+        setImagePreview(url);
+      } else {
+        // Fallback: compress to base64 to fit the CRM text field.
+        const compressed = await compressImage(file);
+        setImageData(compressed);
+        setImagePreview(compressed);
+        setImageUrl('');
+      }
+    } catch {
+      // If the upload service fails, fall back to compressed base64.
+      try {
+        const compressed = await compressImage(file);
+        setImageData(compressed);
+        setImagePreview(compressed);
+        setImageUrl('');
+      } catch { /* ignore */ }
     } finally { setCompressing(false); }
   }
 
@@ -197,7 +216,9 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         authorName:   currentUser.name,
         authorRole:   isInvestor ? 'investor' : 'founder',
         tags:         '',
-        imageUrl:     imageMode === 'url' ? imageUrl.trim() : '',
+        // In upload mode the image is either a Cloudinary URL (imageUrl, no base64)
+        // or a compressed base64 fallback (imageData). Send whichever we have.
+        imageUrl:     imageMode === 'url' ? imageUrl.trim() : (imageData ? '' : imageUrl.trim()),
         imageData:    imageMode === 'upload' ? imageData : '',
         visibility:   postVisibility,
       };

@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
 import { type CRMActivityFields } from '../services/crmActivities';
 import { postSharedActivity, fetchActivityPermissions } from '../services/sharedActivities';
+import { uploadFile, canUploadFiles } from '../services/fileUpload';
 import { cn } from '../lib/cn';
 
 // ─── Activity types (must match CRM picklist exact values) ────────────────────
@@ -150,10 +151,21 @@ export default function AddActivity() {
     if (!file.type.startsWith('image/')) return;
     setCompressing(true);
     try {
-      const compressed = await compressImage(file);
-      setForm(prev => ({ ...prev, imageData: compressed, imagePreview: compressed, imageUrl: '' }));
+      if (canUploadFiles()) {
+        // Full-resolution upload to Cloudinary — no compression, no blur.
+        const url = await uploadFile(file);
+        setForm(prev => ({ ...prev, imageUrl: url, imageData: '', imagePreview: url }));
+      } else {
+        const compressed = await compressImage(file);
+        setForm(prev => ({ ...prev, imageData: compressed, imagePreview: compressed, imageUrl: '' }));
+      }
     } catch {
-      setSaveError('Could not process image. Please try a different file.');
+      try {
+        const compressed = await compressImage(file);
+        setForm(prev => ({ ...prev, imageData: compressed, imagePreview: compressed, imageUrl: '' }));
+      } catch {
+        setSaveError('Could not process image. Please try a different file.');
+      }
     } finally {
       setCompressing(false);
     }
@@ -194,7 +206,7 @@ export default function AddActivity() {
         authorName:   form.authorName.trim(),
         authorRole:   isInvestor ? 'investor' : 'founder',
         tags:         form.tags.trim(),
-        imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
+        imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : (form.imageData ? '' : form.imageUrl.trim()),
         imageData:    imageMode === 'upload' ? form.imageData : '',
         visibility:   isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only'),
       };
