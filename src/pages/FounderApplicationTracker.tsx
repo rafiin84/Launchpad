@@ -876,8 +876,7 @@ export default function FounderApplicationTracker() {
     setLoading(false);
     if (!isInvestor && all.filter(a => a.status !== 'draft').length === 0) {
       try {
-        const d = await debugFounderFetch();
-        setDebug(`email="${d.email}" role="${d.role}" count=${d.count} err="${d.error}" sample=${d.sample}`);
+        setDebug(await debugFounderFetch());
       } catch (e) { setDebug(String(e)); }
     }
   }, [isInvestor, currentUser?.email]);

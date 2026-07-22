@@ -6,7 +6,7 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalCreate, portalUpdate, portalCoql, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalCreate, portalUpdate, portalCoql, portalList, portalListUnscoped, portalSearch, type ZohoRecord } from './zohoApi';
 import { loadRole, loadPortalLoginEmail } from './oauth';
 import { loadPortalSession } from './portalUsers';
 
@@ -363,19 +363,31 @@ function loadFounderEmail(): string {
   return (loadPortalLoginEmail() || loadPortalSession()?.email || '').toLowerCase();
 }
 
-// TEMP diagnostic — surfaces the resolved founder email + raw COQL result/error.
-export async function debugFounderFetch(): Promise<{ email: string; role: string; count: number; error: string; sample: string }> {
+// TEMP diagnostic — probes multiple portal fetch strategies to find which the
+// portal profile actually permits. Reports "method=count" or "method=ERR:msg".
+export async function debugFounderFetch(): Promise<string> {
   const email = loadFounderEmail();
-  const role = loadRole() || '';
-  try {
-    const fields = COQL_SELECT_FIELDS.slice(0, 5).join(',');
-    const records = await portalCoql(
-      `SELECT ${fields} FROM ${CRM_MODULE} WHERE Founder_Email = '${email}' ORDER BY Modified_Time DESC LIMIT 200`
-    );
-    return { email, role, count: records.length, error: '', sample: JSON.stringify(records[0] || {}).slice(0, 200) };
-  } catch (err) {
-    return { email, role, count: -1, error: err instanceof Error ? `${err.name}: ${err.message}` : String(err), sample: '' };
-  }
+  const short = (e: unknown) => {
+    const m = e instanceof Error ? e.message : String(e);
+    return m.replace(/\s+/g, ' ').slice(0, 60);
+  };
+  const probe = async (label: string, fn: () => Promise<ZohoRecord[]>) => {
+    try { const r = await fn(); return `${label}=${r.length}`; }
+    catch (e) { return `${label}=ERR:${short(e)}`; }
+  };
+
+  const results = await Promise.all([
+    probe('coqlFull', () => portalCoql(
+      `SELECT ${COQL_SELECT_FIELDS.join(',')} FROM ${CRM_MODULE} WHERE Founder_Email = '${email}' ORDER BY Modified_Time DESC LIMIT 200`)),
+    probe('coqlName', () => portalCoql(
+      `SELECT Name FROM ${CRM_MODULE} WHERE Founder_Email = '${email}'`)),
+    probe('coqlNoWhere', () => portalCoql(
+      `SELECT Name FROM ${CRM_MODULE} LIMIT 10`)),
+    probe('listUnscoped', () => portalListUnscoped(CRM_MODULE, { per_page: '50' })),
+    probe('list', () => portalList(CRM_MODULE, { per_page: '50' })),
+    probe('search', () => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`)),
+  ]);
+  return `email="${email}" | ${results.join(' | ')}`;
 }
 
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {
