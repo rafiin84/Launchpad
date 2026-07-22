@@ -665,7 +665,8 @@ export interface RequestedDocument {
   type: string;
   status: 'pending' | 'uploaded' | 'submitted';
   fileName?: string;
-  attachmentId?: string;
+  attachmentId?: string; // CRM attachment id (uploaded file) — or a share link for portal fallback
+  link?: string;         // explicit share link (Google Drive / Dropbox)
 }
 
 export const DOCUMENT_TYPES = [

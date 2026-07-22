@@ -887,6 +887,41 @@ export async function portalUploadAttachment(
   return json.data?.[0]?.details?.id ?? '';
 }
 
+// Portal file upload without the x-crmportal header (the header caused
+// API_NOT_SUPPORTED on the standard Attachments call; COQL had the same quirk).
+// Tries the plain-token attachment endpoint first, then falls back to the
+// x-crmportal variant. Throws if both are rejected.
+export async function portalUploadAttachmentPlain(
+  module: string,
+  recordId: string,
+  file: Blob,
+  fileName: string,
+): Promise<string> {
+  const token = ensureToken();
+  const attempt = async (withPortalHeader: boolean) => {
+    const formData = new FormData();
+    formData.append('file', file, fileName);
+    const headers: Record<string, string> = { 'Authorization': `Zoho-oauthtoken ${token}` };
+    if (withPortalHeader) headers['x-crmportal'] = ZOHO_HOSTS.portalName;
+    const res = await fetch(buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/Attachments`), {
+      method: 'POST', headers, body: formData,
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const msg = (errJson.message as string) || String(errJson.code ?? '') || `HTTP ${res.status}`;
+      throw new ZohoApiError(res.status, msg, String(errJson.code ?? ''));
+    }
+    const json = await res.json() as { data?: Array<{ details: { id: string } }> };
+    return json.data?.[0]?.details?.id ?? '';
+  };
+  try {
+    return await attempt(false);
+  } catch (e1) {
+    console.warn('[portalUploadAttachmentPlain] plain failed, retrying with x-crmportal:', e1);
+    return await attempt(true);
+  }
+}
+
 export async function portalDownloadAttachment(
   module: string,
   recordId: string,
