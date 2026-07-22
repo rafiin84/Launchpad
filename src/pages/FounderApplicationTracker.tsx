@@ -370,6 +370,16 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
         requestedDocuments: stringifyRequestedDocuments(allDocs),
       }, false);
       setSubmitted(next);
+      addNotification({
+        type: 'company_update',
+        title: 'Document Removed',
+        message: `${app.founderName || 'Founder'} removed "${docType}" for ${app.companyName} and may re-send it.`,
+        actor: app.founderName || 'Founder',
+        actorRole: 'founder',
+        targetRole: 'investor',
+        link: `/applications/${app.id}`,
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
     } catch (err) {
       setErr(docType, err instanceof Error ? err.message : 'Failed to remove.');
     }

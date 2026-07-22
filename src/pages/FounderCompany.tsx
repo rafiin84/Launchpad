@@ -6,6 +6,7 @@ import {
   Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { addNotification } from '../services/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -191,6 +192,17 @@ export default function FounderCompany() {
       setEditing(false);
       setSaveResult(result.crmSynced ? 'success' : 'partial');
       setTimeout(() => setSaveResult(null), 5000);
+      // Notify the other party that the company profile changed.
+      addNotification({
+        type: 'company_update',
+        title: 'Company Profile Updated',
+        message: `${draft.name || 'A company'} updated their company profile.`,
+        actor: currentUser?.name || draft.name || 'Founder',
+        actorRole: isInvestor ? 'investor' : 'founder',
+        targetRole: isInvestor ? 'founder' : 'investor',
+        link: '/company',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
     } catch {
       setSaveResult('error');
     } finally {
