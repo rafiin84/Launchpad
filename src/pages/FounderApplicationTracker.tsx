@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
-  debugFounderFields,
   canApplyAgain,
   updateApplication,
   deleteApplication,
@@ -854,16 +853,12 @@ export default function FounderApplicationTracker() {
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [debug, setDebug] = useState('');
 
   const loadApps = useCallback(async () => {
     setLoading(true);
     const all = await getApplications(isInvestor, currentUser?.email);
     setApplications(all);
     setLoading(false);
-    if (!isInvestor) {
-      try { setDebug(await debugFounderFields()); } catch (e) { setDebug(String(e)); }
-    }
   }, [isInvestor, currentUser?.email]);
 
   useEffect(() => { setPageTitle(t.applicationTracker.myApplication, t.applicationTracker.trackDescription); return () => setPageTitle(null); }, [t]);
@@ -888,9 +883,6 @@ export default function FounderApplicationTracker() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {debug && (
-        <p className="text-[10px] text-red-400 font-mono break-all mb-3 border border-red-100 bg-red-50 rounded-lg p-2">{debug}</p>
-      )}
       {allowNewApplication && (
         <div className="flex justify-end mb-4">
           <Link
