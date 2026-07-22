@@ -12,6 +12,10 @@ function buildAccountsUrl(apiPath: string): string {
 }
 
 function buildPortalCrmUrl(apiPath: string): string {
+  // In dev, route through the Vite proxy (/portal-api) to avoid CORS — the Zoho
+  // portal domain doesn't send Access-Control-Allow-Origin for localhost. In
+  // production the app is served from a whitelisted domain, so call direct.
+  if (import.meta.env.DEV) return `/portal-api${apiPath}`;
   return `${ZOHO_HOSTS.portalCrm}${apiPath}`;
 }
 
