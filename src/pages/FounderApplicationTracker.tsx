@@ -410,22 +410,30 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
                       <Upload size={9} /> {isBusy && fileTarget === docType ? 'Uploading…' : 'Upload'}
                     </button>
                   </div>
-                  <div className="flex gap-1.5 items-center">
-                    <input
-                      type="url"
-                      placeholder={uploadEnabled ? '…or paste a share link' : 'Paste share link (https://…)'}
-                      value={links[docType] || ''}
-                      onChange={e => setLinks(prev => ({ ...prev, [docType]: e.target.value }))}
-                      className="flex-1 text-[11px] px-2 py-1 rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-300 min-w-0"
-                    />
-                    <button
-                      onClick={() => handleSubmitLink(docType)}
-                      disabled={isBusy || !(links[docType] || '').trim()}
-                      className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-40 transition-colors"
-                    >
-                      <Send size={9} /> {isBusy && fileTarget !== docType ? 'Saving…' : 'Submit'}
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    inputMode="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={uploadEnabled ? '…or paste a share link' : 'Paste share link (https://…)'}
+                    value={links[docType] || ''}
+                    onChange={e => setLinks(prev => ({ ...prev, [docType]: e.target.value }))}
+                    onPaste={e => {
+                      const text = e.clipboardData.getData('text');
+                      if (text) {
+                        e.preventDefault();
+                        setLinks(prev => ({ ...prev, [docType]: text.trim() }));
+                      }
+                    }}
+                    className="w-full text-[11px] px-2 py-1.5 rounded-lg border border-gray-200 bg-white outline-none focus:border-indigo-300"
+                  />
+                  <button
+                    onClick={() => handleSubmitLink(docType)}
+                    disabled={isBusy || !(links[docType] || '').trim()}
+                    className="w-full inline-flex items-center justify-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200 disabled:opacity-40 transition-colors"
+                  >
+                    <Send size={9} /> {isBusy && fileTarget !== docType ? 'Saving…' : 'Submit link'}
+                  </button>
                 </div>
               )}
               {err && <p className="text-[10px] text-red-500 mt-1">{err}</p>}
