@@ -354,6 +354,28 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Remove a submitted doc → set it back to pending so the founder can re-send.
+  const handleRemove = async (docType: string) => {
+    setBusy(docType);
+    setErr(docType, '');
+    const next = { ...submitted };
+    delete next[docType];
+    try {
+      const allDocs: RequestedDocument[] = docTypes.map(t => (
+        next[t]
+          ? { type: t, status: 'submitted' as const, fileName: next[t].name, link: next[t].url }
+          : { type: t, status: 'pending' as const }
+      ));
+      await updateApplication(app.id, {
+        requestedDocuments: stringifyRequestedDocuments(allDocs),
+      }, false);
+      setSubmitted(next);
+    } catch (err) {
+      setErr(docType, err instanceof Error ? err.message : 'Failed to remove.');
+    }
+    setBusy(null);
+  };
+
   // Nothing to show unless the investor actually requested documents.
   const hasRealDocs = docTypes.length > 0 && !(docTypes.length === 1 && docTypes[0] === 'Document');
   if (!hasRealDocs && app.status !== 'documents_requested') return null;
@@ -394,10 +416,19 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
                 {done && <span className="text-[10px] text-green-600 font-semibold">Submitted</span>}
               </div>
               {done ? (
-                <a href={done.url} target="_blank" rel="noopener noreferrer"
-                  className="text-[10px] text-indigo-500 hover:underline truncate block">
-                  {done.name}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a href={done.url} target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] text-indigo-500 hover:underline truncate flex-1 min-w-0">
+                    {done.name}
+                  </a>
+                  <button
+                    onClick={() => handleRemove(docType)}
+                    disabled={isBusy}
+                    className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 transition-colors"
+                  >
+                    <Trash2 size={9} /> {isBusy ? 'Removing…' : 'Delete & re-send'}
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-1.5">
                   <div className="flex gap-1.5 items-center">
