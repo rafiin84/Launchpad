@@ -6,7 +6,7 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalCreate, portalUpdate, portalCoql, portalList, portalListUnscoped, portalSearch, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalCreate, portalUpdate, portalList, portalSearch, type ZohoRecord } from './zohoApi';
 import { loadRole, loadPortalLoginEmail } from './oauth';
 import { loadPortalSession } from './portalUsers';
 
@@ -318,6 +318,11 @@ function generateLocalId(): string {
 
 // ─── CRM direct API ────────────────────────────────────────────────────────
 
+// All CRM field API names — passed to portalList/portalSearch so custom fields
+// (e.g. Requested_Documents) come back. Falls back to a plain call if the portal
+// profile rejects the fields param.
+const ALL_CRM_FIELDS = Object.values(FIELD_MAP).join(',');
+
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
     const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
@@ -326,68 +331,35 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
       return records.map(fromCrmRecord);
     }
 
-    // For portal founders: fetch via portalCoql (the ONLY portal call proven to work
-    // for this module — plain auth token, no x-crmportal header). portalList/portalSearch
-    // use the x-crmportal header which the portal profile rejects for Applications.
-    // COQL filters by Founder_Email so it returns the founder's own records regardless
-    // of who owns them in CRM.
+    // For portal founders: portalList (WITH the x-crmportal header) returns records
+    // the portal user created; portalSearch by Founder_Email catches admin-created
+    // ones. COQL and the unscoped list are rejected by the portal profile — only
+    // these two work. Try with the fields param (for custom fields like
+    // Requested_Documents); if the portal rejects it, retry plain so the list still
+    // loads. Earlier failures were CORS, now handled by the /portal-api dev proxy.
     const email = loadFounderEmail();
-    const fields = COQL_SELECT_FIELDS.join(',');
-    const records = await portalCoql(
-      `SELECT ${fields} FROM ${CRM_MODULE} WHERE Founder_Email = '${email}' ORDER BY Modified_Time DESC LIMIT 200`
-    );
-    return records.map(fromCrmRecord);
+    const listRecords = await portalList(CRM_MODULE, { ...params, fields: ALL_CRM_FIELDS })
+      .catch(() => portalList(CRM_MODULE, params))
+      .catch(() => [] as ZohoRecord[]);
+    const searchRecords = await portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`, ALL_CRM_FIELDS)
+      .catch(() => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`))
+      .catch(() => [] as ZohoRecord[]);
+
+    const seen = new Set<string>();
+    const merged: ZohoRecord[] = [];
+    for (const r of [...listRecords, ...searchRecords]) {
+      if (!seen.has(r.id)) { seen.add(r.id); merged.push(r); }
+    }
+    return merged.map(fromCrmRecord);
   } catch (err) {
     console.warn('[investmentApplications] crmGetAll (founder) failed:', err);
     return [];
   }
 }
 
-// COQL allows selecting up to 50 fields. Curated list covering everything the
-// tracker + detail views read. id/Created_Time/Modified_Time are always returned.
-const COQL_SELECT_FIELDS = [
-  'Application_Status', 'Name', 'Website', 'Industry', 'Company_Stage', 'Location',
-  'Founded_Year', 'Company_Description', 'Founder_Name', 'Founder_Email', 'Founder_Phone',
-  'Founder_LinkedIn', 'Founder_Role', 'Co_Founders', 'Problem_Statement', 'Solution',
-  'Target_Market', 'Business_Model', 'Competitive_Advantage', 'Funding_Ask', 'Use_of_Funds',
-  'Previous_Funding', 'Current_Valuation', 'Equity_Offered', 'Current_Revenue', 'MRR', 'ARR',
-  'Monthly_Burn', 'Runway_Months', 'Active_Users', 'MoM_Growth', 'Churn_Rate', 'NPS_Score',
-  'Pitch_Deck_URL', 'Demo_Video_URL', 'Supporting_Docs', 'Submitted_By_Name',
-  'Submitted_By_Email', 'Submitted_By_Role', 'Investor_Notes', 'Reviewed_By', 'Reviewed_At',
-  'Requested_Documents', 'Meeting_Date', 'Meeting_Location', 'Meeting_Link',
-  'Created_Time', 'Modified_Time',
-];
-
 function loadFounderEmail(): string {
   // Try the explicitly saved login email first, then fall back to portal session email.
   return (loadPortalLoginEmail() || loadPortalSession()?.email || '').toLowerCase();
-}
-
-// TEMP diagnostic — probes multiple portal fetch strategies to find which the
-// portal profile actually permits. Reports "method=count" or "method=ERR:msg".
-export async function debugFounderFetch(): Promise<string> {
-  const email = loadFounderEmail();
-  const short = (e: unknown) => {
-    const m = e instanceof Error ? e.message : String(e);
-    return m.replace(/\s+/g, ' ').slice(0, 60);
-  };
-  const probe = async (label: string, fn: () => Promise<ZohoRecord[]>) => {
-    try { const r = await fn(); return `${label}=${r.length}`; }
-    catch (e) { return `${label}=ERR:${short(e)}`; }
-  };
-
-  const results = await Promise.all([
-    probe('coqlFull', () => portalCoql(
-      `SELECT ${COQL_SELECT_FIELDS.join(',')} FROM ${CRM_MODULE} WHERE Founder_Email = '${email}' ORDER BY Modified_Time DESC LIMIT 200`)),
-    probe('coqlName', () => portalCoql(
-      `SELECT Name FROM ${CRM_MODULE} WHERE Founder_Email = '${email}'`)),
-    probe('coqlNoWhere', () => portalCoql(
-      `SELECT Name FROM ${CRM_MODULE} LIMIT 10`)),
-    probe('listUnscoped', () => portalListUnscoped(CRM_MODULE, { per_page: '50' })),
-    probe('list', () => portalList(CRM_MODULE, { per_page: '50' })),
-    probe('search', () => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`)),
-  ]);
-  return `email="${email}" | ${results.join(' | ')}`;
 }
 
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {

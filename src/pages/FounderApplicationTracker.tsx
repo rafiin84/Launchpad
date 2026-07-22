@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
-  debugFounderFetch,
   canApplyAgain,
   updateApplication,
   deleteApplication,
@@ -20,7 +19,6 @@ import {
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
-import { portalCoql } from '../services/zohoApi';
 import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -251,8 +249,8 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
   );
 }
 
-// Shows per-doc upload buttons sourced from the investor's notification.
-// Fetches requested doc types via COQL (portal-compatible) and lets the founder
+// Shows per-doc upload buttons sourced from the application's Requested_Documents
+// field (fetched with the record by portalList/portalSearch). Lets the founder
 // submit a share link (Google Drive / Dropbox) per document — file attachment API
 // is blocked for portal users, so link-sharing is the supported alternative.
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
@@ -264,31 +262,19 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load requested doc types directly from the application record via COQL
+  // Load requested doc types from the application record (already fetched).
   useEffect(() => {
-    portalCoql(`SELECT id, Requested_Documents, Reviewed_By FROM Applications WHERE id = '${app.id}'`)
-      .then(records => {
-        const raw = String(records[0]?.['Requested_Documents'] ?? '');
-        const reviewer = String(records[0]?.['Reviewed_By'] ?? '');
-        if (reviewer) setInvestorName(reviewer);
-        if (raw) {
-          try {
-            const parsed: RequestedDocument[] = JSON.parse(raw);
-            if (parsed.length > 0) {
-              setDocTypes(parsed.map(d => d.type));
-              // Pre-fill already-submitted links
-              const pre: Record<string, string> = {};
-              parsed.forEach(d => { if (d.attachmentId) pre[d.type] = d.attachmentId; });
-              setSubmitted(pre);
-              return;
-            }
-          } catch { /* fall through */ }
-        }
-        // Fallback: generic placeholder
-        setDocTypes(['Document']);
-      })
-      .catch(() => setDocTypes(['Document']));
-  }, [app.id]);
+    if (app.reviewedBy) setInvestorName(app.reviewedBy);
+    const parsed = parseRequestedDocuments(app.requestedDocuments);
+    if (parsed.length > 0) {
+      setDocTypes(parsed.map(d => d.type));
+      const pre: Record<string, string> = {};
+      parsed.forEach(d => { if (d.attachmentId) pre[d.type] = d.attachmentId; });
+      setSubmitted(pre);
+    } else {
+      setDocTypes(['Document']);
+    }
+  }, [app.requestedDocuments, app.reviewedBy]);
 
   const handleSubmitLink = async (docType: string) => {
     const link = (links[docType] || '').trim();
@@ -867,18 +853,12 @@ export default function FounderApplicationTracker() {
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [debug, setDebug] = useState<string>('');
 
   const loadApps = useCallback(async () => {
     setLoading(true);
     const all = await getApplications(isInvestor, currentUser?.email);
     setApplications(all);
     setLoading(false);
-    if (!isInvestor && all.filter(a => a.status !== 'draft').length === 0) {
-      try {
-        setDebug(await debugFounderFetch());
-      } catch (e) { setDebug(String(e)); }
-    }
   }, [isInvestor, currentUser?.email]);
 
   useEffect(() => { setPageTitle(t.applicationTracker.myApplication, t.applicationTracker.trackDescription); return () => setPageTitle(null); }, [t]);
@@ -928,9 +908,6 @@ export default function FounderApplicationTracker() {
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">{t.applicationTracker.noApplicationYet}</p>
           <p className="text-xs text-gray-400 mb-5">{t.applicationTracker.noApplicationDesc}</p>
-          {debug && (
-            <p className="text-[10px] text-red-400 mb-5 font-mono px-4 break-all max-w-2xl mx-auto">{debug}</p>
-          )}
           <Link
             to="/applications/apply"
             className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
