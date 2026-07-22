@@ -9,7 +9,7 @@
  */
 
 import { loadRole } from './oauth';
-import { zohoCreate, zohoList, portalListUnscoped } from './zohoApi';
+import { zohoCreate, zohoList, portalList, portalListUnscoped } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
 const MAX_NOTIFICATIONS = 100;
@@ -78,17 +78,23 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
 // ─── CRM helpers ───────────────────────────────────────────────────────────
 
 async function fetchFromServer(role: string): Promise<AppNotification[]> {
-  // Founders are portal users — use portal-scoped API; investors use admin token
-  const params = {
-    per_page: '200',
-    fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
-  };
-  const records = role === 'founder'
-    ? await portalListUnscoped('My_Activities', params)
-    : await zohoList('My_Activities', params);
+  let records: Record<string, unknown>[];
+  if (role === 'founder') {
+    // Portal profile rejects the custom `fields` param on My_Activities (400),
+    // so omit it. portalList sends the x-crmportal header (the method that works
+    // for portal reads); fall back to the unscoped call if that's rejected.
+    records = await portalList('My_Activities', { per_page: '200' })
+      .catch(() => portalListUnscoped('My_Activities', { per_page: '200' }))
+      .catch(() => [] as Record<string, unknown>[]) as Record<string, unknown>[];
+  } else {
+    records = await zohoList('My_Activities', {
+      per_page: '200',
+      fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
+    }) as Record<string, unknown>[];
+  }
   return records
     .filter(r => String(r['Activity_Type'] ?? '') === 'notification' && String(r['Activity_Tags'] ?? '') === role)
-    .map(r => fromCRM(r as Record<string, unknown>));
+    .map(r => fromCRM(r));
 }
 
 async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<AppNotification | null> {
