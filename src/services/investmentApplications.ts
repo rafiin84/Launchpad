@@ -6,8 +6,9 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalList, portalCreate, portalSearch, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalList, portalCreate, portalUpdate, portalSearch, type ZohoRecord } from './zohoApi';
 import { loadRole, loadPortalLoginEmail } from './oauth';
+import { loadPortalSession } from './portalUsers';
 
 function isFounder(): boolean { return loadRole() === 'founder'; }
 
@@ -317,6 +318,10 @@ function generateLocalId(): string {
 
 // ─── CRM direct API ────────────────────────────────────────────────────────
 
+// All CRM field API names needed for the application — passed to portal list/search
+// so the portal API returns them explicitly (not relying on default field selection).
+const ALL_CRM_FIELDS = Object.values(FIELD_MAP).join(',');
+
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
     const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
@@ -329,9 +334,11 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
     // Applications created by an admin on the founder's behalf won't appear there.
     // So we merge portalList results with a portalSearch by Founder_Email to catch
     // admin-created applications (e.g. approved applications created by the investor).
+    // Pass all field names explicitly so the portal API returns custom fields like Requested_Documents.
+    const portalParams = { ...params, fields: ALL_CRM_FIELDS };
     const [listRecords, searchRecords] = await Promise.allSettled([
-      portalList(CRM_MODULE, params),
-      portalSearch(CRM_MODULE, `(Founder_Email:equals:${loadFounderEmail()})`),
+      portalList(CRM_MODULE, portalParams),
+      portalSearch(CRM_MODULE, `(Founder_Email:equals:${loadFounderEmail()})`, ALL_CRM_FIELDS),
     ]);
 
     const seen = new Set<string>();
@@ -349,7 +356,8 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
 }
 
 function loadFounderEmail(): string {
-  return loadPortalLoginEmail()?.toLowerCase() ?? '';
+  // Try the explicitly saved login email first, then fall back to portal session email.
+  return (loadPortalLoginEmail() || loadPortalSession()?.email || '').toLowerCase();
 }
 
 async function crmGetById(id: string): Promise<InvestmentApplication | null> {
@@ -373,7 +381,11 @@ async function crmCreate(fields: InvestmentApplicationFields): Promise<Investmen
 async function crmUpdate(id: string, updates: Partial<InvestmentApplication>): Promise<InvestmentApplication | null> {
   const payload = toCrmPayload(updates);
   console.log('[CRM] crmUpdate payload:', JSON.stringify(payload));
-  await zohoUpdate(CRM_MODULE, id, payload);
+  if (isFounder()) {
+    await portalUpdate(CRM_MODULE, id, payload);
+  } else {
+    await zohoUpdate(CRM_MODULE, id, payload);
+  }
   return crmGetById(id);
 }
 
@@ -398,24 +410,31 @@ export async function getApplications(isInvestor: boolean, founderEmail?: string
 
   if (isInvestor) return crmApps;
 
-  const email = founderEmail?.toLowerCase();
-  const myApps = email
-    ? crmApps.filter(a =>
-        a.founderEmail?.toLowerCase() === email ||
-        a.submittedByEmail?.toLowerCase() === email
-      )
-    : crmApps;
+  // For founders, crmGetAll() already scopes via portalList (only their own records).
+  // Don't re-filter by email — currentUser.email (Zoho One) may differ from the
+  // portal login email used in Founder_Email, causing all apps to be filtered out.
+  const myApps = crmApps;
 
-  const myLocalDrafts = email
+  // For local drafts use the portal login email (the authoritative founder identity).
+  const draftEmail = (loadFounderEmail() || founderEmail || '').toLowerCase();
+  const myLocalDrafts = draftEmail
     ? localDrafts.filter(d =>
-        d.founderEmail?.toLowerCase() === email ||
-        d.submittedByEmail?.toLowerCase() === email ||
+        d.founderEmail?.toLowerCase() === draftEmail ||
+        d.submittedByEmail?.toLowerCase() === draftEmail ||
         !d.founderEmail
       )
     : localDrafts;
 
   const serverIds = new Set(myApps.map(a => a.id));
-  const uniqueDrafts = myLocalDrafts.filter(d => !serverIds.has(d.id));
+  // Also suppress local drafts when a submitted CRM record exists for the same company,
+  // since submitting creates a new CRM ID that won't match the local draft's temp ID.
+  const submittedCompanyNames = new Set(
+    myApps.filter(a => a.status !== 'draft').map(a => a.companyName?.toLowerCase())
+  );
+  const uniqueDrafts = myLocalDrafts.filter(d =>
+    !serverIds.has(d.id) &&
+    !submittedCompanyNames.has(d.companyName?.toLowerCase())
+  );
   const all = [...uniqueDrafts, ...myApps];
   return all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
@@ -499,7 +518,12 @@ export async function createApplication(fields: InvestmentApplicationFields, isI
     return app;
   }
 
-  return crmCreate(fields);
+  const result = await crmCreate(fields);
+  // Clean up any local draft for the same company so it doesn't linger after submission.
+  const existing = loadLocal();
+  const cleaned = existing.filter(d => d.companyName?.toLowerCase() !== fields.companyName?.toLowerCase());
+  if (cleaned.length !== existing.length) saveLocal(cleaned);
+  return result;
 }
 
 /**
@@ -516,7 +540,9 @@ export async function updateApplication(
   if (localIdx !== -1 && localApps[localIdx].status === 'draft' && updates.status && updates.status !== 'draft') {
     const merged = { ...localApps[localIdx], ...updates, updatedAt: new Date().toISOString() };
     const payload = toCrmPayload(merged);
-    const crmId = await zohoCreate(CRM_MODULE, payload);
+    const crmId = isFounder()
+      ? await portalCreate(CRM_MODULE, payload)
+      : await zohoCreate(CRM_MODULE, payload);
     localApps.splice(localIdx, 1);
     saveLocal(localApps);
     return { ...merged, id: crmId };
