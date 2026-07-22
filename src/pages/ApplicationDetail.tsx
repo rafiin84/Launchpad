@@ -1371,48 +1371,65 @@ export default function ApplicationDetail() {
           {requestedDocs.length > 0 && (
             <Section title={t.applicationDetail.requestedDocuments}>
               <div className="space-y-2">
-                {requestedDocs.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileUp size={12} className={doc.status === 'submitted' ? 'text-green-500' : doc.status === 'uploaded' ? 'text-blue-500' : 'text-gray-400'} />
-                      <div className="min-w-0">
-                        <span className="text-[11px] font-medium text-gray-800">{doc.type}</span>
-                        {doc.fileName && (doc.status === 'submitted' || doc.status === 'uploaded') && (
-                          <p className="text-[10px] text-gray-400 truncate max-w-[100px]">{doc.fileName}</p>
+                {requestedDocs.map((doc, i) => {
+                  // A submitted doc is either a share link (doc.link, or an older
+                  // record where attachmentId holds an http URL) or a real CRM
+                  // attachment (attachmentId that is not a URL).
+                  const linkUrl = doc.link || (doc.attachmentId && /^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '');
+                  const crmAttachmentId = doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
+                  const hasFile = doc.status === 'submitted' || doc.status === 'uploaded';
+                  const ViewButton = () => {
+                    if (linkUrl) {
+                      return (
+                        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                          <ExternalLink size={9} /> {t.applicationDetail.view}
+                        </a>
+                      );
+                    }
+                    if (crmAttachmentId) {
+                      return (
+                        <button onClick={() => handleDownloadAttachment(id!, crmAttachmentId, doc.fileName || 'document')} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                          <Download size={9} /> {t.applicationDetail.view}
+                        </button>
+                      );
+                    }
+                    return null;
+                  };
+                  return (
+                    <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileUp size={12} className={doc.status === 'submitted' ? 'text-green-500' : doc.status === 'uploaded' ? 'text-blue-500' : 'text-gray-400'} />
+                        <div className="min-w-0">
+                          <span className="text-[11px] font-medium text-gray-800">{doc.type}</span>
+                          {doc.fileName && hasFile && doc.fileName !== doc.type && (
+                            <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{doc.fileName}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {doc.status === 'submitted' ? (
+                          <>
+                            <ViewButton />
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                              <Check size={9} /> {t.applicationDetail.submittedStatus}
+                            </span>
+                          </>
+                        ) : doc.status === 'uploaded' ? (
+                          <>
+                            <ViewButton />
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                              <Check size={9} /> {t.applicationDetail.uploadedStatus}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                            <Clock size={9} /> {t.applicationDetail.pendingStatus}
+                          </span>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {doc.status === 'submitted' ? (
-                        <>
-                          {doc.attachmentId && (
-                            <button onClick={() => handleDownloadAttachment(id!, doc.attachmentId!, doc.fileName || 'document')} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
-                              <Download size={9} /> {t.applicationDetail.view}
-                            </button>
-                          )}
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
-                            <Check size={9} /> {t.applicationDetail.submittedStatus}
-                          </span>
-                        </>
-                      ) : doc.status === 'uploaded' ? (
-                        <>
-                          {doc.attachmentId && (
-                            <button onClick={() => handleDownloadAttachment(id!, doc.attachmentId!, doc.fileName || 'document')} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
-                              <Download size={9} /> {t.applicationDetail.view}
-                            </button>
-                          )}
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
-                            <Check size={9} /> {t.applicationDetail.uploadedStatus}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
-                          <Clock size={9} /> {t.applicationDetail.pendingStatus}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Section>
           )}
