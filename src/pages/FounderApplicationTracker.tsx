@@ -586,6 +586,10 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
       app.status === 'rejected' ? 'border-red-200 bg-red-50/20' :
       'border-gray-100',
     )}>
+      {/* TEMP debug — shows what the founder's fetch returned for custom fields */}
+      <p className="text-[10px] text-red-400 font-mono break-all mb-2">
+        [debug] meetingDate="{app.meetingDate || 'EMPTY'}" | reqDocs={parseRequestedDocuments(app.requestedDocuments).length} | reviewedBy="{app.reviewedBy || 'EMPTY'}"
+      </p>
       {/* Action required banner */}
       {needsAction && (
         <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mb-3">
