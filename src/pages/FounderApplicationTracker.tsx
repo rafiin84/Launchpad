@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
+  wasFounderFetchAuthError,
   canApplyAgain,
   updateApplication,
   deleteApplication,
@@ -773,11 +774,13 @@ export default function FounderApplicationTracker() {
   const [applications, setApplications] = useState<InvestmentApplication[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const loadApps = useCallback(async () => {
     setLoading(true);
     const all = await getApplications(isInvestor, currentUser?.email);
     setApplications(all);
+    setSessionExpired(!isInvestor && all.length === 0 && wasFounderFetchAuthError());
     setLoading(false);
   }, [isInvestor, currentUser?.email]);
 
@@ -822,8 +825,24 @@ export default function FounderApplicationTracker() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && isEmpty && (
+      {/* Session-expired state — the token is invalid, so we couldn't load apps.
+          Show this instead of the misleading "no application yet" empty state. */}
+      {!loading && isEmpty && sessionExpired && (
+        <div className="text-center py-20 border-2 border-dashed border-amber-200 bg-amber-50/30 rounded-2xl">
+          <Clock size={32} className="text-amber-300 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-700 mb-1">Session expired</p>
+          <p className="text-xs text-gray-500 mb-5">Your sign-in has timed out. Please sign in again to see your applications.</p>
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            Sign in again
+          </Link>
+        </div>
+      )}
+
+      {/* Empty state (genuinely no applications) */}
+      {!loading && isEmpty && !sessionExpired && (
         <div className="text-center py-20 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">{t.applicationTracker.noApplicationYet}</p>

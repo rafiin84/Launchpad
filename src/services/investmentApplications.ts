@@ -323,6 +323,16 @@ function generateLocalId(): string {
 // profile rejects the fields param.
 const ALL_CRM_FIELDS = Object.values(FIELD_MAP).join(',');
 
+// Set true when the last founder fetch failed because the portal token is
+// expired/invalid (so the UI can show "session expired" instead of "no apps").
+let lastFounderFetchAuthError = false;
+export function wasFounderFetchAuthError(): boolean { return lastFounderFetchAuthError; }
+
+function isAuthError(err: unknown): boolean {
+  const e = err as { status?: number; code?: string; message?: string };
+  return e?.status === 401 || e?.code === 'INVALID_TOKEN' || /invalid.*token|401/i.test(e?.message ?? '');
+}
+
 async function crmGetAll(): Promise<InvestmentApplication[]> {
   try {
     const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
@@ -333,25 +343,37 @@ async function crmGetAll(): Promise<InvestmentApplication[]> {
 
     // For portal founders: portalList (WITH the x-crmportal header) returns records
     // the portal user created; portalSearch by Founder_Email catches admin-created
-    // ones. COQL and the unscoped list are rejected by the portal profile — only
-    // these two work. Try with the fields param (for custom fields like
-    // Requested_Documents); if the portal rejects it, retry plain so the list still
-    // loads. Earlier failures were CORS, now handled by the /portal-api dev proxy.
+    // ones. Try with the fields param (custom fields like Requested_Documents); if
+    // the portal rejects it, retry plain. Track auth (401) failures so the UI can
+    // tell an expired session apart from a genuinely empty list.
+    let authError = false;
     const email = loadFounderEmail();
-    const listRecords = await portalList(CRM_MODULE, { ...params, fields: ALL_CRM_FIELDS })
-      .catch(() => portalList(CRM_MODULE, params))
-      .catch(() => [] as ZohoRecord[]);
-    const searchRecords = await portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`, ALL_CRM_FIELDS)
-      .catch(() => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`))
-      .catch(() => [] as ZohoRecord[]);
+    const run = async (fn: () => Promise<ZohoRecord[]>, fallback: () => Promise<ZohoRecord[]>) => {
+      try { return await fn(); }
+      catch (e1) {
+        if (isAuthError(e1)) authError = true;
+        try { return await fallback(); }
+        catch (e2) { if (isAuthError(e2)) authError = true; return [] as ZohoRecord[]; }
+      }
+    };
+    const listRecords = await run(
+      () => portalList(CRM_MODULE, { ...params, fields: ALL_CRM_FIELDS }),
+      () => portalList(CRM_MODULE, params),
+    );
+    const searchRecords = await run(
+      () => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`, ALL_CRM_FIELDS),
+      () => portalSearch(CRM_MODULE, `(Founder_Email:equals:${email})`),
+    );
 
     const seen = new Set<string>();
     const merged: ZohoRecord[] = [];
     for (const r of [...listRecords, ...searchRecords]) {
       if (!seen.has(r.id)) { seen.add(r.id); merged.push(r); }
     }
+    lastFounderFetchAuthError = authError && merged.length === 0;
     return merged.map(fromCrmRecord);
   } catch (err) {
+    lastFounderFetchAuthError = isAuthError(err);
     console.warn('[investmentApplications] crmGetAll (founder) failed:', err);
     return [];
   }
