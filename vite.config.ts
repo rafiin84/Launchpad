@@ -25,6 +25,16 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/portal-api/, ''),
       },
+      // Dev proxy for the standard Zoho CRM API (investor/admin token). Used by
+      // crmAppUsers (profile photos) and crmFounders (Contacts). Forwards the
+      // user's own Authorization header; zohoapis.in doesn't send CORS headers
+      // to localhost, so calls must go through the dev server.
+      '/zoho-crm-proxy': {
+        target: 'https://www.zohoapis.in',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/zoho-crm-proxy/, ''),
+      },
     },
   },
 })
