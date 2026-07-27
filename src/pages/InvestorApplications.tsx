@@ -109,7 +109,6 @@ type FilterTab = 'all' | ApplicationStatus;
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all',               label: 'All' },
-  { id: 'submitted',         label: 'Submitted' },
   { id: 'under_review',      label: 'Under Review' },
   { id: 'shortlisted',       label: 'Shortlisted' },
   { id: 'meeting_scheduled', label: 'Meeting' },
