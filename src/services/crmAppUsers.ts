@@ -236,7 +236,10 @@ export function clearCachedProfile() {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 function isPortalUser(): boolean {
-  return loadRole() === 'founder' && !loadToken();
+  // A founder is always a portal user: their portal token only works on the
+  // portal domain, never the admin CRM API (zohoapis.in), so appusers admin
+  // calls always 401. Skip them and let the /api/profile fallback load the photo.
+  return loadRole() === 'founder';
 }
 
 /**
