@@ -614,7 +614,9 @@ export default function Activities() {
     if (!canFetch) { setLoading(false); return; }
     setLoading(true); setError('');
     fetchSharedActivities()
-      .then(setRecords)
+      // Show only activities actually saved in CRM — exclude local-only items
+      // (IDs starting with "local_") that haven't synced.
+      .then(recs => setRecords(recs.filter(r => !r.id.startsWith('local_'))))
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
   };
@@ -637,6 +639,8 @@ export default function Activities() {
   }, []);
 
   const handlePost = (activity: CRMActivity) => {
+    // Only show it in the feed if it actually saved to CRM (real id, not local_).
+    if (activity.id.startsWith('local_')) return;
     setRecords(prev => [activity, ...prev]);
   };
 
