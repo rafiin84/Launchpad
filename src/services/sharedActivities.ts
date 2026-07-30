@@ -133,8 +133,9 @@ export async function postSharedActivity(fields: CRMActivityFields): Promise<CRM
   const synced = !!id;
   if (!synced) console.error('[Activities] Activity NOT synced to CRM:', lastError);
 
-  const activity: CRMActivity & { synced: boolean } = {
+  const activity: CRMActivity & { synced: boolean; error?: string } = {
     id: id || generateLocalId(), ...fields, createdTime: new Date().toISOString(), synced,
+    ...(synced ? {} : { error: lastError || 'Unknown error' }),
   };
 
   const local = loadLocal();

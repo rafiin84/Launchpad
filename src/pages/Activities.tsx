@@ -238,7 +238,8 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
       onPost(activity);
       if (!activity.synced) {
-        onSyncWarning?.('Activity saved locally but failed to sync to CRM. It will retry automatically.');
+        const detail = (activity as { error?: string }).error;
+        onSyncWarning?.(`Post did not save to CRM${detail ? `: ${detail}` : ''}. Please sign in again if your session expired, or check portal permissions.`);
       }
       handleCancel();
     } finally { setPosting(false); }
