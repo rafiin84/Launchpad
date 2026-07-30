@@ -145,6 +145,12 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
   return activities.map(a => byId.get(a.id) ?? a);
 }
 
+// Founders (portal users) cannot write to My_Activities, so they post to the
+// portal-writable Feed_Submissions module. A Zoho workflow function then relays
+// each submission into My_Activities (Public), where the shared feed reads from.
+// Feed_Submissions has the same field API names, so the payload is identical.
+const FOUNDER_POST_MODULE = 'Feed_Submissions';
+
 export async function createCRMActivity(fields: CRMActivityFields): Promise<string> {
   const payload: Record<string, unknown> = {};
   for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
@@ -152,7 +158,7 @@ export async function createCRMActivity(fields: CRMActivityFields): Promise<stri
     if (raw !== '') payload[crmKey] = raw;
   }
   const isFounder = loadRole() === 'founder';
-  return isFounder ? portalCreate(MODULE, payload) : zohoCreate(MODULE, payload);
+  return isFounder ? portalCreate(FOUNDER_POST_MODULE, payload) : zohoCreate(MODULE, payload);
 }
 
 export async function updateCRMActivity(id: string, fields: CRMActivityFields): Promise<void> {
