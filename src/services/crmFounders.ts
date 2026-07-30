@@ -1,22 +1,16 @@
 import { zohoList, zohoGetById, zohoCreate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
 import { loadToken } from './oauth';
+import { ZOHO_HOSTS } from '../config/auth';
 
-const isDev = import.meta.env.DEV;
-
-/** Build a URL for CRM API calls that works in both dev (Vite proxy) and prod (Vercel proxy) */
+/** Direct CRM API URL — no proxy. */
 function crmUrl(apiPath: string): string {
-  if (isDev) return `/zoho-crm-proxy${apiPath}`;
-  const token = loadToken();
-  return `/api/zoho-crm-proxy?path=${encodeURIComponent(apiPath)}&token=${encodeURIComponent(token || '')}`;
+  return `${ZOHO_HOSTS.crmApi}${apiPath}`;
 }
 
-/** Headers: in dev include Authorization (Vite proxy forwards it), in prod the serverless proxy handles auth */
+/** Send the user's own token directly on every call. */
 function crmHeaders(): Record<string, string> {
-  if (isDev) {
-    const token = loadToken();
-    return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
-  }
-  return {};
+  const token = loadToken();
+  return token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {};
 }
 
 // Founders are stored as Contacts in Zoho CRM

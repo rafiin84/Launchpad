@@ -22,18 +22,15 @@ import { ZOHO_HOSTS } from '../config/auth';
 async function zohoDeleteRecordPhoto(module: string, recordId: string): Promise<boolean> {
   const token = loadToken();
   if (!token) return false;
-  const base = import.meta.env.DEV ? `/zoho-crm-proxy` : ZOHO_HOSTS.crmApi;
-  const res = await fetch(`${base}/crm/v2/${module}/${recordId}/photo`, {
+  const res = await fetch(`${ZOHO_HOSTS.crmApi}/crm/v2/${module}/${recordId}/photo`, {
     method: 'DELETE',
     headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
   });
   return res.ok;
 }
 
-const isDev = import.meta.env.DEV;
-
+// Direct call to the Zoho CRM API — no proxy.
 function crmUrl(apiPath: string): string {
-  if (isDev) return `/zoho-crm-proxy${apiPath}`;
   return `${ZOHO_HOSTS.crmApi}${apiPath}`;
 }
 
