@@ -66,16 +66,12 @@ function filterByVisibility(activities: CRMActivity[], localIds: Set<string>): C
     // Investors see everything
     if (role === 'investor') return true;
 
-    // Portal founders: show all non-notification activities the CRM returned.
-    // The CRM portal already scopes what records are accessible — no need to
-    // re-filter here. Only hide another founder's activity if it was explicitly
-    // marked investor_only AND was not created by the current user.
+    // Portal founders see: investor posts + their OWN posts.
+    // A founder's post goes only to investors — other founders must NOT see it.
     const isOwnPost = localIds.has(a.id) || (myName && a.authorName?.trim().toLowerCase() === myName);
-    const isInvestorOnly = a.visibility?.toLowerCase() === 'investor_only';
-
     if (isOwnPost) return true;
-    if (isInvestorOnly) return false;
-    return true;
+    const isInvestorPost = a.authorRole?.toLowerCase() === 'investor';
+    return isInvestorPost;
   });
 }
 
