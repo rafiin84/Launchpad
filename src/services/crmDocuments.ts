@@ -21,9 +21,6 @@ export interface CRMDocument {
 export type CRMDocumentFields = Omit<CRMDocument, 'id' | 'createdTime'>;
 
 const MODULE = 'My_Documents';
-// Founders (portal users) can't write My_Documents; they write here and a Zoho
-// workflow relays each submission into My_Documents. Same field API names.
-const FOUNDER_SUBMIT_MODULE = 'Document_Submissions';
 
 const FIELD_MAP: Record<string, string> = {
   documentName:    'Name',
@@ -74,8 +71,8 @@ export async function createCRMDocument(
 ): Promise<string> {
   const isFounder = loadRole() === 'founder';
 
-  // ── Founder: upload file to Cloudinary, then portalCreate a submission that a
-  //    Zoho workflow relays into My_Documents (portal can't write My_Documents).
+  // ── Founder: upload the file to Cloudinary (portal can't attach files), then
+  //    portalCreate the My_Documents record directly with the hosted File_URL.
   if (isFounder) {
     let fileUrl = fields.fileUrl || '';
     if (!fileUrl && fields.fileData && fields.fileName) {
@@ -90,7 +87,7 @@ export async function createCRMDocument(
       const val = appKey === 'fileUrl' ? fileUrl : (fields as Record<string, unknown>)[appKey];
       if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
     }
-    return portalCreate(FOUNDER_SUBMIT_MODULE, payload);
+    return portalCreate(MODULE, payload);
   }
 
   // ── Investor: write My_Documents directly + attach the file.
