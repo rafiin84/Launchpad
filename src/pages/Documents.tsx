@@ -8,7 +8,7 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
   fetchCRMDocuments, deleteCRMDocument, fetchDocumentAttachments,
-  downloadAttachment, viewAttachment, type CRMDocument,
+  downloadAttachment, viewAttachment, openFileUploadField, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -115,7 +115,14 @@ export default function Documents() {
   };
 
   const handleDownload = async (doc: CRMDocument) => {
-    // Founder-submitted docs are hosted files (File_URL) — open the link directly.
+    // Prefer the File Upload field (stored in Zoho); then a hosted link; then a legacy attachment.
+    if (doc.fileUploadId) {
+      setDownloading(doc.id);
+      try { await openFileUploadField(doc, true); }
+      catch { alert('Failed to download. Please try again.'); }
+      finally { setDownloading(null); }
+      return;
+    }
     if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
     setDownloading(doc.id);
     try {
@@ -134,6 +141,13 @@ export default function Documents() {
   };
 
   const handleView = async (doc: CRMDocument) => {
+    if (doc.fileUploadId) {
+      setViewing(doc.id);
+      try { await openFileUploadField(doc, false); }
+      catch { alert('Failed to open document. Please try again.'); }
+      finally { setViewing(null); }
+      return;
+    }
     if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
     setViewing(doc.id);
     try {

@@ -1,7 +1,6 @@
-import { zohoList, zohoCreate, zohoDelete, zohoGetAttachments, zohoDownloadAttachment, zohoUploadAttachment, portalList } from './zohoApi';
+import { zohoList, zohoCreate, zohoDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
 import { loadRole } from './oauth';
 import { portalCreate } from './zohoApi';
-import { uploadFile, canUploadFiles } from './fileUpload';
 
 export interface CRMDocument {
   id: string;
@@ -13,6 +12,7 @@ export interface CRMDocument {
   fileName: string;
   fileSize: string;
   fileUrl: string;
+  fileUploadId: string;   // file id stored in the File_Upload_1 field (file lives in Zoho)
   authorName: string;
   authorRole: string;
   createdTime: string;
@@ -21,6 +21,8 @@ export interface CRMDocument {
 export type CRMDocumentFields = Omit<CRMDocument, 'id' | 'createdTime'>;
 
 const MODULE = 'My_Documents';
+// Zoho File Upload field — stores the actual file IN Zoho CRM.
+export const FILE_UPLOAD_FIELD = 'File_Upload_1';
 
 const FIELD_MAP: Record<string, string> = {
   documentName:    'Name',
@@ -35,10 +37,21 @@ const FIELD_MAP: Record<string, string> = {
   authorRole:      'Author_Role',
 };
 
-const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',Created_Time';
+const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD + ',Created_Time';
+
+// A File Upload field reads back as an array of objects; pull the file id + name.
+function parseFileUpload(v: unknown): { id: string; name: string } {
+  const arr = Array.isArray(v) ? v : [];
+  const f = arr[0] as Record<string, unknown> | undefined;
+  if (!f) return { id: '', name: '' };
+  const id = String(f['file_Id__s'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['id'] ?? '');
+  const name = String(f['file_name__s'] ?? f['file_name'] ?? f['name'] ?? '');
+  return { id, name };
+}
 
 function fromRecord(r: Record<string, unknown>): CRMDocument {
   const s = (k: string) => String(r[k] ?? '');
+  const fu = parseFileUpload(r[FILE_UPLOAD_FIELD]);
   return {
     id:             String(r.id),
     documentName:   s('Name'),
@@ -46,9 +59,10 @@ function fromRecord(r: Record<string, unknown>): CRMDocument {
     relatedCompany: s('Related_Company'),
     description:    s('Document_Description'),
     visibility:     s('Visibility'),
-    fileName:       s('File_Name'),
+    fileName:       fu.name || s('File_Name'),
     fileSize:       s('File_Size'),
     fileUrl:        s('File_URL'),
+    fileUploadId:   fu.id,
     authorName:     s('Author_Name'),
     authorRole:     s('Author_Role'),
     createdTime:    s('Created_Time'),
@@ -67,45 +81,28 @@ export async function fetchCRMDocuments(): Promise<CRMDocument[]> {
 }
 
 export async function createCRMDocument(
-  fields: Omit<CRMDocumentFields, 'fileUrl'> & { fileUrl?: string; fileData?: string; fileName?: string; mimeType?: string },
+  fields: Omit<CRMDocumentFields, 'fileUrl' | 'fileUploadId'> & { fileData?: string; fileName?: string; mimeType?: string },
 ): Promise<string> {
   const isFounder = loadRole() === 'founder';
 
-  // ── Founder: upload the file to Cloudinary (portal can't attach files), then
-  //    portalCreate the My_Documents record directly with the hosted File_URL.
-  if (isFounder) {
-    let fileUrl = fields.fileUrl || '';
-    if (!fileUrl && fields.fileData && fields.fileName) {
-      if (!canUploadFiles()) {
-        throw new Error('File upload is not configured (Cloudinary). Cannot upload document.');
-      }
-      const blob = base64ToBlob(fields.fileData, fields.mimeType);
-      fileUrl = await uploadFile(blob, fields.fileName);
-    }
-    const payload: Record<string, unknown> = {};
-    for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
-      const val = appKey === 'fileUrl' ? fileUrl : (fields as Record<string, unknown>)[appKey];
-      if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
-    }
-    return portalCreate(MODULE, payload);
-  }
-
-  // ── Investor: write My_Documents directly + attach the file.
   const payload: Record<string, unknown> = {};
   for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
     const val = (fields as Record<string, unknown>)[appKey];
     if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
   }
-  const recordId = await zohoCreate(MODULE, payload);
+
+  // Upload the file to Zoho (File Upload API) and reference it on the File Upload
+  // field — this stores the file IN Zoho CRM. Founders use the portal domain,
+  // investors the admin domain.
   if (fields.fileData && fields.fileName) {
-    try {
-      const blob = base64ToBlob(fields.fileData, fields.mimeType);
-      await zohoUploadAttachment(MODULE, recordId, blob, fields.fileName);
-    } catch (err) {
-      console.warn('[crmDocuments] Attachment upload failed:', err);
-    }
+    const blob = base64ToBlob(fields.fileData, fields.mimeType);
+    const fileId = isFounder
+      ? await portalUploadFile(blob, fields.fileName)
+      : await zohoUploadFile(blob, fields.fileName);
+    payload[FILE_UPLOAD_FIELD] = [{ file_id: fileId }];
   }
-  return recordId;
+
+  return isFounder ? portalCreate(MODULE, payload) : zohoCreate(MODULE, payload);
 }
 
 function base64ToBlob(fileData: string, mimeType?: string): Blob {
@@ -118,6 +115,21 @@ function base64ToBlob(fileData: string, mimeType?: string): Blob {
 
 export async function deleteCRMDocument(id: string): Promise<void> {
   await zohoDelete(MODULE, id);
+}
+
+// Open / download the file stored in the File Upload field (lives in Zoho).
+export async function openFileUploadField(doc: CRMDocument, download: boolean): Promise<void> {
+  const blob = await downloadFieldFile(MODULE, doc.id, FILE_UPLOAD_FIELD, doc.fileUploadId, loadRole() === 'founder');
+  if (!blob) throw new Error('File not available');
+  const url = URL.createObjectURL(blob);
+  if (download) {
+    const a = document.createElement('a');
+    a.href = url; a.download = doc.fileName || 'document';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } else {
+    window.open(url, '_blank');
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 export async function fetchDocumentAttachments(

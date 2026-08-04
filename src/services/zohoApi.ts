@@ -934,3 +934,42 @@ export async function portalDownloadAttachment(
   if (!res.ok) return null;
   return res.blob();
 }
+
+// ─── File Upload field (/crm/v2/files) — stores files IN Zoho ────────────────
+// Different API from Attachments; returns an encrypted file id to set on a
+// File Upload field. Founders use the portal domain, investors the admin domain.
+
+async function uploadFileToZoho(file: Blob, fileName: string, portal: boolean): Promise<string> {
+  const token = ensureToken();
+  const form = new FormData();
+  form.append('file', file, fileName);
+  const headers: Record<string, string> = { 'Authorization': `Zoho-oauthtoken ${token}` };
+  if (portal) headers['x-crmportal'] = ZOHO_HOSTS.portalName;
+  const url = portal ? buildPortalCrmUrl('/crm/v2/files') : buildCrmUrl('/crm/v2/files');
+  const res = await fetch(url, { method: 'POST', headers, body: form });
+  const json = await res.json().catch(() => ({})) as { data?: Array<{ code?: string; message?: string; details?: { id?: string } }>; message?: string };
+  const row = json.data?.[0];
+  const id = row?.details?.id;
+  if (!res.ok || !id) {
+    throw new ZohoApiError(res.status, row?.message || json.message || 'File upload failed', row?.code || '');
+  }
+  return id;
+}
+
+export const zohoUploadFile = (file: Blob, fileName: string) => uploadFileToZoho(file, fileName, false);
+export const portalUploadFile = (file: Blob, fileName: string) => uploadFileToZoho(file, fileName, true);
+
+/** Download a file stored in a File Upload field. */
+export async function downloadFieldFile(
+  module: string, recordId: string, fieldApiName: string, fileId: string, portal: boolean,
+): Promise<Blob | null> {
+  const token = loadToken();
+  if (!token) return null;
+  const qs = `fields_data=${encodeURIComponent(JSON.stringify({ [fieldApiName]: fileId }))}`;
+  const path = `/crm/v2/${module}/${recordId}/actions/download_fields_attachment?${qs}`;
+  const headers: Record<string, string> = { 'Authorization': `Zoho-oauthtoken ${token}` };
+  if (portal) headers['x-crmportal'] = ZOHO_HOSTS.portalName;
+  const res = await fetch(portal ? buildPortalCrmUrl(path) : buildCrmUrl(path), { headers });
+  if (!res.ok) return null;
+  return res.blob();
+}
