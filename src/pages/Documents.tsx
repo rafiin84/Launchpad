@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { loadUserName } from '../services/oauth';
+import { fetchCompanyProfile } from '../services/companyProfile';
 
 const TYPE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   'pitch-deck':       { icon: File,           color: 'text-indigo-500 bg-indigo-50',   label: 'Pitch Deck' },
@@ -45,7 +46,7 @@ function formatDate(iso: string, language: string): string {
 }
 
 export default function Documents() {
-  const { isFounder, isInvestor, founderCompanyName } = useAuth();
+  const { isFounder, isInvestor, founderCompanyName, currentUser } = useAuth();
   const { t, language } = useLanguage();
   const { setPageTitle } = usePageTitle();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
@@ -56,6 +57,9 @@ export default function Documents() {
   const [clearingAll, setClearingAll] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  // founderCompanyName from localStorage can be empty; resolve it reliably from
+  // the company profile so the founder actually matches investor-uploaded docs.
+  const [resolvedCompany, setResolvedCompany] = useState((founderCompanyName || '').trim().toLowerCase());
 
   const typeLabels: Record<string, string> = {
     'pitch-deck': t.addDocument.pitchDeck,
@@ -77,8 +81,21 @@ export default function Documents() {
   useEffect(() => { setPageTitle(t.documentsPage.title, t.documentsPage.description); return () => setPageTitle(null); }, [t]);
   useEffect(() => { load(); }, []);
 
+  // Resolve the founder's company name from their profile (localStorage may be empty).
+  useEffect(() => {
+    if (!isFounder) return;
+    const email = currentUser?.email;
+    if (!email) return;
+    fetchCompanyProfile(email)
+      .then(res => {
+        const name = (res?.data?.name || '').trim().toLowerCase();
+        if (name) setResolvedCompany(name);
+      })
+      .catch(() => {});
+  }, [isFounder, currentUser?.email]);
+
   const myName = (loadUserName() || '').trim().toLowerCase();
-  const myCompany = (founderCompanyName || '').trim().toLowerCase();
+  const myCompany = resolvedCompany || (founderCompanyName || '').trim().toLowerCase();
   // Visibility rules:
   //  - Investors see every document.
   //  - A founder sees only documents tied to THEIR OWN company: documents the
