@@ -1,4 +1,7 @@
-import { zohoList, zohoCreate, zohoDelete, zohoGetAttachments, zohoDownloadAttachment, zohoUploadAttachment } from './zohoApi';
+import { zohoList, zohoCreate, zohoDelete, zohoGetAttachments, zohoDownloadAttachment, zohoUploadAttachment, portalList } from './zohoApi';
+import { loadRole } from './oauth';
+import { portalCreate } from './zohoApi';
+import { uploadFile, canUploadFiles } from './fileUpload';
 
 export interface CRMDocument {
   id: string;
@@ -9,6 +12,7 @@ export interface CRMDocument {
   visibility: string;
   fileName: string;
   fileSize: string;
+  fileUrl: string;
   authorName: string;
   authorRole: string;
   createdTime: string;
@@ -17,6 +21,9 @@ export interface CRMDocument {
 export type CRMDocumentFields = Omit<CRMDocument, 'id' | 'createdTime'>;
 
 const MODULE = 'My_Documents';
+// Founders (portal users) can't write My_Documents; they write here and a Zoho
+// workflow relays each submission into My_Documents. Same field API names.
+const FOUNDER_SUBMIT_MODULE = 'Document_Submissions';
 
 const FIELD_MAP: Record<string, string> = {
   documentName:    'Name',
@@ -26,61 +33,90 @@ const FIELD_MAP: Record<string, string> = {
   visibility:      'Visibility',
   fileName:        'File_Name',
   fileSize:        'File_Size',
+  fileUrl:         'File_URL',
   authorName:      'Author_Name',
   authorRole:      'Author_Role',
 };
 
 const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',Created_Time';
 
-export async function fetchCRMDocuments(): Promise<CRMDocument[]> {
-  const records = await zohoList(MODULE, {
-    per_page: '200',
-    sort_by: 'Created_Time',
-    sort_order: 'desc',
-    fields: ALL_FIELDS,
-  });
-  return records.map(r => ({
+function fromRecord(r: Record<string, unknown>): CRMDocument {
+  const s = (k: string) => String(r[k] ?? '');
+  return {
     id:             String(r.id),
-    documentName:   String(r['Name'] ?? ''),
-    documentType:   String(r['Document_Type'] ?? ''),
-    relatedCompany: String(r['Related_Company'] ?? ''),
-    description:    String(r['Document_Description'] ?? ''),
-    visibility:     String(r['Visibility'] ?? ''),
-    fileName:       String(r['File_Name'] ?? ''),
-    fileSize:       String(r['File_Size'] ?? ''),
-    authorName:     String(r['Author_Name'] ?? ''),
-    authorRole:     String(r['Author_Role'] ?? ''),
-    createdTime:    String(r['Created_Time'] ?? ''),
-  }));
+    documentName:   s('Name'),
+    documentType:   s('Document_Type'),
+    relatedCompany: s('Related_Company'),
+    description:    s('Document_Description'),
+    visibility:     s('Visibility'),
+    fileName:       s('File_Name'),
+    fileSize:       s('File_Size'),
+    fileUrl:        s('File_URL'),
+    authorName:     s('Author_Name'),
+    authorRole:     s('Author_Role'),
+    createdTime:    s('Created_Time'),
+  };
+}
+
+export async function fetchCRMDocuments(): Promise<CRMDocument[]> {
+  const params = { per_page: '200', sort_by: 'Created_Time', sort_order: 'desc', fields: ALL_FIELDS };
+  // Founders read My_Documents via the portal API; investors via the admin API.
+  const records = loadRole() === 'founder'
+    ? await portalList(MODULE, params)
+        .catch(() => portalList(MODULE, { per_page: '200' }))
+        .catch(() => [])
+    : await zohoList(MODULE, params);
+  return (records as Record<string, unknown>[]).map(fromRecord);
 }
 
 export async function createCRMDocument(
-  fields: CRMDocumentFields & { fileData?: string; fileName?: string; mimeType?: string },
+  fields: Omit<CRMDocumentFields, 'fileUrl'> & { fileUrl?: string; fileData?: string; fileName?: string; mimeType?: string },
 ): Promise<string> {
+  const isFounder = loadRole() === 'founder';
+
+  // ── Founder: upload file to Cloudinary, then portalCreate a submission that a
+  //    Zoho workflow relays into My_Documents (portal can't write My_Documents).
+  if (isFounder) {
+    let fileUrl = fields.fileUrl || '';
+    if (!fileUrl && fields.fileData && fields.fileName) {
+      if (!canUploadFiles()) {
+        throw new Error('File upload is not configured (Cloudinary). Cannot upload document.');
+      }
+      const blob = base64ToBlob(fields.fileData, fields.mimeType);
+      fileUrl = await uploadFile(blob, fields.fileName);
+    }
+    const payload: Record<string, unknown> = {};
+    for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
+      const val = appKey === 'fileUrl' ? fileUrl : (fields as Record<string, unknown>)[appKey];
+      if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
+    }
+    return portalCreate(FOUNDER_SUBMIT_MODULE, payload);
+  }
+
+  // ── Investor: write My_Documents directly + attach the file.
   const payload: Record<string, unknown> = {};
   for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
     const val = (fields as Record<string, unknown>)[appKey];
-    if (val !== undefined && val !== null && val !== '') {
-      payload[crmKey] = val;
-    }
+    if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
   }
-
   const recordId = await zohoCreate(MODULE, payload);
-
   if (fields.fileData && fields.fileName) {
     try {
-      const base64 = fields.fileData.includes(',') ? fields.fileData.split(',')[1] : fields.fileData;
-      const byteChars = atob(base64);
-      const byteArr = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-      const blob = new Blob([byteArr], { type: fields.mimeType || 'application/octet-stream' });
+      const blob = base64ToBlob(fields.fileData, fields.mimeType);
       await zohoUploadAttachment(MODULE, recordId, blob, fields.fileName);
     } catch (err) {
       console.warn('[crmDocuments] Attachment upload failed:', err);
     }
   }
-
   return recordId;
+}
+
+function base64ToBlob(fileData: string, mimeType?: string): Blob {
+  const base64 = fileData.includes(',') ? fileData.split(',')[1] : fileData;
+  const byteChars = atob(base64);
+  const byteArr = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+  return new Blob([byteArr], { type: mimeType || 'application/octet-stream' });
 }
 
 export async function deleteCRMDocument(id: string): Promise<void> {

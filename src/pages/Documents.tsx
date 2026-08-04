@@ -115,6 +115,8 @@ export default function Documents() {
   };
 
   const handleDownload = async (doc: CRMDocument) => {
+    // Founder-submitted docs are hosted files (File_URL) — open the link directly.
+    if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
     setDownloading(doc.id);
     try {
       const attachments = await fetchDocumentAttachments(doc.id);
@@ -132,6 +134,7 @@ export default function Documents() {
   };
 
   const handleView = async (doc: CRMDocument) => {
+    if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
     setViewing(doc.id);
     try {
       const attachments = await fetchDocumentAttachments(doc.id);

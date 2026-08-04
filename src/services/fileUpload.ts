@@ -23,13 +23,14 @@ export function canUploadFiles(): boolean {
  * Upload a file to Cloudinary and return its secure URL.
  * Uses the `auto` resource type so any file kind (pdf, image, zip…) works.
  */
-export async function uploadFile(file: File): Promise<string> {
+export async function uploadFile(file: Blob, fileName?: string): Promise<string> {
   if (!isCloudinaryConfigured()) {
     throw new FileUploadError('File upload is not configured. Paste a share link instead.');
   }
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/auto/upload`;
   const form = new FormData();
-  form.append('file', file);
+  if (fileName) form.append('file', file, fileName);
+  else form.append('file', file);
   form.append('upload_preset', CLOUDINARY.uploadPreset);
 
   const res = await fetch(url, { method: 'POST', body: form });
