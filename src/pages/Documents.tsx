@@ -45,7 +45,7 @@ function formatDate(iso: string, language: string): string {
 }
 
 export default function Documents() {
-  const { isFounder, isInvestor } = useAuth();
+  const { isFounder, isInvestor, founderCompanyName } = useAuth();
   const { t, language } = useLanguage();
   const { setPageTitle } = usePageTitle();
   const [docs, setDocs] = useState<CRMDocument[]>([]);
@@ -78,12 +78,19 @@ export default function Documents() {
   useEffect(() => { load(); }, []);
 
   const myName = (loadUserName() || '').trim().toLowerCase();
+  const myCompany = (founderCompanyName || '').trim().toLowerCase();
+  // Visibility rules:
+  //  - Investors see every document.
+  //  - A founder sees only documents tied to THEIR OWN company: documents the
+  //    investor uploaded for them (relatedCompany = their company) plus their own
+  //    uploads. They never see other founders' documents or investor documents
+  //    meant for a different company.
   const visibleDocs = isInvestor
     ? docs
     : docs.filter(d => {
-        if (d.authorRole?.toLowerCase() === 'investor') return true;
-        if (myName && d.authorName?.trim().toLowerCase() === myName) return true;
-        return false;
+        const isMine = !!myName && d.authorName?.trim().toLowerCase() === myName;
+        const isForMyCompany = !!myCompany && d.relatedCompany?.trim().toLowerCase() === myCompany;
+        return isMine || isForMyCompany;
       });
 
   const handleDelete = async () => {
