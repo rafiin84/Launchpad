@@ -40,12 +40,15 @@ const FIELD_MAP: Record<string, string> = {
 const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD + ',Created_Time';
 
 // A File Upload field reads back as an array of objects; pull the file id + name.
+// Zoho returns these keys as `File_Id__s` / `File_Name__s` (capitalized) — the
+// lowercase variants below never match, which silently fell back to the file
+// attachment's record `id` instead of the actual file id, breaking downloads.
 function parseFileUpload(v: unknown): { id: string; name: string } {
   const arr = Array.isArray(v) ? v : [];
   const f = arr[0] as Record<string, unknown> | undefined;
   if (!f) return { id: '', name: '' };
-  const id = String(f['file_Id__s'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['id'] ?? '');
-  const name = String(f['file_name__s'] ?? f['file_name'] ?? f['name'] ?? '');
+  const id = String(f['File_Id__s'] ?? f['file_Id__s'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['id'] ?? '');
+  const name = String(f['File_Name__s'] ?? f['file_name__s'] ?? f['file_name'] ?? f['name'] ?? '');
   return { id, name };
 }
 

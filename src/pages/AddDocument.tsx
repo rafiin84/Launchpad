@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, FileText, X, Loader2 } from 'lucide-react';
 import { Input, Textarea, Select } from '../components/ui/Input';
@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { createCRMDocument } from '../services/crmDocuments';
+import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -41,18 +42,20 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function validate(f: FormState, t: any): Record<string, string> {
+function validate(f: FormState, t: any, requireCompany: boolean): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.documentName.trim()) e.documentName = t.addDocument.nameRequired;
   if (!f.type) e.type = t.addDocument.typeRequired;
+  if (requireCompany && !f.relatedCompany.trim()) e.relatedCompany = 'Select the founder this document is for';
   if (!f.fileName) e.file = t.addDocument.fileRequired;
   return e;
 }
 
 export default function AddDocument() {
   const navigate = useNavigate();
-  const { currentUser, isInvestor } = useAuth();
+  const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const { t } = useLanguage();
+  const [companyOptions, setCompanyOptions] = useState<{ value: string; label: string }[]>([]);
 
   const typeOptions = [
     { value: 'pitch-deck', label: t.addDocument.pitchDeck },
@@ -66,6 +69,27 @@ export default function AddDocument() {
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Investors pick which founder company the doc is for (so it's tagged
+  // correctly). Founders' docs are auto-tagged with their own company.
+  useEffect(() => {
+    if (isInvestor) {
+      fetchAllCompanyProfiles()
+        .then(list => {
+          const names = Array.from(new Set(list.map(c => (c.data?.name || '').trim()).filter(Boolean)));
+          setCompanyOptions(names.map(n => ({ value: n, label: n })));
+        })
+        .catch(() => {});
+    } else if (isFounder) {
+      const setName = (name: string) => setForm(prev => ({ ...prev, relatedCompany: name }));
+      if (founderCompanyName?.trim()) setName(founderCompanyName.trim());
+      else if (currentUser?.email) {
+        fetchCompanyProfile(currentUser.email)
+          .then(r => { const n = (r?.data?.name || '').trim(); if (n) setName(n); })
+          .catch(() => {});
+      }
+    }
+  }, [isInvestor, isFounder, currentUser?.email, founderCompanyName]);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -110,7 +134,7 @@ export default function AddDocument() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validate(form, t);
+    const errs = validate(form, t, isInvestor);
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setSubmitting(true);
@@ -152,7 +176,19 @@ export default function AddDocument() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label={`${t.addDocument.documentName} *`} value={form.documentName} onChange={set('documentName')} error={errors.documentName} placeholder="Q3 Financial Model" />
               <Select label={`${t.addDocument.type} *`} value={form.type} onChange={set('type')} options={typeOptions} placeholder={t.addDocument.selectType} error={errors.type} />
-              <Input label={t.addDocument.relatedCompany} value={form.relatedCompany} onChange={set('relatedCompany')} placeholder="Company name" className="sm:col-span-2" />
+              {isInvestor ? (
+                <Select
+                  label={`${t.addDocument.relatedCompany} *`}
+                  value={form.relatedCompany}
+                  onChange={set('relatedCompany')}
+                  options={companyOptions}
+                  placeholder="Select the founder's company"
+                  error={errors.relatedCompany}
+                  className="sm:col-span-2"
+                />
+              ) : (
+                <Input label={t.addDocument.relatedCompany} value={form.relatedCompany} onChange={set('relatedCompany')} placeholder="Your company" className="sm:col-span-2" />
+              )}
             </div>
             <div className="mt-4">
               <Textarea label={t.addDocument.description} value={form.description} onChange={set('description')} placeholder="Brief description of what this document contains..." rows={3} />
