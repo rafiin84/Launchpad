@@ -324,7 +324,8 @@ export default function Documents() {
               return (
                 <div
                   key={doc.id}
-                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors ${i < visibleDocs.length - 1 ? 'border-b border-gray-50' : ''}`}
+                  onClick={() => handleView(doc)}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors cursor-pointer ${i < visibleDocs.length - 1 ? 'border-b border-gray-50' : ''}`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.color}`}>
                     <Icon size={16} />
@@ -377,7 +378,7 @@ export default function Documents() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleView(doc)}
                       disabled={viewerLoading && viewerDoc?.id === doc.id}
