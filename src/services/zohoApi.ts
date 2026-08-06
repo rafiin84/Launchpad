@@ -215,6 +215,25 @@ export async function zohoDelete(module: string, id: string): Promise<void> {
   }
 }
 
+// A portal token is scoped to the launchpad.zcrmportals.in client and is
+// rejected on the admin zohoapis.in domain, so deletes for founders must go
+// through the portal domain — Zoho may still reject them at the profile
+// level (portal profiles are often not granted Delete), in which case this
+// throws the real Zoho error instead of failing silently.
+export async function portalDelete(module: string, id: string): Promise<void> {
+  ensureToken();
+  const url = buildPortalCrmUrl(`/crm/v2/${module}/${id}`);
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: authHeader(),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
+    throw new ZohoApiError(res.status, json.message ?? `Delete failed: ${res.status}`, json.code ?? '');
+  }
+}
+
 // ─── Portal-domain CRUD (for portal tokens that fail on zohoapis.in) ─────────
 
 export async function portalList(module: string, params: Record<string, string> = {}): Promise<ZohoRecord[]> {
@@ -962,14 +981,17 @@ export const portalUploadFile = (file: Blob, fileName: string) => uploadFileToZo
 /** Download a file stored in a File Upload field. */
 export async function downloadFieldFile(
   module: string, recordId: string, fieldApiName: string, fileId: string, portal: boolean,
-): Promise<Blob | null> {
+): Promise<Blob> {
   const token = loadToken();
-  if (!token) return null;
+  if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
   const qs = `fields_data=${encodeURIComponent(JSON.stringify({ [fieldApiName]: fileId }))}`;
   const path = `/crm/v2/${module}/${recordId}/actions/download_fields_attachment?${qs}`;
   const headers: Record<string, string> = { 'Authorization': `Zoho-oauthtoken ${token}` };
   if (portal) headers['x-crmportal'] = ZOHO_HOSTS.portalName;
   const res = await fetch(portal ? buildPortalCrmUrl(path) : buildCrmUrl(path), { headers });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({})) as { message?: string; code?: string };
+    throw new ZohoApiError(res.status, json.message || `Download failed (HTTP ${res.status})`, json.code || '');
+  }
   return res.blob();
 }

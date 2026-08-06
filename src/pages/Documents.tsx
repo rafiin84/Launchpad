@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText, Lock, File, FileSpreadsheet, Scale, Plus,
   Building2, Trash2, AlertCircle, RefreshCw, Download, User, Eye,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
-  fetchCRMDocuments, deleteCRMDocument, fetchDocumentAttachments,
-  downloadAttachment, viewAttachment, openFileUploadField, type CRMDocument,
+  fetchCRMDocuments, deleteCRMDocument, resolveDocumentUrl, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -56,7 +56,11 @@ export default function Documents() {
   const [deleting, setDeleting] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<string | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<CRMDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState('');
+  const viewerRevokeRef = useRef(false);
   // founderCompanyName from localStorage can be empty; resolve it reliably from
   // the company profile so the founder actually matches investor-uploaded docs.
   const [resolvedCompany, setResolvedCompany] = useState((founderCompanyName || '').trim().toLowerCase());
@@ -116,70 +120,75 @@ export default function Documents() {
     try {
       await deleteCRMDocument(pendingDeleteId);
       setDocs(prev => prev.filter(d => d.id !== pendingDeleteId));
-    } catch { /* swallow */ }
-    finally { setDeleting(false); setPendingDeleteId(null); }
+      setPendingDeleteId(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleClearAll = async () => {
     if (!confirm(`Delete all ${visibleDocs.length} documents? This cannot be undone.`)) return;
     setClearingAll(true);
     try {
-      await Promise.allSettled(visibleDocs.map(d => deleteCRMDocument(d.id)));
-      setDocs([]);
+      const targets = visibleDocs.map(d => d.id);
+      const results = await Promise.allSettled(targets.map(id => deleteCRMDocument(id)));
+      const deletedIds = new Set(targets.filter((_, i) => results[i]?.status === 'fulfilled'));
+      setDocs(prev => prev.filter(d => !deletedIds.has(d.id)));
+      const failed = targets.length - deletedIds.size;
+      if (failed > 0) alert(`${failed} of ${targets.length} document(s) could not be deleted.`);
     } finally {
       setClearingAll(false);
     }
   };
 
-  const handleDownload = async (doc: CRMDocument) => {
-    // Prefer the File Upload field (stored in Zoho); then a hosted link; then a legacy attachment.
-    if (doc.fileUploadId) {
-      setDownloading(doc.id);
-      try { await openFileUploadField(doc, true); }
-      catch { alert('Failed to download. Please try again.'); }
-      finally { setDownloading(null); }
-      return;
+  const closeViewer = () => {
+    if (viewerRevokeRef.current && viewerUrl) URL.revokeObjectURL(viewerUrl);
+    setViewerDoc(null);
+    setViewerUrl(null);
+    setViewerError('');
+  };
+
+  const handleView = async (doc: CRMDocument) => {
+    setViewerDoc(doc);
+    setViewerUrl(null);
+    setViewerError('');
+    setViewerLoading(true);
+    try {
+      const { url, revoke } = await resolveDocumentUrl(doc);
+      viewerRevokeRef.current = revoke;
+      setViewerUrl(url);
+    } catch (err) {
+      setViewerError(err instanceof Error ? err.message : 'Failed to open document. Please try again.');
+    } finally {
+      setViewerLoading(false);
     }
-    if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
+  };
+
+  const handleDownload = async (doc: CRMDocument) => {
     setDownloading(doc.id);
     try {
-      const attachments = await fetchDocumentAttachments(doc.id);
-      if (attachments.length === 0) {
-        alert('No file attached to this document.');
-        return;
-      }
-      const att = attachments[0];
-      await downloadAttachment(doc.id, att.id, att.File_Name || doc.fileName || 'document');
-    } catch {
-      alert('Failed to download. Please try again.');
+      const { url, revoke } = await resolveDocumentUrl(doc);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName || 'document';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (revoke) setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to download. Please try again.');
     } finally {
       setDownloading(null);
     }
   };
 
-  const handleView = async (doc: CRMDocument) => {
-    if (doc.fileUploadId) {
-      setViewing(doc.id);
-      try { await openFileUploadField(doc, false); }
-      catch { alert('Failed to open document. Please try again.'); }
-      finally { setViewing(null); }
-      return;
-    }
-    if (doc.fileUrl) { window.open(doc.fileUrl, '_blank', 'noopener,noreferrer'); return; }
-    setViewing(doc.id);
-    try {
-      const attachments = await fetchDocumentAttachments(doc.id);
-      if (attachments.length === 0) {
-        alert('No file attached to this document.');
-        return;
-      }
-      const att = attachments[0];
-      await viewAttachment(doc.id, att.id);
-    } catch {
-      alert('Failed to open document. Please try again.');
-    } finally {
-      setViewing(null);
-    }
+  const handleViewerDownload = () => {
+    if (!viewerDoc) return;
+    handleDownload(viewerDoc);
   };
 
   const typeCounts = visibleDocs.reduce<Record<string, number>>((acc, d) => {
@@ -197,6 +206,19 @@ export default function Documents() {
           onConfirm={handleDelete}
           onCancel={() => setPendingDeleteId(null)}
           deleting={deleting}
+        />
+      )}
+
+      {viewerDoc && (
+        <DocumentViewerModal
+          title={viewerDoc.documentName || 'Document'}
+          fileName={viewerDoc.fileName}
+          url={viewerUrl}
+          loading={viewerLoading}
+          error={viewerError}
+          previewable={/\.pdf$/i.test(viewerDoc.fileName || '')}
+          onClose={closeViewer}
+          onDownload={handleViewerDownload}
         />
       )}
 
@@ -358,11 +380,11 @@ export default function Documents() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleView(doc)}
-                      disabled={viewing === doc.id}
+                      disabled={viewerLoading && viewerDoc?.id === doc.id}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
                       title={t.documentsPage.view}
                     >
-                      <Eye size={14} className={viewing === doc.id ? 'animate-pulse' : ''} />
+                      <Eye size={14} className={viewerLoading && viewerDoc?.id === doc.id ? 'animate-pulse' : ''} />
                     </button>
                     <button
                       onClick={() => handleDownload(doc)}

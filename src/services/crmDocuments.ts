@@ -1,4 +1,4 @@
-import { zohoList, zohoCreate, zohoDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
+import { zohoList, zohoCreate, zohoDelete, portalDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
 import { loadRole } from './oauth';
 import { portalCreate } from './zohoApi';
 
@@ -116,23 +116,12 @@ function base64ToBlob(fileData: string, mimeType?: string): Blob {
   return new Blob([byteArr], { type: mimeType || 'application/octet-stream' });
 }
 
+// Founders' portal tokens are rejected on the admin domain, so their delete
+// must go through the portal-domain endpoint (portalDelete) instead of
+// zohoDelete — Zoho's portal profile may still deny it outright, in which
+// case the caller sees the real Zoho error rather than nothing happening.
 export async function deleteCRMDocument(id: string): Promise<void> {
-  await zohoDelete(MODULE, id);
-}
-
-// Open / download the file stored in the File Upload field (lives in Zoho).
-export async function openFileUploadField(doc: CRMDocument, download: boolean): Promise<void> {
-  const blob = await downloadFieldFile(MODULE, doc.id, FILE_UPLOAD_FIELD, doc.fileUploadId, loadRole() === 'founder');
-  if (!blob) throw new Error('File not available');
-  const url = URL.createObjectURL(blob);
-  if (download) {
-    const a = document.createElement('a');
-    a.href = url; a.download = doc.fileName || 'document';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  } else {
-    window.open(url, '_blank');
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return loadRole() === 'founder' ? portalDelete(MODULE, id) : zohoDelete(MODULE, id);
 }
 
 export async function fetchDocumentAttachments(
@@ -141,22 +130,22 @@ export async function fetchDocumentAttachments(
   return zohoGetAttachments(MODULE, recordId);
 }
 
-export async function downloadAttachment(recordId: string, attachmentId: string, fileName: string): Promise<void> {
-  const blob = await zohoDownloadAttachment(MODULE, recordId, attachmentId);
-  if (!blob) throw new Error('Download failed');
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-export async function viewAttachment(recordId: string, attachmentId: string): Promise<void> {
-  const blob = await zohoDownloadAttachment(MODULE, recordId, attachmentId);
-  if (!blob) throw new Error('View failed');
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+// Resolves any document to a viewable/downloadable URL, trying each storage
+// mechanism the app has used over time: the Zoho File Upload field (current),
+// a hosted share link (fileUrl), then the legacy Attachments API. Object URLs
+// are marked revocable so callers can free them after use.
+export async function resolveDocumentUrl(doc: CRMDocument): Promise<{ url: string; revoke: boolean }> {
+  if (doc.fileUploadId) {
+    const blob = await downloadFieldFile(MODULE, doc.id, FILE_UPLOAD_FIELD, doc.fileUploadId, loadRole() === 'founder');
+    return { url: URL.createObjectURL(blob), revoke: true };
+  }
+  if (doc.fileUrl) {
+    return { url: doc.fileUrl, revoke: false };
+  }
+  const attachments = await fetchDocumentAttachments(doc.id);
+  if (attachments.length === 0) throw new Error('No file attached to this document.');
+  const att = attachments[0];
+  const blob = await zohoDownloadAttachment(MODULE, doc.id, att.id);
+  if (!blob) throw new Error('Download failed.');
+  return { url: URL.createObjectURL(blob), revoke: true };
 }
