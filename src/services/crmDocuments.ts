@@ -12,7 +12,7 @@ export interface CRMDocument {
   fileName: string;
   fileSize: string;
   fileUrl: string;
-  fileUploadId: string;   // file id stored in the File_Upload_1 field (file lives in Zoho)
+  fileUploadId: string;   // attachment record id for the File_Upload_1 field (file lives in Zoho)
   authorName: string;
   authorRole: string;
   createdTime: string;
@@ -41,15 +41,16 @@ const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD 
 
 // A File Upload field reads back as an array of objects, but the admin CRM API
 // and the portal API return DIFFERENT key names for the same data:
-//   admin:  File_Id__s / File_Name__s   (capitalized, __s suffix)
-//   portal: file_Id / file_Name         (no suffix, different casing)
-// Checking only one shape meant the other silently fell back to an empty id,
-// which looked like "no file attached" even though the file was there.
+//   admin:  id / File_Name__s              (plain `id`, capitalized name + __s)
+//   portal: attachment_Id / file_Name      (different casing, no suffix)
+// The download action (downloadFieldFile) needs the ATTACHMENT record's own
+// id here — not the encrypted File_Id__s/file_Id value, which looks like the
+// right field but the download action rejects with UNABLE_TO_PARSE_DATA_TYPE.
 function parseFileUpload(v: unknown): { id: string; name: string } {
   const arr = Array.isArray(v) ? v : [];
   const f = arr[0] as Record<string, unknown> | undefined;
   if (!f) return { id: '', name: '' };
-  const id = String(f['File_Id__s'] ?? f['file_Id'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['attachment_Id'] ?? f['id'] ?? '');
+  const id = String(f['id'] ?? f['attachment_Id'] ?? f['attachment_Id__s'] ?? '');
   const name = String(f['File_Name__s'] ?? f['file_Name'] ?? f['file_name'] ?? f['name'] ?? '');
   return { id, name };
 }
@@ -138,7 +139,7 @@ export async function fetchDocumentAttachments(
 // are marked revocable so callers can free them after use.
 export async function resolveDocumentUrl(doc: CRMDocument): Promise<{ url: string; revoke: boolean }> {
   if (doc.fileUploadId) {
-    const blob = await downloadFieldFile(MODULE, doc.id, FILE_UPLOAD_FIELD, doc.fileUploadId, loadRole() === 'founder');
+    const blob = await downloadFieldFile(MODULE, doc.id, doc.fileUploadId, loadRole() === 'founder');
     return { url: URL.createObjectURL(blob), revoke: true };
   }
   if (doc.fileUrl) {

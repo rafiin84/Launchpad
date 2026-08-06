@@ -978,14 +978,22 @@ async function uploadFileToZoho(file: Blob, fileName: string, portal: boolean): 
 export const zohoUploadFile = (file: Blob, fileName: string) => uploadFileToZoho(file, fileName, false);
 export const portalUploadFile = (file: Blob, fileName: string) => uploadFileToZoho(file, fileName, true);
 
-/** Download a file stored in a File Upload field. */
+/**
+ * Download a file stored in a File Upload field.
+ * The action's query param is `fields_attachment_id`, and its value is the
+ * attachment record's own id (plain `id` on the admin API, `attachment_Id` on
+ * the portal API) — NOT the encrypted `File_Id__s`/`file_Id` value, which
+ * looks right but gets rejected with UNABLE_TO_PARSE_DATA_TYPE. Confirmed
+ * directly against the live API: `fields_data={field: fileId}` (the
+ * previous approach) 400s with REQUIRED_PARAM_MISSING/UNABLE_TO_PARSE_DATA_TYPE;
+ * `fields_attachment_id=<attachmentId>` returns the actual file content.
+ */
 export async function downloadFieldFile(
-  module: string, recordId: string, fieldApiName: string, fileId: string, portal: boolean,
+  module: string, recordId: string, attachmentId: string, portal: boolean,
 ): Promise<Blob> {
   const token = loadToken();
   if (!token) throw new ZohoApiError(401, 'Not connected to Zoho. Please sign in first.', 'NO_TOKEN');
-  const qs = `fields_data=${encodeURIComponent(JSON.stringify({ [fieldApiName]: fileId }))}`;
-  const path = `/crm/v2/${module}/${recordId}/actions/download_fields_attachment?${qs}`;
+  const path = `/crm/v2/${module}/${recordId}/actions/download_fields_attachment?fields_attachment_id=${encodeURIComponent(attachmentId)}`;
   const headers: Record<string, string> = { 'Authorization': `Zoho-oauthtoken ${token}` };
   if (portal) headers['x-crmportal'] = ZOHO_HOSTS.portalName;
   const res = await fetch(portal ? buildPortalCrmUrl(path) : buildCrmUrl(path), { headers });
