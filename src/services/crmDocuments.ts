@@ -39,16 +39,18 @@ const FIELD_MAP: Record<string, string> = {
 
 const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD + ',Created_Time';
 
-// A File Upload field reads back as an array of objects; pull the file id + name.
-// Zoho returns these keys as `File_Id__s` / `File_Name__s` (capitalized) — the
-// lowercase variants below never match, which silently fell back to the file
-// attachment's record `id` instead of the actual file id, breaking downloads.
+// A File Upload field reads back as an array of objects, but the admin CRM API
+// and the portal API return DIFFERENT key names for the same data:
+//   admin:  File_Id__s / File_Name__s   (capitalized, __s suffix)
+//   portal: file_Id / file_Name         (no suffix, different casing)
+// Checking only one shape meant the other silently fell back to an empty id,
+// which looked like "no file attached" even though the file was there.
 function parseFileUpload(v: unknown): { id: string; name: string } {
   const arr = Array.isArray(v) ? v : [];
   const f = arr[0] as Record<string, unknown> | undefined;
   if (!f) return { id: '', name: '' };
-  const id = String(f['File_Id__s'] ?? f['file_Id__s'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['id'] ?? '');
-  const name = String(f['File_Name__s'] ?? f['file_name__s'] ?? f['file_name'] ?? f['name'] ?? '');
+  const id = String(f['File_Id__s'] ?? f['file_Id'] ?? f['file_id'] ?? f['attachment_Id__s'] ?? f['attachment_Id'] ?? f['id'] ?? '');
+  const name = String(f['File_Name__s'] ?? f['file_Name'] ?? f['file_name'] ?? f['name'] ?? '');
   return { id, name };
 }
 
