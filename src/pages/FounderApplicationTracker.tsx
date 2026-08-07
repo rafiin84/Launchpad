@@ -20,7 +20,8 @@ import {
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
-import { uploadFile, canUploadFiles } from '../services/fileUpload';
+import { createCRMDocumentFromFile, resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
+import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
 
@@ -250,20 +251,47 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
   );
 }
 
+interface SubmittedDoc {
+  name: string;
+  link?: string;         // pasted share link
+  documentId?: string;   // My_Documents record id (direct upload)
+  attachmentId?: string; // File_Upload_1 attachment id on that record
+}
+
+function toRequestedDocs(docTypes: string[], submitted: Record<string, SubmittedDoc>): RequestedDocument[] {
+  return docTypes.map(t => {
+    const d = submitted[t];
+    if (!d) return { type: t, status: 'pending' as const };
+    return {
+      type: t,
+      status: 'submitted' as const,
+      fileName: d.name,
+      ...(d.link ? { link: d.link } : {}),
+      ...(d.documentId ? { documentId: d.documentId, attachmentId: d.attachmentId } : {}),
+    };
+  });
+}
+
 // Shows per-doc upload buttons sourced from the application's Requested_Documents
-// field (fetched with the record by portalList/portalSearch). Lets the founder
-// submit a share link (Google Drive / Dropbox) per document — file attachment API
-// is blocked for portal users, so link-sharing is the supported alternative.
+// field (fetched with the record by portalList/portalSearch). Founders can either
+// paste a share link (Google Drive / Dropbox) or upload the file directly — direct
+// upload stores the file in Zoho via the same File Upload field mechanism as the
+// standalone Documents page (createCRMDocumentFromFile), which works for portal
+// tokens too (unlike the CRM Attachments API, which is blocked for founders).
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [investorName, setInvestorName] = useState<string>('');
-  const [submitted, setSubmitted] = useState<Record<string, { url: string; name: string }>>({});
+  const [submitted, setSubmitted] = useState<Record<string, SubmittedDoc>>({});
   const [links, setLinks] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileTarget, setFileTarget] = useState<string | null>(null);
-  const uploadEnabled = canUploadFiles();
+  const [viewer, setViewer] = useState<{ name: string; fileName: string } | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState('');
+  const viewerRevokeRef = useRef(false);
 
   // Load requested doc types + any already-submitted files/links from the record.
   useEffect(() => {
@@ -271,10 +299,15 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     const parsed = parseRequestedDocuments(app.requestedDocuments);
     if (parsed.length > 0) {
       setDocTypes(parsed.map(d => d.type));
-      const pre: Record<string, { url: string; name: string }> = {};
+      const pre: Record<string, SubmittedDoc> = {};
       parsed.forEach(d => {
-        const url = d.link || d.attachmentId; // attachmentId held the link in older records
-        if (url && /^https?:\/\//i.test(url)) pre[d.type] = { url, name: d.fileName || d.type };
+        if (d.documentId && d.attachmentId) {
+          pre[d.type] = { name: d.fileName || d.type, documentId: d.documentId, attachmentId: d.attachmentId };
+        } else {
+          // attachmentId held the link directly in older records, before documentId existed.
+          const link = d.link || (d.attachmentId && /^https?:\/\//i.test(d.attachmentId) ? d.attachmentId : '');
+          if (link) pre[d.type] = { name: d.fileName || d.type, link };
+        }
       });
       setSubmitted(pre);
     } else {
@@ -284,17 +317,12 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
   const setErr = (docType: string, msg: string) => setErrors(prev => ({ ...prev, [docType]: msg }));
 
-  // Persist one doc's URL to CRM and notify the investor.
-  const save = async (docType: string, url: string, name: string) => {
-    const next = { ...submitted, [docType]: { url, name } };
+  // Persist one doc's link/file reference to CRM and notify the investor.
+  const save = async (docType: string, entry: SubmittedDoc) => {
+    const next = { ...submitted, [docType]: entry };
     setSubmitted(next);
-    const allDocs: RequestedDocument[] = docTypes.map(t => (
-      next[t]
-        ? { type: t, status: 'submitted' as const, fileName: next[t].name, link: next[t].url }
-        : { type: t, status: 'pending' as const }
-    ));
     await updateApplication(app.id, {
-      requestedDocuments: stringifyRequestedDocuments(allDocs),
+      requestedDocuments: stringifyRequestedDocuments(toRequestedDocs(docTypes, next)),
       status: 'under_review' as ApplicationStatus,
     }, false);
     addNotification({
@@ -320,7 +348,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     setBusy(docType);
     setErr(docType, '');
     try {
-      await save(docType, link, docType);
+      await save(docType, { name: docType, link });
       setLinks(prev => { const n = { ...prev }; delete n[docType]; return n; });
     } catch (err) {
       setErr(docType, err instanceof Error ? err.message : 'Failed to save.');
@@ -329,10 +357,6 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   };
 
   const triggerFile = (docType: string) => {
-    if (!uploadEnabled) {
-      setErr(docType, 'Direct upload needs a one-time setup — paste a share link below for now.');
-      return;
-    }
     setFileTarget(docType);
     setErr(docType, '');
     setTimeout(() => fileInputRef.current?.click(), 0);
@@ -345,8 +369,17 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     setBusy(docType);
     setErr(docType, '');
     try {
-      const url = await uploadFile(file);
-      await save(docType, url, file.name);
+      const doc = await createCRMDocumentFromFile({
+        documentName: `${app.companyName || 'Application'} — ${docType}`,
+        documentType: 'other',
+        relatedCompany: app.companyName || '',
+        description: `Uploaded for application ${app.id} (requested document: ${docType})`,
+        visibility: 'shared-investors',
+        authorName: app.founderName || 'Founder',
+        authorRole: 'founder',
+      }, file);
+      if (!doc.fileUploadId) throw new Error('Upload succeeded but the file reference could not be read back.');
+      await save(docType, { name: file.name, documentId: doc.id, attachmentId: doc.fileUploadId });
     } catch (err) {
       setErr(docType, err instanceof Error ? err.message : 'Upload failed.');
     }
@@ -362,13 +395,8 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     const next = { ...submitted };
     delete next[docType];
     try {
-      const allDocs: RequestedDocument[] = docTypes.map(t => (
-        next[t]
-          ? { type: t, status: 'submitted' as const, fileName: next[t].name, link: next[t].url }
-          : { type: t, status: 'pending' as const }
-      ));
       await updateApplication(app.id, {
-        requestedDocuments: stringifyRequestedDocuments(allDocs),
+        requestedDocuments: stringifyRequestedDocuments(toRequestedDocs(docTypes, next)),
       }, false);
       setSubmitted(next);
       addNotification({
@@ -387,6 +415,42 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     setBusy(null);
   };
 
+  const closeViewer = () => {
+    if (viewerRevokeRef.current && viewerUrl) URL.revokeObjectURL(viewerUrl);
+    setViewer(null);
+    setViewerUrl(null);
+    setViewerError('');
+  };
+
+  const handleViewFile = async (docType: string, entry: SubmittedDoc) => {
+    if (!entry.documentId || !entry.attachmentId) return;
+    setViewer({ name: docType, fileName: entry.name });
+    setViewerUrl(null);
+    setViewerError('');
+    setViewerLoading(true);
+    try {
+      const { url, revoke } = await resolveDocumentUrl({
+        id: entry.documentId, fileUploadId: entry.attachmentId, fileUrl: '', fileName: entry.name,
+      } as CRMDocument);
+      viewerRevokeRef.current = revoke;
+      setViewerUrl(url);
+    } catch (err) {
+      setViewerError(err instanceof Error ? err.message : 'Failed to open document.');
+    } finally {
+      setViewerLoading(false);
+    }
+  };
+
+  const handleViewerDownload = () => {
+    if (!viewerUrl || !viewer) return;
+    const a = document.createElement('a');
+    a.href = viewerUrl;
+    a.download = viewer.fileName || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Nothing to show unless the investor actually requested documents.
   const hasRealDocs = docTypes.length > 0 && !(docTypes.length === 1 && docTypes[0] === 'Document');
   if (!hasRealDocs && app.status !== 'documents_requested') return null;
@@ -396,6 +460,18 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
   return (
     <div className="mt-3 border-t border-gray-100 pt-3">
+      {viewer && (
+        <DocumentViewerModal
+          title={viewer.name}
+          fileName={viewer.fileName}
+          url={viewerUrl}
+          loading={viewerLoading}
+          error={viewerError}
+          previewable={/\.pdf$/i.test(viewer.fileName || '')}
+          onClose={closeViewer}
+          onDownload={handleViewerDownload}
+        />
+      )}
       <div className="flex items-center gap-1.5 mb-1.5">
         <Upload size={12} className="text-yellow-600" />
         <p className="text-[10px] font-semibold text-yellow-600 uppercase tracking-wider">Documents Requested</p>
@@ -408,9 +484,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
         </p>
       )}
       <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
-        {uploadEnabled
-          ? 'Upload a file from your device, or paste a Google Drive / Dropbox share link.'
-          : 'Upload each file to Google Drive / Dropbox / OneDrive (set “anyone with the link can view”) and paste the link.'}
+        Upload a file from your device, or paste a Google Drive / Dropbox share link.
       </p>
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange}
         accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.zip" />
@@ -428,10 +502,19 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
               </div>
               {done ? (
                 <div className="flex items-center gap-2">
-                  <a href={done.url} target="_blank" rel="noopener noreferrer"
-                    className="text-[10px] text-indigo-500 hover:underline truncate flex-1 min-w-0">
-                    {done.name}
-                  </a>
+                  {done.link ? (
+                    <a href={done.link} target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-500 hover:underline truncate flex-1 min-w-0">
+                      {done.name}
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => handleViewFile(docType, done)}
+                      className="text-[10px] text-indigo-500 hover:underline truncate flex-1 min-w-0 text-left"
+                    >
+                      {done.name}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleRemove(docType)}
                     disabled={isBusy}
@@ -457,7 +540,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
                     inputMode="url"
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder={uploadEnabled ? '…or paste a share link' : 'Paste share link (https://…)'}
+                    placeholder="…or paste a share link"
                     value={links[docType] || ''}
                     onChange={e => setLinks(prev => ({ ...prev, [docType]: e.target.value }))}
                     onPaste={e => {

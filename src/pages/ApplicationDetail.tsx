@@ -23,6 +23,8 @@ import {
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
 import { zohoDownloadAttachment, portalDownloadAttachment } from '../services/zohoApi';
+import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
+import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
 
@@ -781,6 +783,12 @@ export default function ApplicationDetail() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null);
 
+  const [docViewer, setDocViewer] = useState<{ name: string; fileName: string } | null>(null);
+  const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
+  const [docViewerLoading, setDocViewerLoading] = useState(false);
+  const [docViewerError, setDocViewerError] = useState('');
+  const docViewerRevokeRef = React.useRef(false);
+
   const loadApp = useCallback(async () => {
     if (!id) return;
     try {
@@ -950,6 +958,45 @@ export default function ApplicationDetail() {
     setActionLoading(null);
   };
 
+  const closeDocViewer = () => {
+    if (docViewerRevokeRef.current && docViewerUrl) URL.revokeObjectURL(docViewerUrl);
+    setDocViewer(null);
+    setDocViewerUrl(null);
+    setDocViewerError('');
+  };
+
+  // Views a requested document the founder uploaded directly (stored as a
+  // My_Documents record via the same File Upload field mechanism as the
+  // standalone Documents page — see RequestedDocument.documentId/attachmentId).
+  const handleViewRequestedFile = async (doc: RequestedDocument) => {
+    if (!doc.documentId || !doc.attachmentId) return;
+    setDocViewer({ name: doc.type, fileName: doc.fileName || doc.type });
+    setDocViewerUrl(null);
+    setDocViewerError('');
+    setDocViewerLoading(true);
+    try {
+      const { url, revoke } = await resolveDocumentUrl({
+        id: doc.documentId, fileUploadId: doc.attachmentId, fileUrl: '', fileName: doc.fileName || '',
+      } as CRMDocument);
+      docViewerRevokeRef.current = revoke;
+      setDocViewerUrl(url);
+    } catch (err) {
+      setDocViewerError(err instanceof Error ? err.message : 'Failed to open document.');
+    } finally {
+      setDocViewerLoading(false);
+    }
+  };
+
+  const handleDocViewerDownload = () => {
+    if (!docViewerUrl || !docViewer) return;
+    const a = document.createElement('a');
+    a.href = docViewerUrl;
+    a.download = docViewer.fileName || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleDownloadAttachment = async (recordId: string, attachmentId: string, fileName: string) => {
     try {
       const isFounderRole = loadRole() === 'founder';
@@ -1064,6 +1111,19 @@ export default function ApplicationDetail() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+      {docViewer && (
+        <DocumentViewerModal
+          title={docViewer.name}
+          fileName={docViewer.fileName}
+          url={docViewerUrl}
+          loading={docViewerLoading}
+          error={docViewerError}
+          previewable={/\.pdf$/i.test(docViewer.fileName || '')}
+          onClose={closeDocViewer}
+          onDownload={handleDocViewerDownload}
+        />
+      )}
+
       {showDocsModal && (
         <RequestDocsModal
           existingDocs={requestedDocs}
@@ -1372,13 +1432,25 @@ export default function ApplicationDetail() {
             <Section title={t.applicationDetail.requestedDocuments}>
               <div className="space-y-2">
                 {requestedDocs.map((doc, i) => {
-                  // A submitted doc is either a share link (doc.link, or an older
-                  // record where attachmentId holds an http URL) or a real CRM
-                  // attachment (attachmentId that is not a URL).
+                  // A submitted doc is one of: a file the founder uploaded directly
+                  // (doc.documentId + doc.attachmentId — a My_Documents record, the
+                  // current path), a share link (doc.link, or an older record where
+                  // attachmentId holds an http URL directly), or a legacy CRM
+                  // Applications-module attachment (attachmentId that isn't a URL
+                  // and there's no documentId — never actually populated by any
+                  // current write path, kept only for old data).
+                  const uploadedFile = doc.documentId && doc.attachmentId ? doc : null;
                   const linkUrl = doc.link || (doc.attachmentId && /^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '');
-                  const crmAttachmentId = doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
+                  const crmAttachmentId = !uploadedFile && doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
                   const hasFile = doc.status === 'submitted' || doc.status === 'uploaded';
                   const ViewButton = () => {
+                    if (uploadedFile) {
+                      return (
+                        <button onClick={() => handleViewRequestedFile(uploadedFile)} className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">
+                          <Download size={9} /> {t.applicationDetail.view}
+                        </button>
+                      );
+                    }
                     if (linkUrl) {
                       return (
                         <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded-md transition-colors">

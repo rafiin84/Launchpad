@@ -1,4 +1,4 @@
-import { zohoList, zohoCreate, zohoDelete, portalDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoDelete, portalDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, portalGetById, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
 import { loadRole } from './oauth';
 import { portalCreate } from './zohoApi';
 
@@ -109,6 +109,44 @@ export async function createCRMDocument(
   }
 
   return isFounder ? portalCreate(MODULE, payload) : zohoCreate(MODULE, payload);
+}
+
+export async function fetchCRMDocumentById(id: string): Promise<CRMDocument | null> {
+  const record = loadRole() === 'founder'
+    ? await portalGetById(MODULE, id, ALL_FIELDS).catch(() => portalGetById(MODULE, id))
+    : await zohoGetById(MODULE, id, ALL_FIELDS);
+  return record ? fromRecord(record as Record<string, unknown>) : null;
+}
+
+// Same storage mechanism as createCRMDocument (Zoho's File Upload field —
+// works for both investor and founder tokens, no third-party host needed),
+// but takes a File/Blob directly and returns the full created record
+// (including the resolved fileUploadId) so a caller elsewhere in the app
+// — e.g. an application's requested-document upload — can immediately
+// reference it for viewing/downloading without a separate lookup.
+export async function createCRMDocumentFromFile(
+  fields: Omit<CRMDocumentFields, 'fileUrl' | 'fileUploadId' | 'fileName' | 'fileSize'>,
+  file: File,
+): Promise<CRMDocument> {
+  const isFounder = loadRole() === 'founder';
+
+  const payload: Record<string, unknown> = {};
+  for (const [appKey, crmKey] of Object.entries(FIELD_MAP)) {
+    const val = (fields as Record<string, unknown>)[appKey];
+    if (val !== undefined && val !== null && val !== '') payload[crmKey] = val;
+  }
+  payload[FIELD_MAP.fileName] = file.name;
+  payload[FIELD_MAP.fileSize] = String(file.size);
+
+  const fileId = isFounder
+    ? await portalUploadFile(file, file.name)
+    : await zohoUploadFile(file, file.name);
+  payload[FILE_UPLOAD_FIELD] = [{ file_id: fileId }];
+
+  const id = isFounder ? await portalCreate(MODULE, payload) : await zohoCreate(MODULE, payload);
+  const created = await fetchCRMDocumentById(id);
+  if (!created) throw new Error('Document was created but could not be read back.');
+  return created;
 }
 
 function base64ToBlob(fileData: string, mimeType?: string): Blob {

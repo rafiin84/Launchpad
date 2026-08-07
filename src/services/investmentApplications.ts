@@ -687,7 +687,8 @@ export interface RequestedDocument {
   type: string;
   status: 'pending' | 'uploaded' | 'submitted';
   fileName?: string;
-  attachmentId?: string; // CRM attachment id (uploaded file) — or a share link for portal fallback
+  documentId?: string;   // My_Documents record id holding the uploaded file (see crmDocuments.ts)
+  attachmentId?: string; // File_Upload_1 attachment id on that record — or, on older records, a share link
   link?: string;         // explicit share link (Google Drive / Dropbox)
 }
 
