@@ -23,9 +23,11 @@ interface ProfileForm {
   twitter: string;
   linkedIn: string;
   expertise: string[];
+  mobile: string;
+  company: string;
 }
 
-function loadInitialForm(currentUserName: string, appUserData: Record<string, unknown> | null): ProfileForm {
+function loadInitialForm(currentUserName: string, appUserData: Record<string, unknown> | null, fallbackMobile: string): ProfileForm {
   // Priority: appUser from CRM > locally cached profile > defaults
   const cached = loadCachedProfile();
   // Also read from old localStorage key for backwards compatibility
@@ -42,7 +44,17 @@ function loadInitialForm(currentUserName: string, appUserData: Record<string, un
     twitter:   (appUserData?.twitter as string) || cached?.twitter || (oldExtra.twitter as string) || '',
     linkedIn:  (appUserData?.linkedIn as string) || cached?.linkedIn || (oldExtra.linkedIn as string) || '',
     expertise: (appUserData?.expertise as string[]) || cached?.expertise || (oldExtra.expertise as string[]) || [],
+    mobile:    (appUserData?.mobile as string) || cached?.mobile || fallbackMobile || '',
+    company:   (appUserData?.company as string) || cached?.company || '',
   };
+}
+
+function validateInvestorForm(form: ProfileForm): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!form.name.trim()) errs.name = 'Display name is required.';
+  if (!form.mobile.trim()) errs.mobile = 'Mobile number is required.';
+  if (!form.company.trim()) errs.company = 'Company name is required.';
+  return errs;
 }
 
 const CROP_SIZE = 256;
@@ -252,15 +264,16 @@ export default function EditProfile() {
 }
 
 function InvestorEditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, portalSession, isFounder } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, zohoProfile, portalSession, isFounder } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
   const isPortal = isFounder;
 
   const [form, setForm] = useState<ProfileForm>(() =>
-    loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null)
+    loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null, zohoProfile.mobile || zohoProfile.phone || '')
   );
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -284,12 +297,16 @@ function InvestorEditProfile() {
         twitter:   appUser.twitter || prev.twitter,
         linkedIn:  appUser.linkedIn || prev.linkedIn,
         expertise: appUser.expertise.length > 0 ? appUser.expertise : prev.expertise,
+        mobile:    appUser.mobile || prev.mobile,
+        company:   appUser.company || prev.company,
       }));
     }
   }, [appUser]);
 
-  const set = (field: keyof ProfileForm, val: string) =>
+  const set = (field: keyof ProfileForm, val: string) => {
     setForm(prev => ({ ...prev, [field]: val }));
+    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+  };
 
   const addTag = () => {
     const tag = newTag.trim();
@@ -343,6 +360,10 @@ function InvestorEditProfile() {
   };
 
   const handleSave = async () => {
+    const errs = validateInvestorForm(form);
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSaving(true);
     setSaveResult(null);
     try {
@@ -359,6 +380,8 @@ function InvestorEditProfile() {
         linkedIn: form.linkedIn,
         twitter: form.twitter,
         expertise: form.expertise,
+        mobile: form.mobile.trim(),
+        company: form.company.trim(),
       });
 
       // Also update old localStorage key for Profile page backwards compatibility
@@ -385,6 +408,8 @@ function InvestorEditProfile() {
             linkedIn: form.linkedIn,
             twitter: form.twitter,
             expertise: form.expertise,
+            mobile: form.mobile.trim(),
+            company: form.company.trim(),
           }, userEmail);
           if (!updated) crmSuccess = false;
         } catch {
@@ -594,7 +619,7 @@ function InvestorEditProfile() {
 
         {/* Display Name */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.displayName}</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.displayName} *</label>
           <div className="relative">
             <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -602,9 +627,56 @@ function InvestorEditProfile() {
               value={form.name}
               onChange={e => set('name', e.target.value)}
               placeholder="Your full name"
-              className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              className={`w-full border rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.name ? 'border-red-300' : 'border-gray-200'}`}
             />
           </div>
+          {errors.name && <p className="text-xs text-red-500 mt-1.5">{errors.name}</p>}
+        </div>
+
+        {/* Email (read-only — tied to your Zoho login, not editable here) */}
+        <div className="px-6 py-5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.emailAddress}</label>
+          <div className="relative">
+            <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="email"
+              value={userEmail}
+              readOnly
+              className="w-full border border-gray-100 bg-gray-50 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
+            />
+          </div>
+        </div>
+
+        {/* Mobile */}
+        <div className="px-6 py-5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.mobileNumber} *</label>
+          <div className="relative">
+            <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="tel"
+              value={form.mobile}
+              onChange={e => set('mobile', e.target.value)}
+              placeholder="+1 555 000 0000"
+              className={`w-full border rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.mobile ? 'border-red-300' : 'border-gray-200'}`}
+            />
+          </div>
+          {errors.mobile && <p className="text-xs text-red-500 mt-1.5">{errors.mobile}</p>}
+        </div>
+
+        {/* Company */}
+        <div className="px-6 py-5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.companyName} *</label>
+          <div className="relative">
+            <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={form.company}
+              onChange={e => set('company', e.target.value)}
+              placeholder="Your company"
+              className={`w-full border rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.company ? 'border-red-300' : 'border-gray-200'}`}
+            />
+          </div>
+          {errors.company && <p className="text-xs text-red-500 mt-1.5">{errors.company}</p>}
         </div>
 
         {/* Bio */}

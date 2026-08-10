@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Calendar, Loader2 } from 'lucide-react';
+import { MapPin, Mail, LogOut, Edit3, ExternalLink, Link2, Phone, Briefcase, Building2, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -68,6 +68,7 @@ function InvestorProfile() {
   const location = extra.location || appUser?.location || [zohoProfile.state, zohoProfile.country].filter(Boolean).join(', ') || null;
   const phone = appUser?.phone || zohoProfile.phone || appUser?.mobile || zohoProfile.mobile || null;
   const jobTitle = appUser?.jobTitle || zohoProfile.jobTitle || null;
+  const company = appUser?.company || null;
 
   function handleLogout() {
     logout();
@@ -177,6 +178,12 @@ function InvestorProfile() {
                     {jobTitle}
                   </div>
                 )}
+                {company && (
+                  <div className="flex items-center gap-2.5 text-sm text-gray-600">
+                    <Building2 size={14} className="text-gray-400 flex-shrink-0" />
+                    {company}
+                  </div>
+                )}
                 {extra.linkedIn && (
                   <a
                     href={extra.linkedIn.startsWith('http') ? extra.linkedIn : `https://${extra.linkedIn}`}
@@ -212,21 +219,6 @@ function InvestorProfile() {
               </div>
             </div>
           )}
-
-          {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: t.profile.yearsExperience, value: '20+', icon: <Calendar size={14} className="text-indigo-400" /> },
-              { label: t.profile.companiesBuilt, value: '3', icon: <Building2 size={14} className="text-emerald-400" /> },
-              { label: t.profile.startupsMentored, value: '50+', icon: <Briefcase size={14} className="text-amber-400" /> },
-            ].map(s => (
-              <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
-                <div className="flex justify-center mb-1.5">{s.icon}</div>
-                <p className="text-lg font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-400 leading-tight mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
 
           {/* Empty state */}
           {!hasExtra && (
@@ -264,25 +256,20 @@ function InvestorProfile() {
         <div className="w-full lg:w-[300px] flex-shrink-0 space-y-4">
 
           {/* Current Company */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t.profile.currentCompany}</h3>
-            <div className="space-y-4">
-              {[
-                { name: 'Launchpad', role: 'Founder & CEO', period: '2024 – Present', color: 'bg-black' },
-                { name: 'Mudhal Partners', role: 'Co-founder', period: '2020 – Present', color: 'bg-emerald-600' },
-              ].map(c => (
-                <div key={c.name} className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl ${c.color} flex items-center justify-center flex-shrink-0`}>
-                    <Building2 size={14} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{c.name}</p>
-                    <p className="text-xs text-gray-500">{c.role} · {c.period}</p>
-                  </div>
+          {company && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">{t.profile.currentCompany}</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center flex-shrink-0">
+                  <Building2 size={14} className="text-white" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{company}</p>
+                  {jobTitle && <p className="text-xs text-gray-500">{jobTitle}</p>}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Skills & Expertise */}
           {extra.expertise.length > 0 && (

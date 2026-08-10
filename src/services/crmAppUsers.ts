@@ -55,6 +55,7 @@ const FIELD_MAP = {
   linkedIn:    'LinkedIn',       // URL
   twitter:     'Twitter',        // Single-line
   expertise:   'Expertise',      // Single-line (comma-separated)
+  company:     'Company',        // Single-line
   zohoUserId:  'Zoho_User_Id',   // Single-line — Zoho CRM user ID
   jobTitle:    'Job_Title',      // Single-line
   state:       'State',          // Single-line
@@ -76,6 +77,7 @@ export interface AppUser {
   linkedIn: string;
   twitter: string;
   expertise: string[];
+  company: string;
   zohoUserId: string;
   jobTitle: string;
   state: string;
@@ -107,6 +109,7 @@ function fromRecord(r: ZohoRecord): AppUser {
     linkedIn:    str(r, FIELD_MAP.linkedIn),
     twitter:     str(r, FIELD_MAP.twitter),
     expertise:   expertiseRaw ? expertiseRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+    company:     str(r, FIELD_MAP.company),
     zohoUserId:  str(r, FIELD_MAP.zohoUserId),
     jobTitle:    str(r, FIELD_MAP.jobTitle),
     state:       str(r, FIELD_MAP.state),
@@ -127,6 +130,7 @@ function toPayload(fields: Partial<AppUserFields>): Record<string, unknown> {
   if (fields.linkedIn !== undefined)   payload[FIELD_MAP.linkedIn]   = fields.linkedIn;
   if (fields.twitter !== undefined)    payload[FIELD_MAP.twitter]    = fields.twitter;
   if (fields.expertise !== undefined)  payload[FIELD_MAP.expertise]  = fields.expertise.join(', ');
+  if (fields.company !== undefined)    payload[FIELD_MAP.company]    = fields.company;
   if (fields.zohoUserId !== undefined) payload[FIELD_MAP.zohoUserId] = fields.zohoUserId;
   if (fields.jobTitle !== undefined)   payload[FIELD_MAP.jobTitle]   = fields.jobTitle;
   if (fields.state !== undefined)      payload[FIELD_MAP.state]      = fields.state;
@@ -411,6 +415,7 @@ export async function fullProfileSync(
     ...(cached?.linkedIn ? { linkedIn: cached.linkedIn } : {}),
     ...(cached?.twitter ? { twitter: cached.twitter } : {}),
     ...(cached?.expertise?.length ? { expertise: cached.expertise } : {}),
+    ...(cached?.company ? { company: cached.company } : {}),
   };
 
   const recordId = await syncAppUser(fields);
