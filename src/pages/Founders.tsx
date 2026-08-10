@@ -113,6 +113,11 @@ function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
         mailingState:   form.mailingState || '',
         mailingCountry: form.mailingCountry || '',
         description:    form.description || '',
+        bio:            '',
+        location:       '',
+        linkedIn:       '',
+        twitter:        '',
+        skills:         [],
         createdTime:    new Date().toISOString(),
       });
 

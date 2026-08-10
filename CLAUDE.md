@@ -71,11 +71,21 @@ These are the Zoho CRM module API names the app reads/writes (defined as `MODULE
 | `My_Documents` | `crmDocuments.ts` | Standalone document library (shared between founders/investors) |
 | `My_Activities` | `crmActivities.ts`, `notifications.ts` | Shared activity feed + in-app notifications (same module, `Activity_Type` distinguishes them) |
 | `Feed_Submissions` | `crmActivities.ts` | Portal-writable relay target for founder posts → workflow copies into `My_Activities` |
-| `Contacts` | `crmFounders.ts` | Founder directory |
+| `Contacts` | `crmFounders.ts` | Founder directory (investor-side, admin token) **and** a founder's own editable profile (portal token, self-service — see below) |
 | `Deals` | `crmDeals.ts` | Investor deal flow |
 | `Founder_Companies` | `companyProfile.ts` | Founder company profile data |
 
 Application/activity payloads are hand-mapped between camelCase app fields and CRM field API names via `FIELD_MAP`-style objects in each service — when adding a field, it must be added in the service's field map, not just the CRM schema.
+
+### Founder's own profile — Contacts, not `appusers`
+
+`src/services/crmAppUsers.ts` (the `appusers` module) is **admin-only**: every function starts with an `isPortalUser()` check and no-ops for founders, because a founder's portal token is never valid on the admin `zohoapis.in` domain. This means a founder's self-edited profile (bio, location, LinkedIn, etc.) never actually reached CRM through that path — it only ever wrote to `localStorage`, invisible to the investor and to other devices/browsers.
+
+The founder-editable Profile page (`Profile.tsx` / `EditProfile.tsx`, both split into an `Investor*`/`Founder*` component per role) instead reads/writes the founder's own **Contacts** record via the portal API (`fetchMyContactId`/`fetchMyFounderProfile`/`updateMyFounderProfile`/`uploadMyFounderPhoto` in `crmFounders.ts`), since a founder's portal identity maps 1:1 to a Contact and Contacts *is* portal-accessible. `fetchPortalUserContact()` (`zohoApi.ts`) resolves that Contact id from the portal token via several fallback strategies.
+
+Custom fields `Bio`, `Location`, `LinkedIn`, `Skills_Expertise`, and `Company` were added to `Contacts` for this (none existed before — `Company` in particular did **not** exist despite `crmFounders.ts` having written to it for a while, which means investor-created founders' company names were silently dropped until this field was added). `Twitter` already existed as a standard-ish field and is reused as-is. The profile photo uses Zoho's standard `Record_Image` (Record Image API — `portalUploadRecordPhoto`/`portalGetRecordPhoto`/`portalDeleteRecordPhoto` in `zohoApi.ts`), scoped to the Profile pages only — it is deliberately not wired into the sitewide sidebar avatar, which has its own separate (already-complex) fallback chain in `AuthContext.tsx`.
+
+As with every other portal field, **these new fields need Read & Write granted to the Founder profile under Zoho Setup → Portals → \<portal\> → Contacts → Field Permissions** before a founder can actually see/save them through the API — creating the field via the CRM API only makes it exist, not portal-visible (see "Portal restrictions" above).
 
 ### Two generations of "services"
 

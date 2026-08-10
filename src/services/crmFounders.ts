@@ -1,4 +1,8 @@
-import { zohoList, zohoGetById, zohoCreate, zohoDelete, zohoSearch, type ZohoRecord } from './zohoApi';
+import {
+  zohoList, zohoGetById, zohoCreate, zohoDelete, zohoSearch, type ZohoRecord,
+  portalGetById, portalUpdate, portalUploadRecordPhoto, portalGetRecordPhoto, portalDeleteRecordPhoto,
+  fetchPortalUserContact,
+} from './zohoApi';
 import { loadToken } from './oauth';
 import { ZOHO_HOSTS } from '../config/auth';
 
@@ -33,6 +37,11 @@ export interface CRMFounder {
   mailingState: string;
   mailingCountry: string;
   description: string;
+  bio: string;
+  location: string;
+  linkedIn: string;
+  twitter: string;
+  skills: string[];
   createdTime: string;
 }
 
@@ -54,6 +63,11 @@ export interface CRMFounderFields {
   mailingStreet?: string;
   mailingZip?: string;
   description?: string;
+  bio?: string;
+  location?: string;
+  linkedIn?: string;
+  twitter?: string;
+  skills?: string[];
 }
 
 function fromRecord(r: ZohoRecord): CRMFounder {
@@ -62,6 +76,7 @@ function fromRecord(r: ZohoRecord): CRMFounder {
     if (v === null || v === undefined) return '';
     return String(v);
   };
+  const skillsRaw = str('Skills_Expertise');
   return {
     id:             r.id,
     salutation:     str('Salutation'),
@@ -79,6 +94,11 @@ function fromRecord(r: ZohoRecord): CRMFounder {
     mailingState:   str('Mailing_State'),
     mailingCountry: str('Mailing_Country'),
     description:    str('Description'),
+    bio:            str('Bio'),
+    location:       str('Location'),
+    linkedIn:       str('LinkedIn'),
+    twitter:        str('Twitter'),
+    skills:         skillsRaw ? skillsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
     createdTime:    str('Created_Time'),
   };
 }
@@ -87,8 +107,39 @@ const FIELDS = [
   'Salutation', 'First_Name', 'Last_Name', 'Email', 'Secondary_Email',
   'Phone', 'Mobile', 'Title', 'Department', 'Company', 'Account_Name',
   'Lead_Source', 'Mailing_City', 'Mailing_State', 'Mailing_Country',
-  'Description', 'Created_Time',
+  'Description', 'Bio', 'Location', 'LinkedIn', 'Twitter', 'Skills_Expertise',
+  'Created_Time',
 ].join(',');
+
+// Builds a Contacts CRM payload from partial CRMFounder fields — shared by
+// createCRMFounder (investor creating a founder) and updateMyFounderProfile
+// (a founder editing their own Contact record).
+function toContactPayload(fields: Partial<CRMFounderFields>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (fields.salutation !== undefined)     payload.Salutation     = fields.salutation;
+  if (fields.firstName !== undefined)      payload.First_Name     = fields.firstName;
+  if (fields.lastName !== undefined)       payload.Last_Name      = fields.lastName;
+  if (fields.email !== undefined)          payload.Email          = fields.email;
+  if (fields.secondaryEmail !== undefined) payload.Secondary_Email = fields.secondaryEmail;
+  if (fields.phone !== undefined)          payload.Phone          = fields.phone;
+  if (fields.mobile !== undefined)         payload.Mobile         = fields.mobile;
+  if (fields.title !== undefined)          payload.Title          = fields.title;
+  if (fields.department !== undefined)     payload.Department     = fields.department;
+  if (fields.company !== undefined)        payload.Company        = fields.company;
+  if (fields.leadSource !== undefined)     payload.Lead_Source    = fields.leadSource;
+  if (fields.mailingCity !== undefined)    payload.Mailing_City   = fields.mailingCity;
+  if (fields.mailingState !== undefined)   payload.Mailing_State  = fields.mailingState;
+  if (fields.mailingCountry !== undefined) payload.Mailing_Country = fields.mailingCountry;
+  if (fields.mailingStreet !== undefined)  payload.Mailing_Street = fields.mailingStreet;
+  if (fields.mailingZip !== undefined)     payload.Mailing_Zip    = fields.mailingZip;
+  if (fields.description !== undefined)    payload.Description    = fields.description;
+  if (fields.bio !== undefined)            payload.Bio            = fields.bio;
+  if (fields.location !== undefined)       payload.Location       = fields.location;
+  if (fields.linkedIn !== undefined)       payload.LinkedIn       = fields.linkedIn;
+  if (fields.twitter !== undefined)        payload.Twitter        = fields.twitter;
+  if (fields.skills !== undefined)         payload.Skills_Expertise = fields.skills.join(', ');
+  return payload;
+}
 
 export async function getCRMFounder(id: string): Promise<CRMFounder> {
   const record = await zohoGetById(MODULE, id, FIELDS);
@@ -108,26 +159,42 @@ export async function fetchCRMFounders(): Promise<CRMFounder[]> {
     .filter(f => !f.email.endsWith('@noemail.invalid') && !f.lastName.includes('(Sample)'));
 }
 
+// ─── Founder's own profile (portal token, self-service) ──────────────────────
+// A founder's portal identity maps 1:1 to a Contacts record. Unlike the
+// "appusers" module (admin-only, see crmAppUsers.ts), Contacts is readable
+// and writable via the portal API, so this is the source of truth for the
+// founder-editable profile fields on the Profile page.
+
+/** Resolves the current founder's own Contact id via their portal token. */
+export async function fetchMyContactId(): Promise<string | null> {
+  const contact = await fetchPortalUserContact();
+  return contact?.contactId || null;
+}
+
+export async function fetchMyFounderProfile(contactId: string): Promise<CRMFounder | null> {
+  const record = await portalGetById(MODULE, contactId, FIELDS).catch(() => portalGetById(MODULE, contactId));
+  return record ? fromRecord(record) : null;
+}
+
+export async function updateMyFounderProfile(contactId: string, fields: Partial<CRMFounderFields>): Promise<void> {
+  await portalUpdate(MODULE, contactId, toContactPayload(fields));
+}
+
+export async function uploadMyFounderPhoto(contactId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {
+  await portalUploadRecordPhoto(MODULE, contactId, file, fileName);
+}
+
+export async function fetchMyFounderPhoto(contactId: string): Promise<string | null> {
+  return portalGetRecordPhoto(MODULE, contactId);
+}
+
+export async function deleteMyFounderPhoto(contactId: string): Promise<boolean> {
+  return portalDeleteRecordPhoto(MODULE, contactId);
+}
+
 export async function createCRMFounder(fields: CRMFounderFields): Promise<string> {
-  const payload: Record<string, unknown> = {
-    Last_Name: fields.lastName,   // Only required field
-  };
-  if (fields.salutation)     payload.Salutation     = fields.salutation;
-  if (fields.firstName)      payload.First_Name     = fields.firstName;
-  if (fields.email)          payload.Email           = fields.email;
-  if (fields.secondaryEmail) payload.Secondary_Email = fields.secondaryEmail;
-  if (fields.phone)          payload.Phone           = fields.phone;
-  if (fields.mobile)         payload.Mobile          = fields.mobile;
-  if (fields.title)          payload.Title           = fields.title;
-  if (fields.department)     payload.Department      = fields.department;
-  if (fields.company)        payload.Company         = fields.company;
-  if (fields.leadSource)     payload.Lead_Source     = fields.leadSource;
-  if (fields.mailingCity)    payload.Mailing_City    = fields.mailingCity;
-  if (fields.mailingState)   payload.Mailing_State   = fields.mailingState;
-  if (fields.mailingCountry) payload.Mailing_Country = fields.mailingCountry;
-  if (fields.mailingStreet)  payload.Mailing_Street  = fields.mailingStreet;
-  if (fields.mailingZip)     payload.Mailing_Zip     = fields.mailingZip;
-  if (fields.description)    payload.Description     = fields.description;
+  const payload = toContactPayload(fields);
+  payload.Last_Name = fields.lastName; // Only required field
   const contactId = await zohoCreate(MODULE, payload);
 
   // Also create a record in the Founders module so investors can see this founder's profile

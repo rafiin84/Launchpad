@@ -479,6 +479,26 @@ export async function portalGetRecordPhoto(module: string, recordId: string): Pr
   }
 }
 
+export async function zohoDeleteRecordPhoto(module: string, recordId: string): Promise<boolean> {
+  const token = loadToken();
+  if (!token) return false;
+  const res = await fetch(buildCrmUrl(`/crm/v2/${module}/${recordId}/photo`), {
+    method: 'DELETE',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+  });
+  return res.ok;
+}
+
+export async function portalDeleteRecordPhoto(module: string, recordId: string): Promise<boolean> {
+  const token = loadToken();
+  if (!token) return false;
+  const res = await fetch(buildPortalCrmUrl(`/crm/v2/${module}/${recordId}/photo`), {
+    method: 'DELETE',
+    headers: { 'Authorization': `Zoho-oauthtoken ${token}`, 'x-crmportal': ZOHO_HOSTS.portalName },
+  });
+  return res.ok;
+}
+
 // ─── Current user ─────────────────────────────────────────────────────────────
 
 export interface ZohoCurrentUser {
