@@ -177,7 +177,14 @@ export async function fetchMyFounderProfile(contactId: string): Promise<CRMFound
 }
 
 export async function updateMyFounderProfile(contactId: string, fields: Partial<CRMFounderFields>): Promise<void> {
-  await portalUpdate(MODULE, contactId, toContactPayload(fields));
+  // Zoho rejects the ENTIRE update with NOT_ALLOWED ("portal users cannot
+  // edit invited field value") if Email is included at all — it's the
+  // field tied to the portal invite/login identity. Strip it defensively
+  // here so no caller can accidentally break every other field in the
+  // same update by passing it.
+  const rest = { ...fields };
+  delete rest.email;
+  await portalUpdate(MODULE, contactId, toContactPayload(rest));
 }
 
 export async function uploadMyFounderPhoto(contactId: string, file: Blob, fileName = 'photo.jpg'): Promise<void> {

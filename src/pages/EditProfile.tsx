@@ -919,8 +919,6 @@ function FounderEditProfile() {
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
     if (!form.displayName.trim()) e.displayName = 'Display name is required.';
-    if (!form.email.trim()) e.email = 'Email address is required.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.';
     if (!form.mobile.trim()) e.mobile = 'Mobile number is required.';
     if (!form.company.trim()) e.company = 'Company name is required.';
     return e;
@@ -943,7 +941,9 @@ function FounderEditProfile() {
       await updateMyFounderProfile(contactId, {
         firstName,
         lastName: lastName || form.displayName.trim(),
-        email: form.email.trim(),
+        // Email is the portal invite/login-identity field — Zoho rejects the
+        // entire update with NOT_ALLOWED ("portal users cannot edit invited
+        // field value") if it's included at all, so it's never sent here.
         mobile: form.mobile.trim(),
         company: form.company.trim(),
         bio: form.bio.trim(),
@@ -1072,20 +1072,18 @@ function FounderEditProfile() {
           {errors.displayName && <p className="text-xs text-red-500 mt-1.5">{errors.displayName}</p>}
         </div>
 
-        {/* Email */}
+        {/* Email (read-only — tied to your portal login, Zoho doesn't allow portal users to change it) */}
         <div className="px-6 py-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.emailAddress} *</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.profile.emailAddress}</label>
           <div className="relative">
             <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="email"
               value={form.email}
-              onChange={e => set('email', e.target.value)}
-              placeholder="you@company.com"
-              className={`w-full border rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.email ? 'border-red-300' : 'border-gray-200'}`}
+              readOnly
+              className="w-full border border-gray-100 bg-gray-50 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
             />
           </div>
-          {errors.email && <p className="text-xs text-red-500 mt-1.5">{errors.email}</p>}
         </div>
 
         {/* Mobile */}
