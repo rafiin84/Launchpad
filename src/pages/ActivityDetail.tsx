@@ -6,7 +6,7 @@ import { fetchSharedActivities } from '../services/sharedActivities';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
-import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, type DocumentRef } from '../components/activities/PostAttachments';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment, type DocumentRef } from '../components/activities/PostAttachments';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
@@ -315,7 +315,22 @@ export default function ActivityDetail() {
           {/* Post attachment — see ActivityCard in Activities.tsx for the same logic */}
           {(() => {
             switch (activity.postType) {
+              case 'photo':
+                if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="photo" />;
+                if (!activity.imageData && !activity.imageUrl) return null;
+                return (
+                  <div className="rounded-2xl overflow-hidden mb-4">
+                    <img
+                      src={activity.imageData || activity.imageUrl}
+                      alt=""
+                      className="w-full object-cover max-h-80"
+                      loading="lazy"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                );
               case 'video':
+                if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="video" />;
                 return activity.videoUrl ? (
                   <div className="rounded-2xl overflow-hidden mb-4 bg-black">
                     <video src={activity.videoUrl} controls className="w-full max-h-80" />

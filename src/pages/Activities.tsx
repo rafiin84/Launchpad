@@ -21,13 +21,12 @@ import { generateAIActivities } from '../services/aiEngine';
 import { fetchCRMPortfolio } from '../services/crmPortfolio';
 import { fetchCRMDeals } from '../services/crmDeals';
 import { addNotification } from '../services/notifications';
-import { uploadFile, canUploadFiles } from '../services/fileUpload';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 import { createCRMDocumentFromFile, resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
-import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, type DocumentRef } from '../components/activities/PostAttachments';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment, type DocumentRef } from '../components/activities/PostAttachments';
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
@@ -84,33 +83,6 @@ function getVideoThumbnail(url: string): string | null {
   return null;
 }
 
-function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const MAX = 600;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-        else                { width  = Math.round((width  * MAX) / height); height = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('Canvas error')); return; }
-      ctx.drawImage(img, 0, 0, width, height);
-      let quality = 0.75;
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
-      while (dataUrl.length > 28000 && quality > 0.1) { quality -= 0.1; dataUrl = canvas.toDataURL('image/jpeg', quality); }
-      resolve(dataUrl);
-    };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Load error')); };
-    img.src = objectUrl;
-  });
-}
-
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
 type AttachmentType = 'none' | 'photo' | 'video' | 'youtube' | 'document' | 'location' | 'poll' | 'link';
@@ -132,7 +104,7 @@ function isHttpUrl(s: string): boolean {
 function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const { t } = useLanguage();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const photoFileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
   const documentFileRef = useRef<HTMLInputElement>(null);
 
@@ -147,26 +119,23 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
   const [attachment, setAttachment]   = useState<AttachmentType>('none');
   const [showPicker, setShowPicker]   = useState(false);
 
-  // Photo (existing)
-  const [imageData, setImageData]     = useState('');   // base64 compressed
-  const [imageUrl, setImageUrl]       = useState('');    // public URL
-  const [imagePreview, setImagePreview] = useState('');
-  const [imageMode, setImageMode]     = useState<'upload' | 'url'>('upload');
-  const [compressing, setCompressing] = useState(false);
+  // Photo/Video/Document all share one upload path — the file is stored in
+  // Zoho via the File Upload field (createCRMDocumentFromFile, same
+  // mechanism the Documents page uses), not a third-party host. mediaRef is
+  // what actually gets saved on the activity record; mediaPreviewUrl is a
+  // local object URL for an instant preview while the upload is in flight.
+  const [mediaFile, setMediaFile]         = useState<File | null>(null);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
+  const [mediaRef, setMediaRef]           = useState<DocumentRef | null>(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaError, setMediaError]       = useState('');
 
-  // Video (uploaded file, via Cloudinary — same host as photo upload)
-  const [videoUrl, setVideoUrl]       = useState('');
-  const [videoUploading, setVideoUploading] = useState(false);
-  const [videoError, setVideoError]   = useState('');
+  // Photo can ALSO be a pasted external URL instead of an upload.
+  const [imageMode, setImageMode]     = useState<'upload' | 'url'>('upload');
+  const [imageUrl, setImageUrl]       = useState('');
 
   // YouTube
   const [youtubeUrl, setYoutubeUrl]   = useState('');
-
-  // Document (Zoho File Upload field — same mechanism as the Documents page)
-  const [documentName, setDocumentName] = useState('');
-  const [documentUploading, setDocumentUploading] = useState(false);
-  const [documentRefState, setDocumentRefState] = useState<DocumentRef | null>(null);
-  const [documentError, setDocumentError] = useState('');
 
   // Location
   const [locationName, setLocationName] = useState('');
@@ -185,15 +154,19 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
     if (founderCompanyName && !companyName) setCompanyName(founderCompanyName);
   }, [founderCompanyName]);
 
+  function clearMedia() {
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    setMediaFile(null); setMediaPreviewUrl(''); setMediaRef(null); setMediaError('');
+    if (photoFileRef.current) photoFileRef.current.value = '';
+    if (videoFileRef.current) videoFileRef.current.value = '';
+    if (documentFileRef.current) documentFileRef.current.value = '';
+  }
+
   function resetAttachment() {
     setAttachment('none');
-    setImageData(''); setImageUrl(''); setImagePreview(''); setImageMode('upload');
-    if (fileRef.current) fileRef.current.value = '';
-    setVideoUrl(''); setVideoError('');
-    if (videoFileRef.current) videoFileRef.current.value = '';
+    clearMedia();
+    setImageMode('upload'); setImageUrl('');
     setYoutubeUrl('');
-    setDocumentName(''); setDocumentRefState(null); setDocumentError('');
-    if (documentFileRef.current) documentFileRef.current.value = '';
     setLocationName(''); setLocationCoords('');
     setPollQuestion(''); setPollOptions(['', '']);
     setLinkUrl('');
@@ -201,10 +174,10 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
   const attachmentValid = (() => {
     switch (attachment) {
-      case 'photo':    return !!(imagePreview || (imageMode === 'url' && imageUrl.trim()));
-      case 'video':    return !!videoUrl && !videoUploading;
+      case 'photo':    return imageMode === 'url' ? isHttpUrl(imageUrl.trim()) : (!!mediaRef && !mediaUploading);
+      case 'video':    return !!mediaRef && !mediaUploading;
       case 'youtube':  return !!getVideoEmbedUrl(youtubeUrl.trim());
-      case 'document': return !!documentRefState && !documentUploading;
+      case 'document': return !!mediaRef && !mediaUploading;
       case 'location': return !!locationName.trim();
       case 'poll':     return !!pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2;
       case 'link':     return isHttpUrl(linkUrl.trim());
@@ -241,81 +214,34 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
     }
   }
 
-  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
+  // Shared upload handler for Photo (upload mode)/Video/Document — all three
+  // create a My_Documents record via the Zoho File Upload field and store
+  // {documentId, fileUploadId, fileName} as Document_Ref on the activity.
+  async function handleMediaFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setCompressing(true);
-    try {
-      if (canUploadFiles()) {
-        // Full-resolution upload to Cloudinary — no compression, no blur.
-        // Store the URL (small) instead of a heavily-compressed base64.
-        const url = await uploadFile(file);
-        setImageUrl(url);
-        setImageData('');
-        setImagePreview(url);
-      } else {
-        // Fallback: compress to base64 to fit the CRM text field.
-        const compressed = await compressImage(file);
-        setImageData(compressed);
-        setImagePreview(compressed);
-        setImageUrl('');
-      }
-    } catch {
-      // If the upload service fails, fall back to compressed base64.
-      try {
-        const compressed = await compressImage(file);
-        setImageData(compressed);
-        setImagePreview(compressed);
-        setImageUrl('');
-      } catch { /* ignore */ }
-    } finally { setCompressing(false); }
-  }
-
-  function clearImage() {
-    setImageData(''); setImageUrl(''); setImagePreview('');
-    if (fileRef.current) fileRef.current.value = '';
-  }
-
-  async function handleVideoFileSelect(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setVideoError('');
-    setVideoUploading(true);
-    try {
-      if (!canUploadFiles()) {
-        throw new Error('Video upload needs a one-time Cloudinary setup (see .env.example) — paste a video link instead for now, or use the YouTube option.');
-      }
-      const url = await uploadFile(file);
-      setVideoUrl(url);
-    } catch (err) {
-      setVideoError(err instanceof Error ? err.message : 'Video upload failed.');
-    } finally {
-      setVideoUploading(false);
-    }
-  }
-
-  async function handleDocumentFileSelect(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setDocumentError('');
-    setDocumentUploading(true);
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    setMediaError('');
+    setMediaRef(null);
+    setMediaFile(file);
+    setMediaPreviewUrl(URL.createObjectURL(file));
+    setMediaUploading(true);
     try {
       const doc = await createCRMDocumentFromFile({
         documentName: file.name,
         documentType: 'other',
         relatedCompany: companyName.trim(),
-        description: `Shared by ${currentUser.name} in an activity post`,
+        description: `Shared by ${currentUser.name} in an activity post (${attachment})`,
         visibility: 'shared-all',
         authorName: currentUser.name,
         authorRole: isInvestor ? 'investor' : 'founder',
       }, file);
       if (!doc.fileUploadId) throw new Error('Upload succeeded but the file reference could not be read back.');
-      setDocumentName(file.name);
-      setDocumentRefState({ documentId: doc.id, fileUploadId: doc.fileUploadId, fileName: file.name });
+      setMediaRef({ documentId: doc.id, fileUploadId: doc.fileUploadId, fileName: file.name });
     } catch (err) {
-      setDocumentError(err instanceof Error ? err.message : 'Document upload failed.');
+      setMediaError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
-      setDocumentUploading(false);
+      setMediaUploading(false);
     }
   }
 
@@ -371,16 +297,17 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
       };
 
       if (attachment === 'photo') {
-        // In upload mode the image is either a Cloudinary URL (imageUrl, no base64)
-        // or a compressed base64 fallback (imageData). Send whichever we have.
-        fields.imageUrl  = imageMode === 'url' ? imageUrl.trim() : (imageData ? '' : imageUrl.trim());
-        fields.imageData = imageMode === 'upload' ? imageData : '';
-      } else if (attachment === 'video') {
-        fields.videoUrl = videoUrl;
+        if (imageMode === 'url') {
+          fields.imageUrl = imageUrl.trim();
+        } else if (mediaRef) {
+          fields.documentRef = JSON.stringify(mediaRef);
+        }
+      } else if (attachment === 'video' && mediaRef) {
+        fields.documentRef = JSON.stringify(mediaRef);
       } else if (attachment === 'youtube') {
         fields.videoUrl = youtubeUrl.trim();
-      } else if (attachment === 'document' && documentRefState) {
-        fields.documentRef = JSON.stringify(documentRefState);
+      } else if (attachment === 'document' && mediaRef) {
+        fields.documentRef = JSON.stringify(mediaRef);
       } else if (attachment === 'location') {
         fields.locationName = locationName.trim();
         fields.locationCoords = locationCoords.trim();
@@ -545,56 +472,70 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
           {attachment === 'photo' && (
             <>
-              {(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  <img src={imagePreview || imageUrl} alt="preview" className="w-full max-h-56 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
-                    <X size={13} className="text-white" />
+              <div className="flex gap-1 mb-2">
+                {(['upload', 'url'] as const).map(m => (
+                  <button key={m} onClick={() => setImageMode(m)}
+                    className={cn('text-xs px-2 py-1 rounded-lg font-medium transition-all', imageMode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                    {m === 'upload' ? t.activities.upload : t.activities.url}
                   </button>
-                </div>
+                ))}
+              </div>
+              {imageMode === 'upload' ? (
+                mediaPreviewUrl ? (
+                  <div className="relative rounded-xl overflow-hidden">
+                    <img src={mediaPreviewUrl} alt="preview" className="w-full max-h-56 object-cover" />
+                    {mediaUploading && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 size={20} className="animate-spin text-white" />
+                      </div>
+                    )}
+                    <button onClick={clearMedia} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+                      <X size={13} className="text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => photoFileRef.current?.click()}
+                    className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
+                    <Image size={14} /> {t.activities.clickToUpload}
+                  </button>
+                )
               ) : (
                 <>
-                  <div className="flex gap-1 mb-2">
-                    {(['upload', 'url'] as const).map(m => (
-                      <button key={m} onClick={() => setImageMode(m)}
-                        className={cn('text-xs px-2 py-1 rounded-lg font-medium transition-all', imageMode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
-                        {m === 'upload' ? t.activities.upload : t.activities.url}
-                      </button>
-                    ))}
-                  </div>
-                  {imageMode === 'upload' ? (
-                    <button onClick={() => fileRef.current?.click()} disabled={compressing}
-                      className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
-                      {compressing ? <><div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" /> {t.activities.compressing}</> : <><Image size={14} /> {t.activities.clickToUpload}</>}
-                    </button>
-                  ) : (
-                    <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImagePreview(''); setImageData(''); }}
-                      placeholder="https://example.com/image.png"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black" />
+                  <input type="text" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                    placeholder="https://example.com/image.png"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black" />
+                  {imageUrl.trim() && isHttpUrl(imageUrl.trim()) && (
+                    <img src={imageUrl.trim()} alt="preview" className="w-full max-h-56 object-cover rounded-xl mt-2" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   )}
                 </>
               )}
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+              <input ref={photoFileRef} type="file" accept="image/*" className="hidden" onChange={handleMediaFileSelect} />
+              {mediaError && <p className="text-xs text-red-500 mt-1.5">{mediaError}</p>}
             </>
           )}
 
           {attachment === 'video' && (
             <>
-              {videoUrl ? (
+              {mediaPreviewUrl ? (
                 <div className="relative rounded-xl overflow-hidden bg-black">
-                  <video src={videoUrl} controls className="w-full max-h-56" />
-                  <button onClick={() => setVideoUrl('')} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+                  <video src={mediaPreviewUrl} controls className="w-full max-h-56" />
+                  {mediaUploading && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <Loader2 size={20} className="animate-spin text-white" />
+                    </div>
+                  )}
+                  <button onClick={clearMedia} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
                     <X size={13} className="text-white" />
                   </button>
                 </div>
               ) : (
-                <button onClick={() => videoFileRef.current?.click()} disabled={videoUploading}
+                <button onClick={() => videoFileRef.current?.click()}
                   className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
-                  {videoUploading ? <><Loader2 size={14} className="animate-spin" /> {t.activities.uploading}</> : <><Video size={14} /> {t.activities.clickToUpload}</>}
+                  <Video size={14} /> {t.activities.clickToUpload}
                 </button>
               )}
-              <input ref={videoFileRef} type="file" accept="video/*" className="hidden" onChange={handleVideoFileSelect} />
-              {videoError && <p className="text-xs text-red-500 mt-1.5">{videoError}</p>}
+              <input ref={videoFileRef} type="file" accept="video/*" className="hidden" onChange={handleMediaFileSelect} />
+              {mediaError && <p className="text-xs text-red-500 mt-1.5">{mediaError}</p>}
             </>
           )}
 
@@ -624,24 +565,24 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
           {attachment === 'document' && (
             <>
-              {documentRefState ? (
+              {mediaFile ? (
                 <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white">
                   <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                    <FileText size={14} className="text-orange-500" />
+                    {mediaUploading ? <Loader2 size={14} className="text-orange-500 animate-spin" /> : <FileText size={14} className="text-orange-500" />}
                   </div>
-                  <span className="text-xs font-medium text-gray-700 truncate flex-1">{documentName}</span>
-                  <button onClick={() => { setDocumentRefState(null); setDocumentName(''); }} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
+                  <span className="text-xs font-medium text-gray-700 truncate flex-1">{mediaFile.name}</span>
+                  <button onClick={clearMedia} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
                     <X size={13} />
                   </button>
                 </div>
               ) : (
-                <button onClick={() => documentFileRef.current?.click()} disabled={documentUploading}
+                <button onClick={() => documentFileRef.current?.click()}
                   className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
-                  {documentUploading ? <><Loader2 size={14} className="animate-spin" /> {t.activities.uploading}</> : <><FileText size={14} /> {t.activities.clickToUpload}</>}
+                  <FileText size={14} /> {t.activities.clickToUpload}
                 </button>
               )}
-              <input ref={documentFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.zip" className="hidden" onChange={handleDocumentFileSelect} />
-              {documentError && <p className="text-xs text-red-500 mt-1.5">{documentError}</p>}
+              <input ref={documentFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.zip" className="hidden" onChange={handleMediaFileSelect} />
+              {mediaError && <p className="text-xs text-red-500 mt-1.5">{mediaError}</p>}
             </>
           )}
 
@@ -908,7 +849,22 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
             existed. */}
         {(() => {
           switch (activity.postType) {
+            case 'photo':
+              if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="photo" />;
+              if (!activity.imageUrl && !(activity.imageData && activity.imageData.startsWith('data:'))) return null;
+              return (
+                <div className="mt-3 rounded-xl overflow-hidden">
+                  <img
+                    src={activity.imageData?.startsWith('data:') ? activity.imageData : activity.imageUrl}
+                    alt=""
+                    className="w-full max-h-48 object-cover"
+                    loading="lazy"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              );
             case 'video':
+              if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="video" />;
               return activity.videoUrl ? (
                 <div className="mt-3 rounded-xl overflow-hidden bg-black" onClick={e => e.stopPropagation()}>
                   <video src={activity.videoUrl} controls className="w-full max-h-64" />

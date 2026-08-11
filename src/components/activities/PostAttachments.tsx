@@ -1,13 +1,75 @@
-import { useState } from 'react';
-import { BarChart3, Check, FileText, Download, MapPin, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { BarChart3, Check, FileText, Download, MapPin, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import {
   castPollVote, parsePollVotes, parsePollData, parseDocumentRef,
   type CRMActivity, type PollVote, type DocumentRef,
 } from '../../services/crmActivities';
+import { resolveDocumentUrl, type CRMDocument } from '../../services/crmDocuments';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/cn';
 
 export type { DocumentRef };
+
+// ─── Photo / Video (uploaded) ────────────────────────────────────────────────
+// Same storage as Document — a My_Documents record via Zoho's File Upload
+// field — but rendered inline instead of as a file card. Unlike a plain
+// imageUrl/videoUrl, the file has to be fetched (resolveDocumentUrl) before
+// anything can be shown, so this needs its own loading state.
+export function MediaAttachment({ documentRef, kind }: { documentRef: string; kind: 'photo' | 'video' }) {
+  const ref = parseDocumentRef(documentRef);
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const cleanupRef = useRef<{ url: string; revoke: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!ref) return;
+    let cancelled = false;
+    setUrl(null);
+    setError(false);
+    resolveDocumentUrl({ id: ref.documentId, fileUploadId: ref.fileUploadId, fileUrl: '', fileName: ref.fileName } as CRMDocument)
+      .then(result => {
+        if (cancelled) {
+          if (result.revoke) URL.revokeObjectURL(result.url);
+          return;
+        }
+        cleanupRef.current = result;
+        setUrl(result.url);
+      })
+      .catch(() => { if (!cancelled) setError(true); });
+    return () => {
+      cancelled = true;
+      if (cleanupRef.current?.revoke) URL.revokeObjectURL(cleanupRef.current.url);
+      cleanupRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentRef]);
+
+  if (!ref) return null;
+
+  return (
+    <div
+      className={cn('mt-3 rounded-xl overflow-hidden', kind === 'video' ? 'bg-black' : 'bg-gray-100')}
+      onClick={e => kind === 'video' && e.stopPropagation()}
+    >
+      {!url && !error && (
+        <div className="flex items-center justify-center h-40 text-gray-400">
+          <Loader2 size={20} className="animate-spin" />
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center justify-center h-40 gap-2 text-xs text-red-400">
+          <AlertCircle size={14} /> Failed to load {kind}.
+        </div>
+      )}
+      {url && !error && kind === 'photo' && (
+        <img src={url} alt="" className="w-full max-h-64 object-cover" loading="lazy" onError={() => setError(true)} />
+      )}
+      {url && !error && kind === 'video' && (
+        <video src={url} controls className="w-full max-h-64" />
+      )}
+    </div>
+  );
+}
 
 // ─── Poll ───────────────────────────────────────────────────────────────────
 // One vote per user, no changing your vote, results shown only after voting.
