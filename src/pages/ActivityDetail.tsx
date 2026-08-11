@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Tag, Trash2, Edit2 } from 'lucide-react';
 import { deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
 import { fetchSharedActivities } from '../services/sharedActivities';
+import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
@@ -53,13 +54,15 @@ const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> =
 export default function ActivityDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser, founderCompanyName, isInvestor } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor, isFounder } = useAuth();
 
   const [activity, setActivity] = useState<CRMActivity | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  const [companyLogo, setCompanyLogo] = useState('');
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -72,6 +75,32 @@ export default function ActivityDetail() {
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Same company-logo lookup as the Activities feed (see Activities.tsx) —
+  // investors need any founder's company (fetchAllCompanyProfiles, admin-only),
+  // a founder only ever needs their own (other founders' posts aren't visible
+  // to them per the sharedActivities.ts visibility rules).
+  useEffect(() => {
+    if (!activity) return;
+    const displayCompany = activity.companyName
+      || (isFounder && currentUser.name.trim().toLowerCase() === activity.authorName.trim().toLowerCase() ? founderCompanyName : '')
+      || activity.authorName || 'General';
+    const key = displayCompany.trim().toLowerCase();
+    if (isInvestor) {
+      fetchAllCompanyProfiles()
+        .then(profiles => {
+          const match = profiles.find(p => p.data.name?.trim().toLowerCase() === key);
+          if (match?.logo) setCompanyLogo(match.logo);
+        })
+        .catch(() => {});
+    } else if (isFounder && currentUser.email) {
+      fetchCompanyProfile(currentUser.email)
+        .then(result => {
+          if (result.data.name?.trim().toLowerCase() === key && result.logo) setCompanyLogo(result.logo);
+        })
+        .catch(() => {});
+    }
+  }, [activity, isInvestor, isFounder, currentUser.email, currentUser.name, founderCompanyName]);
 
   const handleDelete = async () => {
     if (!id) return;
@@ -178,8 +207,17 @@ export default function ActivityDetail() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <Building2 size={15} className="text-gray-400" />
+            <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {companyLogo && !logoError ? (
+                <img
+                  src={companyLogo}
+                  alt={activity.companyName || activity.authorName}
+                  className="w-full h-full object-cover"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <Building2 size={15} className="text-gray-400" />
+              )}
             </div>
             <p className="text-sm font-semibold text-gray-700">{activity.companyName || (isAuthor ? founderCompanyName : '') || activity.authorName || 'General'}</p>
           </div>

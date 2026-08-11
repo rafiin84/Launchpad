@@ -24,6 +24,7 @@ import { addNotification } from '../services/notifications';
 import { uploadFile, canUploadFiles } from '../services/fileUpload';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
+import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
@@ -476,13 +477,15 @@ function groupAndSort(activities: CRMActivity[]): { key: string; items: CRMActiv
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
-function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete?: (id: string) => void }) {
+function ActivityCard({ activity, onDelete, companyLogos }: { activity: CRMActivity; onDelete?: (id: string) => void; companyLogos?: Record<string, string> }) {
   const { currentUser, founderCompanyName, isInvestor } = useAuth();
   const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
   const canDelete = isOwnPost || isInvestor;
   const [deleting, setDeleting] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || activity.authorName || 'General';
+  const companyLogo = companyLogos?.[displayCompany.trim().toLowerCase()];
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
   const display = isLong ? activity.content.slice(0, LIMIT) : activity.content;
@@ -503,8 +506,17 @@ function ActivityCard({ activity, onDelete }: { activity: CRMActivity; onDelete?
       {/* Header row: company | type badge | delete */}
       <div className="flex items-center justify-between px-5 pt-4 pb-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <Building2 size={14} className="text-gray-400" />
+          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {companyLogo && !logoError ? (
+              <img
+                src={companyLogo}
+                alt={displayCompany}
+                className="w-full h-full object-cover"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <Building2 size={14} className="text-gray-400" />
+            )}
           </div>
           <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
         </div>
@@ -598,6 +610,7 @@ export default function Activities() {
   const [syncWarning, setSyncWarning] = useState('');
   const [clearingAll, setClearingAll] = useState(false);
   const [mySharePublic, setMySharePublic] = useState(false);
+  const [companyLogos, setCompanyLogos] = useState<Record<string, string>>({});
   const isConnected = !!loadToken();
   const canFetch = isConnected || isFounder;
 
@@ -638,6 +651,34 @@ export default function Activities() {
         .catch(() => {});
     }
   }, []);
+
+  // Build a company-name → logo lookup for the feed. Investors can see every
+  // founder's post, so they need every company's logo (fetchAllCompanyProfiles,
+  // admin-only); a founder's own posts are the only founder posts they'll ever
+  // see themselves (per the visibility rules in sharedActivities.ts — other
+  // founders' posts are hidden from them), so they only need their own company.
+  useEffect(() => {
+    if (!canFetch) return;
+    if (isInvestor) {
+      fetchAllCompanyProfiles()
+        .then(profiles => {
+          const map: Record<string, string> = {};
+          for (const p of profiles) {
+            const key = p.data.name?.trim().toLowerCase();
+            if (key && p.logo) map[key] = p.logo;
+          }
+          setCompanyLogos(map);
+        })
+        .catch(() => {});
+    } else if (isFounder && currentUser.email) {
+      fetchCompanyProfile(currentUser.email)
+        .then(result => {
+          const key = result.data.name?.trim().toLowerCase();
+          if (key && result.logo) setCompanyLogos(prev => ({ ...prev, [key]: result.logo as string }));
+        })
+        .catch(() => {});
+    }
+  }, [canFetch, isInvestor, isFounder, currentUser.email]);
 
   const handlePost = (activity: CRMActivity) => {
     // Only show it in the feed if it actually saved to CRM (real id, not local_).
@@ -798,7 +839,7 @@ export default function Activities() {
               </div>
               <div className="grid grid-cols-1 gap-4">
                 {group.items.map(activity => (
-                  <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} />
+                  <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} companyLogos={companyLogos} />
                 ))}
               </div>
             </div>
