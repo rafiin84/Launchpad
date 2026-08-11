@@ -100,6 +100,12 @@ export default function EditActivity() {
   const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
   const [compressing, setCompressing] = useState(false);
   const [isDragging, setIsDragging]   = useState(false);
+  // This page has no UI for the richer post types (video/poll/document/location/
+  // link — see Activities.tsx's Composer) — preserve whatever the original
+  // record had for those fields so editing a plain field like the title doesn't
+  // wipe them (updateCRMActivity writes every CRMActivityFields key, including
+  // empty ones, so anything not carried through here would be cleared).
+  const extraFieldsRef = useRef({ postType: '', videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', documentRef: '' });
 
   useEffect(() => {
     if (!id) return;
@@ -116,6 +122,11 @@ export default function EditActivity() {
         imageData:    activity.imageData || '',
         imagePreview: activity.imageData || activity.imageUrl || '',
       });
+      extraFieldsRef.current = {
+        postType: activity.postType || '', videoUrl: activity.videoUrl || '', linkUrl: activity.linkUrl || '',
+        locationName: activity.locationName || '', locationCoords: activity.locationCoords || '',
+        pollData: activity.pollData || '', documentRef: activity.documentRef || '',
+      };
       if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
       setAuthorRole(activity.authorRole || '');
       setVisibility(activity.visibility || 'public');
@@ -178,6 +189,7 @@ export default function EditActivity() {
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : '',
         imageData:    imageMode === 'upload' ? form.imageData : '',
         visibility,
+        ...extraFieldsRef.current,
       };
       if (id!.startsWith('local_')) {
         const STORAGE_KEY = 'lp_shared_activities';

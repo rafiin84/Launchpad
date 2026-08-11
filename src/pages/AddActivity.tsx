@@ -209,6 +209,7 @@ export default function AddActivity() {
         imageUrl:     imageMode === 'url' ? form.imageUrl.trim() : (form.imageData ? '' : form.imageUrl.trim()),
         imageData:    imageMode === 'upload' ? form.imageData : '',
         visibility:   isInvestor ? 'public' : (mySharePublic ? 'public' : 'investor_only'),
+        postType: '', videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', documentRef: '',
       };
       const result = await postSharedActivity(fields);
       if (!result.synced) {

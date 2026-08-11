@@ -16,28 +16,6 @@ import { ZOHO_HOSTS } from '../config/auth';
 
 const STORAGE_KEY = 'lp_shared_activities';
 
-function fromApiRecord(r: Record<string, unknown>): CRMActivity {
-  const str = (key: string): string => {
-    const v = r[key];
-    if (v === null || v === undefined) return '';
-    return String(v);
-  };
-  return {
-    id:           str('id'),
-    title:        str('title'),
-    activityType: str('activityType'),
-    content:      str('content'),
-    companyName:  str('companyName'),
-    authorName:   str('authorName'),
-    authorRole:   str('authorRole'),
-    tags:         str('tags'),
-    imageUrl:     str('imageUrl'),
-    imageData:    str('imageData'),
-    visibility:   str('visibility'),
-    createdTime:  str('createdTime'),
-  };
-}
-
 function loadLocal(): CRMActivity[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -98,10 +76,16 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
       const cached = localById.get(a.id);
       return {
         ...a,
-        content:     a.content     || cached?.content     || '',
-        imageUrl:    a.imageUrl    || cached?.imageUrl    || '',
-        imageData:   a.imageData   || cached?.imageData   || '',
-        createdTime: a.createdTime || cached?.createdTime || '',
+        content:        a.content        || cached?.content        || '',
+        imageUrl:       a.imageUrl        || cached?.imageUrl       || '',
+        imageData:      a.imageData       || cached?.imageData      || '',
+        videoUrl:       a.videoUrl        || cached?.videoUrl       || '',
+        linkUrl:        a.linkUrl         || cached?.linkUrl        || '',
+        locationName:   a.locationName    || cached?.locationName   || '',
+        locationCoords: a.locationCoords  || cached?.locationCoords || '',
+        pollData:       a.pollData        || cached?.pollData       || '',
+        documentRef:    a.documentRef     || cached?.documentRef    || '',
+        createdTime:    a.createdTime     || cached?.createdTime    || '',
       };
     });
     const merged = [...localOnly, ...withTimes];
@@ -166,6 +150,9 @@ export async function syncUnsyncedActivities(): Promise<number> {
       authorName: activity.authorName, authorRole: activity.authorRole,
       tags: activity.tags, imageUrl: activity.imageUrl, imageData: activity.imageData,
       visibility: activity.visibility,
+      postType: activity.postType, videoUrl: activity.videoUrl, linkUrl: activity.linkUrl,
+      locationName: activity.locationName, locationCoords: activity.locationCoords,
+      pollData: activity.pollData, documentRef: activity.documentRef,
     };
 
     let newId: string | null = null;

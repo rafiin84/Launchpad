@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Tag, Trash2, Edit2 } from 'lucide-react';
-import { deleteCRMActivity, type CRMActivity } from '../services/crmActivities';
+import { deleteCRMActivity, POLL_VOTE_TYPE, type CRMActivity } from '../services/crmActivities';
 import { fetchSharedActivities } from '../services/sharedActivities';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
+import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
+import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, type DocumentRef } from '../components/activities/PostAttachments';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
@@ -57,6 +60,7 @@ export default function ActivityDetail() {
   const { currentUser, founderCompanyName, isInvestor, isFounder } = useAuth();
 
   const [activity, setActivity] = useState<CRMActivity | null>(null);
+  const [allActivities, setAllActivities] = useState<CRMActivity[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [showDelete, setShowDelete] = useState(false);
@@ -64,11 +68,21 @@ export default function ActivityDetail() {
   const [companyLogo, setCompanyLogo] = useState('');
   const [logoError, setLogoError] = useState(false);
 
+  const [docViewer, setDocViewer] = useState<{ name: string; fileName: string } | null>(null);
+  const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
+  const [docViewerLoading, setDocViewerLoading] = useState(false);
+  const [docViewerError, setDocViewerError] = useState('');
+  const docViewerRevokeRef = useRef(false);
+
   useEffect(() => {
     if (!id) return;
     fetchSharedActivities()
       .then(all => {
-        const found = all.find(a => a.id === id);
+        setAllActivities(all);
+        // Poll-vote records are metadata, never a real post — treat direct
+        // navigation to one (shouldn't normally happen, nothing links to it)
+        // as not-found rather than rendering an empty card.
+        const found = all.find(a => a.id === id && a.activityType !== POLL_VOTE_TYPE);
         if (found) setActivity(found);
         else setError('Activity not found');
       })
@@ -126,6 +140,41 @@ export default function ActivityDetail() {
     }
   };
 
+  const closeDocViewer = () => {
+    if (docViewerRevokeRef.current && docViewerUrl) URL.revokeObjectURL(docViewerUrl);
+    setDocViewer(null);
+    setDocViewerUrl(null);
+    setDocViewerError('');
+  };
+
+  const handleOpenDocument = async (doc: DocumentRef) => {
+    setDocViewer({ name: doc.fileName, fileName: doc.fileName });
+    setDocViewerUrl(null);
+    setDocViewerError('');
+    setDocViewerLoading(true);
+    try {
+      const { url, revoke } = await resolveDocumentUrl({
+        id: doc.documentId, fileUploadId: doc.fileUploadId, fileUrl: '', fileName: doc.fileName,
+      } as CRMDocument);
+      docViewerRevokeRef.current = revoke;
+      setDocViewerUrl(url);
+    } catch (err) {
+      setDocViewerError(err instanceof Error ? err.message : 'Failed to open document.');
+    } finally {
+      setDocViewerLoading(false);
+    }
+  };
+
+  const handleDocViewerDownload = () => {
+    if (!docViewerUrl || !docViewer) return;
+    const a = document.createElement('a');
+    a.href = docViewerUrl;
+    a.download = docViewer.fileName || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   // Only the author can delete
   const isAuthor = activity
     ? currentUser.name.trim().toLowerCase() === activity.authorName.trim().toLowerCase()
@@ -166,6 +215,19 @@ export default function ActivityDetail() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl">
+      {docViewer && (
+        <DocumentViewerModal
+          title={docViewer.name}
+          fileName={docViewer.fileName}
+          url={docViewerUrl}
+          loading={docViewerLoading}
+          error={docViewerError}
+          previewable={/\.pdf$/i.test(docViewer.fileName || '')}
+          onClose={closeDocViewer}
+          onDownload={handleDocViewerDownload}
+        />
+      )}
+
       {showDelete && (
         <DeleteConfirmModal
           title="Delete Activity"
@@ -250,26 +312,53 @@ export default function ActivityDetail() {
             </p>
           )}
 
-          {/* Image or video */}
-          {(activity.imageData || activity.imageUrl) && (() => {
-            const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
-            return (
-              <div className="rounded-2xl overflow-hidden mb-4">
-                {videoEmbed ? (
-                  <div className="aspect-video bg-black">
-                    <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+          {/* Post attachment — see ActivityCard in Activities.tsx for the same logic */}
+          {(() => {
+            switch (activity.postType) {
+              case 'video':
+                return activity.videoUrl ? (
+                  <div className="rounded-2xl overflow-hidden mb-4 bg-black">
+                    <video src={activity.videoUrl} controls className="w-full max-h-80" />
                   </div>
-                ) : (
-                  <img
-                    src={activity.imageData || getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl}
-                    alt=""
-                    className="w-full object-cover max-h-80"
-                    loading="lazy"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                )}
-              </div>
-            );
+                ) : null;
+              case 'youtube': {
+                const embed = activity.videoUrl ? getVideoEmbedUrl(activity.videoUrl) : null;
+                return embed ? (
+                  <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-4">
+                    <iframe src={embed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  </div>
+                ) : null;
+              }
+              case 'document':
+                return <DocumentAttachmentCard documentRef={activity.documentRef} onOpen={handleOpenDocument} />;
+              case 'location':
+                return <LocationCard name={activity.locationName} coords={activity.locationCoords} />;
+              case 'poll':
+                return <PollWidget activity={activity} allActivities={allActivities} />;
+              case 'link':
+                return <LinkCard url={activity.linkUrl} />;
+              default: {
+                if (!activity.imageData && !activity.imageUrl) return null;
+                const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
+                return (
+                  <div className="rounded-2xl overflow-hidden mb-4">
+                    {videoEmbed ? (
+                      <div className="aspect-video bg-black">
+                        <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                      </div>
+                    ) : (
+                      <img
+                        src={activity.imageData || getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl}
+                        alt=""
+                        className="w-full object-cover max-h-80"
+                        loading="lazy"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                  </div>
+                );
+              }
+            }
           })()}
 
           {/* Tags */}

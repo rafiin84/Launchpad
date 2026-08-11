@@ -14,6 +14,16 @@ const FIELD_MAP: Record<string, string> = {
   imageUrl:        'Image_URL',
   imageData:       'Activity_Image_Data',
   visibility:      'Visibility',
+  // Post type ('photo' | 'video' | 'youtube' | 'document' | 'location' | 'poll' | 'link')
+  // and per-type payload fields. Missing on older records — renderers fall back
+  // to inferring from imageUrl/imageData like before postType existed.
+  postType:        'Post_Type',
+  videoUrl:        'Video_URL',       // uploaded video (Cloudinary) OR a youtube URL
+  linkUrl:         'Link_URL',
+  locationName:    'Location_Name',
+  locationCoords:  'Location_Coords', // "lat,lng", optional
+  pollData:        'Poll_Data',       // JSON: { question: string, options: string[] }
+  documentRef:     'Document_Ref',    // JSON: { documentId, fileUploadId, fileName } — see crmDocuments.ts
 };
 
 export interface CRMActivity {
@@ -28,6 +38,13 @@ export interface CRMActivity {
   imageUrl: string;
   imageData: string;
   visibility: string;
+  postType: string;
+  videoUrl: string;
+  linkUrl: string;
+  locationName: string;
+  locationCoords: string;
+  pollData: string;
+  documentRef: string;
   createdTime: string;
 }
 
@@ -40,23 +57,30 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     return String(v);
   };
   return {
-    id:           r.id,
-    title:        str(FIELD_MAP.title),
-    activityType: str(FIELD_MAP.activityType),
-    content:      str(FIELD_MAP.content),
-    companyName:  str(FIELD_MAP.companyName),
-    authorName:   str(FIELD_MAP.authorName),
-    authorRole:   str(FIELD_MAP.authorRole),
-    tags:         str(FIELD_MAP.tags),
-    imageUrl:     str(FIELD_MAP.imageUrl),
-    imageData:    str(FIELD_MAP.imageData),
-    visibility:   str(FIELD_MAP.visibility),
-    createdTime:  str('Created_Time') || str('Modified_Time'),
+    id:             r.id,
+    title:          str(FIELD_MAP.title),
+    activityType:   str(FIELD_MAP.activityType),
+    content:        str(FIELD_MAP.content),
+    companyName:    str(FIELD_MAP.companyName),
+    authorName:     str(FIELD_MAP.authorName),
+    authorRole:     str(FIELD_MAP.authorRole),
+    tags:           str(FIELD_MAP.tags),
+    imageUrl:       str(FIELD_MAP.imageUrl),
+    imageData:      str(FIELD_MAP.imageData),
+    visibility:     str(FIELD_MAP.visibility),
+    postType:       str(FIELD_MAP.postType),
+    videoUrl:       str(FIELD_MAP.videoUrl),
+    linkUrl:        str(FIELD_MAP.linkUrl),
+    locationName:   str(FIELD_MAP.locationName),
+    locationCoords: str(FIELD_MAP.locationCoords),
+    pollData:       str(FIELD_MAP.pollData),
+    documentRef:    str(FIELD_MAP.documentRef),
+    createdTime:    str('Created_Time') || str('Modified_Time'),
   };
 }
 
 // Explicitly list all fields — Zoho omits large textarea fields from default list responses
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Created_Time,Modified_Time';
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Document_Ref,Created_Time,Modified_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
@@ -64,7 +88,7 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
   return fromRecord(record);
 }
 
-const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Created_Time, Modified_Time';
+const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Post_Type, Video_URL, Link_URL, Location_Name, Location_Coords, Poll_Data, Document_Ref, Created_Time, Modified_Time';
 
 async function fetchViaCoql(): Promise<CRMActivity[]> {
   const records = await zohoCoql(
@@ -172,5 +196,87 @@ export async function updateCRMActivity(id: string, fields: CRMActivityFields): 
 
 export async function deleteCRMActivity(id: string): Promise<void> {
   return zohoDelete(MODULE, id);
+}
+
+// ─── Poll voting ────────────────────────────────────────────────────────────
+// A poll's own record only ever stores {question, options} in Poll_Data — never
+// vote tallies. Casting a vote creates a small separate activity record (same
+// create path/module-routing as a normal post — Feed_Submissions relay for
+// founders, direct create for investors) marked Activity_Type=POLL_VOTE_TYPE,
+// with the vote itself JSON-encoded in Content. This sidesteps two hard
+// platform limits: founders have no update path to My_Activities at all (see
+// "Portal restrictions" in CLAUDE.md), and mutating a shared vote-tally field
+// directly would race if two people vote at the same moment. Tallying reads
+// back whatever vote records are visible to the viewer (see parsePollVotes) —
+// already-fetched activities are reused, no extra network call.
+export const POLL_VOTE_TYPE = 'poll_vote';
+
+export interface PollVote {
+  activityId: string;
+  optionIndex: number;
+  voterEmail: string;
+  voterName: string;
+}
+
+export async function castPollVote(vote: PollVote, authorRole: 'investor' | 'founder'): Promise<void> {
+  const payload: Record<string, unknown> = {
+    [FIELD_MAP.title]: 'Poll vote',
+    [FIELD_MAP.activityType]: POLL_VOTE_TYPE,
+    [FIELD_MAP.content]: JSON.stringify({ ...vote, voterEmail: vote.voterEmail.toLowerCase() }),
+    [FIELD_MAP.authorName]: vote.voterName,
+    [FIELD_MAP.authorRole]: authorRole,
+    [FIELD_MAP.visibility]: 'public',
+  };
+  if (authorRole === 'founder') {
+    await portalCreate(FOUNDER_POST_MODULE, payload);
+  } else {
+    await zohoCreate(MODULE, payload);
+  }
+}
+
+/** Extracts votes for one poll out of an already-fetched activities list. */
+export function parsePollVotes(activities: CRMActivity[], activityId: string): PollVote[] {
+  const votes: PollVote[] = [];
+  for (const a of activities) {
+    if (a.activityType !== POLL_VOTE_TYPE || !a.content) continue;
+    try {
+      const parsed = JSON.parse(a.content) as PollVote;
+      if (parsed.activityId === activityId) votes.push(parsed);
+    } catch { /* skip malformed vote record */ }
+  }
+  return votes;
+}
+
+// ─── Post attachment payload shapes (Poll_Data / Document_Ref JSON) ─────────
+
+export interface PollData {
+  question: string;
+  options: string[];
+}
+
+export function parsePollData(raw: string): PollData | null {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as Partial<PollData>;
+    if (d && typeof d.question === 'string' && Array.isArray(d.options) && d.options.length > 0) {
+      return { question: d.question, options: d.options as string[] };
+    }
+  } catch { /* malformed */ }
+  return null;
+}
+
+export interface DocumentRef {
+  documentId: string;
+  fileUploadId: string;
+  fileName: string;
+}
+
+export function parseDocumentRef(raw: string): DocumentRef | null {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as Partial<DocumentRef>;
+    if (d && d.documentId) return { documentId: d.documentId, fileUploadId: d.fileUploadId || '', fileName: d.fileName || 'Document' };
+  } catch { /* malformed */ }
+  return null;
 }
 

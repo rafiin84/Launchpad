@@ -4,7 +4,7 @@ import {
   Activity, AlertCircle, RefreshCw, Building2,
   Image, X, Send, Link as LinkIcon,
   PlusCircle, DollarSign, FileText, Users, TrendingUp, MessageSquare, Upload, Clock,
-  Sparkles, Trash2,
+  Sparkles, Trash2, Video, CirclePlay, MapPin, BarChart3, Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
-  type CRMActivity, type CRMActivityFields,
+  type CRMActivity, type CRMActivityFields, POLL_VOTE_TYPE,
 } from '../services/crmActivities';
 import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions, deleteSharedActivity, deleteAllSharedActivities } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
@@ -25,6 +25,9 @@ import { uploadFile, canUploadFiles } from '../services/fileUpload';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
+import { createCRMDocumentFromFile, resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
+import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, type DocumentRef } from '../components/activities/PostAttachments';
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
@@ -110,31 +113,106 @@ function compressImage(file: File): Promise<string> {
 
 // ─── Inline Composer ──────────────────────────────────────────────────────────
 
+type AttachmentType = 'none' | 'photo' | 'video' | 'youtube' | 'document' | 'location' | 'poll' | 'link';
+
+const ATTACHMENT_PICKS: { type: AttachmentType; icon: React.ElementType; label: string; bg: string }[] = [
+  { type: 'photo',    icon: Image,     label: 'Photo',    bg: 'bg-emerald-500' },
+  { type: 'video',    icon: Video,     label: 'Video',    bg: 'bg-red-500' },
+  { type: 'youtube',  icon: CirclePlay, label: 'YouTube',  bg: 'bg-red-600' },
+  { type: 'document', icon: FileText,  label: 'Document', bg: 'bg-orange-500' },
+  { type: 'location', icon: MapPin,    label: 'Location', bg: 'bg-rose-500' },
+  { type: 'poll',     icon: BarChart3, label: 'Poll',     bg: 'bg-indigo-600' },
+  { type: 'link',     icon: LinkIcon,  label: 'Link',     bg: 'bg-violet-500' },
+];
+
+function isHttpUrl(s: string): boolean {
+  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
+}
+
 function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
   const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
+  const documentFileRef = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded]       = useState(false);
   const [title, setTitle]             = useState('');
   const [content, setContent]         = useState('');
   const [activityType, setActivityType] = useState('update');
   const [companyName, setCompanyName] = useState(founderCompanyName);
-  const [imageData, setImageData]     = useState('');   // base64 compressed
-  const [imageUrl, setImageUrl]       = useState('');   // public URL
-  const [imagePreview, setImagePreview] = useState('');
-  const [imageMode, setImageMode]     = useState<'upload' | 'url'>('upload');
-  const [showImagePanel, setShowImagePanel] = useState(false);
-  const [compressing, setCompressing] = useState(false);
   const [posting, setPosting]         = useState(false);
   const [generating, setGenerating]   = useState(false);
+
+  const [attachment, setAttachment]   = useState<AttachmentType>('none');
+  const [showPicker, setShowPicker]   = useState(false);
+
+  // Photo (existing)
+  const [imageData, setImageData]     = useState('');   // base64 compressed
+  const [imageUrl, setImageUrl]       = useState('');    // public URL
+  const [imagePreview, setImagePreview] = useState('');
+  const [imageMode, setImageMode]     = useState<'upload' | 'url'>('upload');
+  const [compressing, setCompressing] = useState(false);
+
+  // Video (uploaded file, via Cloudinary — same host as photo upload)
+  const [videoUrl, setVideoUrl]       = useState('');
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoError, setVideoError]   = useState('');
+
+  // YouTube
+  const [youtubeUrl, setYoutubeUrl]   = useState('');
+
+  // Document (Zoho File Upload field — same mechanism as the Documents page)
+  const [documentName, setDocumentName] = useState('');
+  const [documentUploading, setDocumentUploading] = useState(false);
+  const [documentRefState, setDocumentRefState] = useState<DocumentRef | null>(null);
+  const [documentError, setDocumentError] = useState('');
+
+  // Location
+  const [locationName, setLocationName] = useState('');
+  const [locationCoords, setLocationCoords] = useState('');
+  const [locating, setLocating] = useState(false);
+
+  // Poll
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+
+  // Link
+  const [linkUrl, setLinkUrl] = useState('');
 
   // Keep in sync if founderCompanyName loads async
   useEffect(() => {
     if (founderCompanyName && !companyName) setCompanyName(founderCompanyName);
   }, [founderCompanyName]);
 
-  const canPost = title.trim() && content.trim();
+  function resetAttachment() {
+    setAttachment('none');
+    setImageData(''); setImageUrl(''); setImagePreview(''); setImageMode('upload');
+    if (fileRef.current) fileRef.current.value = '';
+    setVideoUrl(''); setVideoError('');
+    if (videoFileRef.current) videoFileRef.current.value = '';
+    setYoutubeUrl('');
+    setDocumentName(''); setDocumentRefState(null); setDocumentError('');
+    if (documentFileRef.current) documentFileRef.current.value = '';
+    setLocationName(''); setLocationCoords('');
+    setPollQuestion(''); setPollOptions(['', '']);
+    setLinkUrl('');
+  }
+
+  const attachmentValid = (() => {
+    switch (attachment) {
+      case 'photo':    return !!(imagePreview || (imageMode === 'url' && imageUrl.trim()));
+      case 'video':    return !!videoUrl && !videoUploading;
+      case 'youtube':  return !!getVideoEmbedUrl(youtubeUrl.trim());
+      case 'document': return !!documentRefState && !documentUploading;
+      case 'location': return !!locationName.trim();
+      case 'poll':     return !!pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2;
+      case 'link':     return isHttpUrl(linkUrl.trim());
+      default:         return true;
+    }
+  })();
+
+  const canPost = !!title.trim() && !!content.trim() && attachmentValid;
 
   async function handleGenerate() {
     if (generating) return;
@@ -198,11 +276,80 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
     if (fileRef.current) fileRef.current.value = '';
   }
 
+  async function handleVideoFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoError('');
+    setVideoUploading(true);
+    try {
+      if (!canUploadFiles()) {
+        throw new Error('Video upload needs a one-time Cloudinary setup (see .env.example) — paste a video link instead for now, or use the YouTube option.');
+      }
+      const url = await uploadFile(file);
+      setVideoUrl(url);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : 'Video upload failed.');
+    } finally {
+      setVideoUploading(false);
+    }
+  }
+
+  async function handleDocumentFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDocumentError('');
+    setDocumentUploading(true);
+    try {
+      const doc = await createCRMDocumentFromFile({
+        documentName: file.name,
+        documentType: 'other',
+        relatedCompany: companyName.trim(),
+        description: `Shared by ${currentUser.name} in an activity post`,
+        visibility: 'shared-all',
+        authorName: currentUser.name,
+        authorRole: isInvestor ? 'investor' : 'founder',
+      }, file);
+      if (!doc.fileUploadId) throw new Error('Upload succeeded but the file reference could not be read back.');
+      setDocumentName(file.name);
+      setDocumentRefState({ documentId: doc.id, fileUploadId: doc.fileUploadId, fileName: file.name });
+    } catch (err) {
+      setDocumentError(err instanceof Error ? err.message : 'Document upload failed.');
+    } finally {
+      setDocumentUploading(false);
+    }
+  }
+
+  function handleUseMyLocation() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+        setLocationCoords(coords);
+        if (!locationName.trim()) setLocationName(coords);
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { timeout: 8000 },
+    );
+  }
+
+  function updatePollOption(i: number, val: string) {
+    setPollOptions(prev => prev.map((o, idx) => (idx === i ? val : o)));
+  }
+  function addPollOption() {
+    setPollOptions(prev => (prev.length >= 6 ? prev : [...prev, '']));
+  }
+  function removePollOption(i: number) {
+    setPollOptions(prev => (prev.length <= 2 ? prev : prev.filter((_, idx) => idx !== i)));
+  }
+
   function handleCancel() {
     setExpanded(false);
     setTitle(''); setContent(''); setActivityType('update');
     setCompanyName(founderCompanyName);
-    clearImage(); setShowImagePanel(false);
+    resetAttachment();
+    setShowPicker(false);
   }
 
   async function handlePost() {
@@ -217,12 +364,35 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         authorName:   currentUser.name,
         authorRole:   isInvestor ? 'investor' : 'founder',
         tags:         '',
-        // In upload mode the image is either a Cloudinary URL (imageUrl, no base64)
-        // or a compressed base64 fallback (imageData). Send whichever we have.
-        imageUrl:     imageMode === 'url' ? imageUrl.trim() : (imageData ? '' : imageUrl.trim()),
-        imageData:    imageMode === 'upload' ? imageData : '',
+        imageUrl: '', imageData: '',
+        postType: attachment === 'none' ? '' : attachment,
+        videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', documentRef: '',
         visibility:   postVisibility,
       };
+
+      if (attachment === 'photo') {
+        // In upload mode the image is either a Cloudinary URL (imageUrl, no base64)
+        // or a compressed base64 fallback (imageData). Send whichever we have.
+        fields.imageUrl  = imageMode === 'url' ? imageUrl.trim() : (imageData ? '' : imageUrl.trim());
+        fields.imageData = imageMode === 'upload' ? imageData : '';
+      } else if (attachment === 'video') {
+        fields.videoUrl = videoUrl;
+      } else if (attachment === 'youtube') {
+        fields.videoUrl = youtubeUrl.trim();
+      } else if (attachment === 'document' && documentRefState) {
+        fields.documentRef = JSON.stringify(documentRefState);
+      } else if (attachment === 'location') {
+        fields.locationName = locationName.trim();
+        fields.locationCoords = locationCoords.trim();
+      } else if (attachment === 'poll') {
+        fields.pollData = JSON.stringify({
+          question: pollQuestion.trim(),
+          options: pollOptions.map(o => o.trim()).filter(Boolean),
+        });
+      } else if (attachment === 'link') {
+        fields.linkUrl = linkUrl.trim();
+      }
+
       const activity = await postSharedActivity(fields);
 
       const targetRole = isInvestor ? 'founder' : 'investor';
@@ -258,7 +428,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
           {t.activities.shareActivities}
         </div>
         <button
-          onClick={e => { e.stopPropagation(); setExpanded(true); setShowImagePanel(true); }}
+          onClick={e => { e.stopPropagation(); setExpanded(true); setShowPicker(true); }}
           className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
         >
           <Image size={18} />
@@ -336,65 +506,229 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none border-0 outline-none leading-relaxed min-h-[90px]"
       />
 
-      {/* Image / video preview */}
-      {(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) && (() => {
-        const videoEmbed = imageMode === 'url' ? getVideoEmbedUrl(imageUrl) : null;
-        return (
-          <div className="relative mt-2 mb-3 rounded-xl overflow-hidden">
-            {videoEmbed ? (
-              <div className="aspect-video bg-black">
-                <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-              </div>
-            ) : (
-              <img src={imagePreview || getVideoThumbnail(imageUrl) || imageUrl} alt="preview" className="w-full max-h-56 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            )}
-            <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
-              <X size={13} className="text-white" />
-            </button>
-          </div>
-        );
-      })()}
-
-      {/* Image panel */}
-      {showImagePanel && !(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) && (
+      {/* ── Attachment picker grid ── */}
+      {showPicker && attachment === 'none' && (
         <div className="border border-gray-100 rounded-xl p-3 mb-3 bg-gray-50">
-          <div className="flex gap-1 mb-2">
-            {(['upload', 'url'] as const).map(m => (
-              <button key={m} onClick={() => setImageMode(m)}
-                className={cn('text-xs px-2 py-1 rounded-lg font-medium transition-all', imageMode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
-                {m === 'upload' ? t.activities.upload : t.activities.url}
-              </button>
-            ))}
+          <p className="text-xs font-semibold text-gray-500 mb-2.5">{t.activities.addToPost}</p>
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+            {ATTACHMENT_PICKS.map(at => {
+              const Icon = at.icon;
+              return (
+                <button
+                  key={at.type}
+                  type="button"
+                  onClick={() => { setAttachment(at.type); setShowPicker(false); }}
+                  className="flex flex-col items-center gap-1.5 group"
+                >
+                  <div className={cn('w-11 h-11 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 group-active:scale-95', at.bg)}>
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <span className="text-[10px] text-gray-500 font-medium">{at.label}</span>
+                </button>
+              );
+            })}
           </div>
-          {imageMode === 'upload' ? (
-            <button onClick={() => fileRef.current?.click()} disabled={compressing}
-              className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
-              {compressing ? <><div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" /> {t.activities.compressing}</> : <><Image size={14} /> {t.activities.clickToUpload}</>}
+        </div>
+      )}
+
+      {/* ── Per-attachment input + preview panel ── */}
+      {attachment !== 'none' && (
+        <div className="border border-gray-100 rounded-xl p-3 mb-3 bg-gray-50">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-semibold text-gray-600">
+              {ATTACHMENT_PICKS.find(a => a.type === attachment)?.label}
+            </p>
+            <button type="button" onClick={resetAttachment} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+              <X size={14} />
             </button>
-          ) : (
-            <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImagePreview(''); setImageData(''); }}
-              placeholder="https://example.com/image.png"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black" />
+          </div>
+
+          {attachment === 'photo' && (
+            <>
+              {(imagePreview || (imageMode === 'url' && imageUrl.startsWith('http'))) ? (
+                <div className="relative rounded-xl overflow-hidden">
+                  <img src={imagePreview || imageUrl} alt="preview" className="w-full max-h-56 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <button onClick={clearImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+                    <X size={13} className="text-white" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-1 mb-2">
+                    {(['upload', 'url'] as const).map(m => (
+                      <button key={m} onClick={() => setImageMode(m)}
+                        className={cn('text-xs px-2 py-1 rounded-lg font-medium transition-all', imageMode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                        {m === 'upload' ? t.activities.upload : t.activities.url}
+                      </button>
+                    ))}
+                  </div>
+                  {imageMode === 'upload' ? (
+                    <button onClick={() => fileRef.current?.click()} disabled={compressing}
+                      className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
+                      {compressing ? <><div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" /> {t.activities.compressing}</> : <><Image size={14} /> {t.activities.clickToUpload}</>}
+                    </button>
+                  ) : (
+                    <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImagePreview(''); setImageData(''); }}
+                      placeholder="https://example.com/image.png"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black" />
+                  )}
+                </>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+            </>
+          )}
+
+          {attachment === 'video' && (
+            <>
+              {videoUrl ? (
+                <div className="relative rounded-xl overflow-hidden bg-black">
+                  <video src={videoUrl} controls className="w-full max-h-56" />
+                  <button onClick={() => setVideoUrl('')} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+                    <X size={13} className="text-white" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => videoFileRef.current?.click()} disabled={videoUploading}
+                  className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
+                  {videoUploading ? <><Loader2 size={14} className="animate-spin" /> {t.activities.uploading}</> : <><Video size={14} /> {t.activities.clickToUpload}</>}
+                </button>
+              )}
+              <input ref={videoFileRef} type="file" accept="video/*" className="hidden" onChange={handleVideoFileSelect} />
+              {videoError && <p className="text-xs text-red-500 mt-1.5">{videoError}</p>}
+            </>
+          )}
+
+          {attachment === 'youtube' && (
+            <>
+              <input
+                type="text"
+                value={youtubeUrl}
+                onChange={e => setYoutubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black"
+              />
+              {(() => {
+                const embed = getVideoEmbedUrl(youtubeUrl.trim());
+                if (!embed) return null;
+                return (
+                  <div className="aspect-video bg-black rounded-xl overflow-hidden mt-2">
+                    <iframe src={embed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  </div>
+                );
+              })()}
+              {youtubeUrl.trim() && !getVideoEmbedUrl(youtubeUrl.trim()) && (
+                <p className="text-xs text-red-500 mt-1.5">That doesn't look like a YouTube link.</p>
+              )}
+            </>
+          )}
+
+          {attachment === 'document' && (
+            <>
+              {documentRefState ? (
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white">
+                  <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                    <FileText size={14} className="text-orange-500" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-700 truncate flex-1">{documentName}</span>
+                  <button onClick={() => { setDocumentRefState(null); setDocumentName(''); }} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => documentFileRef.current?.click()} disabled={documentUploading}
+                  className="w-full border border-dashed border-gray-200 rounded-xl py-4 text-xs text-gray-400 hover:border-gray-400 hover:bg-white transition-all flex items-center justify-center gap-2">
+                  {documentUploading ? <><Loader2 size={14} className="animate-spin" /> {t.activities.uploading}</> : <><FileText size={14} /> {t.activities.clickToUpload}</>}
+                </button>
+              )}
+              <input ref={documentFileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.zip" className="hidden" onChange={handleDocumentFileSelect} />
+              {documentError && <p className="text-xs text-red-500 mt-1.5">{documentError}</p>}
+            </>
+          )}
+
+          {attachment === 'location' && (
+            <>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={locationName}
+                  onChange={e => setLocationName(e.target.value)}
+                  placeholder="Address or place name"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <button
+                  type="button"
+                  onClick={handleUseMyLocation}
+                  disabled={locating}
+                  className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors disabled:opacity-50"
+                >
+                  {locating ? <Loader2 size={13} className="animate-spin" /> : <MapPin size={13} />}
+                  {t.activities.useMyLocation}
+                </button>
+              </div>
+              {locationName.trim() && <div className="mt-2"><LocationCard name={locationName.trim()} coords={locationCoords} /></div>}
+            </>
+          )}
+
+          {attachment === 'poll' && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={pollQuestion}
+                onChange={e => setPollQuestion(e.target.value)}
+                placeholder={t.activities.pollQuestion}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
+              />
+              <div className="space-y-1.5">
+                {pollOptions.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={e => updatePollOption(i, e.target.value)}
+                      placeholder={`${t.activities.pollOption} ${i + 1}`}
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button type="button" onClick={() => removePollOption(i)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pollOptions.length < 6 && (
+                <button type="button" onClick={addPollOption} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                  <PlusCircle size={12} /> {t.activities.addOption}
+                </button>
+              )}
+            </div>
+          )}
+
+          {attachment === 'link' && (
+            <>
+              <input
+                type="text"
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                placeholder="https://example.com"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black"
+              />
+              {linkUrl.trim() && isHttpUrl(linkUrl.trim()) && <div className="mt-2"><LinkCard url={linkUrl.trim()} /></div>}
+              {linkUrl.trim() && !isHttpUrl(linkUrl.trim()) && <p className="text-xs text-red-500 mt-1.5">Enter a full link starting with https://</p>}
+            </>
           )}
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setShowImagePanel(v => !v)}
+            onClick={() => setShowPicker(v => !v)}
             className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors',
-              showImagePanel ? 'bg-gray-100 text-gray-700' : 'text-gray-500 hover:bg-gray-50')}
+              showPicker || attachment !== 'none' ? 'bg-gray-100 text-gray-700' : 'text-gray-500 hover:bg-gray-50')}
           >
-            <Image size={15} /> {t.activities.photo}
-          </button>
-          <button
-            onClick={() => { setImageMode('url'); setShowImagePanel(true); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors"
-          >
-            <LinkIcon size={15} /> {t.activities.url}
+            <PlusCircle size={15} /> {t.activities.addToPost}
           </button>
           <button
             onClick={handleGenerate}
@@ -477,7 +811,13 @@ function groupAndSort(activities: CRMActivity[]): { key: string; items: CRMActiv
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
-function ActivityCard({ activity, onDelete, companyLogos }: { activity: CRMActivity; onDelete?: (id: string) => void; companyLogos?: Record<string, string> }) {
+function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenDocument }: {
+  activity: CRMActivity;
+  onDelete?: (id: string) => void;
+  companyLogos?: Record<string, string>;
+  allActivities: CRMActivity[];
+  onOpenDocument: (doc: DocumentRef) => void;
+}) {
   const { currentUser, founderCompanyName, isInvestor } = useAuth();
   const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
@@ -563,26 +903,56 @@ function ActivityCard({ activity, onDelete, companyLogos }: { activity: CRMActiv
           </p>
         )}
 
-        {/* Image or video — prefer full imageData (base64), fallback to imageUrl */}
-        {(activity.imageUrl || (activity.imageData && activity.imageData.startsWith('data:'))) && (() => {
-          const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
-          return (
-            <div className="mt-3 rounded-xl overflow-hidden">
-              {videoEmbed ? (
-                <div className="aspect-video bg-black" onClick={e => e.preventDefault()}>
-                  <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        {/* Post attachment — dispatches on postType; falls back to the old
+            image/youtube-URL inference for records saved before postType
+            existed. */}
+        {(() => {
+          switch (activity.postType) {
+            case 'video':
+              return activity.videoUrl ? (
+                <div className="mt-3 rounded-xl overflow-hidden bg-black" onClick={e => e.stopPropagation()}>
+                  <video src={activity.videoUrl} controls className="w-full max-h-64" />
                 </div>
-              ) : (
-                <img
-                  src={activity.imageData?.startsWith('data:') ? activity.imageData : (getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl)}
-                  alt=""
-                  className="w-full max-h-48 object-cover"
-                  loading="lazy"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              )}
-            </div>
-          );
+              ) : null;
+            case 'youtube': {
+              const embed = activity.videoUrl ? getVideoEmbedUrl(activity.videoUrl) : null;
+              return embed ? (
+                <div className="mt-3 aspect-video bg-black rounded-xl overflow-hidden" onClick={e => e.preventDefault()}>
+                  <iframe src={embed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              ) : null;
+            }
+            case 'document':
+              return <DocumentAttachmentCard documentRef={activity.documentRef} onOpen={onOpenDocument} />;
+            case 'location':
+              return <LocationCard name={activity.locationName} coords={activity.locationCoords} />;
+            case 'poll':
+              return <PollWidget activity={activity} allActivities={allActivities} />;
+            case 'link':
+              return <LinkCard url={activity.linkUrl} />;
+            default: {
+              // Legacy: no postType saved — infer from imageUrl/imageData like before.
+              if (!activity.imageUrl && !(activity.imageData && activity.imageData.startsWith('data:'))) return null;
+              const videoEmbed = activity.imageUrl ? getVideoEmbedUrl(activity.imageUrl) : null;
+              return (
+                <div className="mt-3 rounded-xl overflow-hidden">
+                  {videoEmbed ? (
+                    <div className="aspect-video bg-black" onClick={e => e.preventDefault()}>
+                      <iframe src={videoEmbed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                    </div>
+                  ) : (
+                    <img
+                      src={activity.imageData?.startsWith('data:') ? activity.imageData : (getVideoThumbnail(activity.imageUrl || '') || activity.imageUrl)}
+                      alt=""
+                      className="w-full max-h-48 object-cover"
+                      loading="lazy"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                </div>
+              );
+            }
+          }
         })()}
 
         {/* Tags */}
@@ -611,8 +981,17 @@ export default function Activities() {
   const [clearingAll, setClearingAll] = useState(false);
   const [mySharePublic, setMySharePublic] = useState(false);
   const [companyLogos, setCompanyLogos] = useState<Record<string, string>>({});
+  const [docViewer, setDocViewer] = useState<{ name: string; fileName: string } | null>(null);
+  const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
+  const [docViewerLoading, setDocViewerLoading] = useState(false);
+  const [docViewerError, setDocViewerError] = useState('');
+  const docViewerRevokeRef = useRef(false);
   const isConnected = !!loadToken();
   const canFetch = isConnected || isFounder;
+  // Poll-vote records are real activity records (see castPollVote in
+  // crmActivities.ts) but aren't posts — keep them in `records` so
+  // PollWidget can tally them, but never render/count them as feed items.
+  const visibleRecords = records.filter(r => r.activityType !== POLL_VOTE_TYPE);
 
   useEffect(() => {
     setPageTitle(
@@ -691,14 +1070,51 @@ export default function Activities() {
   };
 
   const handleClearAll = async () => {
-    if (!confirm(`Delete all ${records.length} activities? This cannot be undone.`)) return;
+    if (!confirm(`Delete all ${visibleRecords.length} activities? This cannot be undone.`)) return;
     setClearingAll(true);
     try {
+      // Delete the full set (including hidden poll-vote records) so nothing
+      // orphaned is left behind in CRM.
       await deleteAllSharedActivities(records.map(r => r.id));
       setRecords([]);
     } finally {
       setClearingAll(false);
     }
+  };
+
+  const closeDocViewer = () => {
+    if (docViewerRevokeRef.current && docViewerUrl) URL.revokeObjectURL(docViewerUrl);
+    setDocViewer(null);
+    setDocViewerUrl(null);
+    setDocViewerError('');
+  };
+
+  const handleOpenDocument = async (doc: DocumentRef) => {
+    setDocViewer({ name: doc.fileName, fileName: doc.fileName });
+    setDocViewerUrl(null);
+    setDocViewerError('');
+    setDocViewerLoading(true);
+    try {
+      const { url, revoke } = await resolveDocumentUrl({
+        id: doc.documentId, fileUploadId: doc.fileUploadId, fileUrl: '', fileName: doc.fileName,
+      } as CRMDocument);
+      docViewerRevokeRef.current = revoke;
+      setDocViewerUrl(url);
+    } catch (err) {
+      setDocViewerError(err instanceof Error ? err.message : 'Failed to open document.');
+    } finally {
+      setDocViewerLoading(false);
+    }
+  };
+
+  const handleDocViewerDownload = () => {
+    if (!docViewerUrl || !docViewer) return;
+    const a = document.createElement('a');
+    a.href = docViewerUrl;
+    a.download = docViewer.fileName || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const RECENT_TYPE_STYLE: Record<string, { icon: typeof Activity; color: string }> = {
@@ -721,7 +1137,7 @@ export default function Activities() {
     return t.activities.daysAgo.replace('{n}', String(days));
   }
 
-  const RECENT_EVENTS = records.slice(0, 5).map(r => {
+  const RECENT_EVENTS = visibleRecords.slice(0, 5).map(r => {
     const style = RECENT_TYPE_STYLE[r.activityType?.toLowerCase()] ?? defaultStyle;
     const label = r.title || r.content?.slice(0, 60) || 'Activity';
     const author = r.authorName ? ` — ${r.authorName}` : '';
@@ -746,6 +1162,19 @@ export default function Activities() {
       <div className="pointer-events-none absolute inset-0 bg-white/30" />
 
       <div className="relative z-10 w-full max-w-5xl">
+
+      {docViewer && (
+        <DocumentViewerModal
+          title={docViewer.name}
+          fileName={docViewer.fileName}
+          url={docViewerUrl}
+          loading={docViewerLoading}
+          error={docViewerError}
+          previewable={/\.pdf$/i.test(docViewer.fileName || '')}
+          onClose={closeDocViewer}
+          onDownload={handleDocViewerDownload}
+        />
+      )}
 
       {/* Not connected */}
       {!isConnected && (
@@ -806,7 +1235,7 @@ export default function Activities() {
       <Composer onPost={handlePost} onSyncWarning={setSyncWarning} postVisibility={postVisibility} />
 
       {/* Empty */}
-      {!loading && !error && records.length === 0 && canFetch && (
+      {!loading && !error && visibleRecords.length === 0 && canFetch && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl mt-4">
           <Activity size={28} className="text-gray-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-gray-500 mb-1">{t.activities.noActivities}</p>
@@ -815,7 +1244,7 @@ export default function Activities() {
       )}
 
       {/* Clear All — investor only */}
-      {!loading && !error && records.length > 0 && isInvestor && (
+      {!loading && !error && visibleRecords.length > 0 && isInvestor && (
         <div className="flex justify-end mb-2">
           <button
             onClick={handleClearAll}
@@ -823,15 +1252,15 @@ export default function Activities() {
             className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
           >
             <Trash2 size={12} className={clearingAll ? 'animate-pulse' : ''} />
-            {clearingAll ? 'Deleting...' : `Clear All (${records.length})`}
+            {clearingAll ? 'Deleting...' : `Clear All (${visibleRecords.length})`}
           </button>
         </div>
       )}
 
       {/* Feed — grouped by date */}
-      {!loading && !error && records.length > 0 && (
+      {!loading && !error && visibleRecords.length > 0 && (
         <div className="mt-4 space-y-6">
-          {groupAndSort(records).map(group => (
+          {groupAndSort(visibleRecords).map(group => (
             <div key={group.key}>
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.activities[group.key as 'today' | 'yesterday' | 'earlier']}</h2>
@@ -839,7 +1268,14 @@ export default function Activities() {
               </div>
               <div className="grid grid-cols-1 gap-4">
                 {group.items.map(activity => (
-                  <ActivityCard key={activity.id} activity={activity} onDelete={handleDelete} companyLogos={companyLogos} />
+                  <ActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    onDelete={handleDelete}
+                    companyLogos={companyLogos}
+                    allActivities={records}
+                    onOpenDocument={handleOpenDocument}
+                  />
                 ))}
               </div>
             </div>
