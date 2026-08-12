@@ -185,7 +185,15 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
 // Feed_Submissions has the same field API names, so the payload is identical.
 const FOUNDER_POST_MODULE = 'Feed_Submissions';
 
-export async function createCRMActivity(fields: CRMActivityFields, pendingFileId?: string): Promise<string> {
+export interface CreateActivityResult {
+  id: string;
+  /** The Document_Ref pointer, already resolved — same value the server ends
+   *  up persisting — so the caller can render the attachment immediately
+   *  without waiting for a refetch. Empty if the post had no file. */
+  fileRef: string;
+}
+
+export async function createCRMActivity(fields: CRMActivityFields, pendingFileId?: string): Promise<CreateActivityResult> {
   const payload: Record<string, unknown> = {};
   for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
     const raw = (fields as Record<string, string>)[formKey] ?? '';
@@ -196,22 +204,30 @@ export async function createCRMActivity(fields: CRMActivityFields, pendingFileId
 
   const id = isFounder ? await portalCreate(FOUNDER_POST_MODULE, payload) : await zohoCreate(MODULE, payload);
 
-  if (pendingFileId && !isFounder) {
-    // Investor: the record's own id wasn't known until just now, so the
-    // {module, recordId} pointer needs a follow-up update. Best-effort —
-    // the activity itself already saved even if this fails.
+  if (!pendingFileId) return { id, fileRef: '' };
+
+  // The record's own id — and therefore the {module, recordId} pointer — is
+  // only known now that creation has returned. For a founder, the pointer
+  // targets Feed_Submissions (where the file was actually uploaded); the
+  // relay workflow function independently sets the same value on the
+  // My_Activities copy it creates, using the same recordId as a parameter.
+  const fileRef = JSON.stringify({ module: isFounder ? FOUNDER_POST_MODULE : MODULE, recordId: id });
+
+  if (!isFounder) {
+    // Investor: persist it with a follow-up update — best-effort, the
+    // activity itself already saved even if this fails.
     try {
-      await zohoUpdate(MODULE, id, { [FIELD_MAP.fileRef]: JSON.stringify({ module: MODULE, recordId: id }) });
+      await zohoUpdate(MODULE, id, { [FIELD_MAP.fileRef]: fileRef });
     } catch (err) {
       console.warn('[Activities] Failed to attach file reference:', err);
     }
   }
-  // Founder: the relay workflow function builds the {module, recordId} pointer
-  // itself (using the Feed_Submissions record's own id, which it already has
-  // as a parameter) — no follow-up update needed, and none would be safe here
-  // since the relay may fire before any async follow-up from the client lands.
+  // Founder: no follow-up update is possible or safe here (Feed_Submissions
+  // isn't updatable this way and the relay's timing is uncontrollable) — the
+  // relay must construct Document_Ref itself. Returning the same value here
+  // just lets the client render immediately without waiting for the relay.
 
-  return id;
+  return { id, fileRef };
 }
 
 export async function updateCRMActivity(id: string, fields: CRMActivityFields): Promise<void> {

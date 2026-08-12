@@ -100,11 +100,14 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
 
 export async function postSharedActivity(fields: CRMActivityFields, pendingFileId?: string): Promise<CRMActivity & { synced: boolean }> {
   let id: string | null = null;
+  let fileRef = fields.fileRef;
   let lastError: string | null = null;
 
   // Direct CRM call
   try {
-    id = await createCRMActivity(fields, pendingFileId);
+    const result = await createCRMActivity(fields, pendingFileId);
+    id = result.id;
+    if (result.fileRef) fileRef = result.fileRef;
     console.log('[Activities] Posted to CRM (direct), id:', id);
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
@@ -115,7 +118,7 @@ export async function postSharedActivity(fields: CRMActivityFields, pendingFileI
   if (!synced) console.error('[Activities] Activity NOT synced to CRM:', lastError);
 
   const activity: CRMActivity & { synced: boolean; error?: string } = {
-    id: id || generateLocalId(), ...fields, createdTime: new Date().toISOString(), synced,
+    id: id || generateLocalId(), ...fields, fileRef, createdTime: new Date().toISOString(), synced,
     ...(synced ? {} : { error: lastError || 'Unknown error' }),
   };
 
@@ -157,7 +160,7 @@ export async function syncUnsyncedActivities(): Promise<number> {
     };
 
     let newId: string | null = null;
-    try { newId = await createCRMActivity(fields); } catch { /* continue */ }
+    try { newId = (await createCRMActivity(fields)).id; } catch { /* continue */ }
 
     if (newId) {
       activity.id = newId;
