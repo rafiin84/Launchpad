@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { BarChart3, Check, FileText, Download, MapPin, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import {
-  castPollVote, parsePollVotes, parsePollData, parseDocumentRef,
-  type CRMActivity, type PollVote, type DocumentRef,
+  castPollVote, parsePollVotes, parsePollData, parseActivityFileRef, resolveActivityFileUrl,
+  type CRMActivity, type PollVote, type ActivityFileRef,
 } from '../../services/crmActivities';
-import { resolveDocumentUrl, type CRMDocument } from '../../services/crmDocuments';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/cn';
 
-export type { DocumentRef };
+export type { ActivityFileRef };
 
 // ─── Photo / Video (uploaded) ────────────────────────────────────────────────
-// Same storage as Document — a My_Documents record via Zoho's File Upload
-// field — but rendered inline instead of as a file card. Unlike a plain
-// imageUrl/videoUrl, the file has to be fetched (resolveDocumentUrl) before
-// anything can be shown, so this needs its own loading state.
-export function MediaAttachment({ documentRef, kind }: { documentRef: string; kind: 'photo' | 'video' }) {
-  const ref = parseDocumentRef(documentRef);
+// The file lives directly on the activity's own record (My_Activities for an
+// investor post, or Feed_Submissions for a founder's — never My_Documents),
+// rendered inline instead of as a file card. Unlike a plain imageUrl/videoUrl,
+// it has to be fetched (resolveActivityFileUrl) before anything can be shown,
+// so this needs its own loading state.
+export function MediaAttachment({ fileRef, kind }: { fileRef: string; kind: 'photo' | 'video' }) {
+  const ref = parseActivityFileRef(fileRef);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const cleanupRef = useRef<{ url: string; revoke: boolean } | null>(null);
@@ -26,7 +26,7 @@ export function MediaAttachment({ documentRef, kind }: { documentRef: string; ki
     let cancelled = false;
     setUrl(null);
     setError(false);
-    resolveDocumentUrl({ id: ref.documentId, fileUploadId: ref.fileUploadId, fileUrl: '', fileName: ref.fileName } as CRMDocument)
+    resolveActivityFileUrl(ref)
       .then(result => {
         if (cancelled) {
           if (result.revoke) URL.revokeObjectURL(result.url);
@@ -42,7 +42,7 @@ export function MediaAttachment({ documentRef, kind }: { documentRef: string; ki
       cleanupRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentRef]);
+  }, [fileRef]);
 
   if (!ref) return null;
 
@@ -167,8 +167,12 @@ export function PollWidget({ activity, allActivities, onVoteCast }: {
 }
 
 // ─── Document ───────────────────────────────────────────────────────────────
-export function DocumentAttachmentCard({ documentRef, onOpen }: { documentRef: string; onOpen: (doc: DocumentRef) => void }) {
-  const ref = parseDocumentRef(documentRef);
+export function DocumentAttachmentCard({ fileRef, fileName, onOpen }: {
+  fileRef: string;
+  fileName: string;
+  onOpen: (ref: ActivityFileRef) => void;
+}) {
+  const ref = parseActivityFileRef(fileRef);
   if (!ref) return null;
   return (
     <button
@@ -179,7 +183,7 @@ export function DocumentAttachmentCard({ documentRef, onOpen }: { documentRef: s
       <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
         <FileText size={14} className="text-orange-500" />
       </div>
-      <span className="text-xs font-medium text-gray-700 truncate flex-1">{ref.fileName}</span>
+      <span className="text-xs font-medium text-gray-700 truncate flex-1">{fileName}</span>
       <Download size={13} className="text-gray-400 flex-shrink-0" />
     </button>
   );

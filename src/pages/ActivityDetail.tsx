@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Tag, Trash2, Edit2 } from 'lucide-react';
-import { deleteCRMActivity, POLL_VOTE_TYPE, type CRMActivity } from '../services/crmActivities';
+import {
+  deleteCRMActivity, POLL_VOTE_TYPE, resolveActivityFileUrl,
+  type CRMActivity, type ActivityFileRef,
+} from '../services/crmActivities';
 import { fetchSharedActivities } from '../services/sharedActivities';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
-import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
-import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment, type DocumentRef } from '../components/activities/PostAttachments';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment } from '../components/activities/PostAttachments';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/cn';
@@ -147,15 +149,13 @@ export default function ActivityDetail() {
     setDocViewerError('');
   };
 
-  const handleOpenDocument = async (doc: DocumentRef) => {
-    setDocViewer({ name: doc.fileName, fileName: doc.fileName });
+  const handleOpenDocument = async (ref: ActivityFileRef, fileName: string) => {
+    setDocViewer({ name: fileName, fileName });
     setDocViewerUrl(null);
     setDocViewerError('');
     setDocViewerLoading(true);
     try {
-      const { url, revoke } = await resolveDocumentUrl({
-        id: doc.documentId, fileUploadId: doc.fileUploadId, fileUrl: '', fileName: doc.fileName,
-      } as CRMDocument);
+      const { url, revoke } = await resolveActivityFileUrl(ref);
       docViewerRevokeRef.current = revoke;
       setDocViewerUrl(url);
     } catch (err) {
@@ -316,7 +316,7 @@ export default function ActivityDetail() {
           {(() => {
             switch (activity.postType) {
               case 'photo':
-                if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="photo" />;
+                if (activity.fileRef) return <MediaAttachment fileRef={activity.fileRef} kind="photo" />;
                 if (!activity.imageData && !activity.imageUrl) return null;
                 return (
                   <div className="rounded-2xl overflow-hidden mb-4">
@@ -330,7 +330,7 @@ export default function ActivityDetail() {
                   </div>
                 );
               case 'video':
-                if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="video" />;
+                if (activity.fileRef) return <MediaAttachment fileRef={activity.fileRef} kind="video" />;
                 return activity.videoUrl ? (
                   <div className="rounded-2xl overflow-hidden mb-4 bg-black">
                     <video src={activity.videoUrl} controls className="w-full max-h-80" />
@@ -345,7 +345,7 @@ export default function ActivityDetail() {
                 ) : null;
               }
               case 'document':
-                return <DocumentAttachmentCard documentRef={activity.documentRef} onOpen={handleOpenDocument} />;
+                return <DocumentAttachmentCard fileRef={activity.fileRef} fileName={activity.activityFileName} onOpen={ref => handleOpenDocument(ref, activity.activityFileName)} />;
               case 'location':
                 return <LocationCard name={activity.locationName} coords={activity.locationCoords} />;
               case 'poll':

@@ -1,4 +1,8 @@
-import { zohoList, zohoListUnscoped, zohoCoql, portalCoql, zohoGetById, portalList, portalListUnscoped, portalGetById, zohoCreate, portalCreate, zohoUpdate, zohoDelete, type ZohoRecord } from './zohoApi';
+import {
+  zohoList, zohoListUnscoped, zohoCoql, portalCoql, zohoGetById, portalList, portalListUnscoped, portalGetById,
+  zohoCreate, portalCreate, zohoUpdate, zohoDelete, zohoUploadFile, portalUploadFile, downloadFieldFile,
+  type ZohoRecord,
+} from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'My_Activities';
@@ -18,12 +22,13 @@ const FIELD_MAP: Record<string, string> = {
   // and per-type payload fields. Missing on older records — renderers fall back
   // to inferring from imageUrl/imageData like before postType existed.
   postType:        'Post_Type',
-  videoUrl:        'Video_URL',       // uploaded video (Cloudinary) OR a youtube URL
+  videoUrl:        'Video_URL',       // a pasted youtube URL only (uploaded video uses fileRef now)
   linkUrl:         'Link_URL',
   locationName:    'Location_Name',
   locationCoords:  'Location_Coords', // "lat,lng", optional
   pollData:        'Poll_Data',       // JSON: { question: string, options: string[] }
-  documentRef:     'Document_Ref',    // JSON: { documentId, fileUploadId, fileName } — see crmDocuments.ts
+  activityFileName: 'Activity_File_Name', // display name of an uploaded Photo/Video/Document
+  fileRef:         'Document_Ref',    // JSON ActivityFileRef — see "Uploaded activity files" below
 };
 
 export interface CRMActivity {
@@ -44,7 +49,8 @@ export interface CRMActivity {
   locationName: string;
   locationCoords: string;
   pollData: string;
-  documentRef: string;
+  activityFileName: string;
+  fileRef: string;
   createdTime: string;
 }
 
@@ -57,30 +63,34 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     return String(v);
   };
   return {
-    id:             r.id,
-    title:          str(FIELD_MAP.title),
-    activityType:   str(FIELD_MAP.activityType),
-    content:        str(FIELD_MAP.content),
-    companyName:    str(FIELD_MAP.companyName),
-    authorName:     str(FIELD_MAP.authorName),
-    authorRole:     str(FIELD_MAP.authorRole),
-    tags:           str(FIELD_MAP.tags),
-    imageUrl:       str(FIELD_MAP.imageUrl),
-    imageData:      str(FIELD_MAP.imageData),
-    visibility:     str(FIELD_MAP.visibility),
-    postType:       str(FIELD_MAP.postType),
-    videoUrl:       str(FIELD_MAP.videoUrl),
-    linkUrl:        str(FIELD_MAP.linkUrl),
-    locationName:   str(FIELD_MAP.locationName),
-    locationCoords: str(FIELD_MAP.locationCoords),
-    pollData:       str(FIELD_MAP.pollData),
-    documentRef:    str(FIELD_MAP.documentRef),
-    createdTime:    str('Created_Time') || str('Modified_Time'),
+    id:               r.id,
+    title:            str(FIELD_MAP.title),
+    activityType:     str(FIELD_MAP.activityType),
+    content:          str(FIELD_MAP.content),
+    companyName:      str(FIELD_MAP.companyName),
+    authorName:       str(FIELD_MAP.authorName),
+    authorRole:       str(FIELD_MAP.authorRole),
+    tags:             str(FIELD_MAP.tags),
+    imageUrl:         str(FIELD_MAP.imageUrl),
+    imageData:        str(FIELD_MAP.imageData),
+    visibility:       str(FIELD_MAP.visibility),
+    postType:         str(FIELD_MAP.postType),
+    videoUrl:         str(FIELD_MAP.videoUrl),
+    linkUrl:          str(FIELD_MAP.linkUrl),
+    locationName:     str(FIELD_MAP.locationName),
+    locationCoords:   str(FIELD_MAP.locationCoords),
+    pollData:         str(FIELD_MAP.pollData),
+    activityFileName: str(FIELD_MAP.activityFileName),
+    fileRef:          str(FIELD_MAP.fileRef),
+    createdTime:      str('Created_Time') || str('Modified_Time'),
   };
 }
 
-// Explicitly list all fields — Zoho omits large textarea fields from default list responses
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Document_Ref,Created_Time,Modified_Time';
+// Explicitly list all fields — Zoho omits large textarea fields from default list responses.
+// Activity_File_Upload itself is deliberately NOT listed here (a file-upload-type
+// field is only fetched on demand when actually resolving/downloading a file —
+// see resolveActivityFileUrl).
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Activity_File_Name,Document_Ref,Created_Time,Modified_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
@@ -88,7 +98,7 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
   return fromRecord(record);
 }
 
-const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Post_Type, Video_URL, Link_URL, Location_Name, Location_Coords, Poll_Data, Document_Ref, Created_Time, Modified_Time';
+const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Post_Type, Video_URL, Link_URL, Location_Name, Location_Coords, Poll_Data, Activity_File_Name, Document_Ref, Created_Time, Modified_Time';
 
 async function fetchViaCoql(): Promise<CRMActivity[]> {
   const records = await zohoCoql(
@@ -175,14 +185,33 @@ export async function fetchCRMActivities(): Promise<CRMActivity[]> {
 // Feed_Submissions has the same field API names, so the payload is identical.
 const FOUNDER_POST_MODULE = 'Feed_Submissions';
 
-export async function createCRMActivity(fields: CRMActivityFields): Promise<string> {
+export async function createCRMActivity(fields: CRMActivityFields, pendingFileId?: string): Promise<string> {
   const payload: Record<string, unknown> = {};
   for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
     const raw = (fields as Record<string, string>)[formKey] ?? '';
     if (raw !== '') payload[crmKey] = raw;
   }
   const isFounder = loadRole() === 'founder';
-  return isFounder ? portalCreate(FOUNDER_POST_MODULE, payload) : zohoCreate(MODULE, payload);
+  if (pendingFileId) payload[ACTIVITY_FILE_FIELD] = [{ file_id: pendingFileId }];
+
+  const id = isFounder ? await portalCreate(FOUNDER_POST_MODULE, payload) : await zohoCreate(MODULE, payload);
+
+  if (pendingFileId && !isFounder) {
+    // Investor: the record's own id wasn't known until just now, so the
+    // {module, recordId} pointer needs a follow-up update. Best-effort —
+    // the activity itself already saved even if this fails.
+    try {
+      await zohoUpdate(MODULE, id, { [FIELD_MAP.fileRef]: JSON.stringify({ module: MODULE, recordId: id }) });
+    } catch (err) {
+      console.warn('[Activities] Failed to attach file reference:', err);
+    }
+  }
+  // Founder: the relay workflow function builds the {module, recordId} pointer
+  // itself (using the Feed_Submissions record's own id, which it already has
+  // as a parameter) — no follow-up update needed, and none would be safe here
+  // since the relay may fire before any async follow-up from the client lands.
+
+  return id;
 }
 
 export async function updateCRMActivity(id: string, fields: CRMActivityFields): Promise<void> {
@@ -196,6 +225,62 @@ export async function updateCRMActivity(id: string, fields: CRMActivityFields): 
 
 export async function deleteCRMActivity(id: string): Promise<void> {
   return zohoDelete(MODULE, id);
+}
+
+// ─── Uploaded activity files (Photo/Video/Document attachments) ─────────────
+// These live directly on the activity's own record (My_Activities for an
+// investor's post, or Feed_Submissions for a founder's — never My_Documents,
+// so they never show up on the Documents page) via the Activity_File_Upload
+// File Upload field. `fileRef` (the Document_Ref CRM field, repurposed) is a
+// small JSON pointer — {module, recordId} — to whichever record actually
+// holds the file, since a founder's relayed My_Activities copy is a
+// DIFFERENT record than the Feed_Submissions one the file was uploaded to.
+// The pointer is deliberately minimal (no pre-resolved attachment id) —
+// resolveActivityFileUrl always re-fetches the field fresh, so there's no
+// staleness/race risk with the relay's timing.
+const ACTIVITY_FILE_FIELD = 'Activity_File_Upload';
+
+export interface ActivityFileRef {
+  module: 'My_Activities' | 'Feed_Submissions';
+  recordId: string;
+}
+
+export function parseActivityFileRef(raw: string): ActivityFileRef | null {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as Partial<ActivityFileRef>;
+    if (d && (d.module === 'My_Activities' || d.module === 'Feed_Submissions') && d.recordId) {
+      return { module: d.module, recordId: d.recordId };
+    }
+  } catch { /* malformed */ }
+  return null;
+}
+
+/** Uploads a file and returns its raw file_id, for use with createCRMActivity's pendingFileId. */
+export async function uploadActivityFile(file: File): Promise<string> {
+  return loadRole() === 'founder' ? portalUploadFile(file, file.name) : zohoUploadFile(file, file.name);
+}
+
+// A File Upload field reads back as an array of objects, but the admin CRM API
+// and the portal API return DIFFERENT key names for the attachment's own id —
+// see the identical gotcha documented in crmDocuments.ts's parseFileUpload.
+function parseFileUploadAttachmentId(v: unknown): string {
+  const arr = Array.isArray(v) ? v : [];
+  const f = arr[0] as Record<string, unknown> | undefined;
+  if (!f) return '';
+  return String(f['id'] ?? f['attachment_Id'] ?? f['attachment_Id__s'] ?? '');
+}
+
+export async function resolveActivityFileUrl(ref: ActivityFileRef): Promise<{ url: string; revoke: boolean }> {
+  const isFounder = loadRole() === 'founder';
+  const record = isFounder
+    ? await portalGetById(ref.module, ref.recordId, ACTIVITY_FILE_FIELD).catch(() => portalGetById(ref.module, ref.recordId))
+    : await zohoGetById(ref.module, ref.recordId, ACTIVITY_FILE_FIELD);
+  if (!record) throw new Error('The record holding this file could not be found.');
+  const attachmentId = parseFileUploadAttachmentId(record[ACTIVITY_FILE_FIELD]);
+  if (!attachmentId) throw new Error('No file attached to this post.');
+  const blob = await downloadFieldFile(ref.module, ref.recordId, attachmentId, isFounder);
+  return { url: URL.createObjectURL(blob), revoke: true };
 }
 
 // ─── Poll voting ────────────────────────────────────────────────────────────
@@ -247,7 +332,7 @@ export function parsePollVotes(activities: CRMActivity[], activityId: string): P
   return votes;
 }
 
-// ─── Post attachment payload shapes (Poll_Data / Document_Ref JSON) ─────────
+// ─── Poll payload shape (Poll_Data JSON) ─────────────────────────────────────
 
 export interface PollData {
   question: string;
@@ -261,21 +346,6 @@ export function parsePollData(raw: string): PollData | null {
     if (d && typeof d.question === 'string' && Array.isArray(d.options) && d.options.length > 0) {
       return { question: d.question, options: d.options as string[] };
     }
-  } catch { /* malformed */ }
-  return null;
-}
-
-export interface DocumentRef {
-  documentId: string;
-  fileUploadId: string;
-  fileName: string;
-}
-
-export function parseDocumentRef(raw: string): DocumentRef | null {
-  if (!raw) return null;
-  try {
-    const d = JSON.parse(raw) as Partial<DocumentRef>;
-    if (d && d.documentId) return { documentId: d.documentId, fileUploadId: d.fileUploadId || '', fileName: d.fileName || 'Document' };
   } catch { /* malformed */ }
   return null;
 }

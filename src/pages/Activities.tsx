@@ -13,6 +13,7 @@ import { usePageTitle } from '../context/PageTitleContext';
 import { Avatar } from '../components/ui/Avatar';
 import {
   type CRMActivity, type CRMActivityFields, POLL_VOTE_TYPE,
+  uploadActivityFile, resolveActivityFileUrl, type ActivityFileRef,
 } from '../services/crmActivities';
 import { fetchSharedActivities, postSharedActivity, syncUnsyncedActivities, fetchActivityPermissions, deleteSharedActivity, deleteAllSharedActivities } from '../services/sharedActivities';
 import { loadToken } from '../services/oauth';
@@ -24,9 +25,8 @@ import { addNotification } from '../services/notifications';
 import { fetchCRMApplications } from '../services/crmApplications';
 import { fetchCRMFounders } from '../services/crmFounders';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
-import { createCRMDocumentFromFile, resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
-import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment, type DocumentRef } from '../components/activities/PostAttachments';
+import { PollWidget, DocumentAttachmentCard, LocationCard, LinkCard, MediaAttachment } from '../components/activities/PostAttachments';
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
@@ -119,14 +119,15 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
   const [attachment, setAttachment]   = useState<AttachmentType>('none');
   const [showPicker, setShowPicker]   = useState(false);
 
-  // Photo/Video/Document all share one upload path — the file is stored in
-  // Zoho via the File Upload field (createCRMDocumentFromFile, same
-  // mechanism the Documents page uses), not a third-party host. mediaRef is
-  // what actually gets saved on the activity record; mediaPreviewUrl is a
-  // local object URL for an instant preview while the upload is in flight.
+  // Photo/Video/Document all share one upload path — the file is uploaded
+  // straight to Zoho (uploadActivityFile) and its file_id is attached to the
+  // activity's own record at create time (Activity_File_Upload), never to a
+  // My_Documents record. mediaFileId is what actually gets sent along with
+  // the post; mediaPreviewUrl is a local object URL for an instant preview
+  // while the upload is in flight.
   const [mediaFile, setMediaFile]         = useState<File | null>(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
-  const [mediaRef, setMediaRef]           = useState<DocumentRef | null>(null);
+  const [mediaFileId, setMediaFileId]     = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError]       = useState('');
 
@@ -156,7 +157,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
   function clearMedia() {
     if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
-    setMediaFile(null); setMediaPreviewUrl(''); setMediaRef(null); setMediaError('');
+    setMediaFile(null); setMediaPreviewUrl(''); setMediaFileId(null); setMediaError('');
     if (photoFileRef.current) photoFileRef.current.value = '';
     if (videoFileRef.current) videoFileRef.current.value = '';
     if (documentFileRef.current) documentFileRef.current.value = '';
@@ -174,10 +175,10 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
 
   const attachmentValid = (() => {
     switch (attachment) {
-      case 'photo':    return imageMode === 'url' ? isHttpUrl(imageUrl.trim()) : (!!mediaRef && !mediaUploading);
-      case 'video':    return !!mediaRef && !mediaUploading;
+      case 'photo':    return imageMode === 'url' ? isHttpUrl(imageUrl.trim()) : (!!mediaFileId && !mediaUploading);
+      case 'video':    return !!mediaFileId && !mediaUploading;
       case 'youtube':  return !!getVideoEmbedUrl(youtubeUrl.trim());
-      case 'document': return !!mediaRef && !mediaUploading;
+      case 'document': return !!mediaFileId && !mediaUploading;
       case 'location': return !!locationName.trim();
       case 'poll':     return !!pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2;
       case 'link':     return isHttpUrl(linkUrl.trim());
@@ -215,29 +216,21 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
   }
 
   // Shared upload handler for Photo (upload mode)/Video/Document — all three
-  // create a My_Documents record via the Zoho File Upload field and store
-  // {documentId, fileUploadId, fileName} as Document_Ref on the activity.
+  // upload straight to Zoho and attach the resulting file_id to the
+  // activity's own record (Activity_File_Upload) at post time, never to a
+  // My_Documents record.
   async function handleMediaFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
     setMediaError('');
-    setMediaRef(null);
+    setMediaFileId(null);
     setMediaFile(file);
     setMediaPreviewUrl(URL.createObjectURL(file));
     setMediaUploading(true);
     try {
-      const doc = await createCRMDocumentFromFile({
-        documentName: file.name,
-        documentType: 'other',
-        relatedCompany: companyName.trim(),
-        description: `Shared by ${currentUser.name} in an activity post (${attachment})`,
-        visibility: 'shared-all',
-        authorName: currentUser.name,
-        authorRole: isInvestor ? 'investor' : 'founder',
-      }, file);
-      if (!doc.fileUploadId) throw new Error('Upload succeeded but the file reference could not be read back.');
-      setMediaRef({ documentId: doc.id, fileUploadId: doc.fileUploadId, fileName: file.name });
+      const fileId = await uploadActivityFile(file);
+      setMediaFileId(fileId);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
@@ -292,22 +285,27 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         tags:         '',
         imageUrl: '', imageData: '',
         postType: attachment === 'none' ? '' : attachment,
-        videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', documentRef: '',
+        videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', activityFileName: '', fileRef: '',
         visibility:   postVisibility,
       };
+
+      let pendingFileId: string | undefined;
 
       if (attachment === 'photo') {
         if (imageMode === 'url') {
           fields.imageUrl = imageUrl.trim();
-        } else if (mediaRef) {
-          fields.documentRef = JSON.stringify(mediaRef);
+        } else if (mediaFileId && mediaFile) {
+          pendingFileId = mediaFileId;
+          fields.activityFileName = mediaFile.name;
         }
-      } else if (attachment === 'video' && mediaRef) {
-        fields.documentRef = JSON.stringify(mediaRef);
+      } else if (attachment === 'video' && mediaFileId && mediaFile) {
+        pendingFileId = mediaFileId;
+        fields.activityFileName = mediaFile.name;
       } else if (attachment === 'youtube') {
         fields.videoUrl = youtubeUrl.trim();
-      } else if (attachment === 'document' && mediaRef) {
-        fields.documentRef = JSON.stringify(mediaRef);
+      } else if (attachment === 'document' && mediaFileId && mediaFile) {
+        pendingFileId = mediaFileId;
+        fields.activityFileName = mediaFile.name;
       } else if (attachment === 'location') {
         fields.locationName = locationName.trim();
         fields.locationCoords = locationCoords.trim();
@@ -320,7 +318,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         fields.linkUrl = linkUrl.trim();
       }
 
-      const activity = await postSharedActivity(fields);
+      const activity = await postSharedActivity(fields, pendingFileId);
 
       const targetRole = isInvestor ? 'founder' : 'investor';
       addNotification({
@@ -757,7 +755,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
   onDelete?: (id: string) => void;
   companyLogos?: Record<string, string>;
   allActivities: CRMActivity[];
-  onOpenDocument: (doc: DocumentRef) => void;
+  onOpenDocument: (ref: ActivityFileRef, fileName: string) => void;
 }) {
   const { currentUser, founderCompanyName, isInvestor } = useAuth();
   const { t } = useLanguage();
@@ -850,7 +848,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
         {(() => {
           switch (activity.postType) {
             case 'photo':
-              if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="photo" />;
+              if (activity.fileRef) return <MediaAttachment fileRef={activity.fileRef} kind="photo" />;
               if (!activity.imageUrl && !(activity.imageData && activity.imageData.startsWith('data:'))) return null;
               return (
                 <div className="mt-3 rounded-xl overflow-hidden">
@@ -864,7 +862,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
                 </div>
               );
             case 'video':
-              if (activity.documentRef) return <MediaAttachment documentRef={activity.documentRef} kind="video" />;
+              if (activity.fileRef) return <MediaAttachment fileRef={activity.fileRef} kind="video" />;
               return activity.videoUrl ? (
                 <div className="mt-3 rounded-xl overflow-hidden bg-black" onClick={e => e.stopPropagation()}>
                   <video src={activity.videoUrl} controls className="w-full max-h-64" />
@@ -879,7 +877,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
               ) : null;
             }
             case 'document':
-              return <DocumentAttachmentCard documentRef={activity.documentRef} onOpen={onOpenDocument} />;
+              return <DocumentAttachmentCard fileRef={activity.fileRef} fileName={activity.activityFileName} onOpen={ref => onOpenDocument(ref, activity.activityFileName)} />;
             case 'location':
               return <LocationCard name={activity.locationName} coords={activity.locationCoords} />;
             case 'poll':
@@ -1045,15 +1043,13 @@ export default function Activities() {
     setDocViewerError('');
   };
 
-  const handleOpenDocument = async (doc: DocumentRef) => {
-    setDocViewer({ name: doc.fileName, fileName: doc.fileName });
+  const handleOpenDocument = async (ref: ActivityFileRef, fileName: string) => {
+    setDocViewer({ name: fileName, fileName });
     setDocViewerUrl(null);
     setDocViewerError('');
     setDocViewerLoading(true);
     try {
-      const { url, revoke } = await resolveDocumentUrl({
-        id: doc.documentId, fileUploadId: doc.fileUploadId, fileUrl: '', fileName: doc.fileName,
-      } as CRMDocument);
+      const { url, revoke } = await resolveActivityFileUrl(ref);
       docViewerRevokeRef.current = revoke;
       setDocViewerUrl(url);
     } catch (err) {

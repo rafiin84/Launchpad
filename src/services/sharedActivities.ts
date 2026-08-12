@@ -84,7 +84,8 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
         locationName:   a.locationName    || cached?.locationName   || '',
         locationCoords: a.locationCoords  || cached?.locationCoords || '',
         pollData:       a.pollData        || cached?.pollData       || '',
-        documentRef:    a.documentRef     || cached?.documentRef    || '',
+        activityFileName: a.activityFileName || cached?.activityFileName || '',
+        fileRef:        a.fileRef         || cached?.fileRef        || '',
         createdTime:    a.createdTime     || cached?.createdTime    || '',
       };
     });
@@ -97,13 +98,13 @@ export async function fetchSharedActivities(): Promise<CRMActivity[]> {
   }
 }
 
-export async function postSharedActivity(fields: CRMActivityFields): Promise<CRMActivity & { synced: boolean }> {
+export async function postSharedActivity(fields: CRMActivityFields, pendingFileId?: string): Promise<CRMActivity & { synced: boolean }> {
   let id: string | null = null;
   let lastError: string | null = null;
 
   // Direct CRM call
   try {
-    id = await createCRMActivity(fields);
+    id = await createCRMActivity(fields, pendingFileId);
     console.log('[Activities] Posted to CRM (direct), id:', id);
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
@@ -152,7 +153,7 @@ export async function syncUnsyncedActivities(): Promise<number> {
       visibility: activity.visibility,
       postType: activity.postType, videoUrl: activity.videoUrl, linkUrl: activity.linkUrl,
       locationName: activity.locationName, locationCoords: activity.locationCoords,
-      pollData: activity.pollData, documentRef: activity.documentRef,
+      pollData: activity.pollData, activityFileName: activity.activityFileName, fileRef: activity.fileRef,
     };
 
     let newId: string | null = null;

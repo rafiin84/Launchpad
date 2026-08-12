@@ -105,7 +105,7 @@ export default function EditActivity() {
   // record had for those fields so editing a plain field like the title doesn't
   // wipe them (updateCRMActivity writes every CRMActivityFields key, including
   // empty ones, so anything not carried through here would be cleared).
-  const extraFieldsRef = useRef({ postType: '', videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', documentRef: '' });
+  const extraFieldsRef = useRef({ postType: '', videoUrl: '', linkUrl: '', locationName: '', locationCoords: '', pollData: '', activityFileName: '', fileRef: '' });
 
   useEffect(() => {
     if (!id) return;
@@ -125,7 +125,7 @@ export default function EditActivity() {
       extraFieldsRef.current = {
         postType: activity.postType || '', videoUrl: activity.videoUrl || '', linkUrl: activity.linkUrl || '',
         locationName: activity.locationName || '', locationCoords: activity.locationCoords || '',
-        pollData: activity.pollData || '', documentRef: activity.documentRef || '',
+        pollData: activity.pollData || '', activityFileName: activity.activityFileName || '', fileRef: activity.fileRef || '',
       };
       if (activity.imageUrl && !hasUploadedImage) setImageMode('url');
       setAuthorRole(activity.authorRole || '');
