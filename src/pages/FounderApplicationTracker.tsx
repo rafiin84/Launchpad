@@ -15,12 +15,15 @@ import {
   deleteApplication,
   parseRequestedDocuments,
   stringifyRequestedDocuments,
+  uploadApplicationDocumentFile,
+  attachApplicationDocumentFile,
+  resolveApplicationDocumentUrl,
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
 } from '../services/investmentApplications';
 import { addNotification } from '../services/notifications';
-import { createCRMDocumentFromFile, resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
+import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -253,9 +256,10 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 
 interface SubmittedDoc {
   name: string;
-  link?: string;         // pasted share link
-  documentId?: string;   // My_Documents record id (direct upload)
-  attachmentId?: string; // File_Upload_1 attachment id on that record
+  link?: string;             // pasted share link
+  documentId?: string;       // LEGACY: My_Documents record id (old direct upload)
+  attachmentId?: string;     // LEGACY: File_Upload_1 attachment id on that record
+  fileAttachmentId?: string; // current uploads: this file's own attachment id on the Application's own Requested_Document_Files field
 }
 
 function toRequestedDocs(docTypes: string[], submitted: Record<string, SubmittedDoc>): RequestedDocument[] {
@@ -268,6 +272,7 @@ function toRequestedDocs(docTypes: string[], submitted: Record<string, Submitted
       fileName: d.name,
       ...(d.link ? { link: d.link } : {}),
       ...(d.documentId ? { documentId: d.documentId, attachmentId: d.attachmentId } : {}),
+      ...(d.fileAttachmentId ? { fileAttachmentId: d.fileAttachmentId } : {}),
     };
   });
 }
@@ -275,9 +280,11 @@ function toRequestedDocs(docTypes: string[], submitted: Record<string, Submitted
 // Shows per-doc upload buttons sourced from the application's Requested_Documents
 // field (fetched with the record by portalList/portalSearch). Founders can either
 // paste a share link (Google Drive / Dropbox) or upload the file directly — direct
-// upload stores the file in Zoho via the same File Upload field mechanism as the
-// standalone Documents page (createCRMDocumentFromFile), which works for portal
-// tokens too (unlike the CRM Attachments API, which is blocked for founders).
+// upload stores the file on the Application's own Requested_Document_Files field
+// (uploadApplicationDocumentFile + attachApplicationDocumentFile), never in
+// My_Documents, so it's scoped to this application and never shows on the
+// Documents page. Works for portal tokens too (unlike the CRM Attachments API,
+// which is blocked for founders).
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [investorName, setInvestorName] = useState<string>('');
@@ -301,10 +308,13 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
       setDocTypes(parsed.map(d => d.type));
       const pre: Record<string, SubmittedDoc> = {};
       parsed.forEach(d => {
-        if (d.documentId && d.attachmentId) {
+        if (d.fileAttachmentId) {
+          pre[d.type] = { name: d.fileName || d.type, fileAttachmentId: d.fileAttachmentId };
+        } else if (d.documentId && d.attachmentId) {
+          // Legacy: uploaded before requested docs moved onto the Application itself.
           pre[d.type] = { name: d.fileName || d.type, documentId: d.documentId, attachmentId: d.attachmentId };
         } else {
-          // attachmentId held the link directly in older records, before documentId existed.
+          // attachmentId held the link directly in even older records, before documentId existed.
           const link = d.link || (d.attachmentId && /^https?:\/\//i.test(d.attachmentId) ? d.attachmentId : '');
           if (link) pre[d.type] = { name: d.fileName || d.type, link };
         }
@@ -369,17 +379,9 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
     setBusy(docType);
     setErr(docType, '');
     try {
-      const doc = await createCRMDocumentFromFile({
-        documentName: `${app.companyName || 'Application'} — ${docType}`,
-        documentType: 'other',
-        relatedCompany: app.companyName || '',
-        description: `Uploaded for application ${app.id} (requested document: ${docType})`,
-        visibility: 'shared-investors',
-        authorName: app.founderName || 'Founder',
-        authorRole: 'founder',
-      }, file);
-      if (!doc.fileUploadId) throw new Error('Upload succeeded but the file reference could not be read back.');
-      await save(docType, { name: file.name, documentId: doc.id, attachmentId: doc.fileUploadId });
+      const fileId = await uploadApplicationDocumentFile(file);
+      const fileAttachmentId = await attachApplicationDocumentFile(app.id, fileId);
+      await save(docType, { name: file.name, fileAttachmentId });
     } catch (err) {
       setErr(docType, err instanceof Error ? err.message : 'Upload failed.');
     }
@@ -423,15 +425,17 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   };
 
   const handleViewFile = async (docType: string, entry: SubmittedDoc) => {
-    if (!entry.documentId || !entry.attachmentId) return;
+    if (!entry.fileAttachmentId && !(entry.documentId && entry.attachmentId)) return;
     setViewer({ name: docType, fileName: entry.name });
     setViewerUrl(null);
     setViewerError('');
     setViewerLoading(true);
     try {
-      const { url, revoke } = await resolveDocumentUrl({
-        id: entry.documentId, fileUploadId: entry.attachmentId, fileUrl: '', fileName: entry.name,
-      } as CRMDocument);
+      const { url, revoke } = entry.fileAttachmentId
+        ? await resolveApplicationDocumentUrl(app.id, entry.fileAttachmentId)
+        : await resolveDocumentUrl({
+            id: entry.documentId!, fileUploadId: entry.attachmentId!, fileUrl: '', fileName: entry.name,
+          } as CRMDocument);
       viewerRevokeRef.current = revoke;
       setViewerUrl(url);
     } catch (err) {

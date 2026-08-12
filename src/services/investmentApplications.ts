@@ -6,7 +6,12 @@
  * Drafts are saved to localStorage only.
  */
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch, portalCreate, portalUpdate, portalList, portalSearch, type ZohoRecord } from './zohoApi';
+import {
+  zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, zohoSearch,
+  portalCreate, portalUpdate, portalList, portalSearch, portalGetById,
+  zohoUploadFile, portalUploadFile, downloadFieldFile,
+  type ZohoRecord,
+} from './zohoApi';
 import { loadRole, loadPortalLoginEmail } from './oauth';
 import { loadPortalSession } from './portalUsers';
 
@@ -687,9 +692,82 @@ export interface RequestedDocument {
   type: string;
   status: 'pending' | 'uploaded' | 'submitted';
   fileName?: string;
-  documentId?: string;   // My_Documents record id holding the uploaded file (see crmDocuments.ts)
-  attachmentId?: string; // File_Upload_1 attachment id on that record — or, on older records, a share link
+  documentId?: string;   // LEGACY: My_Documents record id holding the uploaded file (see crmDocuments.ts) — records submitted before requested-doc uploads moved onto the Application itself
+  attachmentId?: string; // LEGACY: File_Upload_1 attachment id on that My_Documents record — or, on even older records, a share link held directly here
   link?: string;         // explicit share link (Google Drive / Dropbox)
+  fileAttachmentId?: string; // this entry's own attachment id within THIS Application's own Requested_Document_Files field (see "Requested-document file uploads" below) — current uploads use this, never My_Documents
+}
+
+// ─── Requested-document file uploads ─────────────────────────────────────────
+// A requested document's file lives directly on the Application record itself
+// (Requested_Document_Files, a multi-file File Upload field) — never in
+// My_Documents, so it never shows up on the Documents page. Multiple requested
+// documents on the same application share this one field, so adding a new
+// upload must read the field's current contents first and re-submit them
+// alongside the new file, or Zoho would replace the whole list and silently
+// drop every previously uploaded document.
+const REQUESTED_FILES_FIELD = 'Requested_Document_Files';
+
+interface RequestedFileEntry {
+  attachmentId: string; // the entry's own id — what a download action needs
+  fileId: string;       // the encrypted upload-time id — what a later "keep this file" write needs
+}
+
+// Same admin-vs-portal key-naming gotcha as crmDocuments.ts/crmActivities.ts,
+// but iterating the WHOLE array (not just the first entry) since this field
+// holds one file per requested document, not a single attachment.
+function parseRequestedFileEntries(v: unknown): RequestedFileEntry[] {
+  const arr = Array.isArray(v) ? v : [];
+  return (arr as Record<string, unknown>[]).map(f => ({
+    attachmentId: String(f['id'] ?? f['attachment_Id'] ?? f['attachment_Id__s'] ?? ''),
+    fileId: String(f['File_Id__s'] ?? f['file_Id'] ?? ''),
+  })).filter(e => e.attachmentId);
+}
+
+async function getRequestedFileEntries(applicationId: string): Promise<RequestedFileEntry[]> {
+  const record = isFounder()
+    ? await portalGetById(CRM_MODULE, applicationId, REQUESTED_FILES_FIELD)
+    : await zohoGetById(CRM_MODULE, applicationId, REQUESTED_FILES_FIELD);
+  if (!record) return [];
+  return parseRequestedFileEntries(record[REQUESTED_FILES_FIELD]);
+}
+
+/** Uploads a file and returns its raw file_id, for use with attachApplicationDocumentFile. */
+export async function uploadApplicationDocumentFile(file: File): Promise<string> {
+  return isFounder() ? portalUploadFile(file, file.name) : zohoUploadFile(file, file.name);
+}
+
+/**
+ * Attaches an already-uploaded file to an Application's Requested_Document_Files
+ * field, preserving any files already there, and returns the new entry's own
+ * attachment id (to store on that requested document's RequestedDocument.fileAttachmentId).
+ */
+export async function attachApplicationDocumentFile(applicationId: string, fileId: string): Promise<string> {
+  const existing = await getRequestedFileEntries(applicationId);
+  const keep = existing.map(e => ({ file_id: e.fileId })).filter(e => e.file_id);
+  const payload = { [REQUESTED_FILES_FIELD]: [...keep, { file_id: fileId }] };
+
+  if (isFounder()) {
+    await portalUpdate(CRM_MODULE, applicationId, payload);
+  } else {
+    await zohoUpdate(CRM_MODULE, applicationId, payload);
+  }
+
+  const afterIds = new Set(existing.map(e => e.attachmentId));
+  const after = await getRequestedFileEntries(applicationId);
+  const added = after.find(e => !afterIds.has(e.attachmentId));
+  if (!added) throw new Error('Upload succeeded but the new file reference could not be read back.');
+  return added.attachmentId;
+}
+
+/** Fetches the actual file for one requested document, given its fileAttachmentId. */
+export async function resolveApplicationDocumentUrl(applicationId: string, fileAttachmentId: string): Promise<{ url: string; revoke: boolean }> {
+  const entries = await getRequestedFileEntries(applicationId);
+  if (!entries.some(e => e.attachmentId === fileAttachmentId)) {
+    throw new Error('This file is no longer attached to the application.');
+  }
+  const blob = await downloadFieldFile(CRM_MODULE, applicationId, fileAttachmentId, isFounder());
+  return { url: URL.createObjectURL(blob), revoke: true };
 }
 
 export const DOCUMENT_TYPES = [

@@ -15,6 +15,7 @@ import {
   approveApplication,
   parseRequestedDocuments,
   stringifyRequestedDocuments,
+  resolveApplicationDocumentUrl,
   DOCUMENT_TYPES,
   type InvestmentApplication,
   type ApplicationStatus,
@@ -965,19 +966,23 @@ export default function ApplicationDetail() {
     setDocViewerError('');
   };
 
-  // Views a requested document the founder uploaded directly (stored as a
-  // My_Documents record via the same File Upload field mechanism as the
-  // standalone Documents page — see RequestedDocument.documentId/attachmentId).
+  // Views a requested document the founder uploaded directly. Current uploads
+  // live on this Application's own Requested_Document_Files field
+  // (doc.fileAttachmentId); older records point at a My_Documents record
+  // instead (doc.documentId/attachmentId), from before requested-doc uploads
+  // moved off the Documents module.
   const handleViewRequestedFile = async (doc: RequestedDocument) => {
-    if (!doc.documentId || !doc.attachmentId) return;
+    if (!doc.fileAttachmentId && !(doc.documentId && doc.attachmentId)) return;
     setDocViewer({ name: doc.type, fileName: doc.fileName || doc.type });
     setDocViewerUrl(null);
     setDocViewerError('');
     setDocViewerLoading(true);
     try {
-      const { url, revoke } = await resolveDocumentUrl({
-        id: doc.documentId, fileUploadId: doc.attachmentId, fileUrl: '', fileName: doc.fileName || '',
-      } as CRMDocument);
+      const { url, revoke } = doc.fileAttachmentId
+        ? await resolveApplicationDocumentUrl(app!.id, doc.fileAttachmentId)
+        : await resolveDocumentUrl({
+            id: doc.documentId!, fileUploadId: doc.attachmentId!, fileUrl: '', fileName: doc.fileName || '',
+          } as CRMDocument);
       docViewerRevokeRef.current = revoke;
       setDocViewerUrl(url);
     } catch (err) {
@@ -1433,13 +1438,16 @@ export default function ApplicationDetail() {
               <div className="space-y-2">
                 {requestedDocs.map((doc, i) => {
                   // A submitted doc is one of: a file the founder uploaded directly
-                  // (doc.documentId + doc.attachmentId — a My_Documents record, the
-                  // current path), a share link (doc.link, or an older record where
-                  // attachmentId holds an http URL directly), or a legacy CRM
-                  // Applications-module attachment (attachmentId that isn't a URL
-                  // and there's no documentId — never actually populated by any
-                  // current write path, kept only for old data).
-                  const uploadedFile = doc.documentId && doc.attachmentId ? doc : null;
+                  // (doc.fileAttachmentId — lives on this Application's own
+                  // Requested_Document_Files field, the current path; or the legacy
+                  // doc.documentId + doc.attachmentId pointing at a My_Documents
+                  // record, from before uploads moved off the Documents module), a
+                  // share link (doc.link, or an older record where attachmentId
+                  // holds an http URL directly), or a legacy CRM Applications-module
+                  // attachment (attachmentId that isn't a URL and there's no
+                  // documentId — never actually populated by any current write
+                  // path, kept only for old data).
+                  const uploadedFile = doc.fileAttachmentId || (doc.documentId && doc.attachmentId) ? doc : null;
                   const linkUrl = doc.link || (doc.attachmentId && /^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '');
                   const crmAttachmentId = !uploadedFile && doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
                   const hasFile = doc.status === 'submitted' || doc.status === 'uploaded';
