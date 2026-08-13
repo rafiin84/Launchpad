@@ -831,10 +831,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
       {/* Body */}
       <div className="px-5 pt-3 pb-4">
         {activity.title && (
-          <h3 className="text-sm font-bold text-gray-900 mb-1 leading-snug">{activity.title}</h3>
-        )}
-        {activity.authorName && (
-          <p className="text-xs font-medium text-gray-500 mb-2">{activity.authorName}</p>
+          <h3 className="text-sm font-bold text-gray-900 mb-2 leading-snug">{activity.title}</h3>
         )}
         {activity.content && (
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
