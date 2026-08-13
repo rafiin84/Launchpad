@@ -12,7 +12,7 @@
  */
 
 import {
-  zohoUpsert, zohoSearch, zohoUpdate,
+  zohoSearch, zohoUpdate, zohoCreate,
   zohoUploadRecordPhoto, zohoGetRecordPhoto,
   type ZohoRecord,
 } from './zohoApi';
@@ -244,8 +244,16 @@ function isPortalUser(): boolean {
 }
 
 /**
- * Upsert (insert-or-update) the current user into the appusers module.
- * Uses Email as the duplicate check field.
+ * Insert-or-update the current user into the appusers module.
+ *
+ * Does NOT use Zoho's built-in Upsert API: Zoho only updates the matching
+ * record when duplicate_check_fields matches EXACTLY one existing record —
+ * once more than one exists (Email isn't a unique field on this module),
+ * it silently inserts yet another duplicate instead of erroring. That's
+ * exactly what happened here — every login compounded the problem. Finding
+ * the record ourselves and updating that specific id sidesteps this
+ * entirely, regardless of how many old duplicates are already sitting in CRM.
+ *
  * Returns the record ID, or null if the module isn't available.
  */
 export async function syncAppUser(fields: Partial<AppUserFields> & { email: string }): Promise<string | null> {
@@ -258,9 +266,16 @@ export async function syncAppUser(fields: Partial<AppUserFields> & { email: stri
 
   try {
     const payload = toPayload(fields);
-    const result = await zohoUpsert(MODULE, payload, [FIELD_MAP.email]);
-    cacheRecordId(result.id);
-    return result.id;
+    const existing = await findAppUserByEmail(fields.email);
+    if (existing) {
+      await zohoUpdate(MODULE, existing.id, payload);
+      cacheRecordId(existing.id);
+      return existing.id;
+    }
+
+    const id = await zohoCreate(MODULE, payload);
+    cacheRecordId(id);
+    return id;
   } catch (err) {
     console.warn('[AppUsers] Sync failed:', err);
     return null;
@@ -280,12 +295,19 @@ export async function findAppUserByEmail(email: string): Promise<AppUser | null>
   try {
     const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
     if (records.length === 0) return null;
-    const user = fromRecord(records[0]);
+    // This module has accumulated duplicate records for the same email (see
+    // syncAppUser above) — Zoho's search doesn't guarantee recency order, so
+    // always pick the most recently modified match. Otherwise a stale/empty
+    // duplicate can shadow data the user actually saved.
+    const newest = records.reduce((a, b) =>
+      new Date(str(b, 'Modified_Time')).getTime() > new Date(str(a, 'Modified_Time')).getTime() ? b : a
+    );
+    const user = fromRecord(newest);
     cacheRecordId(user.id);
     cacheProfileLocally({
       name: user.name, email: user.email, phone: user.phone, mobile: user.mobile,
       role: user.role, bio: user.bio, location: user.location, linkedIn: user.linkedIn,
-      twitter: user.twitter, expertise: user.expertise, zohoUserId: user.zohoUserId,
+      twitter: user.twitter, expertise: user.expertise, company: user.company, zohoUserId: user.zohoUserId,
       jobTitle: user.jobTitle, state: user.state, country: user.country,
       languagePreference: user.languagePreference,
     });
