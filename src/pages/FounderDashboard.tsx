@@ -513,8 +513,8 @@ export default function FounderDashboard() {
         </button>
       </div>
 
-      {/* Company profile incomplete banner — hidden for portal founders (CRM module may not be portal-accessible) */}
-      {profileComplete === false && !isPortalFounder && (
+      {/* Company profile incomplete banner */}
+      {profileComplete === false && (
         <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
@@ -558,8 +558,8 @@ export default function FounderDashboard() {
         </div>
       )}
 
-      {/* Application not submitted banner — hidden for portal founders (CRM module may not be portal-accessible) */}
-      {hasApplication === false && !isPortalFounder && (
+      {/* Application not submitted banner */}
+      {hasApplication === false && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -582,7 +582,7 @@ export default function FounderDashboard() {
       )}
 
       {/* Draft application banner — shown when founder has a saved but unsubmitted draft */}
-      {hasApplication === false && hasDraftApplication && !isPortalFounder && (
+      {hasApplication === false && hasDraftApplication && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl px-6 py-5 mb-6">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
