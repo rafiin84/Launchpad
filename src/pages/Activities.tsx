@@ -797,7 +797,15 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
               <Building2 size={14} className="text-gray-400" />
             )}
           </div>
-          <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
+          <div>
+            <p className="text-xs font-semibold text-gray-700">{displayCompany}</p>
+            {timeStr && (
+              <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                <Clock size={10} className="text-gray-400" />
+                {timeStr}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full', cfg.bg, cfg.text)}>
@@ -825,17 +833,9 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
         {activity.title && (
           <h3 className="text-sm font-bold text-gray-900 mb-1 leading-snug">{activity.title}</h3>
         )}
-        <div className="flex flex-col gap-0.5 mb-2">
-          {activity.authorName && (
-            <p className="text-xs font-medium text-gray-500">{activity.authorName}</p>
-          )}
-          {timeStr && (
-            <p className="text-xs text-gray-400 flex items-center gap-1">
-              <Clock size={11} className="text-gray-400" />
-              {timeStr}
-            </p>
-          )}
-        </div>
+        {activity.authorName && (
+          <p className="text-xs font-medium text-gray-500 mb-2">{activity.authorName}</p>
+        )}
         {activity.content && (
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
             {display}{isLong && '…'}
