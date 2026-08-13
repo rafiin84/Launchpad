@@ -359,7 +359,10 @@ export function parsePollData(raw: string): PollData | null {
   if (!raw) return null;
   try {
     const d = JSON.parse(raw) as Partial<PollData>;
-    if (d && typeof d.question === 'string' && Array.isArray(d.options) && d.options.length > 0) {
+    if (
+      d && typeof d.question === 'string' && Array.isArray(d.options) && d.options.length > 0
+      && d.options.every(o => typeof o === 'string')
+    ) {
       return { question: d.question, options: d.options as string[] };
     }
   } catch { /* malformed */ }
