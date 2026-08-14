@@ -633,6 +633,7 @@ const ja: TranslationKeys = {
     savedAndSynced: '会社プロフィールが保存され、CRMに同期されました！',
     savedLocally: 'プロフィールがローカルに保存されました。CRM同期は次回保存時に再試行されます。',
     saveFailed: 'プロフィールの保存に失敗しました。もう一度お試しください。',
+    logoUploadFailed: 'ロゴの保存に失敗しました。もう一度お試しください。',
     mrr: 'MRR',
     arr: 'ARR',
     activeCustomers: 'アクティブ顧客',

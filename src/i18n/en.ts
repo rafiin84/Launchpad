@@ -645,6 +645,7 @@ const en = {
     savedAndSynced: 'Company profile saved and synced to CRM successfully!',
     savedLocally: 'Profile saved locally. CRM sync will retry on next save.',
     saveFailed: 'Failed to save profile. Please try again.',
+    logoUploadFailed: 'Failed to save your logo. Please try again.',
     mrr: 'MRR',
     arr: 'ARR',
     activeCustomers: 'Active Customers',

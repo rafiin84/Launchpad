@@ -131,6 +131,7 @@ export default function FounderCompany() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setPageTitle(t.nav.company); return () => setPageTitle(null); }, [t]);
@@ -162,10 +163,19 @@ export default function FounderCompany() {
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const previousLogoUrl = logoUrl;
     setUploadingLogo(true);
+    setLogoUploadError(false);
     setLogoUrl(URL.createObjectURL(file));
     try {
-      await uploadCompanyLogoFile(userEmail, file);
+      const ok = await uploadCompanyLogoFile(userEmail, file);
+      if (!ok) {
+        setLogoUrl(previousLogoUrl);
+        setLogoUploadError(true);
+      }
+    } catch {
+      setLogoUrl(previousLogoUrl);
+      setLogoUploadError(true);
     } finally {
       setUploadingLogo(false);
     }
@@ -361,6 +371,14 @@ export default function FounderCompany() {
           <div className="flex items-center justify-center py-16">
             <Loader2 size={24} className="animate-spin text-gray-400" />
             <span className="ml-3 text-sm text-gray-500">{t.common.loading}</span>
+          </div>
+        )}
+
+        {/* Logo upload error */}
+        {logoUploadError && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} className="flex-shrink-0" />
+            {t.companySidebar.logoUploadFailed}
           </div>
         )}
 
