@@ -90,12 +90,12 @@ type AttachmentType = 'none' | 'photo' | 'video' | 'youtube' | 'document' | 'loc
 // Poll and Link are deliberately not offered here anymore — see handlePost/
 // PollWidget/LinkCard for why the rest of their plumbing stays: existing
 // posts of those types still need to render correctly in the feed.
-const ATTACHMENT_PICKS: { type: AttachmentType; icon: React.ElementType; label: string; bg: string }[] = [
-  { type: 'photo',    icon: Image,     label: 'Photo',    bg: 'bg-emerald-500' },
-  { type: 'video',    icon: Video,     label: 'Video',    bg: 'bg-red-500' },
-  { type: 'youtube',  icon: CirclePlay, label: 'YouTube',  bg: 'bg-red-600' },
-  { type: 'document', icon: FileText,  label: 'Document', bg: 'bg-orange-500' },
-  { type: 'location', icon: MapPin,    label: 'Location', bg: 'bg-rose-500' },
+const ATTACHMENT_PICKS: { type: AttachmentType; icon: React.ElementType; label: string }[] = [
+  { type: 'photo',    icon: Image,     label: 'Photo' },
+  { type: 'video',    icon: Video,     label: 'Video' },
+  { type: 'youtube',  icon: CirclePlay, label: 'YouTube' },
+  { type: 'document', icon: FileText,  label: 'Document' },
+  { type: 'location', icon: MapPin,    label: 'Location' },
 ];
 
 function isHttpUrl(s: string): boolean {
@@ -446,8 +446,8 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
                   onClick={() => { setAttachment(at.type); setShowPicker(false); }}
                   className="flex flex-col items-center gap-1.5 group"
                 >
-                  <div className={cn('w-11 h-11 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 group-active:scale-95', at.bg)}>
-                    <Icon size={20} className="text-white" />
+                  <div className="w-11 h-11 rounded-2xl bg-gray-100 flex items-center justify-center transition-transform group-hover:scale-105 group-active:scale-95">
+                    <Icon size={20} className="text-gray-600" />
                   </div>
                   <span className="text-[10px] text-gray-500 font-medium">{at.label}</span>
                 </button>
