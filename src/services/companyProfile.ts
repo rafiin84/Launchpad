@@ -206,15 +206,37 @@ async function resolveCompanyLogo(recordId: string): Promise<string | null> {
   }
 }
 
-// The Record Image endpoint 415s if the uploaded part's content type isn't a
-// recognized image type — and a raw <input type="file"> File's own .type can
-// be empty or unreliable depending on the browser/OS. Every other working
-// Record Image upload in this app (founder profile photo, the original
-// company logo code) goes through an explicit Blob with a guaranteed image
-// type instead of trusting the file's own type — do the same here.
-function normalizeImageBlob(file: File): Blob {
-  if (file.type && file.type.startsWith('image/')) return file;
-  return new Blob([file], { type: 'image/jpeg' });
+// The Record Image endpoint 415s unless the upload is a format it actually
+// accepts (JPEG/PNG-ish) — a phone photo can be HEIC/WEBP/etc. and still
+// correctly report an image/* type, so checking the type string isn't
+// enough. Every other working Record Image upload in this app (founder
+// profile photo's crop step) sidesteps this by re-encoding through a canvas
+// into a guaranteed real JPEG rather than trusting the original file's
+// format — do the same here instead of just relabeling the original bytes.
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+    img.src = url;
+  });
+}
+
+async function normalizeImageBlob(file: File): Promise<Blob> {
+  try {
+    const img = await loadImage(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0);
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    return blob ?? file;
+  } catch {
+    return file;
+  }
 }
 
 /** Uploads a new company logo as the record's Record Image. */
@@ -230,11 +252,13 @@ export async function uploadCompanyLogo(email: string, file: File): Promise<bool
       saveCrmId(email, recordId);
     }
 
-    const blob = normalizeImageBlob(file);
+    // Always a real re-encoded JPEG now (see normalizeImageBlob) — name it
+    // to match so the extension never disagrees with the actual content.
+    const blob = await normalizeImageBlob(file);
     if (isFounder()) {
-      await portalUploadRecordPhoto(MODULE, recordId, blob, file.name);
+      await portalUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
     } else {
-      await zohoUploadRecordPhoto(MODULE, recordId, blob, file.name);
+      await zohoUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
     }
     return true;
   } catch (err) {
