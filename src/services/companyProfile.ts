@@ -6,7 +6,11 @@
  * localStorage is used as local cache and offline fallback.
  */
 
-import { zohoUpsert, zohoSearch, zohoList, zohoUploadRecordPhoto, zohoGetRecordPhoto, portalUploadRecordPhoto, portalGetRecordPhoto, portalList, portalSearch, portalUpsert, portalUpdate } from './zohoApi';
+import {
+  zohoUpsert, zohoSearch, zohoList, zohoGetRecordPhoto, portalGetRecordPhoto,
+  portalList, portalSearch, portalUpsert, portalUpdate,
+  zohoUpdate, zohoGetById, portalGetById, zohoUploadFile, portalUploadFile, downloadFieldFile,
+} from './zohoApi';
 import { loadRole } from './oauth';
 
 export interface CompanyData {
@@ -186,6 +190,77 @@ function isFounder(): boolean {
   return loadRole() === 'founder';
 }
 
+// ─── Company logo (File Upload field) ────────────────────────────────────────
+// The logo lives in a dedicated File Upload field on Founder_Companies itself,
+// not Zoho's Record Image API — the founder can then see/manage it as a
+// normal field on the record like any other. Same admin-vs-portal key-naming
+// gotcha as crmDocuments.ts/crmActivities.ts.
+const LOGO_FIELD = 'Company_Logo';
+
+function parseLogoAttachmentId(v: unknown): string {
+  const arr = Array.isArray(v) ? v : [];
+  const f = arr[0] as Record<string, unknown> | undefined;
+  if (!f) return '';
+  return String(f['id'] ?? f['attachment_Id'] ?? f['attachment_Id__s'] ?? '');
+}
+
+async function resolveCompanyLogoFileUrl(recordId: string): Promise<string | null> {
+  try {
+    const record = isFounder()
+      ? await portalGetById(MODULE, recordId, LOGO_FIELD)
+      : await zohoGetById(MODULE, recordId, LOGO_FIELD);
+    if (!record) return null;
+    const attachmentId = parseLogoAttachmentId(record[LOGO_FIELD]);
+    if (!attachmentId) return null;
+    const blob = await downloadFieldFile(MODULE, recordId, attachmentId, isFounder());
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+// Older records may only have a logo set via the previous Record Image
+// mechanism — try the File Upload field first, fall back to Record Image so
+// an already-uploaded logo doesn't disappear.
+async function resolveCompanyLogo(recordId: string): Promise<string | null> {
+  const fileLogo = await resolveCompanyLogoFileUrl(recordId);
+  if (fileLogo) return fileLogo;
+  try {
+    return isFounder()
+      ? await portalGetRecordPhoto(MODULE, recordId)
+      : await zohoGetRecordPhoto(MODULE, recordId);
+  } catch {
+    return null;
+  }
+}
+
+/** Uploads a new company logo via the Company_Logo File Upload field. */
+export async function uploadCompanyLogoFile(email: string, file: File): Promise<boolean> {
+  try {
+    let recordId = loadCrmId(email);
+    if (!recordId) {
+      const records = await (isFounder()
+        ? portalList(MODULE, { per_page: '1', fields: 'Email' })
+        : zohoSearch(MODULE, `(Email:equals:${email})`));
+      if (!records.length) return false;
+      recordId = records[0].id;
+      saveCrmId(email, recordId);
+    }
+
+    const fileId = isFounder() ? await portalUploadFile(file, file.name) : await zohoUploadFile(file, file.name);
+    const payload = { [LOGO_FIELD]: [{ file_id: fileId }] };
+    if (isFounder()) {
+      await portalUpdate(MODULE, recordId, payload);
+    } else {
+      await zohoUpdate(MODULE, recordId, payload);
+    }
+    return true;
+  } catch (err) {
+    console.warn('[CompanyProfile] Logo file upload failed:', err);
+    return false;
+  }
+}
+
 async function searchFounders(email: string): Promise<import('./zohoApi').ZohoRecord[]> {
   if (isFounder()) {
     // Portal tokens only work on zcrmportals.in.
@@ -251,11 +326,7 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
       saveLocal(email, crmData);
       saveCrmId(email, record.id); // cache record ID for direct updates
 
-      try {
-        logo = isFounder()
-          ? await portalGetRecordPhoto(MODULE, record.id)
-          : await zohoGetRecordPhoto(MODULE, record.id);
-      } catch { /* no logo */ }
+      logo = await resolveCompanyLogo(record.id);
     }
   } catch (err) {
     console.warn('[CompanyProfile] CRM fetch failed, using localStorage:', err);
@@ -296,12 +367,7 @@ export async function fetchAllCompanyProfiles(): Promise<Array<{ email: string; 
       const r = record as Record<string, unknown>;
       const email = String(r.Email || '');
       const data = crmRecordToData(r);
-      let logo: string | null = null;
-      try {
-        logo = isFounder()
-          ? await portalGetRecordPhoto(MODULE, record.id)
-          : await zohoGetRecordPhoto(MODULE, record.id);
-      } catch { /* no logo */ }
+      const logo = await resolveCompanyLogo(record.id);
       return { email, data, logo };
     }));
 
@@ -316,48 +382,14 @@ export async function fetchCompanyLogo(email: string): Promise<string | null> {
   try {
     const recordId = loadCrmId(email);
     if (recordId) {
-      return isFounder()
-        ? await portalGetRecordPhoto(MODULE, recordId)
-        : await zohoGetRecordPhoto(MODULE, recordId);
+      return resolveCompanyLogo(recordId);
     }
     // Fallback: search by email (investor path)
     const records = await zohoSearch(MODULE, `(Email:equals:${email})`);
     if (!records.length) return null;
-    return await zohoGetRecordPhoto(MODULE, records[0].id);
+    return resolveCompanyLogo(records[0].id);
   } catch {
     return null;
   }
 }
 
-export async function uploadCompanyLogo(email: string, logoDataUrl: string): Promise<boolean> {
-  try {
-    let recordId = loadCrmId(email);
-    if (!recordId) {
-      // Try to find the record and cache its ID first
-      const records = await (isFounder()
-        ? portalList(MODULE, { per_page: '1', fields: 'Email' })
-        : zohoSearch(MODULE, `(Email:equals:${email})`));
-      if (!records.length) return false;
-      recordId = records[0].id;
-      saveCrmId(email, recordId);
-    }
-
-    const [meta, base64] = logoDataUrl.split(',');
-    const mimeMatch = meta.match(/data:([^;]+)/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mime });
-
-    if (isFounder()) {
-      await portalUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
-    } else {
-      await zohoUploadRecordPhoto(MODULE, recordId, blob, 'logo.jpg');
-    }
-    return true;
-  } catch (err) {
-    console.warn('[CompanyProfile] Logo upload failed:', err);
-    return false;
-  }
-}

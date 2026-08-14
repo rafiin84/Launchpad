@@ -13,7 +13,7 @@ import { usePageTitle } from '../context/PageTitleContext';
 import {
   type CompanyData, EMPTY,
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
-  uploadCompanyLogo,
+  uploadCompanyLogoFile,
 } from '../services/companyProfile';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
@@ -163,15 +163,12 @@ export default function FounderCompany() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      setLogoUrl(dataUrl);
-      await uploadCompanyLogo(userEmail, dataUrl);
+    setLogoUrl(URL.createObjectURL(file));
+    try {
+      await uploadCompanyLogoFile(userEmail, file);
+    } finally {
       setUploadingLogo(false);
-    };
-    reader.onerror = () => setUploadingLogo(false);
-    reader.readAsDataURL(file);
+    }
     e.target.value = '';
   }
 
