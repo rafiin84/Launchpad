@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import {
   Activity, AlertCircle, RefreshCw, Building2,
-  Image, X, Send, Link as LinkIcon,
+  Image, X, Send,
   PlusCircle, DollarSign, FileText, Users, TrendingUp, MessageSquare, Upload, Clock,
-  Sparkles, Trash2, Video, CirclePlay, MapPin, BarChart3, Loader2,
+  Sparkles, Trash2, Video, CirclePlay, MapPin, Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -87,14 +87,15 @@ function getVideoThumbnail(url: string): string | null {
 
 type AttachmentType = 'none' | 'photo' | 'video' | 'youtube' | 'document' | 'location' | 'poll' | 'link';
 
+// Poll and Link are deliberately not offered here anymore — see handlePost/
+// PollWidget/LinkCard for why the rest of their plumbing stays: existing
+// posts of those types still need to render correctly in the feed.
 const ATTACHMENT_PICKS: { type: AttachmentType; icon: React.ElementType; label: string; bg: string }[] = [
   { type: 'photo',    icon: Image,     label: 'Photo',    bg: 'bg-emerald-500' },
   { type: 'video',    icon: Video,     label: 'Video',    bg: 'bg-red-500' },
   { type: 'youtube',  icon: CirclePlay, label: 'YouTube',  bg: 'bg-red-600' },
   { type: 'document', icon: FileText,  label: 'Document', bg: 'bg-orange-500' },
   { type: 'location', icon: MapPin,    label: 'Location', bg: 'bg-rose-500' },
-  { type: 'poll',     icon: BarChart3, label: 'Poll',     bg: 'bg-indigo-600' },
-  { type: 'link',     icon: LinkIcon,  label: 'Link',     bg: 'bg-violet-500' },
 ];
 
 function isHttpUrl(s: string): boolean {
