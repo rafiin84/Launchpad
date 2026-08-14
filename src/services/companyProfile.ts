@@ -206,6 +206,17 @@ async function resolveCompanyLogo(recordId: string): Promise<string | null> {
   }
 }
 
+// The Record Image endpoint 415s if the uploaded part's content type isn't a
+// recognized image type — and a raw <input type="file"> File's own .type can
+// be empty or unreliable depending on the browser/OS. Every other working
+// Record Image upload in this app (founder profile photo, the original
+// company logo code) goes through an explicit Blob with a guaranteed image
+// type instead of trusting the file's own type — do the same here.
+function normalizeImageBlob(file: File): Blob {
+  if (file.type && file.type.startsWith('image/')) return file;
+  return new Blob([file], { type: 'image/jpeg' });
+}
+
 /** Uploads a new company logo as the record's Record Image. */
 export async function uploadCompanyLogo(email: string, file: File): Promise<boolean> {
   try {
@@ -219,10 +230,11 @@ export async function uploadCompanyLogo(email: string, file: File): Promise<bool
       saveCrmId(email, recordId);
     }
 
+    const blob = normalizeImageBlob(file);
     if (isFounder()) {
-      await portalUploadRecordPhoto(MODULE, recordId, file, file.name);
+      await portalUploadRecordPhoto(MODULE, recordId, blob, file.name);
     } else {
-      await zohoUploadRecordPhoto(MODULE, recordId, file, file.name);
+      await zohoUploadRecordPhoto(MODULE, recordId, blob, file.name);
     }
     return true;
   } catch (err) {
