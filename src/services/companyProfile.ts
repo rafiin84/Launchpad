@@ -10,7 +10,6 @@ import {
   zohoUpsert, zohoSearch, zohoList, zohoGetRecordPhoto, portalGetRecordPhoto,
   zohoUploadRecordPhoto, portalUploadRecordPhoto,
   portalList, portalSearch, portalUpsert, portalUpdate,
-  zohoUpdate, zohoGetById, portalGetById, zohoUploadFile, portalUploadFile, downloadFieldFile,
 } from './zohoApi';
 import { loadRole } from './oauth';
 
@@ -191,41 +190,13 @@ function isFounder(): boolean {
   return loadRole() === 'founder';
 }
 
-// ─── Company logo (File Upload field) ────────────────────────────────────────
-// The logo lives in a dedicated File Upload field on Founder_Companies itself,
-// not Zoho's Record Image API — the founder can then see/manage it as a
-// normal field on the record like any other. Same admin-vs-portal key-naming
-// gotcha as crmDocuments.ts/crmActivities.ts.
-const LOGO_FIELD = 'Company_Logo';
-
-function parseLogoAttachmentId(v: unknown): string {
-  const arr = Array.isArray(v) ? v : [];
-  const f = arr[0] as Record<string, unknown> | undefined;
-  if (!f) return '';
-  return String(f['id'] ?? f['attachment_Id'] ?? f['attachment_Id__s'] ?? '');
-}
-
-async function resolveCompanyLogoFileUrl(recordId: string): Promise<string | null> {
-  try {
-    const record = isFounder()
-      ? await portalGetById(MODULE, recordId, LOGO_FIELD)
-      : await zohoGetById(MODULE, recordId, LOGO_FIELD);
-    if (!record) return null;
-    const attachmentId = parseLogoAttachmentId(record[LOGO_FIELD]);
-    if (!attachmentId) return null;
-    const blob = await downloadFieldFile(MODULE, recordId, attachmentId, isFounder());
-    return URL.createObjectURL(blob);
-  } catch {
-    return null;
-  }
-}
-
-// Older records may only have a logo set via the previous Record Image
-// mechanism — try the File Upload field first, fall back to Record Image so
-// an already-uploaded logo doesn't disappear.
+// ─── Company logo (Zoho Record Image) ────────────────────────────────────────
+// The logo is stored via Zoho's Record Image API, not a custom field — this
+// is what makes it show as the record's own thumbnail (top-left, next to the
+// company name) inside Zoho CRM itself. A custom File Upload field's value
+// never populates that thumbnail, so Record Image is the only mechanism that
+// satisfies both "read back in this app" and "shown correctly in Zoho CRM".
 async function resolveCompanyLogo(recordId: string): Promise<string | null> {
-  const fileLogo = await resolveCompanyLogoFileUrl(recordId);
-  if (fileLogo) return fileLogo;
   try {
     return isFounder()
       ? await portalGetRecordPhoto(MODULE, recordId)
@@ -235,16 +206,8 @@ async function resolveCompanyLogo(recordId: string): Promise<string | null> {
   }
 }
 
-/**
- * Uploads a new company logo. Writes to two places:
- * - Company_Logo (File Upload field) — what this app reads back via
- *   resolveCompanyLogo, works reliably for both roles.
- * - Record Image — Zoho's own per-record thumbnail, shown top-left on the
- *   record page inside Zoho CRM itself. A File Upload field's value never
- *   populates that thumbnail on its own, so this is a separate write,
- *   best-effort: if it fails, the app's own logo display is unaffected.
- */
-export async function uploadCompanyLogoFile(email: string, file: File): Promise<boolean> {
+/** Uploads a new company logo as the record's Record Image. */
+export async function uploadCompanyLogo(email: string, file: File): Promise<boolean> {
   try {
     let recordId = loadCrmId(email);
     if (!recordId) {
@@ -256,27 +219,14 @@ export async function uploadCompanyLogoFile(email: string, file: File): Promise<
       saveCrmId(email, recordId);
     }
 
-    const fileId = isFounder() ? await portalUploadFile(file, file.name) : await zohoUploadFile(file, file.name);
-    const payload = { [LOGO_FIELD]: [{ file_id: fileId }] };
     if (isFounder()) {
-      await portalUpdate(MODULE, recordId, payload);
+      await portalUploadRecordPhoto(MODULE, recordId, file, file.name);
     } else {
-      await zohoUpdate(MODULE, recordId, payload);
+      await zohoUploadRecordPhoto(MODULE, recordId, file, file.name);
     }
-
-    try {
-      if (isFounder()) {
-        await portalUploadRecordPhoto(MODULE, recordId, file, file.name);
-      } else {
-        await zohoUploadRecordPhoto(MODULE, recordId, file, file.name);
-      }
-    } catch (err) {
-      console.warn('[CompanyProfile] Record Image update failed (logo still saved via file field):', err);
-    }
-
     return true;
   } catch (err) {
-    console.warn('[CompanyProfile] Logo file upload failed:', err);
+    console.warn('[CompanyProfile] Logo upload failed:', err);
     return false;
   }
 }

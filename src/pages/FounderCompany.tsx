@@ -13,7 +13,7 @@ import { usePageTitle } from '../context/PageTitleContext';
 import {
   type CompanyData, EMPTY,
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
-  uploadCompanyLogoFile,
+  uploadCompanyLogo,
 } from '../services/companyProfile';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
@@ -168,7 +168,7 @@ export default function FounderCompany() {
     setLogoUploadError(false);
     setLogoUrl(URL.createObjectURL(file));
     try {
-      const ok = await uploadCompanyLogoFile(userEmail, file);
+      const ok = await uploadCompanyLogo(userEmail, file);
       if (!ok) {
         setLogoUrl(previousLogoUrl);
         setLogoUploadError(true);
