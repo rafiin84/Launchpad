@@ -8,6 +8,7 @@
 
 import {
   zohoUpsert, zohoSearch, zohoList, zohoGetRecordPhoto, portalGetRecordPhoto,
+  zohoUploadRecordPhoto, portalUploadRecordPhoto,
   portalList, portalSearch, portalUpsert, portalUpdate,
   zohoUpdate, zohoGetById, portalGetById, zohoUploadFile, portalUploadFile, downloadFieldFile,
 } from './zohoApi';
@@ -234,7 +235,15 @@ async function resolveCompanyLogo(recordId: string): Promise<string | null> {
   }
 }
 
-/** Uploads a new company logo via the Company_Logo File Upload field. */
+/**
+ * Uploads a new company logo. Writes to two places:
+ * - Company_Logo (File Upload field) — what this app reads back via
+ *   resolveCompanyLogo, works reliably for both roles.
+ * - Record Image — Zoho's own per-record thumbnail, shown top-left on the
+ *   record page inside Zoho CRM itself. A File Upload field's value never
+ *   populates that thumbnail on its own, so this is a separate write,
+ *   best-effort: if it fails, the app's own logo display is unaffected.
+ */
 export async function uploadCompanyLogoFile(email: string, file: File): Promise<boolean> {
   try {
     let recordId = loadCrmId(email);
@@ -254,6 +263,17 @@ export async function uploadCompanyLogoFile(email: string, file: File): Promise<
     } else {
       await zohoUpdate(MODULE, recordId, payload);
     }
+
+    try {
+      if (isFounder()) {
+        await portalUploadRecordPhoto(MODULE, recordId, file, file.name);
+      } else {
+        await zohoUploadRecordPhoto(MODULE, recordId, file, file.name);
+      }
+    } catch (err) {
+      console.warn('[CompanyProfile] Record Image update failed (logo still saved via file field):', err);
+    }
+
     return true;
   } catch (err) {
     console.warn('[CompanyProfile] Logo file upload failed:', err);
