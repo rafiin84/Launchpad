@@ -18,6 +18,7 @@ import {
   uploadApplicationDocumentFile,
   attachApplicationDocumentFile,
   resolveApplicationDocumentUrl,
+  requestedDocumentFileId,
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
@@ -257,7 +258,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
 interface SubmittedDoc {
   name: string;
   link?: string;             // pasted share link
-  documentId?: string;       // LEGACY: My_Documents record id (old direct upload)
+  documentId?: string;       // LEGACY: My_Documents record id (old direct upload) — canonicalized from doc.recordId too, see requestedDocumentFileId
   attachmentId?: string;     // LEGACY: File_Upload_1 attachment id on that record
   fileAttachmentId?: string; // current uploads: this file's own attachment id on the Application's own Requested_Document_Files field
 }
@@ -308,11 +309,14 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
       setDocTypes(parsed.map(d => d.type));
       const pre: Record<string, SubmittedDoc> = {};
       parsed.forEach(d => {
+        const legacyFileId = requestedDocumentFileId(d);
         if (d.fileAttachmentId) {
           pre[d.type] = { name: d.fileName || d.type, fileAttachmentId: d.fileAttachmentId };
-        } else if (d.documentId && d.attachmentId) {
+        } else if (legacyFileId && d.attachmentId) {
           // Legacy: uploaded before requested docs moved onto the Application itself.
-          pre[d.type] = { name: d.fileName || d.type, documentId: d.documentId, attachmentId: d.attachmentId };
+          // The mobile app writes this reference under recordId instead of documentId —
+          // canonicalize to documentId here since that's the key this app serializes back.
+          pre[d.type] = { name: d.fileName || d.type, documentId: legacyFileId, attachmentId: d.attachmentId };
         } else {
           // attachmentId held the link directly in even older records, before documentId existed.
           const link = d.link || (d.attachmentId && /^https?:\/\//i.test(d.attachmentId) ? d.attachmentId : '');

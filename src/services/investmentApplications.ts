@@ -693,9 +693,15 @@ export interface RequestedDocument {
   status: 'pending' | 'uploaded' | 'submitted';
   fileName?: string;
   documentId?: string;   // LEGACY: My_Documents record id holding the uploaded file (see crmDocuments.ts) — records submitted before requested-doc uploads moved onto the Application itself
+  recordId?: string;     // LEGACY: same as documentId (a My_Documents record id) — the mobile app writes this key name instead of documentId for the same data
   attachmentId?: string; // LEGACY: File_Upload_1 attachment id on that My_Documents record — or, on even older records, a share link held directly here
-  link?: string;         // explicit share link (Google Drive / Dropbox)
+  link?: string;         // explicit share link (Google Drive / Dropbox) — NOTE: the mobile app also puts a raw Zoho API download URL here (needs an Authorization header to work, unlike a real share link) whenever it also sets recordId/attachmentId; always prefer resolving via recordId+attachmentId over treating link as a plain hyperlink when both are present
   fileAttachmentId?: string; // this entry's own attachment id within THIS Application's own Requested_Document_Files field (see "Requested-document file uploads" below) — current uploads use this, never My_Documents
+}
+
+/** documentId and recordId are two different key names the same data has been stored under across sources (this app vs. the mobile app) — always read through this. */
+export function requestedDocumentFileId(doc: RequestedDocument): string | undefined {
+  return doc.documentId || doc.recordId;
 }
 
 // ─── Requested-document file uploads ─────────────────────────────────────────

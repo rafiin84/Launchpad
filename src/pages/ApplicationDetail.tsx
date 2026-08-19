@@ -16,6 +16,7 @@ import {
   parseRequestedDocuments,
   stringifyRequestedDocuments,
   resolveApplicationDocumentUrl,
+  requestedDocumentFileId,
   DOCUMENT_TYPES,
   type InvestmentApplication,
   type ApplicationStatus,
@@ -969,10 +970,15 @@ export default function ApplicationDetail() {
   // Views a requested document the founder uploaded directly. Current uploads
   // live on this Application's own Requested_Document_Files field
   // (doc.fileAttachmentId); older records point at a My_Documents record
-  // instead (doc.documentId/attachmentId), from before requested-doc uploads
-  // moved off the Documents module.
+  // instead (doc.documentId/doc.recordId + doc.attachmentId — recordId is
+  // the mobile app's key name for the same documentId value), from before
+  // requested-doc uploads moved off the Documents module. Both of those
+  // legacy shapes need an authenticated fetch via resolveDocumentUrl — the
+  // mobile app also stores a raw (auth-required) Zoho API URL in doc.link
+  // for these, which must never be opened as a plain hyperlink.
   const handleViewRequestedFile = async (doc: RequestedDocument) => {
-    if (!doc.fileAttachmentId && !(doc.documentId && doc.attachmentId)) return;
+    const legacyFileId = requestedDocumentFileId(doc);
+    if (!doc.fileAttachmentId && !(legacyFileId && doc.attachmentId)) return;
     setDocViewer({ name: doc.type, fileName: doc.fileName || doc.type });
     setDocViewerUrl(null);
     setDocViewerError('');
@@ -981,7 +987,7 @@ export default function ApplicationDetail() {
       const { url, revoke } = doc.fileAttachmentId
         ? await resolveApplicationDocumentUrl(app!.id, doc.fileAttachmentId)
         : await resolveDocumentUrl({
-            id: doc.documentId!, fileUploadId: doc.attachmentId!, fileUrl: '', fileName: doc.fileName || '',
+            id: legacyFileId!, fileUploadId: doc.attachmentId!, fileUrl: '', fileName: doc.fileName || '',
           } as CRMDocument);
       docViewerRevokeRef.current = revoke;
       setDocViewerUrl(url);
@@ -1440,16 +1446,20 @@ export default function ApplicationDetail() {
                   // A submitted doc is one of: a file the founder uploaded directly
                   // (doc.fileAttachmentId — lives on this Application's own
                   // Requested_Document_Files field, the current path; or the legacy
-                  // doc.documentId + doc.attachmentId pointing at a My_Documents
-                  // record, from before uploads moved off the Documents module), a
-                  // share link (doc.link, or an older record where attachmentId
-                  // holds an http URL directly), or a legacy CRM Applications-module
-                  // attachment (attachmentId that isn't a URL and there's no
-                  // documentId — never actually populated by any current write
-                  // path, kept only for old data).
-                  const uploadedFile = doc.fileAttachmentId || (doc.documentId && doc.attachmentId) ? doc : null;
-                  const linkUrl = doc.link || (doc.attachmentId && /^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '');
-                  const crmAttachmentId = !uploadedFile && doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
+                  // doc.documentId/doc.recordId + doc.attachmentId pointing at a
+                  // My_Documents record, from before uploads moved off the Documents
+                  // module — the mobile app writes recordId instead of documentId
+                  // for this same reference), a share link (doc.link, or an older
+                  // record where attachmentId holds an http URL directly — but NOT
+                  // when a legacyFileId is also present, since the mobile app also
+                  // stashes an auth-required Zoho API URL in link alongside recordId),
+                  // or a legacy CRM Applications-module attachment (attachmentId that
+                  // isn't a URL and there's no documentId/recordId — never actually
+                  // populated by any current write path, kept only for old data).
+                  const legacyFileId = requestedDocumentFileId(doc);
+                  const uploadedFile = doc.fileAttachmentId || (legacyFileId && doc.attachmentId) ? doc : null;
+                  const linkUrl = !uploadedFile && (doc.link || (doc.attachmentId && /^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '')) || '';
+                  const crmAttachmentId = !uploadedFile && !linkUrl && doc.attachmentId && !/^https?:\/\//i.test(doc.attachmentId) ? doc.attachmentId : '';
                   const hasFile = doc.status === 'submitted' || doc.status === 'uploaded';
                   const ViewButton = () => {
                     if (uploadedFile) {
