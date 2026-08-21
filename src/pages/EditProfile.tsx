@@ -14,7 +14,6 @@ import {
   type CRMFounder,
 } from '../services/crmFounders';
 import { saveUserName } from '../services/oauth';
-import { addNotification } from '../services/notifications';
 
 interface ProfileForm {
   name: string;
@@ -264,11 +263,10 @@ export default function EditProfile() {
 }
 
 function InvestorEditProfile() {
-  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, zohoProfile, portalSession, isFounder } = useAuth();
+  const { currentUser, appUser, appUserRecordId, refreshAvatar, refreshAppUser, coverImage, setCoverImage, setProfileImage, zohoEmail, zohoProfile, portalSession } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
-  const isPortal = isFounder;
 
   const [form, setForm] = useState<ProfileForm>(() =>
     loadInitialForm(currentUser.name, appUser as unknown as Record<string, unknown> | null, zohoProfile.mobile || zohoProfile.phone || '')
@@ -463,20 +461,6 @@ function InvestorEditProfile() {
       }
 
       setSaveResult(crmSuccess ? 'success' : 'partial');
-
-      // Notify about profile update
-      const myRole = isPortal ? 'founder' : 'investor';
-      const otherRole = isPortal ? 'investor' : 'founder';
-      addNotification({
-        type: 'profile_update',
-        title: 'Profile Updated',
-        message: `${form.name.trim() || 'User'} updated their profile.`,
-        actor: form.name.trim() || 'User',
-        actorRole: myRole,
-        targetRole: otherRole,
-        link: '/profile',
-      });
-      window.dispatchEvent(new Event('notifications-updated'));
 
       // Refresh appUser in context so Profile page shows latest data
       refreshAppUser();
@@ -963,17 +947,6 @@ function FounderEditProfile() {
 
       saveUserName(form.displayName.trim());
       setSaveResult('success');
-
-      addNotification({
-        type: 'profile_update',
-        title: 'Profile Updated',
-        message: `${form.displayName.trim() || 'Founder'} updated their profile.`,
-        actor: form.displayName.trim() || 'Founder',
-        actorRole: 'founder',
-        targetRole: 'investor',
-        link: '/profile',
-      });
-      window.dispatchEvent(new Event('notifications-updated'));
 
       setTimeout(() => navigate('/profile'), 900);
     } catch (err) {

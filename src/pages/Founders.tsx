@@ -351,6 +351,7 @@ function PortalStatusToggle({
         actor: 'Admin',
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: founder.email,
         link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -371,6 +372,7 @@ function PortalStatusToggle({
         actor: 'Admin',
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: founder.email,
         link: `/applicants/${founder.id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -392,6 +394,7 @@ function PortalStatusToggle({
       actor: 'Admin',
       actorRole: 'investor',
       targetRole: 'founder',
+      targetEmail: founder.email,
       link: `/applicants/${founder.id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));

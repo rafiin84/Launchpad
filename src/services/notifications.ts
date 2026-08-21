@@ -8,7 +8,7 @@
  * Falls back to localStorage for offline/error resilience.
  */
 
-import { loadRole } from './oauth';
+import { loadRole, loadPortalLoginEmail } from './oauth';
 import { zohoCreate, zohoList, portalList, portalListUnscoped, portalCreate } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
@@ -33,6 +33,14 @@ export interface AppNotification {
   actor: string;
   actorRole: 'investor' | 'founder';
   targetRole: 'investor' | 'founder';
+  /**
+   * The specific founder's login email this notification is for, when
+   * targetRole is 'founder' — every founder-portal session filters strictly
+   * to notifications matching its own email, so a notification without this
+   * set is never shown to any founder (see fetchFromServer). There's only
+   * one investor audience, so investor-targeted notifications don't need this.
+   */
+  targetEmail?: string;
   link?: string;
   requestedDocs?: string[];
 }
@@ -70,6 +78,7 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
     actor: s('Author_Name'),
     actorRole: (s('Author_Role') || 'investor') as 'investor' | 'founder',
     targetRole: (s('Activity_Tags') || 'investor') as 'investor' | 'founder',
+    targetEmail: (parsed.targetEmail as string) || undefined,
     link: (parsed.link as string) || '',
     requestedDocs: Array.isArray(parsed.requestedDocs) ? parsed.requestedDocs as string[] : undefined,
   };
@@ -92,13 +101,30 @@ async function fetchFromServer(role: string): Promise<AppNotification[]> {
       fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
     }) as Record<string, unknown>[];
   }
-  return records
+  const matched = records
     .filter(r => String(r['Activity_Type'] ?? '') === 'notification' && String(r['Activity_Tags'] ?? '') === role)
     .map(r => fromCRM(r));
+
+  if (role !== 'founder') return matched;
+
+  // A founder must only ever see notifications addressed to their own email —
+  // otherwise every founder sees every other company's notifications, since
+  // Activity_Tags alone only distinguishes the role, not the specific founder.
+  // Fail closed: a founder-targeted notification with no targetEmail is
+  // dropped rather than shown broadcast-style to every company.
+  const myEmail = (loadPortalLoginEmail() || '').trim().toLowerCase();
+  return matched.filter(n => !!n.targetEmail && n.targetEmail.trim().toLowerCase() === myEmail);
 }
 
 async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'>): Promise<AppNotification | null> {
-  const content = JSON.stringify({ type: n.type, message: n.message, link: n.link || '', read: 'false', ...(n.requestedDocs ? { requestedDocs: n.requestedDocs } : {}) });
+  const content = JSON.stringify({
+    type: n.type,
+    message: n.message,
+    link: n.link || '',
+    read: 'false',
+    ...(n.targetEmail ? { targetEmail: n.targetEmail } : {}),
+    ...(n.requestedDocs ? { requestedDocs: n.requestedDocs } : {}),
+  });
   const payload: Record<string, unknown> = {
     Name: n.title,
     Activity_Type: 'notification',
@@ -150,7 +176,9 @@ export async function getNotifications(): Promise<AppNotification[]> {
     console.warn('[Notifications] CRM fetch failed, using cache:', err);
   }
 
-  const cached = loadLocal().filter(n => n.targetRole === role);
+  const myEmail = (loadPortalLoginEmail() || '').trim().toLowerCase();
+  const cached = loadLocal().filter(n => n.targetRole === role
+    && (role !== 'founder' || (!!n.targetEmail && n.targetEmail.trim().toLowerCase() === myEmail)));
   return cached.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 

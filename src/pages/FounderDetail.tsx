@@ -140,6 +140,7 @@ export default function FounderDetail() {
         actor: 'Admin',
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: founder.email,
         link: `/applicants/${id}`,
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -164,6 +165,7 @@ export default function FounderDetail() {
       actor: 'Admin',
       actorRole: 'investor',
       targetRole: 'founder',
+      targetEmail: founder.email,
       link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));
@@ -184,6 +186,7 @@ export default function FounderDetail() {
       actor: 'Admin',
       actorRole: 'investor',
       targetRole: 'founder',
+      targetEmail: founder.email,
       link: `/applicants/${id}`,
     });
     window.dispatchEvent(new Event('notifications-updated'));

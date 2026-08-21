@@ -831,6 +831,7 @@ export default function ApplicationDetail() {
           actor: currentUser.name,
           actorRole: 'investor',
           targetRole: 'founder',
+          targetEmail: app.founderEmail,
           link: '/applications/track',
         });
       } else {
@@ -842,6 +843,7 @@ export default function ApplicationDetail() {
           actor: currentUser.name,
           actorRole: 'investor',
           targetRole: 'founder',
+          targetEmail: app.founderEmail,
           link: '/applications/track',
         });
       }
@@ -887,6 +889,7 @@ export default function ApplicationDetail() {
       actor: currentUser.name,
       actorRole: 'investor',
       targetRole: 'founder',
+      targetEmail: app.founderEmail,
       link: '/applications/track',
     });
 
@@ -918,6 +921,7 @@ export default function ApplicationDetail() {
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: app.founderEmail,
         link: '/applications/track',
         requestedDocs: docs.map(d => d.type),
       });
@@ -949,6 +953,7 @@ export default function ApplicationDetail() {
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: app.founderEmail,
         link: '/applications/track',
       });
       window.dispatchEvent(new Event('notifications-updated'));
@@ -1057,6 +1062,7 @@ export default function ApplicationDetail() {
         actor: currentUser.name,
         actorRole: 'investor',
         targetRole: 'founder',
+        targetEmail: app.founderEmail,
         link: '/applications/track',
       });
       window.dispatchEvent(new Event('notifications-updated'));
