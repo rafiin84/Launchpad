@@ -103,17 +103,19 @@ function isHttpUrl(s: string): boolean {
 }
 
 function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
-  const { currentUser, isInvestor, isFounder, founderCompanyName } = useAuth();
+  const { currentUser, isInvestor, isFounder, founderCompanyName, appUser } = useAuth();
   const { t } = useLanguage();
   const photoFileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
   const documentFileRef = useRef<HTMLInputElement>(null);
 
+  const myCompanyName = isInvestor ? (appUser?.company || '') : founderCompanyName;
+
   const [expanded, setExpanded]       = useState(false);
   const [title, setTitle]             = useState('');
   const [content, setContent]         = useState('');
   const [activityType, setActivityType] = useState('update');
-  const [companyName, setCompanyName] = useState(founderCompanyName);
+  const [companyName, setCompanyName] = useState(myCompanyName);
   const [posting, setPosting]         = useState(false);
   const [generating, setGenerating]   = useState(false);
 
@@ -151,10 +153,10 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
   // Link
   const [linkUrl, setLinkUrl] = useState('');
 
-  // Keep in sync if founderCompanyName loads async
+  // Keep in sync if the profile's company name loads async
   useEffect(() => {
-    if (founderCompanyName && !companyName) setCompanyName(founderCompanyName);
-  }, [founderCompanyName]);
+    if (myCompanyName && !companyName) setCompanyName(myCompanyName);
+  }, [myCompanyName]);
 
   function clearMedia() {
     if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
@@ -758,13 +760,14 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
   allActivities: CRMActivity[];
   onOpenDocument: (ref: ActivityFileRef, fileName: string) => void;
 }) {
-  const { currentUser, founderCompanyName, isInvestor } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor, appUser } = useAuth();
   const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
   const canDelete = isOwnPost || isInvestor;
   const [deleting, setDeleting] = useState(false);
   const [logoError, setLogoError] = useState(false);
-  const displayCompany = activity.companyName || (isOwnPost ? founderCompanyName : '') || activity.authorName || 'General';
+  const myCompanyName = isInvestor ? (appUser?.company || '') : founderCompanyName;
+  const displayCompany = activity.companyName || (isOwnPost ? myCompanyName : '') || activity.authorName || 'General';
   const companyLogo = companyLogos?.[displayCompany.trim().toLowerCase()];
   const LIMIT = 220;
   const isLong = activity.content.length > LIMIT;
