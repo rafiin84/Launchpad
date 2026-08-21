@@ -135,12 +135,19 @@ async function postToServer(n: Omit<AppNotification, 'id' | 'timestamp' | 'read'
   };
 
   try {
-    // Founders are portal users and cannot call the admin create API (zohoCreate).
-    // Use portalCreate so founder-originated notifications (e.g. document submitted)
-    // actually reach CRM and the investor sees them.
+    // My_Activities itself is not portal-writable (same restriction documented
+    // for activity posts in crmActivities.ts's FOUNDER_POST_MODULE) — a founder's
+    // portalCreate against it fails outright, which silently dropped every
+    // founder-originated notification (document submitted, application
+    // submitted/updated) before the investor ever saw it. Route through the
+    // portal-writable Feed_Submissions relay instead, exactly like activity
+    // posts do; the Zoho workflow function that relays Feed_Submissions into
+    // My_Activities already forwards this exact field set (Name, Activity_Type,
+    // Activity_Tags, Content, Author_Name, Author_Role) since every ordinary
+    // founder post relies on it today.
     const isFounder = loadRole() === 'founder';
     const id = isFounder
-      ? await portalCreate('My_Activities', payload)
+      ? await portalCreate('Feed_Submissions', payload)
       : await zohoCreate('My_Activities', payload);
     return {
       ...n,
