@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { createCRMDocument } from '../services/crmDocuments';
+import { addNotification } from '../services/notifications';
 import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/companyProfile';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -152,6 +153,20 @@ export default function AddDocument() {
         fileData: form.fileData,
         mimeType: form.mimeType,
       });
+
+      if (!isInvestor) {
+        addNotification({
+          type: 'company_update',
+          title: 'Document Submitted',
+          message: `${currentUser.name || 'A founder'} uploaded "${form.documentName}"${form.relatedCompany ? ` for ${form.relatedCompany}` : ''}.`,
+          actor: currentUser.name || 'Founder',
+          actorRole: 'founder',
+          targetRole: 'investor',
+          link: '/documents',
+        });
+        window.dispatchEvent(new Event('notifications-updated'));
+      }
+
       navigate('/documents');
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : 'Upload failed' });
