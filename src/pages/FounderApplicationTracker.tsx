@@ -780,21 +780,46 @@ export default function FounderApplicationTracker() {
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  const loadApps = useCallback(async () => {
-    setLoading(true);
+  const loadApps = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const all = await getApplications(isInvestor, currentUser?.email);
     setApplications(all);
     setSessionExpired(!isInvestor && all.length === 0 && wasFounderFetchAuthError());
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [isInvestor, currentUser?.email]);
 
   useEffect(() => { setPageTitle(t.applicationTracker.myApplication, t.applicationTracker.trackDescription); return () => setPageTitle(null); }, [t]);
   useEffect(() => { loadApps(); }, [loadApps]);
 
+  // Investor decisions land in CRM from a different session, so this page has
+  // to re-read rather than wait for a manual refresh. Poll only while the tab
+  // is actually visible, and re-read immediately on focus or a new
+  // notification — all silently, so the view never flashes a spinner.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') loadApps(true); };
+    const onVisibility = () => { if (document.visibilityState === 'visible') loadApps(true); };
+
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('notifications-updated', refresh);
+    const timer = window.setInterval(refresh, 60_000);
+
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('notifications-updated', refresh);
+      window.clearInterval(timer);
+    };
+  }, [loadApps]);
+
   const drafts = applications.filter(a => a.status === 'draft');
   const approvedApps = applications.filter(a => a.status === 'approved' || a.status === 'invested');
-  const rejectedApps = applications.filter(a => a.status === 'rejected');
-  const activeApps = applications.filter(a => a.status !== 'draft' && a.status !== 'approved' && a.status !== 'invested' && a.status !== 'rejected');
+  // not_shortlisted is terminal: it belongs with the decided applications, not
+  // the live ones, or it would sit under "Your Application" as if still open.
+  const rejectedApps = applications.filter(a => a.status === 'rejected' || a.status === 'not_shortlisted');
+  const activeApps = applications.filter(a =>
+    a.status !== 'draft' && a.status !== 'approved' && a.status !== 'invested'
+    && a.status !== 'rejected' && a.status !== 'not_shortlisted');
 
   // The application whose progress heads the page: the live one if there is
   // one, otherwise the most recent decided one.

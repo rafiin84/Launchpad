@@ -486,7 +486,7 @@ export async function getApplications(isInvestor: boolean, founderEmail?: string
 export function canApplyAgain(applications: InvestmentApplication[]): boolean {
   const submitted = applications.filter(a => a.status !== 'draft');
   if (submitted.length === 0) return true;
-  if (submitted.length === 1 && submitted[0].status === 'rejected') return true;
+  if (submitted.length === 1 && (submitted[0].status === 'rejected' || submitted[0].status === 'not_shortlisted')) return true;
   return false;
 }
 
@@ -840,6 +840,12 @@ export interface LevelReview {
   comment: string;
   /** Optional 1–5 assessment score captured alongside the comment. */
   score?: number;
+  /**
+   * True when this entry was reconstructed from Application_Status rather than
+   * read from the ledger — the level is known to be cleared, but the reviewer
+   * and comment were not available on this device. See reconcileWithStatus.
+   */
+  synthesized?: boolean;
 }
 
 /** The final approve/reject decision, only allowed after level 3 clears. */
@@ -849,6 +855,7 @@ export interface FinalReview {
   reviewerEmail: string;
   decidedAt: string;
   comment: string;
+  synthesized?: boolean;
 }
 
 export interface ReviewLedger {
@@ -889,6 +896,7 @@ export function parseReviewLedger(json: string): ReviewLedger {
         reviewedAt: String(l.reviewedAt ?? ''),
         comment: String(l.comment ?? ''),
         score: typeof l.score === 'number' ? l.score : undefined,
+        synthesized: l.synthesized === true || undefined,
       });
     }
     clean.sort((a, b) => a.level - b.level);
@@ -929,6 +937,99 @@ function saveLedgerMirror(id: string, json: string): void {
 
 // ── Derived pipeline state ────────────────────────────────────────────────
 
+/**
+ * Levels implied by each status. Application_Status is a first-class CRM field
+ * and therefore always syncs between the investor and the founder; the ledger
+ * lives in Shortlist_Review, which may not exist in Zoho yet and falls back to
+ * a per-device localStorage mirror. Without this reconciliation a founder would
+ * read an empty ledger and see "Level 1, in review" while the investor had
+ * already cleared level 2.
+ */
+const STATUS_MIN_CLEARED: Partial<Record<ApplicationStatus, number>> = {
+  level1_cleared: 1,
+  level2_cleared: 2,
+  level3_cleared: 3,
+  approved: 3,
+  invested: 3,
+};
+
+/**
+ * Fills in levels the status proves are done but the ledger does not contain.
+ * Synthesized entries carry no comment; the most recent one borrows the synced
+ * Reviewed_By / Reviewed_At fields so the founder still sees who acted and when.
+ * A ledger that already records a drop is never extended.
+ */
+function reconcileWithStatus(
+  ledger: ReviewLedger,
+  app: Pick<InvestmentApplication, 'status' | 'reviewedBy' | 'reviewedAt'>,
+): ReviewLedger {
+  const dropped = ledger.levels.some(l => l.outcome === 'not_shortlisted');
+  const levels = [...ledger.levels];
+  let final = ledger.final;
+
+  if (!dropped) {
+    const minCleared = STATUS_MIN_CLEARED[app.status] ?? 0;
+    for (let lvl = 1; lvl <= minCleared; lvl++) {
+      if (levels.some(l => l.level === lvl)) continue;
+      const isLatest = lvl === minCleared;
+      levels.push({
+        level: lvl as ReviewLevel,
+        outcome: 'shortlisted',
+        reviewer: isLatest ? (app.reviewedBy || '') : '',
+        reviewerEmail: '',
+        reviewedAt: isLatest ? (app.reviewedAt || '') : '',
+        comment: '',
+        synthesized: true,
+      });
+    }
+    levels.sort((a, b) => a.level - b.level);
+
+    // An approved/invested record with no recorded final decision
+    if (!final && (app.status === 'approved' || app.status === 'invested')) {
+      final = {
+        outcome: 'approved',
+        reviewer: app.reviewedBy || '',
+        reviewerEmail: '',
+        decidedAt: app.reviewedAt || '',
+        comment: '',
+        synthesized: true,
+      };
+    }
+  }
+
+  // Dropped per status but the ledger has no drop entry: the level is unknown,
+  // so attribute it to the first level that is not already cleared.
+  if (app.status === 'not_shortlisted' && !dropped) {
+    const nextLevel = (levels.filter(l => l.outcome === 'shortlisted').length + 1);
+    if (nextLevel <= 3) {
+      levels.push({
+        level: nextLevel as ReviewLevel,
+        outcome: 'not_shortlisted',
+        reviewer: app.reviewedBy || '',
+        reviewerEmail: '',
+        reviewedAt: app.reviewedAt || '',
+        comment: '',
+        synthesized: true,
+      });
+      levels.sort((a, b) => a.level - b.level);
+    }
+  }
+
+  // Rejected per status with no recorded final decision
+  if (!final && app.status === 'rejected') {
+    final = {
+      outcome: 'rejected',
+      reviewer: app.reviewedBy || '',
+      reviewerEmail: '',
+      decidedAt: app.reviewedAt || '',
+      comment: '',
+      synthesized: true,
+    };
+  }
+
+  return { levels, final };
+}
+
 export type PipelineStageState = 'completed' | 'current' | 'locked' | 'not_shortlisted';
 
 export interface PipelineState {
@@ -948,7 +1049,7 @@ export interface PipelineState {
 }
 
 export function getPipelineState(app: InvestmentApplication): PipelineState {
-  const ledger = parseReviewLedger(app.reviewLedger);
+  const ledger = reconcileWithStatus(parseReviewLedger(app.reviewLedger), app);
   const dropped = ledger.levels.find(l => l.outcome === 'not_shortlisted') || null;
   const cleared = ledger.levels.filter(l => l.outcome === 'shortlisted');
   const clearedCount = cleared.length;
@@ -1008,6 +1109,9 @@ export async function recordLevelDecision(
   if (!app) throw new Error('Application not found');
 
   const state = getPipelineState(app);
+  // Writes are built from the stored ledger: entries reconstructed from status
+  // must not be persisted as if they were genuine recorded reviews.
+  const stored = parseReviewLedger(app.reviewLedger);
   if (state.ledger.final) throw new Error('A final decision has already been recorded');
   if (state.droppedAtLevel !== null) throw new Error(`Application was not shortlisted at level ${state.droppedAtLevel}`);
   if (state.currentLevel !== input.level) {
@@ -1029,7 +1133,9 @@ export async function recordLevelDecision(
     score: input.score,
   };
 
-  const ledger: ReviewLedger = { ...state.ledger, levels: [...state.ledger.levels, entry] };
+  // Keep any real stored entries, drop synthesized ones, add this decision.
+  const keep = stored.levels.filter(l => l.level !== input.level);
+  const ledger: ReviewLedger = { ...stored, levels: [...keep, entry].sort((a, b) => a.level - b.level) };
   const json = stringifyReviewLedger(ledger);
   saveLedgerMirror(id, json);
 
@@ -1065,10 +1171,13 @@ export async function recordFinalDecision(
   }
   // Re-recording the same outcome is allowed so a caller can safely retry when
   // a downstream step (e.g. portfolio creation) failed after the ledger write.
-  // A conflicting outcome is rejected.
-  if (state.ledger.final && state.ledger.final.outcome !== outcome) {
-    throw new Error(`This application was already ${state.ledger.final.outcome}`);
+  // A conflicting outcome is rejected. A synthesized final (inferred from
+  // status) never blocks a real decision.
+  const existingFinal = state.ledger.final && !state.ledger.final.synthesized ? state.ledger.final : undefined;
+  if (existingFinal && existingFinal.outcome !== outcome) {
+    throw new Error(`This application was already ${existingFinal.outcome}`);
   }
+  const storedFinalBase = parseReviewLedger(app.reviewLedger);
 
   const final: FinalReview = {
     outcome,
@@ -1077,7 +1186,7 @@ export async function recordFinalDecision(
     decidedAt: new Date().toISOString(),
     comment: comment.trim(),
   };
-  const ledger: ReviewLedger = { ...state.ledger, final };
+  const ledger: ReviewLedger = { ...storedFinalBase, final };
   const json = stringifyReviewLedger(ledger);
   saveLedgerMirror(id, json);
 
