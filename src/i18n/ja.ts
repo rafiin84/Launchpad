@@ -1136,6 +1136,42 @@ const ja: TranslationKeys = {
     failedToRecord: '審査判断の記録に失敗しました',
     levelLocked: 'このレベルはまだ審査できません',
   },
+
+  // ─── Founder-facing review progress (redacted view of the pipeline) ───────
+  founderPipeline: {
+    title: '審査の進捗',
+    subtitle: '申請は3段階の審査を通過します',
+    stage1: '初期スクリーニング',
+    stage1Next: '投資チームが基本的な適格性と適合性を確認しています。',
+    stage2: '詳細審査',
+    stage2Next: 'ビジネスモデル・トラクション・財務を詳しく審査しています。',
+    stage3: '最終選考',
+    stage3Next: '投資委員会が推薦を検討しています。',
+    finalStage: '最終判断',
+    finalStageNext: '間もなく承認または見送りの最終判断が行われます。',
+
+    stateCleared: '通過',
+    stateInReview: '審査中',
+    stateUpcoming: '未着手',
+    stateNotCleared: '不通過',
+    stateApproved: '承認済み',
+    stateDeclined: '見送り',
+
+    clearedOn: '{date} に通過',
+    whatsNext: '現在の状況',
+    noActionNeeded: '現在、あなたの対応は必要ありません',
+    actionNeeded: 'あなたの対応が必要です — 下記をご確認ください',
+    internalNote: '審査コメントは投資チーム内部で管理されます',
+
+    approvedTitle: 'おめでとうございます — 申請が承認されました',
+    approvedDesc: '3段階すべての審査を通過しました。次のステップについて投資チームからご連絡します。',
+    notClearedTitle: '{stage} を通過できませんでした',
+    notClearedDesc: '投資チームはこの申請を先に進めないと判断しました。共有されるフィードバックはメッセージに表示されます。',
+    declinedTitle: '申請は選定されませんでした',
+    declinedDesc: '3段階すべてを通過しましたが、投資対象には選定されませんでした。フィードバックはメッセージに表示されます。',
+
+    stageCount: 'ステージ {n} / 4',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

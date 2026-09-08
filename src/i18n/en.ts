@@ -1157,6 +1157,42 @@ const en = {
     failedToRecord: 'Failed to record the review decision',
     levelLocked: 'This level is not yet open for review',
   },
+
+  // ─── Founder-facing review progress (redacted view of the pipeline) ───────
+  founderPipeline: {
+    title: 'Review Progress',
+    subtitle: 'Your application goes through three review stages',
+    stage1: 'Initial Screening',
+    stage1Next: 'The investment team is checking basic eligibility and fit.',
+    stage2: 'Detailed Review',
+    stage2Next: 'Your business model, traction and financials are being reviewed in depth.',
+    stage3: 'Final Shortlist',
+    stage3Next: 'Your application is with the investment committee for a recommendation.',
+    finalStage: 'Final Decision',
+    finalStageNext: 'A final approve or decline decision will be made shortly.',
+
+    stateCleared: 'Cleared',
+    stateInReview: 'In Review',
+    stateUpcoming: 'Upcoming',
+    stateNotCleared: 'Not Cleared',
+    stateApproved: 'Approved',
+    stateDeclined: 'Declined',
+
+    clearedOn: 'Cleared on {date}',
+    whatsNext: "What's happening now",
+    noActionNeeded: 'No action needed from you right now',
+    actionNeeded: 'Action needed from you — see below',
+    internalNote: 'Reviewer notes are kept internal to the investment team',
+
+    approvedTitle: 'Congratulations — your application was approved',
+    approvedDesc: 'All three review stages were cleared. The investment team will be in touch about next steps.',
+    notClearedTitle: 'Your application did not progress past {stage}',
+    notClearedDesc: 'The investment team has decided not to take this application further. Any feedback they choose to share will appear in your messages.',
+    declinedTitle: 'Your application was not selected',
+    declinedDesc: 'Your application cleared all three review stages but was not selected for investment. Any feedback will appear in your messages.',
+
+    stageCount: 'Stage {n} of 4',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

@@ -5,6 +5,7 @@ import {
   TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
   Upload, Check, Send, Trash2,
 } from 'lucide-react';
+import FounderReviewProgress from '../components/applications/FounderReviewProgress';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
@@ -80,28 +81,6 @@ const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; b
   rejected:            { label: 'Rejected',           color: '#ef4444', bg: 'bg-red-50',      text: 'text-red-600' },
 };
 
-// Mirrors the investor-side 3-level shortlisting pipeline so the founder sees
-// exactly how far their application has progressed.
-const PIPELINE_STAGES: ApplicationStatus[] = [
-  'submitted',
-  'level1_cleared',
-  'level2_cleared',
-  'level3_cleared',
-  'approved',
-];
-
-function stageIndex(status: ApplicationStatus): number {
-  const idx = PIPELINE_STAGES.indexOf(status);
-  return idx === -1 ? 0 : idx;
-}
-
-function progressPercent(status: ApplicationStatus): number {
-  if (status === 'draft') return 0;
-  if (status === 'rejected' || status === 'not_shortlisted') return 100;
-  const idx = stageIndex(status);
-  return Math.round(((idx + 1) / PIPELINE_STAGES.length) * 100);
-}
-
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
@@ -157,14 +136,13 @@ function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
   }
 
   const allStages: { status: ApplicationStatus; label: string }[] = [
-    { status: 'submitted', label: t.applicationTracker.statusSubmitted },
-    { status: 'under_review', label: t.applicationTracker.statusUnderReview },
-    { status: 'shortlisted', label: t.applicationTracker.statusShortlisted },
-    { status: 'meeting_scheduled', label: t.applicationTracker.statusMeeting },
-    { status: 'due_diligence', label: t.applicationTracker.statusDueDiligence },
-    { status: 'approved', label: t.applicationTracker.statusApproved },
-    { status: 'on_hold', label: t.applicationTracker.statusOnHold },
-    { status: 'rejected', label: t.applicationTracker.statusRejected },
+    { status: 'submitted',       label: t.applicationTracker.statusSubmitted },
+    { status: 'level1_cleared',  label: t.founderPipeline.stage1 },
+    { status: 'level2_cleared',  label: t.founderPipeline.stage2 },
+    { status: 'level3_cleared',  label: t.founderPipeline.stage3 },
+    { status: 'approved',        label: t.applicationTracker.statusApproved },
+    { status: 'not_shortlisted', label: t.founderPipeline.stateNotCleared },
+    { status: 'rejected',        label: t.applicationTracker.statusRejected },
   ];
 
   return (
@@ -593,11 +571,9 @@ const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_
 
 function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void }) {
   const { t } = useLanguage();
-  const cfg = STATUS_CONFIG[app.status] ?? STATUS_CONFIG.submitted;
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
   const needsAction = ACTION_REQUIRED.includes(app.status);
-  const progress = progressPercent(app.status);
 
   return (
     <div className={cn(
@@ -666,25 +642,10 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
         </span>
       </div>
 
-      {/* Progress bar (non-drafts only) */}
+      {/* Review progress — compact 4-stage stepper (non-drafts only) */}
       {!isDraft && (
         <div className="mb-3">
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${progress}%`,
-                backgroundColor: app.status === 'rejected' || app.status === 'not_shortlisted' ? '#ef4444' : cfg.color,
-              }}
-            />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1">
-            {app.status === 'rejected'
-              ? t.applicationTracker.statusRejected
-              : app.status === 'not_shortlisted'
-              ? t.applicationTracker.statusNotShortlisted
-              : `${STATUS_CONFIG[PIPELINE_STAGES[stageIndex(app.status)]]?.label || t.applicationTracker.statusSubmitted} (${progress}%)`}
-          </p>
+          <FounderReviewProgress app={app} variant="compact" />
         </div>
       )}
 
@@ -732,8 +693,13 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
       {expanded && !isDraft && (
         <div className="mt-4 pt-4 border-t border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left column — company profile */}
+            {/* Left column — review progress, then company profile */}
             <div className="lg:col-span-2 space-y-3">
+              <FounderReviewProgress
+                app={app}
+                variant="detailed"
+                actionNeeded={ACTION_REQUIRED.includes(app.status)}
+              />
               {app.companyDescription && (
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.description}</p>
