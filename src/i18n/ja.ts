@@ -526,6 +526,11 @@ const ja: TranslationKeys = {
     statusApproved: '承認済み',
     statusInvested: '投資済み',
     statusRejected: '却下',
+    statusLevel1Screening: 'レベル1 — 選考',
+    statusLevel1Cleared: 'レベル1 通過',
+    statusLevel2Cleared: 'レベル2 通過',
+    statusLevel3Cleared: 'レベル3 通過',
+    statusNotShortlisted: '不選考',
   },
 
   // ─── Application Form ────────────────────────────────────────────────────
@@ -1052,6 +1057,85 @@ const ja: TranslationKeys = {
   },
 
   // ─── Language names (displayed in selector) ──────────────────────────────
+
+  // ─── Review Pipeline (3-level shortlisting) ───────────────────────────────
+  reviewPipeline: {
+    title: '選考パイプライン',
+    subtitle: '最終判断の前に3段階の審査を通過する必要があります',
+    stepOf: 'ステップ {n} / 4',
+    complete: '{pct}% 完了',
+    awaitingReview: 'あなたの審査待ち',
+    nextAction: '次のアクション',
+    noActionRequired: 'アクション不要',
+
+    level1: 'レベル1 — 初期スクリーニング',
+    level1Desc: '適格性と適合性の一次確認',
+    level2: 'レベル2 — 詳細審査',
+    level2Desc: 'ビジネスモデル・トラクション・財務の詳細分析',
+    level3: 'レベル3 — 最終選考',
+    level3Desc: '投資委員会への推薦',
+    finalStage: '最終判断',
+    finalStageDesc: '承認して受け入れる、または申請を却下する',
+
+    stateCompleted: '通過',
+    stateCurrent: '進行中',
+    stateLocked: 'ロック中',
+    stateNotShortlisted: '不選考',
+    statePending: '保留',
+    stateApproved: '承認済み',
+    stateRejected: '却下',
+    lockedHint: 'レベル{n}の通過後に解除されます',
+    finalLockedHint: '3段階すべての通過後に解除されます',
+
+    reviewLevel: 'レベル{n}を審査',
+    shortlistAction: '選考通過 → レベル{n}',
+    shortlistFinalAction: '選考通過 → 最終判断',
+    notShortlistedAction: '不選考',
+    approveAction: '承認して投資',
+    rejectAction: '却下',
+    recording: '記録中...',
+
+    reviewedBy: '審査者',
+    decidedBy: '決定者',
+    assessment: '評価',
+    comment: 'コメント',
+    noComment: 'コメントなし',
+    score: 'スコア',
+    scoreOf: '{n} / 5',
+
+    modalTitle: 'レベル{n} 審査',
+    modalSubtitle: '{company} の評価を記録します',
+    decisionLabel: '判断',
+    decisionShortlist: '選考通過',
+    decisionShortlistDesc: '次のレベルへ進める',
+    decisionShortlistFinalDesc: '最終判断を解除する',
+    decisionReject: '不選考',
+    decisionRejectDesc: 'このレベルで審査を終了する',
+    scoreLabel: '評価スコア（任意）',
+    commentLabel: '審査コメント',
+    commentPlaceholder: '評価内容とこの判断の理由を記載してください...',
+    commentRequired: '審査コメントは必須です',
+    submitDecision: '判断を記録',
+
+    rejectModalTitle: '申請を却下',
+    rejectModalDesc: '3段階すべてを通過しましたが、この申請は投資に進みません。創業者に通知されます。',
+    rejectCommentLabel: '却下理由',
+    rejectCommentPlaceholder: 'この申請が進まない理由を説明してください...',
+    rejectConfirm: '申請を却下',
+
+    droppedBanner: 'レベル{n}で不選考',
+    droppedBannerDesc: 'レベル{n}で審査終了 — {reviewer}（{date}）',
+    approvedBanner: '申請承認済み',
+    approvedBannerDesc: '3段階すべて通過、{reviewer} が {date} に承認',
+    rejectedBanner: '申請却下',
+    rejectedBannerDesc: '{reviewer} が {date} に却下',
+
+    supportingActions: '補助アクション',
+    supportingActionsDesc: '審査中いつでも利用できます',
+
+    failedToRecord: '審査判断の記録に失敗しました',
+    levelLocked: 'このレベルはまだ審査できません',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

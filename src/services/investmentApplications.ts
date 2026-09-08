@@ -34,6 +34,12 @@ export type ApplicationStatus =
   | 'meeting_scheduled'
   | 'due_diligence'
   | 'on_hold'
+  // ── 3-level shortlisting pipeline ──
+  | 'level1_screening'      // awaiting Level 1 initial screening
+  | 'level1_cleared'        // L1 shortlisted, awaiting Level 2
+  | 'level2_cleared'        // L2 shortlisted, awaiting Level 3
+  | 'level3_cleared'        // L3 shortlisted, awaiting final decision
+  | 'not_shortlisted'       // dropped at L1/L2/L3 (level recorded in the ledger)
   | 'approved'
   | 'invested'
   | 'rejected';
@@ -114,6 +120,9 @@ export interface InvestmentApplication {
   meetingLocation: string;
   meetingLink: string;
   meetingAgenda: string;
+
+  // 3-level shortlisting ledger (JSON string — see ReviewLedger)
+  reviewLedger: string;
 }
 
 export type InvestmentApplicationFields = Omit<InvestmentApplication, 'id' | 'submittedAt' | 'updatedAt'>;
@@ -171,6 +180,7 @@ const FIELD_MAP: Record<keyof Omit<InvestmentApplication, 'id' | 'submittedAt' |
   meetingLocation:     'Meeting_Location',
   meetingLink:         'Meeting_Link',
   meetingAgenda:       'Meeting_Agenda',
+  reviewLedger:        'Shortlist_Review',
 };
 
 /** Currency fields in CRM — values must be sent as numbers */
@@ -280,6 +290,8 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
     meetingLocation:    str('Meeting_Location'),
     meetingLink:        str('Meeting_Link'),
     meetingAgenda:      str('Meeting_Agenda'),
+    // Falls back to the local mirror when the CRM field does not exist yet
+    reviewLedger:       str('Shortlist_Review') || loadLedgerMirror(r.id),
   };
 }
 
@@ -798,4 +810,295 @@ export function parseRequestedDocuments(json: string): RequestedDocument[] {
 
 export function stringifyRequestedDocuments(docs: RequestedDocument[]): string {
   return JSON.stringify(docs);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  3-LEVEL SHORTLISTING PIPELINE
+//
+//  Applications must clear three review levels before a final decision:
+//      Level 1 (Initial Screening) → Level 2 (Detailed Review)
+//      → Level 3 (Final Shortlist) → Final Decision (Approve / Reject)
+//
+//  Each level records reviewer, timestamp, decision and a mandatory comment.
+//  The whole history is persisted as JSON in the CRM field `Shortlist_Review`,
+//  mirrored to localStorage so the flow keeps working if that custom field has
+//  not been created in Zoho yet.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type ReviewLevel = 1 | 2 | 3;
+export type LevelOutcome = 'shortlisted' | 'not_shortlisted';
+export type FinalOutcome = 'approved' | 'rejected';
+
+/** A single completed review level. */
+export interface LevelReview {
+  level: ReviewLevel;
+  outcome: LevelOutcome;
+  reviewer: string;
+  reviewerEmail: string;
+  reviewedAt: string;          // ISO timestamp
+  comment: string;
+  /** Optional 1–5 assessment score captured alongside the comment. */
+  score?: number;
+}
+
+/** The final approve/reject decision, only allowed after level 3 clears. */
+export interface FinalReview {
+  outcome: FinalOutcome;
+  reviewer: string;
+  reviewerEmail: string;
+  decidedAt: string;
+  comment: string;
+}
+
+export interface ReviewLedger {
+  levels: LevelReview[];
+  final?: FinalReview;
+}
+
+const LEDGER_MIRROR_PREFIX = 'lp_review_ledger_';
+
+export const REVIEW_LEVELS: ReviewLevel[] = [1, 2, 3];
+
+/** Status an application sits at once the given level has been cleared. */
+const CLEARED_STATUS: Record<ReviewLevel, ApplicationStatus> = {
+  1: 'level1_cleared',
+  2: 'level2_cleared',
+  3: 'level3_cleared',
+};
+
+// ── Ledger (de)serialisation ──────────────────────────────────────────────
+
+export function parseReviewLedger(json: string): ReviewLedger {
+  if (!json || !json.trim()) return { levels: [] };
+  try {
+    const parsed = JSON.parse(json) as Partial<ReviewLedger>;
+    const levels = Array.isArray(parsed.levels) ? parsed.levels : [];
+    // Keep only well-formed entries, one per level, ordered 1→3
+    const seen = new Set<number>();
+    const clean: LevelReview[] = [];
+    for (const l of levels) {
+      const lvl = Number(l?.level) as ReviewLevel;
+      if (![1, 2, 3].includes(lvl) || seen.has(lvl)) continue;
+      seen.add(lvl);
+      clean.push({
+        level: lvl,
+        outcome: l.outcome === 'not_shortlisted' ? 'not_shortlisted' : 'shortlisted',
+        reviewer: String(l.reviewer ?? ''),
+        reviewerEmail: String(l.reviewerEmail ?? ''),
+        reviewedAt: String(l.reviewedAt ?? ''),
+        comment: String(l.comment ?? ''),
+        score: typeof l.score === 'number' ? l.score : undefined,
+      });
+    }
+    clean.sort((a, b) => a.level - b.level);
+    const final = parsed.final && (parsed.final.outcome === 'approved' || parsed.final.outcome === 'rejected')
+      ? {
+          outcome: parsed.final.outcome,
+          reviewer: String(parsed.final.reviewer ?? ''),
+          reviewerEmail: String(parsed.final.reviewerEmail ?? ''),
+          decidedAt: String(parsed.final.decidedAt ?? ''),
+          comment: String(parsed.final.comment ?? ''),
+        }
+      : undefined;
+    return { levels: clean, final };
+  } catch {
+    return { levels: [] };
+  }
+}
+
+export function stringifyReviewLedger(ledger: ReviewLedger): string {
+  return JSON.stringify(ledger);
+}
+
+// ── Local mirror (fallback when the CRM custom field is absent) ────────────
+
+function loadLedgerMirror(id: string): string {
+  try {
+    return localStorage.getItem(LEDGER_MIRROR_PREFIX + id) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveLedgerMirror(id: string, json: string): void {
+  try {
+    localStorage.setItem(LEDGER_MIRROR_PREFIX + id, json);
+  } catch { /* storage full or unavailable — CRM copy is authoritative anyway */ }
+}
+
+// ── Derived pipeline state ────────────────────────────────────────────────
+
+export type PipelineStageState = 'completed' | 'current' | 'locked' | 'not_shortlisted';
+
+export interface PipelineState {
+  ledger: ReviewLedger;
+  /** Level awaiting a decision (1–3), or null when all three have cleared. */
+  currentLevel: ReviewLevel | null;
+  /** Number of levels cleared (0–3). */
+  clearedCount: number;
+  /** Level at which the application was dropped, if any. */
+  droppedAtLevel: ReviewLevel | null;
+  /** True once all three levels are cleared — unlocks Approve / Reject. */
+  finalUnlocked: boolean;
+  /** True when no further action is possible (dropped, approved or rejected). */
+  isTerminal: boolean;
+  /** 0–100, for the progress indicator. */
+  progressPct: number;
+}
+
+export function getPipelineState(app: InvestmentApplication): PipelineState {
+  const ledger = parseReviewLedger(app.reviewLedger);
+  const dropped = ledger.levels.find(l => l.outcome === 'not_shortlisted') || null;
+  const cleared = ledger.levels.filter(l => l.outcome === 'shortlisted');
+  const clearedCount = cleared.length;
+
+  // A record already approved/rejected/invested in CRM is terminal even if the
+  // ledger predates this workflow.
+  const statusTerminal = app.status === 'approved' || app.status === 'invested' || app.status === 'rejected';
+  const isTerminal = !!dropped || !!ledger.final || statusTerminal;
+
+  const finalUnlocked = clearedCount >= 3 && !dropped;
+  const currentLevel: ReviewLevel | null =
+    dropped || clearedCount >= 3 ? null : ((clearedCount + 1) as ReviewLevel);
+
+  // Progress: 3 levels + the final decision = 4 steps
+  const steps = clearedCount + (ledger.final || statusTerminal ? 1 : 0);
+  const progressPct = dropped
+    ? Math.round((clearedCount / 4) * 100)
+    : Math.round((Math.min(steps, 4) / 4) * 100);
+
+  return { ledger, currentLevel, clearedCount, droppedAtLevel: dropped ? dropped.level : null, finalUnlocked, isTerminal, progressPct };
+}
+
+/** Per-stage state for rendering the stepper. */
+export function getStageState(state: PipelineState, level: ReviewLevel): PipelineStageState {
+  const entry = state.ledger.levels.find(l => l.level === level);
+  if (entry) return entry.outcome === 'not_shortlisted' ? 'not_shortlisted' : 'completed';
+  if (state.droppedAtLevel !== null) return 'locked';
+  return state.currentLevel === level ? 'current' : 'locked';
+}
+
+export function getLevelReview(state: PipelineState, level: ReviewLevel): LevelReview | undefined {
+  return state.ledger.levels.find(l => l.level === level);
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+
+export interface LevelDecisionInput {
+  level: ReviewLevel;
+  outcome: LevelOutcome;
+  reviewer: string;
+  reviewerEmail?: string;
+  comment: string;
+  score?: number;
+}
+
+/**
+ * Record a decision for one shortlisting level.
+ * Enforces strict order: a level can only be actioned when it is the current
+ * one, and nothing can be actioned after a drop or a final decision.
+ */
+export async function recordLevelDecision(
+  id: string,
+  input: LevelDecisionInput,
+  isInvestor = true,
+): Promise<InvestmentApplication | null> {
+  const app = await getApplicationById(id, isInvestor);
+  if (!app) throw new Error('Application not found');
+
+  const state = getPipelineState(app);
+  if (state.ledger.final) throw new Error('A final decision has already been recorded');
+  if (state.droppedAtLevel !== null) throw new Error(`Application was not shortlisted at level ${state.droppedAtLevel}`);
+  if (state.currentLevel !== input.level) {
+    throw new Error(
+      state.currentLevel === null
+        ? 'All shortlisting levels are already complete'
+        : `Level ${state.currentLevel} must be completed first`,
+    );
+  }
+  if (!input.comment.trim()) throw new Error('A review comment is required');
+
+  const entry: LevelReview = {
+    level: input.level,
+    outcome: input.outcome,
+    reviewer: input.reviewer,
+    reviewerEmail: input.reviewerEmail || '',
+    reviewedAt: new Date().toISOString(),
+    comment: input.comment.trim(),
+    score: input.score,
+  };
+
+  const ledger: ReviewLedger = { ...state.ledger, levels: [...state.ledger.levels, entry] };
+  const json = stringifyReviewLedger(ledger);
+  saveLedgerMirror(id, json);
+
+  const status: ApplicationStatus =
+    input.outcome === 'not_shortlisted' ? 'not_shortlisted' : CLEARED_STATUS[input.level];
+
+  return updateApplication(id, {
+    reviewLedger: json,
+    status,
+    reviewedBy: input.reviewer,
+    reviewedAt: entry.reviewedAt,
+  }, isInvestor);
+}
+
+/**
+ * Record the final approve/reject decision. Only permitted once all three
+ * levels have been cleared.
+ */
+export async function recordFinalDecision(
+  id: string,
+  outcome: FinalOutcome,
+  reviewer: string,
+  comment: string,
+  isInvestor = true,
+  reviewerEmail = '',
+): Promise<{ app: InvestmentApplication | null; ledgerJson: string }> {
+  const app = await getApplicationById(id, isInvestor);
+  if (!app) throw new Error('Application not found');
+
+  const state = getPipelineState(app);
+  if (!state.finalUnlocked) {
+    throw new Error('All three shortlisting levels must be completed before a final decision');
+  }
+  // Re-recording the same outcome is allowed so a caller can safely retry when
+  // a downstream step (e.g. portfolio creation) failed after the ledger write.
+  // A conflicting outcome is rejected.
+  if (state.ledger.final && state.ledger.final.outcome !== outcome) {
+    throw new Error(`This application was already ${state.ledger.final.outcome}`);
+  }
+
+  const final: FinalReview = {
+    outcome,
+    reviewer,
+    reviewerEmail,
+    decidedAt: new Date().toISOString(),
+    comment: comment.trim(),
+  };
+  const ledger: ReviewLedger = { ...state.ledger, final };
+  const json = stringifyReviewLedger(ledger);
+  saveLedgerMirror(id, json);
+
+  // Rejection is a plain status update; approval goes through approveApplication
+  // (which also creates the portfolio record) — the caller handles that.
+  if (outcome === 'rejected') {
+    const updated = await updateApplication(id, {
+      reviewLedger: json,
+      status: 'rejected',
+      reviewedBy: reviewer,
+      reviewedAt: final.decidedAt,
+    }, isInvestor);
+    return { app: updated, ledgerJson: json };
+  }
+
+  // For approval, persist the ledger first so it survives even if the
+  // portfolio step fails downstream.
+  const updated = await updateApplication(id, {
+    reviewLedger: json,
+    reviewedBy: reviewer,
+    reviewedAt: final.decidedAt,
+  }, isInvestor);
+  return { app: updated, ledgerJson: json };
 }

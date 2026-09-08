@@ -70,17 +70,23 @@ const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; b
   meeting_scheduled:   { label: 'Meeting Scheduled',  color: '#8b5cf6', bg: 'bg-violet-50',   text: 'text-violet-600' },
   due_diligence:       { label: 'Due Diligence',      color: '#f97316', bg: 'bg-orange-50',   text: 'text-orange-600' },
   on_hold:             { label: 'On Hold',            color: '#475569', bg: 'bg-slate-100',   text: 'text-slate-600' },
+  level1_screening:    { label: 'Level 1 — Screening', color: '#0284c7', bg: 'bg-sky-50',      text: 'text-sky-600' },
+  level1_cleared:      { label: 'Level 1 Cleared',    color: '#0369a1', bg: 'bg-sky-100',     text: 'text-sky-700' },
+  level2_cleared:      { label: 'Level 2 Cleared',    color: '#4338ca', bg: 'bg-indigo-100',  text: 'text-indigo-700' },
+  level3_cleared:      { label: 'Level 3 Cleared',    color: '#6d28d9', bg: 'bg-violet-100',  text: 'text-violet-700' },
+  not_shortlisted:     { label: 'Not Shortlisted',    color: '#ef4444', bg: 'bg-red-50',      text: 'text-red-600' },
   approved:            { label: 'Approved',           color: '#22c55e', bg: 'bg-green-50',    text: 'text-green-600' },
   invested:            { label: 'Invested',           color: '#15803d', bg: 'bg-green-100',   text: 'text-green-700' },
   rejected:            { label: 'Rejected',           color: '#ef4444', bg: 'bg-red-50',      text: 'text-red-600' },
 };
 
+// Mirrors the investor-side 3-level shortlisting pipeline so the founder sees
+// exactly how far their application has progressed.
 const PIPELINE_STAGES: ApplicationStatus[] = [
   'submitted',
-  'under_review',
-  'shortlisted',
-  'meeting_scheduled',
-  'due_diligence',
+  'level1_cleared',
+  'level2_cleared',
+  'level3_cleared',
   'approved',
 ];
 
@@ -91,7 +97,7 @@ function stageIndex(status: ApplicationStatus): number {
 
 function progressPercent(status: ApplicationStatus): number {
   if (status === 'draft') return 0;
-  if (status === 'rejected') return 100;
+  if (status === 'rejected' || status === 'not_shortlisted') return 100;
   const idx = stageIndex(status);
   return Math.round(((idx + 1) / PIPELINE_STAGES.length) * 100);
 }
@@ -112,6 +118,11 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     meeting_scheduled: t.applicationTracker.statusMeeting,
     due_diligence: t.applicationTracker.statusDueDiligence,
     on_hold: t.applicationTracker.statusOnHold,
+    level1_screening: t.applicationTracker.statusLevel1Screening,
+    level1_cleared: t.applicationTracker.statusLevel1Cleared,
+    level2_cleared: t.applicationTracker.statusLevel2Cleared,
+    level3_cleared: t.applicationTracker.statusLevel3Cleared,
+    not_shortlisted: t.applicationTracker.statusNotShortlisted,
     approved: t.applicationTracker.statusApproved,
     invested: t.applicationTracker.statusInvested,
     rejected: t.applicationTracker.statusRejected,
@@ -663,12 +674,16 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${progress}%`,
-                backgroundColor: app.status === 'rejected' ? '#ef4444' : cfg.color,
+                backgroundColor: app.status === 'rejected' || app.status === 'not_shortlisted' ? '#ef4444' : cfg.color,
               }}
             />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
-            {app.status === 'rejected' ? t.applicationTracker.statusRejected : `${PIPELINE_STAGES[stageIndex(app.status)]?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || t.applicationTracker.statusSubmitted} (${progress}%)`}
+            {app.status === 'rejected'
+              ? t.applicationTracker.statusRejected
+              : app.status === 'not_shortlisted'
+              ? t.applicationTracker.statusNotShortlisted
+              : `${STATUS_CONFIG[PIPELINE_STAGES[stageIndex(app.status)]]?.label || t.applicationTracker.statusSubmitted} (${progress}%)`}
           </p>
         </div>
       )}

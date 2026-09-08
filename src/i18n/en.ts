@@ -525,6 +525,11 @@ const en = {
     statusApproved: 'Approved',
     statusInvested: 'Invested',
     statusRejected: 'Rejected',
+    statusLevel1Screening: 'Level 1 — Screening',
+    statusLevel1Cleared: 'Level 1 Cleared',
+    statusLevel2Cleared: 'Level 2 Cleared',
+    statusLevel3Cleared: 'Level 3 Cleared',
+    statusNotShortlisted: 'Not Shortlisted',
   },
 
   // ─── Application Form ────────────────────────────────────────────────────
@@ -1064,6 +1069,94 @@ const en = {
   },
 
   // ─── Language names (displayed in selector) ──────────────────────────────
+
+  // ─── Review Pipeline (3-level shortlisting) ───────────────────────────────
+  reviewPipeline: {
+    title: 'Shortlisting Pipeline',
+    subtitle: 'Applications clear three review levels before a final decision',
+    stepOf: 'Step {n} of 4',
+    complete: '{pct}% complete',
+    awaitingReview: 'Awaiting your review',
+    nextAction: 'Next action',
+    noActionRequired: 'No action required',
+
+    // Level names + descriptions
+    level1: 'Level 1 — Initial Screening',
+    level1Desc: 'First-pass eligibility and fit check',
+    level2: 'Level 2 — Detailed Review',
+    level2Desc: 'Business model, traction and financial deep-dive',
+    level3: 'Level 3 — Final Shortlist',
+    level3Desc: 'Investment committee recommendation',
+    finalStage: 'Final Decision',
+    finalStageDesc: 'Approve and onboard, or reject the application',
+
+    // Stage states
+    stateCompleted: 'Cleared',
+    stateCurrent: 'In Progress',
+    stateLocked: 'Locked',
+    stateNotShortlisted: 'Not Shortlisted',
+    statePending: 'Pending',
+    stateApproved: 'Approved',
+    stateRejected: 'Rejected',
+    lockedHint: 'Unlocks after Level {n} is cleared',
+    finalLockedHint: 'Unlocks after all 3 levels are cleared',
+
+    // Actions
+    reviewLevel: 'Review Level {n}',
+    shortlistAction: 'Shortlist → Level {n}',
+    shortlistFinalAction: 'Shortlist → Final Decision',
+    notShortlistedAction: 'Not Shortlisted',
+    approveAction: 'Approve & Invest',
+    rejectAction: 'Reject',
+    recording: 'Recording...',
+
+    // Reviewer meta
+    reviewedBy: 'Reviewed by',
+    decidedBy: 'Decided by',
+    assessment: 'Assessment',
+    comment: 'Comment',
+    noComment: 'No comment recorded',
+    score: 'Score',
+    scoreOf: '{n} / 5',
+
+    // Level decision modal
+    modalTitle: 'Level {n} Review',
+    modalSubtitle: 'Record your assessment for {company}',
+    decisionLabel: 'Decision',
+    decisionShortlist: 'Shortlist',
+    decisionShortlistDesc: 'Advance to the next level',
+    decisionShortlistFinalDesc: 'Unlock the final decision',
+    decisionReject: 'Not Shortlisted',
+    decisionRejectDesc: 'End the review at this level',
+    scoreLabel: 'Assessment score (optional)',
+    commentLabel: 'Review comment',
+    commentPlaceholder: 'Summarise your assessment and the reasoning behind this decision...',
+    commentRequired: 'A review comment is required',
+    submitDecision: 'Record Decision',
+
+    // Final decision modal
+    rejectModalTitle: 'Reject Application',
+    rejectModalDesc: 'All three levels were cleared, but this application will not proceed to investment. The founder will be notified.',
+    rejectCommentLabel: 'Reason for rejection',
+    rejectCommentPlaceholder: 'Explain why this application is not proceeding...',
+    rejectConfirm: 'Reject Application',
+
+    // Terminal banners
+    droppedBanner: 'Not shortlisted at Level {n}',
+    droppedBannerDesc: 'The review ended at Level {n} — {reviewer} on {date}',
+    approvedBanner: 'Application approved',
+    approvedBannerDesc: 'All three levels cleared and approved by {reviewer} on {date}',
+    rejectedBanner: 'Application rejected',
+    rejectedBannerDesc: 'Rejected by {reviewer} on {date}',
+
+    // Secondary actions section
+    supportingActions: 'Supporting Actions',
+    supportingActionsDesc: 'Available at any point during the review',
+
+    // Errors
+    failedToRecord: 'Failed to record the review decision',
+    levelLocked: 'This level is not yet open for review',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

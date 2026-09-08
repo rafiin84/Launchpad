@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   Inbox, Search, Building2, Star,
   XCircle, ExternalLink,
-  BarChart3, CheckCircle2,
+  BarChart3, CheckCircle2, Layers, Check, Lock, X as XIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
+  getPipelineState,
+  REVIEW_LEVELS,
   type InvestmentApplication,
   type ApplicationStatus,
 } from '../services/investmentApplications';
@@ -54,6 +56,11 @@ const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; b
   meeting_scheduled:    { label: 'Meeting',            color: 'text-violet-600',  bg: 'bg-violet-50' },
   due_diligence:        { label: 'Due Diligence',      color: 'text-orange-600',  bg: 'bg-orange-50' },
   on_hold:              { label: 'On Hold',            color: 'text-slate-600',   bg: 'bg-slate-100' },
+  level1_screening:     { label: 'L1 Screening',       color: 'text-sky-600',     bg: 'bg-sky-50' },
+  level1_cleared:       { label: 'L1 Cleared',         color: 'text-sky-700',     bg: 'bg-sky-100' },
+  level2_cleared:       { label: 'L2 Cleared',         color: 'text-indigo-700',  bg: 'bg-indigo-100' },
+  level3_cleared:       { label: 'L3 Cleared',         color: 'text-violet-700',  bg: 'bg-violet-100' },
+  not_shortlisted:      { label: 'Not Shortlisted',    color: 'text-red-600',     bg: 'bg-red-50' },
   approved:             { label: 'Approved',           color: 'text-green-600',   bg: 'bg-green-50' },
   invested:             { label: 'Invested',           color: 'text-green-700',   bg: 'bg-green-100' },
   rejected:             { label: 'Rejected',           color: 'text-red-600',     bg: 'bg-red-50' },
@@ -83,6 +90,11 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     meeting_scheduled: t.applicationTracker.statusMeeting,
     due_diligence: t.applicationTracker.statusDueDiligence,
     on_hold: t.applicationTracker.statusOnHold,
+    level1_screening: t.applicationTracker.statusLevel1Screening,
+    level1_cleared: t.applicationTracker.statusLevel1Cleared,
+    level2_cleared: t.applicationTracker.statusLevel2Cleared,
+    level3_cleared: t.applicationTracker.statusLevel3Cleared,
+    not_shortlisted: t.applicationTracker.statusNotShortlisted,
     approved: t.applicationTracker.statusApproved,
     invested: t.applicationTracker.statusInvested,
     rejected: t.applicationTracker.statusRejected,
@@ -108,14 +120,53 @@ function StageBadge({ stage }: { stage: string }) {
 type FilterTab = 'all' | ApplicationStatus;
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
-  { id: 'all',               label: 'All' },
-  { id: 'under_review',      label: 'Under Review' },
-  { id: 'shortlisted',       label: 'Shortlisted' },
-  { id: 'meeting_scheduled', label: 'Meeting' },
-  { id: 'on_hold',           label: 'On Hold' },
-  { id: 'approved',          label: 'Approved' },
-  { id: 'rejected',          label: 'Rejected' },
+  { id: 'all',              label: 'All' },
+  { id: 'submitted',        label: 'Awaiting L1' },
+  { id: 'level1_cleared',   label: 'L1 Cleared' },
+  { id: 'level2_cleared',   label: 'L2 Cleared' },
+  { id: 'level3_cleared',   label: 'Ready for Decision' },
+  { id: 'not_shortlisted',  label: 'Not Shortlisted' },
+  { id: 'approved',         label: 'Approved' },
+  { id: 'rejected',         label: 'Rejected' },
 ];
+
+// ─── Level progress indicator (list view) ─────────────────────────────────────
+
+function LevelProgress({ app }: { app: InvestmentApplication }) {
+  const { t } = useLanguage();
+  const state = getPipelineState(app);
+  const { clearedCount, droppedAtLevel, currentLevel } = state;
+
+  return (
+    <div className="flex items-center gap-1" title={
+      droppedAtLevel !== null
+        ? t.reviewPipeline.droppedBanner.replace('{n}', String(droppedAtLevel))
+        : currentLevel !== null
+        ? t.reviewPipeline.reviewLevel.replace('{n}', String(currentLevel))
+        : t.reviewPipeline.finalStage
+    }>
+      {REVIEW_LEVELS.map(level => {
+        const cleared = clearedCount >= level;
+        const dropped = droppedAtLevel === level;
+        const isCurrent = currentLevel === level;
+        return (
+          <span
+            key={level}
+            className={cn(
+              'w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold ring-1',
+              dropped   ? 'bg-red-50 text-red-600 ring-red-200'
+                : cleared ? 'bg-emerald-50 text-emerald-600 ring-emerald-200'
+                : isCurrent ? 'bg-amber-50 text-amber-700 ring-amber-300'
+                : 'bg-gray-50 text-gray-300 ring-gray-200',
+            )}
+          >
+            {dropped ? <XIcon size={9} /> : cleared ? <Check size={9} /> : isCurrent ? level : <Lock size={8} />}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -174,7 +225,7 @@ export default function InvestorApplications() {
 
   const stats = [
     { label: t.investorApplications.total,       value: applications.length,                                                                                             icon: BarChart3,    color: 'text-blue-600',   bg: 'bg-blue-50' },
-    { label: t.investorApplications.shortlisted, value: applications.filter(a => a.status === 'shortlisted').length,                                                     icon: Star,         color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: t.reviewPipeline.title,             value: applications.filter(a => ['submitted','under_review','level1_screening','level1_cleared','level2_cleared','level3_cleared'].includes(a.status)).length, icon: Layers,       color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: t.investorApplications.approved,    value: applications.filter(a => a.status === 'approved' || a.status === 'invested').length,                              icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50' },
     { label: t.investorApplications.rejected,    value: applications.filter(a => a.status === 'rejected').length,                                                        icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
   ];
@@ -308,6 +359,7 @@ export default function InvestorApplications() {
                 </div>
 
                 <div className="flex items-center gap-4 flex-shrink-0">
+                  <LevelProgress app={app} />
                   {app.fundingAsk && (
                     <span className="text-sm font-semibold text-gray-900">
                       {formatCurrency(parseFloat(app.fundingAsk))}

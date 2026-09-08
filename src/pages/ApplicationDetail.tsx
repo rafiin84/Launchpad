@@ -18,11 +18,16 @@ import {
   resolveApplicationDocumentUrl,
   requestedDocumentFileId,
   DOCUMENT_TYPES,
+  recordLevelDecision,
+  recordFinalDecision,
+  getPipelineState,
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
   type ApprovalDetails,
+  type ReviewLevel,
 } from '../services/investmentApplications';
+import ReviewPipeline, { type LevelDecisionPayload } from '../components/applications/ReviewPipeline';
 import { addNotification } from '../services/notifications';
 import { zohoDownloadAttachment, portalDownloadAttachment } from '../services/zohoApi';
 import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
@@ -67,6 +72,11 @@ function getStatusConfig(t: TranslationKeys): Record<ApplicationStatus, { label:
     meeting_scheduled:    { label: t.applicationTracker.statusMeeting,       color: 'text-violet-600',  bg: 'bg-violet-50' },
     due_diligence:        { label: t.applicationTracker.statusDueDiligence,  color: 'text-orange-600',  bg: 'bg-orange-50' },
     on_hold:              { label: t.applicationTracker.statusOnHold,       color: 'text-slate-600',   bg: 'bg-slate-100' },
+    level1_screening:     { label: t.applicationTracker.statusLevel1Screening, color: 'text-sky-600',    bg: 'bg-sky-50' },
+    level1_cleared:       { label: t.applicationTracker.statusLevel1Cleared,   color: 'text-sky-700',    bg: 'bg-sky-100' },
+    level2_cleared:       { label: t.applicationTracker.statusLevel2Cleared,   color: 'text-indigo-700', bg: 'bg-indigo-100' },
+    level3_cleared:       { label: t.applicationTracker.statusLevel3Cleared,   color: 'text-violet-700', bg: 'bg-violet-100' },
+    not_shortlisted:      { label: t.applicationTracker.statusNotShortlisted,  color: 'text-red-600',    bg: 'bg-red-50' },
     approved:             { label: t.applicationTracker.statusApproved,     color: 'text-green-600',   bg: 'bg-green-50' },
     invested:             { label: t.applicationTracker.statusInvested,     color: 'text-green-700',   bg: 'bg-green-100' },
     rejected:             { label: t.applicationTracker.statusRejected,     color: 'text-red-600',     bg: 'bg-red-50' },
@@ -940,6 +950,13 @@ export default function ApplicationDetail() {
     setActionLoading('approved');
     setActionError('');
     try {
+      // Stamp the final decision into the shortlisting ledger first, so the
+      // audit trail survives even if the portfolio creation step fails.
+      await recordFinalDecision(
+        id, 'approved', currentUser.name,
+        details.investmentNotes || t.reviewPipeline.approvedBanner,
+        isInvestor, currentUser.email,
+      );
       await approveApplication(id, currentUser.name, isInvestor, details);
 
       const { title, message } = getNotificationMessages(t).approved(app.companyName, currentUser.name);
@@ -963,6 +980,90 @@ export default function ApplicationDetail() {
       setActionError(msg);
     }
     setActionLoading(null);
+  };
+
+  // ── 3-level shortlisting pipeline ───────────────────────────────────────
+
+  /** Records a decision for one shortlisting level and notifies the founder. */
+  const handleLevelDecision = async (level: ReviewLevel, payload: LevelDecisionPayload) => {
+    if (!app || !id) return;
+    setActionLoading(`level${level}`);
+    setActionError('');
+    try {
+      await recordLevelDecision(id, {
+        level,
+        outcome: payload.outcome,
+        reviewer: currentUser.name,
+        reviewerEmail: currentUser.email,
+        comment: payload.comment,
+        score: payload.score,
+      }, isInvestor);
+
+      const levelName = level === 1
+        ? t.reviewPipeline.level1
+        : level === 2 ? t.reviewPipeline.level2 : t.reviewPipeline.level3;
+      const cleared = payload.outcome === 'shortlisted';
+      addNotification({
+        type: 'company_update',
+        title: cleared ? t.reviewPipeline.stateCompleted : t.reviewPipeline.stateNotShortlisted,
+        message: `${levelName} — ${cleared ? t.reviewPipeline.stateCompleted : t.reviewPipeline.stateNotShortlisted}: ${payload.comment}`,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        targetRole: 'founder',
+        targetEmail: app.founderEmail,
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t.reviewPipeline.failedToRecord;
+      console.error('Failed to record level decision:', err);
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
+  /**
+   * Final rejection — only reachable once all three levels have cleared
+   * (the service re-checks this server-side of the UI).
+   */
+  const handleFinalReject = async (comment: string) => {
+    if (!app || !id) return;
+    setActionLoading('rejected');
+    setActionError('');
+    try {
+      await recordFinalDecision(id, 'rejected', currentUser.name, comment, isInvestor, currentUser.email);
+      const { title, message } = getNotificationMessages(t).rejected(app.companyName, currentUser.name);
+      addNotification({
+        type: 'company_update',
+        title,
+        message: `${message} — ${comment}`,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        targetRole: 'founder',
+        targetEmail: app.founderEmail,
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t.reviewPipeline.failedToRecord;
+      console.error('Failed to reject application:', err);
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
+  /** Opens the Approve & Invest modal, guarding the level-3 gate. */
+  const handleOpenApprove = () => {
+    if (!app) return;
+    const state = getPipelineState(app);
+    if (!state.finalUnlocked) {
+      setActionError(t.reviewPipeline.levelLocked);
+      return;
+    }
+    setActionError('');
+    setShowApproveModal(true);
   };
 
   const closeDocViewer = () => {
@@ -1097,14 +1198,12 @@ export default function ApplicationDetail() {
     </div>
   );
 
+  // Supporting actions only — Approve / Reject / Shortlist now live in the
+  // 3-level shortlisting pipeline below and are gated by it.
   const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string }[] = [
-    { label: t.applicationDetail.approve,         status: 'approved',            icon: CheckCircle2,  color: 'text-green-600',   hoverBg: 'hover:bg-green-50',  activeBg: 'bg-green-50',  borderColor: 'border-green-300' },
-    { label: t.applicationDetail.hold,            status: 'on_hold',             icon: Pause,         color: 'text-slate-600',   hoverBg: 'hover:bg-slate-50',  activeBg: 'bg-slate-100', borderColor: 'border-slate-300' },
-    { label: t.applicationDetail.reject,          status: 'rejected',            icon: XCircle,       color: 'text-red-600',     hoverBg: 'hover:bg-red-50',    activeBg: 'bg-red-50',    borderColor: 'border-red-300' },
-    { label: t.applicationDetail.requestInfo,     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',   hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
-    { label: t.applicationDetail.requestDocs,     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600',  hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
-    { label: t.applicationDetail.scheduleMeeting, status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600',  hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
-    { label: t.applicationDetail.shortlist,       status: 'shortlisted',         icon: Star,          color: 'text-purple-600',  hoverBg: 'hover:bg-purple-50', activeBg: 'bg-purple-50', borderColor: 'border-purple-300' },
+    { label: t.applicationDetail.requestInfo,     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',  hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
+    { label: t.applicationDetail.requestDocs,     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600', hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
+    { label: t.applicationDetail.scheduleMeeting, status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600', hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
   ];
 
   let supportingDocs: { name: string; url: string }[] = [];
@@ -1216,83 +1315,87 @@ export default function ApplicationDetail() {
         {/* LEFT */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Actions */}
-          <Section title={t.applicationDetail.actions}>
-            {actionError && (
-              <div className="mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-medium">
-                {actionError}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {actions.map(a => {
-                const Icon = a.icon;
-                const isActive = app.status === a.status;
-                const isLoading = actionLoading === a.status;
-                const isApproved = app.status === 'approved' || app.status === 'invested';
-                const isRejected = app.status === 'rejected';
-                const isTerminal = isApproved || isRejected;
-                const isDisabled = !!actionLoading || (isTerminal && a.status !== 'approved' && a.status !== 'rejected');
-                const isApproveDisabled = a.status === 'approved' && isApproved;
-                const isRejectDisabled = a.status === 'rejected' && isRejected;
+          {/* ── Shortlisting pipeline: the primary element of this page ── */}
+          <ReviewPipeline
+            app={app}
+            onLevelDecision={handleLevelDecision}
+            onApprove={handleOpenApprove}
+            onReject={handleFinalReject}
+            actionLoading={!!actionLoading}
+            error={actionError}
+          />
 
-                const onClick = a.status === 'documents_requested'
-                  ? () => setShowDocsModal(true)
-                  : a.status === 'meeting_scheduled'
-                  ? () => setShowMeetingModal(true)
-                  : a.status === 'approved'
-                  ? () => setShowApproveModal(true)
-                  : () => setConfirmAction(a.status);
-                return (
-                  <button
-                    key={a.status}
-                    onClick={onClick}
-                    disabled={isDisabled || isApproveDisabled || isRejectDisabled}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
-                      isActive
-                        ? `${a.color} ${a.activeBg} ${a.borderColor}`
-                        : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
-                      isLoading && 'opacity-50 cursor-wait',
-                      (isApproveDisabled || isRejectDisabled) && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    <Icon size={13} /> {isLoading ? t.applicationDetail.updating : isApproveDisabled ? t.applicationDetail.approvedCheck : isRejectDisabled ? t.applicationDetail.rejectedLabel : a.label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setShowMessage(!showMessage)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
-                  showMessage
-                    ? 'text-blue-600 border-blue-300 bg-blue-50'
-                    : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
-                )}
-              >
-                <Send size={12} /> {t.applicationDetail.sendMessage}
-              </button>
-            </div>
-            {showMessage && (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-2">
-                <textarea
-                  value={messageText}
-                  onChange={e => setMessageText(e.target.value)}
-                  placeholder={t.applicationDetail.messagePlaceholder}
-                  className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
-                  rows={3}
-                />
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={sendingMessage || !messageText.trim()}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <Send size={11} /> {sendingMessage ? t.applicationDetail.sending : t.applicationDetail.sendMessage}
-                  </button>
-                </div>
+          {/* ── Supporting actions (available throughout the review) ── */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              {t.reviewPipeline.supportingActions}
+            </p>
+            <p className="text-[11px] text-gray-400 mb-3">{t.reviewPipeline.supportingActionsDesc}</p>
+            <div className="bg-white border border-gray-100 rounded-2xl p-4">
+              <div className="flex flex-wrap gap-2">
+                {actions.map(a => {
+                  const Icon = a.icon;
+                  const isActive = app.status === a.status;
+                  const isLoading = actionLoading === a.status;
+
+                  const onClick = a.status === 'documents_requested'
+                    ? () => setShowDocsModal(true)
+                    : a.status === 'meeting_scheduled'
+                    ? () => setShowMeetingModal(true)
+                    : () => setConfirmAction(a.status);
+
+                  return (
+                    <button
+                      key={a.status}
+                      onClick={onClick}
+                      disabled={!!actionLoading}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
+                        isActive
+                          ? `${a.color} ${a.activeBg} ${a.borderColor}`
+                          : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
+                        isLoading && 'opacity-50 cursor-wait',
+                        !!actionLoading && 'disabled:opacity-50',
+                      )}
+                    >
+                      <Icon size={13} /> {isLoading ? t.applicationDetail.updating : a.label}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setShowMessage(!showMessage)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
+                    showMessage
+                      ? 'text-blue-600 border-blue-300 bg-blue-50'
+                      : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
+                  )}
+                >
+                  <Send size={12} /> {t.applicationDetail.sendMessage}
+                </button>
               </div>
-            )}
-          </Section>
+              {showMessage && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-3">
+                  <textarea
+                    value={messageText}
+                    onChange={e => setMessageText(e.target.value)}
+                    placeholder={t.applicationDetail.messagePlaceholder}
+                    className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
+                    rows={3}
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendingMessage || !messageText.trim()}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Send size={11} /> {sendingMessage ? t.applicationDetail.sending : t.applicationDetail.sendMessage}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (

@@ -543,6 +543,8 @@ export default function FounderApplicationForm() {
   function buildFields(status: 'draft' | 'submitted'): InvestmentApplicationFields {
     return {
       status,
+      // Shortlisting ledger starts empty — populated by investor reviews
+      reviewLedger: '',
       companyName: form.companyName,
       companyWebsite: form.companyWebsite,
       companyIndustry: form.companyIndustry,
