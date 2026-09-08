@@ -1,7 +1,7 @@
 const en = {
   // ─── Common ──────────────────────────────────────────────────────────────
   common: {
-    appName: 'Launchpad',
+    appName: 'Zoho VC CRM',
     save: 'Save',
     cancel: 'Cancel',
     edit: 'Edit',
@@ -36,7 +36,7 @@ const en = {
 
   // ─── Login ───────────────────────────────────────────────────────────────
   login: {
-    welcome: 'Welcome to Launchpad',
+    welcome: 'Welcome to Zoho VC CRM',
     selectRole: 'Select your role to sign in.',
     inviteOnly: 'Invite Only',
     privateNetwork: 'Private Founder + Investor Network',
@@ -47,8 +47,8 @@ const en = {
     founderNetwork: 'Founder network',
     companyProfile: 'Company profile',
     investorSignIn: 'Sign in with your Zoho CRM account.',
-    founderSignIn: 'Sign in via the Launchpad Portal using the account from your invitation email.',
-    confidential: 'Private & invite-only. All data shared on Launchpad is strictly confidential.',
+    founderSignIn: 'Sign in via the Zoho VC CRM Portal using the account from your invitation email.',
+    confidential: 'Private & invite-only. All data shared on Zoho VC CRM is strictly confidential.',
     selectLanguage: 'Language',
   },
 
@@ -84,7 +84,7 @@ const en = {
     goodEvening: 'Good evening',
     updateKPIs: 'Update KPIs',
     completeProfile: 'Complete your profile',
-    completeProfileDesc: 'Add your company details and profile information to get your LaunchPad profile ready.',
+    completeProfileDesc: 'Add your company details and profile information to get your Zoho VC CRM profile ready.',
     setupCompanyProfile: 'Set Up Company Profile',
     addYourKPIs: 'Add Your KPIs',
     noApplicationYet: 'Ready to connect with investors?',
@@ -122,7 +122,7 @@ const en = {
 
   // ─── Welcome Modal ───────────────────────────────────────────────────────
   welcome: {
-    title: 'Welcome to Launchpad!',
+    title: 'Welcome to Zoho VC CRM!',
     subtitle: 'Your investor portal is ready. Here\'s how to get started.',
     step1Title: 'Set up your company profile',
     step1Desc: 'Add your company details, metrics, and logo so investors can review your data.',
@@ -866,7 +866,7 @@ const en = {
     activateUserAria: 'Activate user',
     reSendingInvitation: 'Re-sending...',
     reSendInvitation: 'Re-send Invitation',
-    sendInvitationDesc: 'Send a portal invitation so this founder can log in to Launchpad.',
+    sendInvitationDesc: 'Send a portal invitation so this founder can log in to Zoho VC CRM.',
     invitationWillBeSentTo: 'Invitation will be sent to',
     sendInvite: 'Send Invite',
     noEmailAvailable: 'No email address available. Add an email to send an invitation.',

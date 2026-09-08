@@ -78,7 +78,7 @@ export function MobileHeader() {
           <div className="w-7 h-7 bg-black rounded-lg flex items-center justify-center">
             <Rocket size={14} className="text-white" />
           </div>
-          <span className="text-base font-bold tracking-tight text-gray-900">Launchpad</span>
+          <span className="text-base font-bold tracking-tight text-gray-900">Zoho VC CRM</span>
         </Link>
 
         {/* Right-side icons — vary by page */}

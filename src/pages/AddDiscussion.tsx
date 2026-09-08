@@ -126,7 +126,7 @@ export default function AddDiscussion() {
           Back to Discussions
         </Link>
 
-        <PageHeader title="New Discussion" description="Start a conversation with the Launchpad community." />
+        <PageHeader title="New Discussion" description="Start a conversation with the Zoho VC CRM community." />
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Post Details */}

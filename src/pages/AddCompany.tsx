@@ -162,7 +162,7 @@ export default function AddCompany() {
           Back to Companies
         </Link>
 
-        <PageHeader title="Add Company" description="List your startup in the Launchpad network." />
+        <PageHeader title="Add Company" description="List your startup in the Zoho VC CRM network." />
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Basic Info */}

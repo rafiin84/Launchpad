@@ -60,7 +60,7 @@ export function Sidebar() {
         <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center">
           <Rocket size={15} className="text-white" />
         </div>
-        <span className="text-lg font-bold tracking-tight text-gray-900">Launchpad</span>
+        <span className="text-lg font-bold tracking-tight text-gray-900">Zoho VC CRM</span>
       </div>
 
       {/* Navigation */}

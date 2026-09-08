@@ -3,7 +3,7 @@ import type { TranslationKeys } from './en';
 const ja: TranslationKeys = {
   // ─── Common ──────────────────────────────────────────────────────────────
   common: {
-    appName: 'Launchpad',
+    appName: 'Zoho VC CRM',
     save: '保存',
     cancel: 'キャンセル',
     edit: '編集',
@@ -38,7 +38,7 @@ const ja: TranslationKeys = {
 
   // ─── Login ───────────────────────────────────────────────────────────────
   login: {
-    welcome: 'Launchpadへようこそ',
+    welcome: 'Zoho VC CRMへようこそ',
     selectRole: 'サインインするロールを選択してください。',
     inviteOnly: '招待制',
     privateNetwork: 'プライベート創業者＋投資家ネットワーク',
@@ -49,8 +49,8 @@ const ja: TranslationKeys = {
     founderNetwork: '創業者ネットワーク',
     companyProfile: '会社プロフィール',
     investorSignIn: 'Zoho CRMアカウントでサインインしてください。',
-    founderSignIn: '招待メールのアカウントでLaunchpadポータルからサインインしてください。',
-    confidential: 'プライベート＆招待制。Launchpadで共有されるすべてのデータは厳密に機密です。',
+    founderSignIn: '招待メールのアカウントでZoho VC CRMポータルからサインインしてください。',
+    confidential: 'プライベート＆招待制。Zoho VC CRMで共有されるすべてのデータは厳密に機密です。',
     selectLanguage: '言語',
   },
 
@@ -124,7 +124,7 @@ const ja: TranslationKeys = {
 
   // ─── Welcome Modal ───────────────────────────────────────────────────────
   welcome: {
-    title: 'Launchpadへようこそ！',
+    title: 'Zoho VC CRMへようこそ！',
     subtitle: '投資家ポータルの準備ができました。始め方をご案内します。',
     step1Title: '会社プロフィールを設定',
     step1Desc: '会社の詳細、指標、ロゴを追加して、投資家がデータを確認できるようにしましょう。',
@@ -854,7 +854,7 @@ const ja: TranslationKeys = {
     activateUserAria: 'ユーザーを有効化',
     reSendingInvitation: '再送信中...',
     reSendInvitation: '招待を再送信',
-    sendInvitationDesc: 'この創業者がLaunchpadにログインできるようポータル招待を送信します。',
+    sendInvitationDesc: 'この創業者がZoho VC CRMにログインできるようポータル招待を送信します。',
     invitationWillBeSentTo: '招待の送信先',
     sendInvite: '招待を送信',
     noEmailAvailable: 'メールアドレスがありません。招待を送信するにはメールアドレスを追加してください。',

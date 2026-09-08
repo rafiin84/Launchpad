@@ -146,18 +146,18 @@ async function trySendMail(token: string, contactId: string, toEmail: string, na
   const htmlContent = `
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:32px 0">
   <div style="text-align:center;margin-bottom:32px">
-    <h1 style="font-size:24px;font-weight:700;color:#111827;margin:0">Launchpad</h1>
+    <h1 style="font-size:24px;font-weight:700;color:#111827;margin:0">Zoho VC CRM</h1>
     <p style="font-size:13px;color:#9CA3AF;margin:4px 0 0">Private Founder + Investor Network</p>
   </div>
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:32px">
     <h2 style="font-size:20px;font-weight:600;color:#111827;margin:0 0 12px">Hi ${firstName}, you're invited!</h2>
     <p style="font-size:14px;line-height:1.6;color:#4B5563;margin:0 0 24px">
-      You've been invited to join <strong>Launchpad</strong> — a private platform connecting founders with investors.
+      You've been invited to join <strong>Zoho VC CRM</strong> — a private platform connecting founders with investors.
       Sign in to submit your application, share documents, and track your investment progress.
     </p>
     <div style="text-align:center;margin:28px 0">
       <a href="${portalUrl}" style="display:inline-block;background:#111827;color:#fff;font-size:14px;font-weight:600;padding:12px 32px;border-radius:12px;text-decoration:none">
-        Sign in to Launchpad
+        Sign in to Zoho VC CRM
       </a>
     </div>
   </div>
@@ -165,9 +165,9 @@ async function trySendMail(token: string, contactId: string, toEmail: string, na
 
   const mailPayload = {
     data: [{
-      from: { user_name: fromUser.full_name || 'Launchpad', email: fromUser.email },
+      from: { user_name: fromUser.full_name || 'Zoho VC CRM', email: fromUser.email },
       to: [{ user_name: name, email: toEmail }],
-      subject: "You're invited to Launchpad — Sign in to get started",
+      subject: "You're invited to Zoho VC CRM — Sign in to get started",
       content: htmlContent,
       mail_format: 'html',
     }],
