@@ -473,6 +473,8 @@ const en = {
     trackDescription: 'Track the status of your investment proposal',
     newApplication: 'New Application',
     reApply: 'Re-Apply',
+    yourApplication: 'Your Application',
+    previousApplications: 'Previous Applications',
     noApplicationYet: 'No application yet',
     noApplicationDesc: 'Submit your investment proposal to get started',
     applyNow: 'Apply Now',
@@ -1192,6 +1194,12 @@ const en = {
     declinedDesc: 'Your application cleared all three review stages but was not selected for investment. Any feedback will appear in your messages.',
 
     stageCount: 'Stage {n} of 4',
+    heroTitle: 'Application Progress',
+    heroSubtitle: 'Level 1 \u2192 Level 2 \u2192 Level 3 \u2192 Final Decision',
+    reviewedByLabel: 'Reviewed by',
+    reviewCommentLabel: 'Reviewer comment',
+    currentStage: 'Current stage',
+    awaitingStart: 'Submitted \u2014 waiting for the first review',
   },
   languages: {
     en: 'English',

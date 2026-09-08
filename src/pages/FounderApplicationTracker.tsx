@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle, Edit2,
-  TrendingUp, Building2, DollarSign, ArrowRight, MessageSquare,
+  Building2, DollarSign, ArrowRight, MessageSquare,
   Upload, Check, Send, Trash2,
 } from 'lucide-react';
 import FounderReviewProgress from '../components/applications/FounderReviewProgress';
@@ -110,76 +110,6 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
     <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
       {statusLabels[status] || cfg.label}
     </span>
-  );
-}
-
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', color)}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-lg font-bold text-gray-900">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function PipelineVisualization({ apps }: { apps: InvestmentApplication[] }) {
-  const { t } = useLanguage();
-  const nonDraft = apps.filter(a => a.status !== 'draft');
-  const counts: Record<string, number> = {};
-  for (const a of nonDraft) {
-    counts[a.status] = (counts[a.status] || 0) + 1;
-  }
-
-  const allStages: { status: ApplicationStatus; label: string }[] = [
-    { status: 'submitted',       label: t.applicationTracker.statusSubmitted },
-    { status: 'level1_cleared',  label: t.founderPipeline.stage1 },
-    { status: 'level2_cleared',  label: t.founderPipeline.stage2 },
-    { status: 'level3_cleared',  label: t.founderPipeline.stage3 },
-    { status: 'approved',        label: t.applicationTracker.statusApproved },
-    { status: 'not_shortlisted', label: t.founderPipeline.stateNotCleared },
-    { status: 'rejected',        label: t.applicationTracker.statusRejected },
-  ];
-
-  return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-6 overflow-x-auto">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">{t.applicationTracker.applicationPipeline}</h3>
-      <div className="flex items-center gap-1 min-w-[640px]">
-        {allStages.map((stage, i) => {
-          const count = counts[stage.status] || 0;
-          const cfg = STATUS_CONFIG[stage.status] ?? STATUS_CONFIG.submitted;
-          const hasApps = count > 0;
-          return (
-            <div key={stage.status} className="flex items-center flex-1">
-              <div className="flex flex-col items-center flex-1">
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
-                    hasApps ? 'border-current shadow-sm' : 'border-gray-200 bg-gray-50 text-gray-300',
-                  )}
-                  style={hasApps ? { color: cfg.color, backgroundColor: `${cfg.color}15` } : undefined}
-                >
-                  {count}
-                </div>
-                <span className={cn(
-                  'text-[10px] mt-1.5 text-center font-medium leading-tight',
-                  hasApps ? 'text-gray-700' : 'text-gray-400',
-                )}>
-                  {stage.label}
-                </span>
-              </div>
-              {i < allStages.length - 1 && (
-                <div className={cn('h-0.5 w-4 flex-shrink-0', hasApps && (counts[allStages[i + 1]?.status] || 0) > 0 ? 'bg-indigo-200' : 'bg-gray-100')} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -569,7 +499,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
 const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
 
-function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void }) {
+function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hideProgress = false }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void; hideProgress?: boolean }) {
   const { t } = useLanguage();
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
@@ -642,8 +572,8 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
         </span>
       </div>
 
-      {/* Review progress — compact 4-stage stepper (non-drafts only) */}
-      {!isDraft && (
+      {/* Review progress — compact strip, unless the hero above already shows it */}
+      {!isDraft && !hideProgress && (
         <div className="mb-3">
           <FounderReviewProgress app={app} variant="compact" />
         </div>
@@ -695,11 +625,13 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete }: { app
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left column — review progress, then company profile */}
             <div className="lg:col-span-2 space-y-3">
-              <FounderReviewProgress
-                app={app}
-                variant="detailed"
-                actionNeeded={ACTION_REQUIRED.includes(app.status)}
-              />
+              {!hideProgress && (
+                <FounderReviewProgress
+                  app={app}
+                  variant="detailed"
+                  actionNeeded={ACTION_REQUIRED.includes(app.status)}
+                />
+              )}
               {app.companyDescription && (
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.description}</p>
@@ -863,14 +795,10 @@ export default function FounderApplicationTracker() {
   const approvedApps = applications.filter(a => a.status === 'approved' || a.status === 'invested');
   const rejectedApps = applications.filter(a => a.status === 'rejected');
   const activeApps = applications.filter(a => a.status !== 'draft' && a.status !== 'approved' && a.status !== 'invested' && a.status !== 'rejected');
-  const nonDrafts = applications.filter(a => a.status !== 'draft');
 
-  // Stats
-  const inProgressStatuses: ApplicationStatus[] = ['under_review', 'interested', 'shortlisted', 'meeting_scheduled', 'due_diligence', 'more_info_requested', 'documents_requested'];
-  const totalSubmitted = nonDrafts.length;
-  const inProgress = nonDrafts.filter(a => inProgressStatuses.includes(a.status)).length;
-  const approved = nonDrafts.filter(a => a.status === 'approved' || a.status === 'invested').length;
-  const rejected = nonDrafts.filter(a => a.status === 'rejected').length;
+  // The application whose progress heads the page: the live one if there is
+  // one, otherwise the most recent decided one.
+  const primaryApp = activeApps[0] ?? approvedApps[0] ?? rejectedApps[0] ?? null;
 
   const isEmpty = applications.length === 0;
   const hasDraft = drafts.length > 0;
@@ -930,36 +858,16 @@ export default function FounderApplicationTracker() {
 
       {!loading && !isEmpty && (
         <>
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <StatCard
-              icon={<FileText size={16} className="text-indigo-500" />}
-              label={t.applicationTracker.totalSubmitted}
-              value={totalSubmitted}
-              color="bg-indigo-50"
+          {/* ── Application Progress — the single progress indicator for this page.
+                 Replaces the old aggregate "Application Pipeline" funnel and the
+                 "In Progress" stat card, which described the same thing three ways. ── */}
+          {primaryApp && (
+            <FounderReviewProgress
+              app={primaryApp}
+              variant="hero"
+              actionNeeded={ACTION_REQUIRED.includes(primaryApp.status)}
             />
-            <StatCard
-              icon={<TrendingUp size={16} className="text-amber-500" />}
-              label={t.applicationTracker.inProgress}
-              value={inProgress}
-              color="bg-amber-50"
-            />
-            <StatCard
-              icon={<CheckCircle size={16} className="text-green-500" />}
-              label={t.applicationTracker.approved}
-              value={approved}
-              color="bg-green-50"
-            />
-            <StatCard
-              icon={<XCircle size={16} className="text-red-500" />}
-              label={t.applicationTracker.rejected}
-              value={rejected}
-              color="bg-red-50"
-            />
-          </div>
-
-          {/* Pipeline visualization */}
-          <PipelineVisualization apps={applications} />
+          )}
 
           {/* Draft section */}
           {drafts.length > 0 && (
@@ -1000,18 +908,22 @@ export default function FounderApplicationTracker() {
                     expanded={expandedId === app.id}
                     onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
                     onRefresh={loadApps}
+                    hideProgress={primaryApp?.id === app.id}
                   />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Active applications */}
+          {/* Active applications — progress now lives in the hero above, so this
+              section carries the application record and its actions. */}
           {activeApps.length > 0 && (
             <div className="mb-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">
-                {t.applicationTracker.inProgress}
-                <span className="ml-2 text-xs font-medium text-gray-400">{activeApps.length}</span>
+                {t.applicationTracker.yourApplication}
+                {activeApps.length > 1 && (
+                  <span className="ml-2 text-xs font-medium text-gray-400">{activeApps.length}</span>
+                )}
               </h2>
               <div className="space-y-4">
                 {activeApps.map(app => (
@@ -1021,6 +933,7 @@ export default function FounderApplicationTracker() {
                     expanded={expandedId === app.id}
                     onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
                     onRefresh={loadApps}
+                    hideProgress={primaryApp?.id === app.id}
                   />
                 ))}
               </div>
@@ -1043,6 +956,7 @@ export default function FounderApplicationTracker() {
                     expanded={expandedId === app.id}
                     onToggle={() => setExpandedId(expandedId === app.id ? null : app.id)}
                     onRefresh={loadApps}
+                    hideProgress={primaryApp?.id === app.id}
                   />
                 ))}
               </div>

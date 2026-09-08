@@ -475,6 +475,8 @@ const ja: TranslationKeys = {
     trackDescription: '投資提案のステータスを追跡',
     newApplication: '新規申請',
     reApply: '再申請',
+    yourApplication: 'あなたの申請',
+    previousApplications: '過去の申請',
     noApplicationYet: 'まだ申請がありません',
     noApplicationDesc: '投資提案を提出して始めましょう',
     applyNow: '今すぐ申請',
@@ -1171,6 +1173,12 @@ const ja: TranslationKeys = {
     declinedDesc: '3段階すべてを通過しましたが、投資対象には選定されませんでした。フィードバックはメッセージに表示されます。',
 
     stageCount: 'ステージ {n} / 4',
+    heroTitle: '申請の進捗',
+    heroSubtitle: 'レベル1 → レベル2 → レベル3 → 最終判断',
+    reviewedByLabel: '審査者',
+    reviewCommentLabel: '審査コメント',
+    currentStage: '現在のステージ',
+    awaitingStart: '提出済み — 最初の審査を待っています',
   },
   languages: {
     en: 'English',
