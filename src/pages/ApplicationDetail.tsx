@@ -28,6 +28,7 @@ import {
   type ReviewLevel,
 } from '../services/investmentApplications';
 import ReviewPipeline, { type LevelDecisionPayload } from '../components/applications/ReviewPipeline';
+import ConfirmDecisionDialog from '../components/applications/ConfirmDecisionDialog';
 import { addNotification } from '../services/notifications';
 import { zohoDownloadAttachment, portalDownloadAttachment } from '../services/zohoApi';
 import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
@@ -498,16 +499,26 @@ function ApproveApplicationModal({
   const [equity, setEquity] = useState(app.equityOffered || '');
   const [investNotes, setInvestNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Approving creates a portfolio record and moves the founder across, so the
+  // investor confirms against the actual figures before it is committed.
+  const [confirming, setConfirming] = useState(false);
 
-  const handleSubmit = () => {
+  const cleanAmount = amount.replace(/[,$\s]/g, '');
+
+  /** Validates the investment details, then hands over to the confirmation. */
+  const requestConfirm = () => {
     const errs: Record<string, string> = {};
     if (!amount.trim()) errs.amount = t.applicationDetail.amountRequired;
     if (!paymentType) errs.paymentType = t.applicationDetail.paymentTypeRequired;
     if (!investDate) errs.investDate = t.applicationDetail.investmentDateRequired;
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    setErrors({});
+    setConfirming(true);
+  };
 
+  const handleSubmit = () => {
     onSubmit({
-      investmentAmount: amount.replace(/[,$\s]/g, ''),
+      investmentAmount: cleanAmount,
       paymentType,
       investmentDate: investDate,
       equityOffered: equity,
@@ -517,6 +528,23 @@ function ApproveApplicationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      {confirming && (
+        <ConfirmDecisionDialog
+          tone="approve"
+          title={t.confirmDecision.approveTitle.replace(
+            '{company}', app.companyName || t.applicationDetail.untitledApplication)}
+          lines={[
+            t.confirmDecision.approveLine1
+              .replace('{amount}', formatCurrency(parseFloat(cleanAmount)))
+              .replace('{paymentType}', paymentType),
+            t.confirmDecision.approveLine2,
+            t.confirmDecision.approveLine3,
+          ]}
+          confirmLabel={t.confirmDecision.approveConfirm}
+          onConfirm={handleSubmit}
+          onBack={() => setConfirming(false)}
+        />
+      )}
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
         <div className="px-6 pt-6 pb-4">
           <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
@@ -624,7 +652,7 @@ function ApproveApplicationModal({
             {t.applicationDetail.cancel}
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={requestConfirm}
             className="flex-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-4 py-2.5 rounded-xl transition-colors"
           >
             {t.applicationDetail.approveInvestButton}
@@ -1370,6 +1398,7 @@ export default function ApplicationDetail() {
             error={actionError}
             actableLevel={reviewerLevel}
             canDecideFinal={!isReviewer}
+            reviewerName={currentUser.name}
           />
 
           {/* ── Supporting actions (available throughout the review) ── */}

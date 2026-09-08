@@ -17,6 +17,7 @@ import {
   type PipelineStageState,
   type PipelineState,
 } from '../../services/investmentApplications';
+import ConfirmDecisionDialog from './ConfirmDecisionDialog';
 import { cn } from '../../lib/cn';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,10 +124,11 @@ export interface LevelDecisionPayload {
 }
 
 function LevelDecisionModal({
-  level, companyName, onSubmit, onClose, submitting,
+  level, companyName, reviewerName, onSubmit, onClose, submitting,
 }: {
   level: ReviewLevel;
   companyName: string;
+  reviewerName?: string;
   onSubmit: (payload: LevelDecisionPayload) => void;
   onClose: () => void;
   submitting: boolean;
@@ -136,21 +138,73 @@ function LevelDecisionModal({
   const [comment, setComment] = useState('');
   const [score, setScore] = useState<number | null>(null);
   const [error, setError] = useState('');
+  // Second step: passing an application on or dropping it cannot be undone
+  // from here, so the reviewer confirms against a plain statement of effects.
+  const [confirming, setConfirming] = useState(false);
 
   const nextLabel = level < 3
     ? t.reviewPipeline.decisionShortlistDesc
     : t.reviewPipeline.decisionShortlistFinalDesc;
 
-  const submit = () => {
+  /** Validates, then hands over to the confirmation step. */
+  const requestConfirm = () => {
     if (!comment.trim()) { setError(t.reviewPipeline.commentRequired); return; }
     setError('');
+    setConfirming(true);
+  };
+
+  const submit = () => {
     onSubmit({ outcome, comment: comment.trim(), score: score ?? undefined });
   };
+
+  // ── Confirmation copy, specific to the decision being made ──
+  const c = t.confirmDecision;
+  const next = String(level + 1);
+  const isDrop = outcome === 'not_shortlisted';
+  const isFinalHandoff = !isDrop && level === 3;
+
+  const confirmProps = isDrop
+    ? {
+        tone: 'danger' as const,
+        title: c.dropTitle.replace('{company}', companyName),
+        lines: [
+          c.dropLine1.replace('{level}', String(level)),
+          c.dropLine2,
+          c.dropLine3,
+        ],
+        confirmLabel: c.dropConfirm,
+      }
+    : isFinalHandoff
+    ? {
+        tone: 'advance' as const,
+        title: c.passFinalTitle.replace('{company}', companyName),
+        lines: [c.passFinalLine1, c.passFinalLine2, c.passFinalLine3],
+        confirmLabel: c.passFinalConfirm,
+      }
+    : {
+        tone: 'advance' as const,
+        title: c.passTitle.replace('{company}', companyName).replace('{next}', next),
+        lines: [
+          c.passLine1,
+          c.passLine2.replace('{next}', next),
+          c.passLine3,
+        ],
+        confirmLabel: c.passConfirm.replace('{next}', next),
+      };
 
   const Icon = LEVEL_META[level].icon;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      {confirming && (
+        <ConfirmDecisionDialog
+          {...confirmProps}
+          actorName={reviewerName}
+          submitting={submitting}
+          onConfirm={submit}
+          onBack={() => setConfirming(false)}
+        />
+      )}
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start gap-3 p-5 border-b border-gray-100">
@@ -260,7 +314,7 @@ function LevelDecisionModal({
             {t.applicationDetail.cancel}
           </button>
           <button
-            onClick={submit}
+            onClick={requestConfirm}
             disabled={submitting}
             className={cn(
               'px-4 py-2 text-xs font-semibold text-white rounded-lg transition-colors disabled:opacity-50',
@@ -278,8 +332,10 @@ function LevelDecisionModal({
 // ─── Final reject modal ───────────────────────────────────────────────────────
 
 function FinalRejectModal({
-  onSubmit, onClose, submitting,
+  companyName, reviewerName, onSubmit, onClose, submitting,
 }: {
+  companyName: string;
+  reviewerName?: string;
   onSubmit: (comment: string) => void;
   onClose: () => void;
   submitting: boolean;
@@ -287,9 +343,22 @@ function FinalRejectModal({
   const { t } = useLanguage();
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      {confirming && (
+        <ConfirmDecisionDialog
+          tone="danger"
+          title={t.confirmDecision.rejectTitle.replace('{company}', companyName)}
+          lines={[t.confirmDecision.rejectLine1, t.confirmDecision.rejectLine2, t.confirmDecision.rejectLine3]}
+          confirmLabel={t.confirmDecision.rejectConfirm}
+          actorName={reviewerName}
+          submitting={submitting}
+          onConfirm={() => onSubmit(comment.trim())}
+          onBack={() => setConfirming(false)}
+        />
+      )}
       <div className="bg-white rounded-2xl w-full max-w-md">
         <div className="flex items-start gap-3 p-5 border-b border-gray-100">
           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
@@ -326,7 +395,8 @@ function FinalRejectModal({
           <button
             onClick={() => {
               if (!comment.trim()) { setError(t.reviewPipeline.commentRequired); return; }
-              onSubmit(comment.trim());
+              setError('');
+              setConfirming(true);
             }}
             disabled={submitting}
             className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
@@ -557,7 +627,7 @@ function FinalStageCard({
 
 export default function ReviewPipeline({
   app, onLevelDecision, onApprove, onReject, actionLoading, error,
-  actableLevel = null, canDecideFinal = true,
+  actableLevel = null, canDecideFinal = true, reviewerName,
 }: {
   app: InvestmentApplication;
   onLevelDecision: (level: ReviewLevel, payload: LevelDecisionPayload) => Promise<void>;
@@ -572,6 +642,8 @@ export default function ReviewPipeline({
   actableLevel?: 1 | 2 | 3 | null;
   /** False for reviewers — the final approve/reject belongs to the investor. */
   canDecideFinal?: boolean;
+  /** Shown on the confirmation step as who the decision is recorded against. */
+  reviewerName?: string;
 }) {
   const { t, language } = useLanguage();
   const [modalLevel, setModalLevel] = useState<ReviewLevel | null>(null);
@@ -608,6 +680,7 @@ export default function ReviewPipeline({
         <LevelDecisionModal
           level={modalLevel}
           companyName={app.companyName || t.applicationDetail.untitledApplication}
+          reviewerName={reviewerName}
           onSubmit={handleLevelSubmit}
           onClose={() => setModalLevel(null)}
           submitting={actionLoading}
@@ -615,6 +688,8 @@ export default function ReviewPipeline({
       )}
       {showRejectModal && (
         <FinalRejectModal
+          companyName={app.companyName || t.applicationDetail.untitledApplication}
+          reviewerName={reviewerName}
           onSubmit={handleRejectSubmit}
           onClose={() => setShowRejectModal(false)}
           submitting={actionLoading}

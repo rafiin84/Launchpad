@@ -1223,6 +1223,45 @@ const en = {
     yourLevel: 'Your level',
     stageScoped: 'You only see applications at your review stage',
   },
+
+  // ─── Decision confirmations (irreversible / one-way actions) ──────────────
+  confirmDecision: {
+    heading: 'Please confirm',
+    back: 'Go back',
+
+    passTitle: 'Pass {company} to Level {next}?',
+    passLine1: 'This application moves out of your queue.',
+    passLine2: 'The Level {next} Reviewer will be able to see it.',
+    passLine3: 'It will no longer appear in your list.',
+    passConfirm: 'Yes, pass to Level {next}',
+
+    passFinalTitle: 'Pass {company} to the investor?',
+    passFinalLine1: 'All three review levels will be complete.',
+    passFinalLine2: 'The investor will be able to approve or reject it.',
+    passFinalLine3: 'It will no longer appear in your list.',
+    passFinalConfirm: 'Yes, pass to the investor',
+
+    dropTitle: 'Do not shortlist {company}?',
+    dropLine1: 'The review ends here at Level {level}.',
+    dropLine2: 'The application will not proceed to any later level.',
+    dropLine3: 'The founder will be notified.',
+    dropConfirm: 'Yes, do not shortlist',
+
+    approveTitle: 'Approve and invest in {company}?',
+    approveLine1: 'Investment of {amount} via {paymentType}.',
+    approveLine2: 'A portfolio record will be created for this company.',
+    approveLine3: 'The founder becomes an active portfolio founder and is notified.',
+    approveConfirm: 'Yes, approve and invest',
+
+    rejectTitle: 'Reject {company}?',
+    rejectLine1: 'This application cleared all three levels but will not be funded.',
+    rejectLine2: 'The founder will be notified of the decision.',
+    rejectLine3: 'This cannot be undone from here.',
+    rejectConfirm: 'Yes, reject application',
+
+    reviewingAs: 'Recorded as {name}',
+    cannotUndo: 'This action cannot be undone from this screen.',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

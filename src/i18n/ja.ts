@@ -1202,6 +1202,45 @@ const ja: TranslationKeys = {
     yourLevel: 'あなたのレベル',
     stageScoped: '自分の審査ステージの申請のみ表示されます',
   },
+
+  // ─── Decision confirmations (irreversible / one-way actions) ──────────────
+  confirmDecision: {
+    heading: 'ご確認ください',
+    back: '戻る',
+
+    passTitle: '{company} をレベル{next}へ進めますか？',
+    passLine1: 'この申請はあなたのキューから外れます。',
+    passLine2: 'レベル{next}審査者が閲覧できるようになります。',
+    passLine3: 'あなたの一覧には表示されなくなります。',
+    passConfirm: 'はい、レベル{next}へ進める',
+
+    passFinalTitle: '{company} を投資家へ進めますか？',
+    passFinalLine1: '3段階すべての審査が完了します。',
+    passFinalLine2: '投資家が承認または却下できるようになります。',
+    passFinalLine3: 'あなたの一覧には表示されなくなります。',
+    passFinalConfirm: 'はい、投資家へ進める',
+
+    dropTitle: '{company} を不選考にしますか？',
+    dropLine1: 'レベル{level}で審査が終了します。',
+    dropLine2: 'この申請は以降のレベルには進みません。',
+    dropLine3: '創業者に通知されます。',
+    dropConfirm: 'はい、不選考にする',
+
+    approveTitle: '{company} を承認して投資しますか？',
+    approveLine1: '{paymentType} による {amount} の投資。',
+    approveLine2: 'この企業のポートフォリオレコードが作成されます。',
+    approveLine3: '創業者はポートフォリオ創業者となり、通知されます。',
+    approveConfirm: 'はい、承認して投資する',
+
+    rejectTitle: '{company} を却下しますか？',
+    rejectLine1: '3段階すべてを通過しましたが、投資は行われません。',
+    rejectLine2: 'この判断は創業者に通知されます。',
+    rejectLine3: 'この操作はこの画面から取り消せません。',
+    rejectConfirm: 'はい、申請を却下する',
+
+    reviewingAs: '{name} として記録されます',
+    cannotUndo: 'この操作はこの画面から取り消せません。',
+  },
   languages: {
     en: 'English',
     ja: '日本語',
