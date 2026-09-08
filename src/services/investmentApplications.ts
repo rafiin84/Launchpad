@@ -350,10 +350,28 @@ function isAuthError(err: unknown): boolean {
   return e?.status === 401 || e?.code === 'INVALID_TOKEN' || /invalid.*token|401/i.test(e?.message ?? '');
 }
 
-async function crmGetAll(): Promise<InvestmentApplication[]> {
+async function crmGetAll(viewer: ViewerRole = 'investor'): Promise<InvestmentApplication[]> {
   try {
     const params = { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' };
     if (!isFounder()) {
+      // Stage-scoped fetch: ask CRM only for the statuses this viewer may see,
+      // so out-of-stage applications never reach the client at all.
+      const criteria = stageCriteria(viewer);
+      if (criteria) {
+        try {
+          // NOTE: Zoho's search endpoint returns at most 200 records and this
+          // helper does not paginate — see the pagination follow-up before
+          // running this at multi-thousand volume.
+          const records = await zohoSearch(CRM_MODULE, criteria);
+          return records.map(fromCrmRecord);
+        } catch (err) {
+          // A search failure must not silently widen visibility — fall back to
+          // a full list and filter locally instead of returning everything.
+          console.warn('[investmentApplications] stage-scoped search failed, filtering locally:', err);
+          const records = await zohoList(CRM_MODULE, params);
+          return records.map(fromCrmRecord).filter(a => canViewApplication(a, viewer));
+        }
+      }
       const records = await zohoList(CRM_MODULE, params);
       return records.map(fromCrmRecord);
     }
@@ -443,15 +461,19 @@ async function crmDeleteApp(id: string): Promise<void> {
  * Investors: all applications from CRM.
  * Founders: CRM applications filtered to the founder's email + local drafts.
  */
-export async function getApplications(isInvestor: boolean, founderEmail?: string): Promise<InvestmentApplication[]> {
+export async function getApplications(
+  isInvestor: boolean,
+  founderEmail?: string,
+  viewer: ViewerRole = 'investor',
+): Promise<InvestmentApplication[]> {
   const [crmApps, localDrafts] = await Promise.all([
-    crmGetAll(),
+    crmGetAll(viewer),
     Promise.resolve(loadLocalDrafts()),
   ]);
 
   if (isInvestor) return crmApps;
 
-  // For founders, crmGetAll() already scopes via COQL WHERE Founder_Email = login email.
+  // For founders, crmGetAll(viewer) already scopes via COQL WHERE Founder_Email = login email.
   // Don't re-filter by email — currentUser.email (Zoho One) may differ from the
   // portal login email used in Founder_Email, causing all apps to be filtered out.
   const myApps = crmApps;
@@ -491,10 +513,18 @@ export function canApplyAgain(applications: InvestmentApplication[]): boolean {
 }
 
 /** Fetch a single application by ID. */
-export async function getApplicationById(id: string, isInvestor: boolean): Promise<InvestmentApplication | null> {
+export async function getApplicationById(
+  id: string,
+  isInvestor: boolean,
+  viewer?: ViewerRole,
+): Promise<InvestmentApplication | null> {
   const local = loadLocal().find(a => a.id === id);
   if (local) return local;
-  return crmGetById(id);
+  const app = await crmGetById(id);
+  // Stage visibility applies to direct record access too, so pasting an id
+  // into the URL cannot reveal an application from another stage.
+  if (app && viewer && !canViewApplication(app, viewer)) return null;
+  return app;
 }
 
 /** Fetch applications by status. */
@@ -1030,6 +1060,78 @@ function reconcileWithStatus(
   return { levels, final };
 }
 
+/**
+ * Who is looking at an application. Reviewers are CRM (non-portal) users
+ * distinguished by their Zoho *profile* — "Level 1/2/3 Reviewer" — not by their
+ * Zoho role (all three share the "Manager" role).
+ */
+export type ViewerRole = 'founder' | 'reviewer_l1' | 'reviewer_l2' | 'reviewer_l3' | 'investor';
+
+/** The review level a viewer owns, or null for founders and the investor. */
+export function viewerLevel(viewer: ViewerRole): ReviewLevel | null {
+  return viewer === 'reviewer_l1' ? 1 : viewer === 'reviewer_l2' ? 2 : viewer === 'reviewer_l3' ? 3 : null;
+}
+
+/** The stage an application sits at while it awaits the given level. */
+export const AWAITING_STATUS: Record<ReviewLevel, ApplicationStatus> = {
+  1: 'submitted',
+  2: 'level1_cleared',
+  3: 'level2_cleared',
+};
+
+/**
+ * Statuses that predate the 3-level workflow. They are folded into the Level 1
+ * queue so no historical record becomes invisible to everyone; they re-enter
+ * the funnel at screening.
+ */
+const LEGACY_IN_REVIEW: ApplicationStatus[] = [
+  'under_review', 'interested', 'more_info_requested',
+  'documents_requested', 'shortlisted', 'meeting_scheduled',
+  'due_diligence', 'on_hold',
+];
+
+/**
+ * STRICT STAGE-BASED VISIBILITY.
+ *
+ * A newly submitted application is visible ONLY to the Level 1 reviewer. Each
+ * subsequent level sees it only once the previous level has passed it, and the
+ * investor never sees an application that has not cleared level 3.
+ *
+ * Returned as an explicit status allowlist so it can be pushed into the CRM
+ * query rather than filtered after the fact — at 2,000 applications the
+ * difference matters, and it keeps out-of-stage records off the wire.
+ */
+export function visibleStatusesFor(viewer: ViewerRole): ApplicationStatus[] {
+  switch (viewer) {
+    case 'reviewer_l1':
+      return ['submitted', 'level1_screening', ...LEGACY_IN_REVIEW];
+    case 'reviewer_l2':
+      return ['level1_cleared'];
+    case 'reviewer_l3':
+      return ['level2_cleared'];
+    case 'investor':
+      // Only applications that cleared all three levels, plus the ones the
+      // investor has already decided. Never a new or mid-funnel application.
+      return ['level3_cleared', 'approved', 'invested', 'rejected'];
+    case 'founder':
+    default:
+      return [];  // founders are scoped by ownership, not by stage
+  }
+}
+
+/** True when this viewer is allowed to see this application at all. */
+export function canViewApplication(app: InvestmentApplication, viewer: ViewerRole): boolean {
+  if (viewer === 'founder') return true;
+  return visibleStatusesFor(viewer).includes(app.status);
+}
+
+/** CRM search criteria for the viewer's queue, e.g. "(Application_Status:equals:submitted)or(...)". */
+function stageCriteria(viewer: ViewerRole): string {
+  const statuses = visibleStatusesFor(viewer);
+  if (!statuses.length) return '';
+  return statuses.map(s => `(Application_Status:equals:${s})`).join('or');
+}
+
 export type PipelineStageState = 'completed' | 'current' | 'locked' | 'not_shortlisted';
 
 export interface PipelineState {
@@ -1093,6 +1195,11 @@ export interface LevelDecisionInput {
   reviewerEmail?: string;
   comment: string;
   score?: number;
+  /**
+   * The acting user's role. A reviewer may only decide at their own level;
+   * the investor may not decide review levels at all.
+   */
+  viewer?: ViewerRole;
 }
 
 /**
@@ -1105,6 +1212,23 @@ export async function recordLevelDecision(
   input: LevelDecisionInput,
   isInvestor = true,
 ): Promise<InvestmentApplication | null> {
+  // ── Authorisation first: a reviewer may only act on their own level, and
+  // this does not depend on the record, so it must not require a fetch. It
+  // also stops an unauthorised caller learning whether the record exists.
+  if (input.viewer) {
+    const own = viewerLevel(input.viewer);
+    if (own === null) {
+      throw new Error(
+        input.viewer === 'investor'
+          ? 'The investor cannot decide review levels — only the final approve/reject'
+          : 'You are not a reviewer',
+      );
+    }
+    if (own !== input.level) {
+      throw new Error(`You can only review at level ${own}`);
+    }
+  }
+
   const app = await getApplicationById(id, isInvestor);
   if (!app) throw new Error('Application not found');
 
@@ -1161,7 +1285,12 @@ export async function recordFinalDecision(
   comment: string,
   isInvestor = true,
   reviewerEmail = '',
+  viewer: ViewerRole = 'investor',
 ): Promise<{ app: InvestmentApplication | null; ledgerJson: string }> {
+  // ── Authorisation: the final approve/reject belongs to the investor alone ──
+  if (viewer !== 'investor') {
+    throw new Error('Only the investor can make the final approve or reject decision');
+  }
   const app = await getApplicationById(id, isInvestor);
   if (!app) throw new Error('Application not found');
 

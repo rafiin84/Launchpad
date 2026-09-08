@@ -1201,6 +1201,28 @@ const en = {
     currentStage: 'Current stage',
     awaitingStart: 'Submitted \u2014 waiting for the first review',
   },
+
+  // ─── Reviewer queues (3-level sequential review) ──────────────────────────
+  reviewerQueue: {
+    l1Title: 'Level 1 Reviewer — Initial Screening',
+    l2Title: 'Level 2 Reviewer — Detailed Review',
+    l3Title: 'Level 3 Reviewer — Final Shortlist',
+    investorTitle: 'Investment Decision',
+    l1Desc: 'New applications awaiting your first-pass screening',
+    l2Desc: 'Applications passed to you by the Level 1 Reviewer',
+    l3Desc: 'Applications passed to you by the Level 2 Reviewer',
+    investorDesc: 'Applications that cleared all three review levels',
+    queueCount: '{n} in your queue',
+    emptyQueue: 'Nothing awaiting your review',
+    emptyQueueDesc: 'Applications appear here once the previous level passes them on.',
+    emptyL1Desc: 'New applications appear here as soon as founders submit them.',
+    emptyInvestorDesc: 'Applications appear here once the Level 3 Reviewer passes them on.',
+    passedOn: 'Passed on',
+    notMyLevel: 'This application is at another review level',
+    onlyInvestorDecides: 'Only the investor can approve or reject',
+    yourLevel: 'Your level',
+    stageScoped: 'You only see applications at your review stage',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

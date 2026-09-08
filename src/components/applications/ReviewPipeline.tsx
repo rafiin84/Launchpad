@@ -342,7 +342,7 @@ function FinalRejectModal({
 // ─── Stage card ───────────────────────────────────────────────────────────────
 
 function StageCard({
-  level, state, review, isLast, language, t, onAction, actionLoading,
+  level, state, review, isLast, language, t, onAction, actionLoading, canAct,
 }: {
   level: ReviewLevel;
   state: PipelineStageState;
@@ -352,6 +352,8 @@ function StageCard({
   t: TranslationKeys;
   onAction: () => void;
   actionLoading: boolean;
+  /** Whether this viewer may act on this level. */
+  canAct: boolean;
 }) {
   const meta = LEVEL_META[level];
   const Icon = meta.icon;
@@ -408,7 +410,7 @@ function StageCard({
               <p className="text-xs text-gray-500 mt-0.5">{levelDesc(t, level)}</p>
             </div>
 
-            {isCurrent && (
+            {isCurrent && canAct && (
               <button
                 onClick={onAction}
                 disabled={actionLoading}
@@ -444,7 +446,8 @@ function StageCard({
           {/* Awaiting hint */}
           {isCurrent && (
             <p className="text-[11px] font-medium text-amber-700 mt-2.5 inline-flex items-center gap-1">
-              <CircleDot size={10} /> {t.reviewPipeline.awaitingReview}
+              <CircleDot size={10} />
+              {canAct ? t.reviewPipeline.awaitingReview : t.reviewerQueue.notMyLevel}
             </p>
           )}
         </div>
@@ -554,6 +557,7 @@ function FinalStageCard({
 
 export default function ReviewPipeline({
   app, onLevelDecision, onApprove, onReject, actionLoading, error,
+  actableLevel = null, canDecideFinal = true,
 }: {
   app: InvestmentApplication;
   onLevelDecision: (level: ReviewLevel, payload: LevelDecisionPayload) => Promise<void>;
@@ -561,6 +565,13 @@ export default function ReviewPipeline({
   onReject: (comment: string) => Promise<void>;
   actionLoading: boolean;
   error?: string;
+  /**
+   * The review level this viewer owns (1-3), or null for the investor.
+   * A reviewer sees the whole pipeline but can only act on their own level.
+   */
+  actableLevel?: 1 | 2 | 3 | null;
+  /** False for reviewers — the final approve/reject belongs to the investor. */
+  canDecideFinal?: boolean;
 }) {
   const { t, language } = useLanguage();
   const [modalLevel, setModalLevel] = useState<ReviewLevel | null>(null);
@@ -733,6 +744,7 @@ export default function ReviewPipeline({
             t={t}
             onAction={() => setModalLevel(level)}
             actionLoading={actionLoading && currentLevel === level}
+            canAct={actableLevel === null ? false : actableLevel === level}
           />
         ))}
         <FinalStageCard
@@ -743,7 +755,7 @@ export default function ReviewPipeline({
           onApprove={onApprove}
           onReject={() => setShowRejectModal(true)}
           actionLoading={actionLoading}
-          unlocked={finalUnlocked}
+          unlocked={finalUnlocked && canDecideFinal}
         />
       </div>
     </div>

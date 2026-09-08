@@ -10,6 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import {
   getApplications,
   getPipelineState,
+  canViewApplication,
   REVIEW_LEVELS,
   type InvestmentApplication,
   type ApplicationStatus,
@@ -171,7 +172,7 @@ function LevelProgress({ app }: { app: InvestmentApplication }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvestorApplications() {
-  const { isInvestor } = useAuth();
+  const { isInvestor, viewerRole, reviewerLevel, isReviewer } = useAuth();
   const { t, language } = useLanguage();
   const { setPageTitle } = usePageTitle();
   const relativeTime = createRelativeTime(t, language);
@@ -195,11 +196,13 @@ export default function InvestorApplications() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const all = await getApplications(isInvestor);
-      setApplications(all.filter(a => a.status !== 'draft'));
+      // Stage-scoped: the service asks CRM only for the statuses this viewer
+      // may see. The extra filter is a safety net, not the mechanism.
+      const all = await getApplications(isInvestor, undefined, viewerRole);
+      setApplications(all.filter(a => a.status !== 'draft' && canViewApplication(a, viewerRole)));
     } catch { /* ignore */ }
     setLoading(false);
-  }, [isInvestor]);
+  }, [isInvestor, viewerRole]);
 
   useEffect(() => { setPageTitle(t.nav.applications, t.applications.title); return () => setPageTitle(null); }, [t]);
   useEffect(() => { load(); }, [load]);
@@ -230,8 +233,39 @@ export default function InvestorApplications() {
     { label: t.investorApplications.rejected,    value: applications.filter(a => a.status === 'rejected').length,                                                        icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
   ];
 
+  // Queue identity: each reviewer level gets its own framing, and the tabs
+  // only offer statuses that can actually appear in that queue.
+  const queueTitle = reviewerLevel === 1 ? t.reviewerQueue.l1Title
+    : reviewerLevel === 2 ? t.reviewerQueue.l2Title
+    : reviewerLevel === 3 ? t.reviewerQueue.l3Title
+    : t.reviewerQueue.investorTitle;
+  const queueDesc = reviewerLevel === 1 ? t.reviewerQueue.l1Desc
+    : reviewerLevel === 2 ? t.reviewerQueue.l2Desc
+    : reviewerLevel === 3 ? t.reviewerQueue.l3Desc
+    : t.reviewerQueue.investorDesc;
+  const emptyDesc = reviewerLevel === 1 ? t.reviewerQueue.emptyL1Desc
+    : isReviewer ? t.reviewerQueue.emptyQueueDesc
+    : t.reviewerQueue.emptyInvestorDesc;
+
+  // Reviewers have a single-stage queue, so status tabs are meaningless for
+  // them; only the investor sees more than one status.
+  const visibleTabs = isReviewer
+    ? []
+    : FILTER_TABS.filter(tab => ['all', 'level3_cleared', 'approved', 'rejected'].includes(tab.id));
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      {/* Queue header — states plainly whose queue this is */}
+      <div className="mb-5">
+        <h1 className="text-lg font-bold text-gray-900">{queueTitle}</h1>
+        <p className="text-xs text-gray-500 mt-0.5">{queueDesc}</p>
+        {isReviewer && (
+          <p className="text-[11px] text-gray-400 mt-1.5 inline-flex items-center gap-1">
+            <Lock size={10} /> {t.reviewerQueue.stageScoped}
+          </p>
+        )}
+      </div>
+
       {/* Search + Filter Tabs */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -246,7 +280,7 @@ export default function InvestorApplications() {
         </div>
 
         <div className="flex flex-wrap gap-1.5 sm:ml-auto">
-          {FILTER_TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -263,9 +297,9 @@ export default function InvestorApplications() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        {stats.map(stat => {
+      {/* Stats Cards — the investor sees the funnel; a reviewer sees their queue */}
+      <div className={cn('grid gap-3 mb-6', isReviewer ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
+        {(isReviewer ? stats.slice(0, 1) : stats).map(stat => {
           const Icon = stat.icon;
           return (
             <div key={stat.label} className="bg-white border border-gray-100 rounded-2xl p-4">
@@ -284,8 +318,7 @@ export default function InvestorApplications() {
       {/* Section header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-900">
-          {t.nav.applications}
-          <span className="ml-2 text-xs font-medium text-gray-400">{filtered.length}</span>
+          {t.reviewerQueue.queueCount.replace('{n}', String(filtered.length))}
         </h2>
       </div>
 
@@ -310,8 +343,8 @@ export default function InvestorApplications() {
       {!loading && filtered.length === 0 && (
         <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
           <Inbox size={28} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.common.noResults}</p>
-          <p className="text-xs text-gray-400">{t.applications.title}</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t.reviewerQueue.emptyQueue}</p>
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">{emptyDesc}</p>
         </div>
       )}
 

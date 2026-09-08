@@ -263,6 +263,7 @@ export function clearPortalLoginEmail(): void {
 // -----------------------------------------------------------------------------
 
 const ROLE_KEY = 'lp_user_role';
+const REVIEWER_LEVEL_KEY = 'lp_reviewer_level';
 const PENDING_ROLE_KEY = 'lp_pending_role';
 
 export function saveRole(role: string): void {
@@ -273,6 +274,59 @@ export function saveRole(role: string): void {
 export function loadRole(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ROLE_KEY);
+}
+
+/**
+ * The reviewer level (1-3) of the signed-in CRM user, or null.
+ *
+ * Derived from the Zoho *profile* name at login ("Level 1/2/3 Reviewer") and
+ * cached here only so the UI can render before the profile round-trip
+ * completes. AuthContext re-validates it against Zoho on load — never trust
+ * this value for an authorisation decision on its own.
+ */
+export function saveReviewerLevel(level: 1 | 2 | 3 | null): void {
+  if (typeof window === "undefined") return;
+  if (level === null) localStorage.removeItem(REVIEWER_LEVEL_KEY);
+  else localStorage.setItem(REVIEWER_LEVEL_KEY, String(level));
+}
+
+export function loadReviewerLevel(): 1 | 2 | 3 | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(REVIEWER_LEVEL_KEY);
+  return raw === '1' ? 1 : raw === '2' ? 2 : raw === '3' ? 3 : null;
+}
+
+export function clearReviewerLevel(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(REVIEWER_LEVEL_KEY);
+}
+
+/**
+ * Maps a Zoho CRM profile name to the app's role and reviewer level.
+ * Single source of truth, used both at login and on every reload.
+ *
+ *   "Level 1 Reviewer" → investor role, level 1   (screening queue)
+ *   "Level 2 Reviewer" → investor role, level 2
+ *   "Level 3 Reviewer" → investor role, level 3
+ *   "Investor" / "Administrator" → investor role, no level (final decision)
+ *   anything else      → founder
+ *
+ * Reviewers carry the 'investor' UserRole because they are CRM (non-portal)
+ * users on the same token path; what separates them is the level, which gates
+ * both their queue and their actions.
+ */
+export function identityFromProfile(profileName: string | undefined | null): {
+  role: 'founder' | 'investor';
+  reviewerLevel: 1 | 2 | 3 | null;
+} {
+  if (!profileName) return { role: 'founder', reviewerLevel: null };
+  const p = profileName.trim().toLowerCase();
+  const m = p.match(/^level\s*([123])\s*reviewer$/);
+  if (m) return { role: 'investor', reviewerLevel: Number(m[1]) as 1 | 2 | 3 };
+  if (p === 'administrator' || p === 'investor' || p === 'admin') {
+    return { role: 'investor', reviewerLevel: null };
+  }
+  return { role: 'founder', reviewerLevel: null };
 }
 
 export function clearRole(): void {

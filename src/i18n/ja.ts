@@ -1180,6 +1180,28 @@ const ja: TranslationKeys = {
     currentStage: '現在のステージ',
     awaitingStart: '提出済み — 最初の審査を待っています',
   },
+
+  // ─── Reviewer queues (3-level sequential review) ──────────────────────────
+  reviewerQueue: {
+    l1Title: 'レベル1審査者 — 初期スクリーニング',
+    l2Title: 'レベル2審査者 — 詳細審査',
+    l3Title: 'レベル3審査者 — 最終選考',
+    investorTitle: '投資判断',
+    l1Desc: '一次スクリーニング待ちの新規申請',
+    l2Desc: 'レベル1審査者から引き継がれた申請',
+    l3Desc: 'レベル2審査者から引き継がれた申請',
+    investorDesc: '3段階すべての審査を通過した申請',
+    queueCount: 'キューに {n} 件',
+    emptyQueue: '審査待ちの申請はありません',
+    emptyQueueDesc: '前のレベルが通過させると、ここに表示されます。',
+    emptyL1Desc: '創業者が申請すると、すぐにここに表示されます。',
+    emptyInvestorDesc: 'レベル3審査者が通過させると、ここに表示されます。',
+    passedOn: '引き継ぎ日',
+    notMyLevel: 'この申請は別の審査レベルにあります',
+    onlyInvestorDecides: '承認・却下は投資家のみが行えます',
+    yourLevel: 'あなたのレベル',
+    stageScoped: '自分の審査ステージの申請のみ表示されます',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

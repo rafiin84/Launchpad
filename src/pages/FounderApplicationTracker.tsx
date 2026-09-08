@@ -380,7 +380,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
   // Nothing to show unless the investor actually requested documents.
   const hasRealDocs = docTypes.length > 0 && !(docTypes.length === 1 && docTypes[0] === 'Document');
-  if (!hasRealDocs && app.status !== 'documents_requested') return null;
+  if (!hasRealDocs && pendingDocCount(app) === 0 && app.status !== 'documents_requested') return null;
 
   const displayDocs = docTypes.length > 0 ? docTypes : ['Document'];
   const doneCount = Object.keys(submitted).length;
@@ -497,13 +497,29 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   );
 }
 
-const ACTION_REQUIRED: ApplicationStatus[] = ['more_info_requested', 'documents_requested'];
+/**
+ * Supporting actions no longer change Application_Status — that field is the
+ * pipeline stage only, so an application never leaves its reviewer's queue
+ * when someone asks for a document. The founder-facing "action needed" state
+ * is therefore derived from the data itself.
+ */
+function pendingDocCount(app: InvestmentApplication): number {
+  return parseRequestedDocuments(app.requestedDocuments)
+    .filter(d => d.status !== 'submitted').length;
+}
+
+function needsFounderAction(app: InvestmentApplication): boolean {
+  if (pendingDocCount(app) > 0) return true;
+  // Legacy records written before stage/activity were separated
+  return app.status === 'more_info_requested' || app.status === 'documents_requested';
+}
+
 
 function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hideProgress = false }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void; hideProgress?: boolean }) {
   const { t } = useLanguage();
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
-  const needsAction = ACTION_REQUIRED.includes(app.status);
+  const needsAction = needsFounderAction(app);
 
   return (
     <div className={cn(
@@ -519,7 +535,9 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
       {needsAction && (
         <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mb-3">
           <Clock size={12} />
-          {app.status === 'more_info_requested' ? t.applicationTracker.moreInfoRequested : t.applicationTracker.docsRequested}
+          {pendingDocCount(app) > 0 || app.status === 'documents_requested'
+            ? t.applicationTracker.docsRequested
+            : t.applicationTracker.moreInfoRequested}
         </div>
       )}
       {isApproved && (
@@ -629,7 +647,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
                 <FounderReviewProgress
                   app={app}
                   variant="detailed"
-                  actionNeeded={ACTION_REQUIRED.includes(app.status)}
+                  actionNeeded={needsFounderAction(app)}
                 />
               )}
               {app.companyDescription && (
@@ -729,7 +747,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
       )}
 
       {/* When collapsed and docs requested, show upload section directly */}
-      {!expanded && !isDraft && app.status === 'documents_requested' && (
+      {!expanded && !isDraft && (pendingDocCount(app) > 0 || app.status === 'documents_requested') && (
         <div className="mt-3 border-t border-gray-100 pt-3">
           <GenericDocUpload app={app} onRefresh={onRefresh} />
         </div>
@@ -890,7 +908,7 @@ export default function FounderApplicationTracker() {
             <FounderReviewProgress
               app={primaryApp}
               variant="hero"
-              actionNeeded={ACTION_REQUIRED.includes(primaryApp.status)}
+              actionNeeded={needsFounderAction(primaryApp)}
             />
           )}
 

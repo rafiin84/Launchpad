@@ -776,7 +776,7 @@ function ScheduleMeetingModal({
 
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
-  const { currentUser, isInvestor, isFounder } = useAuth();
+  const { currentUser, isInvestor, isFounder, viewerRole, reviewerLevel, isReviewer } = useAuth();
   const { t, language } = useLanguage();
 
   const [app, setApp] = useState<InvestmentApplication | null>(null);
@@ -804,7 +804,7 @@ export default function ApplicationDetail() {
   const loadApp = useCallback(async () => {
     if (!id) return;
     try {
-      const result = await getApplicationById(id, isInvestor);
+      const result = await getApplicationById(id, isInvestor, viewerRole);
       if (result) {
         setApp(result);
         setNotes(result.investorNotes || '');
@@ -815,7 +815,7 @@ export default function ApplicationDetail() {
       setError(err instanceof Error ? err.message : t.applicationDetail.failedToLoad);
     }
     setLoading(false);
-  }, [id, isInvestor, t]);
+  }, [id, isInvestor, viewerRole, t]);
 
   useEffect(() => { loadApp(); }, [loadApp]);
 
@@ -916,9 +916,12 @@ export default function ApplicationDetail() {
     setActionLoading('documents_requested');
     setActionError('');
     try {
+      // Deliberately does NOT touch Application_Status. Requesting documents is
+      // a supporting action: the application must stay in the current
+      // reviewer's queue. The pending state is derived from
+      // requestedDocuments, not from the stage.
       await updateApplication(id, {
         requestedDocuments: stringifyRequestedDocuments(docs),
-        status: 'documents_requested' as ApplicationStatus,
         reviewedBy: currentUser.name,
         reviewedAt: new Date().toISOString(),
       }, isInvestor);
@@ -955,7 +958,7 @@ export default function ApplicationDetail() {
       await recordFinalDecision(
         id, 'approved', currentUser.name,
         details.investmentNotes || t.reviewPipeline.approvedBanner,
-        isInvestor, currentUser.email,
+        isInvestor, currentUser.email, viewerRole,
       );
       await approveApplication(id, currentUser.name, isInvestor, details);
 
@@ -982,6 +985,42 @@ export default function ApplicationDetail() {
     setActionLoading(null);
   };
 
+  /**
+   * Asks the founder for more information. A supporting action: it notifies
+   * and records, but never moves the application between review levels.
+   */
+  const handleRequestInfo = async () => {
+    if (!app || !id) return;
+    setActionLoading('more_info_requested');
+    setActionError('');
+    try {
+      await updateApplication(id, {
+        reviewedBy: currentUser.name,
+        reviewedAt: new Date().toISOString(),
+      }, isInvestor);
+      const notif = getNotificationMessages(t).more_info_requested;
+      const { title, message } = notif
+        ? notif(app.companyName, currentUser.name)
+        : { title: t.applicationDetail.requestInfo, message: t.applicationDetail.requestInfoDesc };
+      addNotification({
+        type: 'company_update',
+        title,
+        message,
+        actor: currentUser.name,
+        actorRole: 'investor',
+        targetRole: 'founder',
+        targetEmail: app.founderEmail,
+        link: '/applications/track',
+      });
+      window.dispatchEvent(new Event('notifications-updated'));
+      await loadApp();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t.applicationDetail.failedToUpdateStatus;
+      setActionError(msg);
+    }
+    setActionLoading(null);
+  };
+
   // ── 3-level shortlisting pipeline ───────────────────────────────────────
 
   /** Records a decision for one shortlisting level and notifies the founder. */
@@ -997,6 +1036,7 @@ export default function ApplicationDetail() {
         reviewerEmail: currentUser.email,
         comment: payload.comment,
         score: payload.score,
+        viewer: viewerRole,
       }, isInvestor);
 
       const levelName = level === 1
@@ -1032,7 +1072,7 @@ export default function ApplicationDetail() {
     setActionLoading('rejected');
     setActionError('');
     try {
-      await recordFinalDecision(id, 'rejected', currentUser.name, comment, isInvestor, currentUser.email);
+      await recordFinalDecision(id, 'rejected', currentUser.name, comment, isInvestor, currentUser.email, viewerRole);
       const { title, message } = getNotificationMessages(t).rejected(app.companyName, currentUser.name);
       addNotification({
         type: 'company_update',
@@ -1057,6 +1097,10 @@ export default function ApplicationDetail() {
   /** Opens the Approve & Invest modal, guarding the level-3 gate. */
   const handleOpenApprove = () => {
     if (!app) return;
+    if (isReviewer) {
+      setActionError(t.reviewerQueue.onlyInvestorDecides);
+      return;
+    }
     const state = getPipelineState(app);
     if (!state.finalUnlocked) {
       setActionError(t.reviewPipeline.levelLocked);
@@ -1138,9 +1182,10 @@ export default function ApplicationDetail() {
     setActionLoading('meeting_scheduled');
     setActionError('');
     try {
+      // Supporting action — stage unchanged, see handleRequestDocs. The meeting
+      // state is derived from meetingDate.
       await updateApplication(id, {
         ...data,
-        status: 'meeting_scheduled' as ApplicationStatus,
         reviewedBy: currentUser.name,
         reviewedAt: new Date().toISOString(),
       }, isInvestor);
@@ -1200,8 +1245,8 @@ export default function ApplicationDetail() {
 
   // Supporting actions only — Approve / Reject / Shortlist now live in the
   // 3-level shortlisting pipeline below and are gated by it.
-  const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string }[] = [
-    { label: t.applicationDetail.requestInfo,     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',  hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300' },
+  const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string; notifyOnly?: boolean }[] = [
+    { label: t.applicationDetail.requestInfo,     status: 'more_info_requested', icon: MessageSquare, color: 'text-amber-600',  hoverBg: 'hover:bg-amber-50',  activeBg: 'bg-amber-50',  borderColor: 'border-amber-300', notifyOnly: true },
     { label: t.applicationDetail.requestDocs,     status: 'documents_requested', icon: FileUp,        color: 'text-yellow-600', hoverBg: 'hover:bg-yellow-50', activeBg: 'bg-yellow-50', borderColor: 'border-yellow-300' },
     { label: t.applicationDetail.scheduleMeeting, status: 'meeting_scheduled',   icon: Calendar,      color: 'text-violet-600', hoverBg: 'hover:bg-violet-50', activeBg: 'bg-violet-50', borderColor: 'border-violet-300' },
   ];
@@ -1323,6 +1368,8 @@ export default function ApplicationDetail() {
             onReject={handleFinalReject}
             actionLoading={!!actionLoading}
             error={actionError}
+            actableLevel={reviewerLevel}
+            canDecideFinal={!isReviewer}
           />
 
           {/* ── Supporting actions (available throughout the review) ── */}
@@ -1342,6 +1389,8 @@ export default function ApplicationDetail() {
                     ? () => setShowDocsModal(true)
                     : a.status === 'meeting_scheduled'
                     ? () => setShowMeetingModal(true)
+                    : a.notifyOnly
+                    ? () => handleRequestInfo()
                     : () => setConfirmAction(a.status);
 
                   return (

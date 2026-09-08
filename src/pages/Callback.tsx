@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Rocket, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
 import {
   consumePendingToken, saveToken, loadToken, consumePendingRole,
-  saveUserName, clearToken, clearRole, clearUserName,
-} from '../services/oauth';
+  saveUserName, clearToken, clearRole, clearUserName, identityFromProfile, saveReviewerLevel } from '../services/oauth';
 import { fetchCurrentZohoUser, fetchZohoAccountsUser, fetchUserPhoto, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
 import { fullProfileSync, uploadAppUserPhoto, clearCachedRecordId, clearCachedProfile, clearModuleStatusCache } from '../services/crmAppUsers';
 import { findPortalUser, savePortalSession, clearPortalSession } from '../services/portalUsers';
@@ -57,19 +56,6 @@ export default function Callback() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Determine role from CRM profile name.
-   * - "Administrator" → investor (admin has full access)
-   * - "Investor"      → investor
-   * - Anything else   → founder (portal users, unknown profiles)
-   */
-  function roleFromProfile(profileName: string | undefined): UserRole {
-    if (!profileName) return 'founder';
-    const p = profileName.toLowerCase();
-    if (p === 'administrator' || p === 'investor' || p === 'admin') return 'investor';
-    return 'founder';
-  }
-
   async function handleLogin(pendingRole: UserRole) {
     // ── Step 1: Try CRM user login (admin / staff) ──────────────────
     setStatusText('Identifying your account...');
@@ -80,7 +66,8 @@ export default function Callback() {
     if (zohoUser?.email) {
       // CRM user — auto-detect role from CRM profile (ENFORCED)
       const profileName = zohoUser.profile?.name;
-      const detectedRole = roleFromProfile(profileName);
+      const { role: detectedRole, reviewerLevel: detectedLevel } = identityFromProfile(profileName);
+      saveReviewerLevel(detectedLevel);
       console.log(`[Auth] CRM profile: "${profileName}" → role: ${detectedRole}, selected: ${pendingRole}`);
 
       // ── STRICT ROLE ENFORCEMENT ──
@@ -135,7 +122,7 @@ export default function Callback() {
         }
       } catch { /* best-effort */ }
 
-      login(detectedRole);
+      login(detectedRole, detectedLevel);
       setStatus('success');
       setStatusText(`Welcome, ${zohoUser.full_name}! Profile: ${profileName}`);
       setTimeout(() => navigate('/'), 1500);

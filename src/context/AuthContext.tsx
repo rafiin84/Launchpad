@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { User, UserRole } from '../types';
-import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName, loadPortalLoginEmail } from '../services/oauth';
+import { loadToken, clearToken, saveRole, loadRole, clearRole, loadUserName, clearUserName, saveUserName, loadPortalLoginEmail, loadReviewerLevel, saveReviewerLevel, clearReviewerLevel, identityFromProfile } from '../services/oauth';
+import type { ViewerRole } from '../services/investmentApplications';
 import { fetchCurrentZohoUser, fetchUserPhoto, fetchZohoAccountsUser, searchContactByEmail, searchContactByEmailV6, fetchPortalUserContact } from '../services/zohoApi';
 import { ZOHO_HOSTS } from '../config/auth';
 import {
@@ -28,8 +29,14 @@ interface AuthContextValue {
   role: UserRole;
   isInvestor: boolean;
   isFounder: boolean;
+  /** 1-3 when the signed-in CRM user holds a "Level N Reviewer" profile. */
+  reviewerLevel: 1 | 2 | 3 | null;
+  /** True for a level reviewer (not the investor, not a founder). */
+  isReviewer: boolean;
+  /** Single value to pass to the application service for visibility + gating. */
+  viewerRole: ViewerRole;
   isLoggedIn: boolean;
-  login: (role: UserRole) => void;
+  login: (role: UserRole, reviewerLevel?: 1 | 2 | 3 | null) => void;
   logout: () => void;
   zohoEmail: string | null;
   zohoProfile: ZohoProfile;
@@ -103,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { applyFromCRM } = useLanguage();
   const initial = getInitialState();
   const [role, setRole] = useState<UserRole>(initial.role);
+  const [reviewerLevel, setReviewerLevel] = useState<1 | 2 | 3 | null>(() => loadReviewerLevel());
   const [isLoggedIn, setIsLoggedIn] = useState(initial.isLoggedIn);
   const [userName, setUserName] = useState<string | null>(loadUserName);
   const [avatarUrl, setAvatarUrl] = useState<string>('');
@@ -181,6 +189,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchCurrentZohoUser().then(async (user) => {
       console.log('[Auth] fetchCurrentZohoUser result:', user);
+
+      // ── Re-derive role + reviewer level from the CRM profile on every load.
+      // lp_user_role / lp_reviewer_level are only a render-time cache; Zoho is
+      // the authority, so a hand-edited localStorage value is corrected here.
+      if (user?.profile?.name) {
+        const identity = identityFromProfile(user.profile.name);
+        if (identity.reviewerLevel !== reviewerLevel) {
+          setReviewerLevel(identity.reviewerLevel);
+          saveReviewerLevel(identity.reviewerLevel);
+        }
+        if (identity.role !== loadRole()) {
+          console.warn(`[Auth] Stored role "${loadRole()}" disagrees with CRM profile "${user.profile.name}" — using the profile.`);
+          saveRole(identity.role);
+          setRole(identity.role);
+        }
+      }
       if (!user) {
         console.log('[Auth] No CRM user returned — entering portal user flow');
         const isRealN = (n: string | undefined | null) => !!n && n !== 'Founder' && n !== 'Investor' && n !== 'User';
@@ -436,9 +460,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avatar: avatarUrl,
   };
 
-  function login(selectedRole: UserRole) {
+  function login(selectedRole: UserRole, level: 1 | 2 | 3 | null = null) {
     saveRole(selectedRole);
     setRole(selectedRole);
+    saveReviewerLevel(level);
+    setReviewerLevel(level);
     const name = loadUserName();
     setUserName(name);
     setIsLoggedIn(true);
@@ -448,6 +474,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const email = zohoEmail || portalSession?.email || '';
     clearToken();
     clearRole();
+    clearReviewerLevel();
+    setReviewerLevel(null);
     clearUserName();
     clearCachedRecordId();
     clearModuleStatusCache();
@@ -515,6 +543,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         isInvestor: role === 'investor',
         isFounder: role === 'founder',
+        reviewerLevel,
+        isReviewer: role === 'investor' && reviewerLevel !== null,
+        viewerRole: (role === 'founder'
+          ? 'founder'
+          : reviewerLevel === 1 ? 'reviewer_l1'
+          : reviewerLevel === 2 ? 'reviewer_l2'
+          : reviewerLevel === 3 ? 'reviewer_l3'
+          : 'investor') as ViewerRole,
         isLoggedIn,
         login,
         logout,
