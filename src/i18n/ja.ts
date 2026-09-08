@@ -1241,6 +1241,19 @@ const ja: TranslationKeys = {
     reviewingAs: '{name} として記録されます',
     cannotUndo: 'この操作はこの画面から取り消せません。',
   },
+
+  // ─── Locked (decided) applications ────────────────────────────────────────
+  recordLock: {
+    approvedTitle: '承認済み — このレコードはロックされています',
+    approvedDesc: 'この申請は承認され、ポートフォリオレコードの基礎となっています。編集・変更はできません。',
+    rejectedTitle: '却下 — このレコードはロックされています',
+    rejectedDesc: 'この申請は審査の結果却下されました。記録として保持され、編集はできません。',
+    notShortlistedTitle: '不選考 — このレコードはロックされています',
+    notShortlistedDesc: 'この申請は審査を通過しませんでした。記録として保持され、編集はできません。',
+    readOnly: '閲覧のみ',
+    noActions: 'この申請に対して行える操作はありません。',
+    cannotEdit: '承認済みの申請は編集できません。',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

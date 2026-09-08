@@ -14,6 +14,7 @@ import {
   canApplyAgain,
   updateApplication,
   deleteApplication,
+  isApplicationLocked,
   parseRequestedDocuments,
   stringifyRequestedDocuments,
   uploadApplicationDocumentFile,
@@ -254,9 +255,11 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
   const save = async (docType: string, entry: SubmittedDoc) => {
     const next = { ...submitted, [docType]: entry };
     setSubmitted(next);
+    // Submitting a document must NOT change Application_Status — that field is
+    // the review stage, and writing to it here would pull the application out
+    // of whichever reviewer's queue it is currently sitting in.
     await updateApplication(app.id, {
       requestedDocuments: stringifyRequestedDocuments(toRequestedDocs(docTypes, next)),
-      status: 'under_review' as ApplicationStatus,
     }, false);
     addNotification({
       type: 'company_update',
@@ -380,6 +383,8 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
 
   // Nothing to show unless the investor actually requested documents.
   const hasRealDocs = docTypes.length > 0 && !(docTypes.length === 1 && docTypes[0] === 'Document');
+  // Nothing to upload against a decided application.
+  if (isApplicationLocked(app)) return null;
   if (!hasRealDocs && pendingDocCount(app) === 0 && app.status !== 'documents_requested') return null;
 
   const displayDocs = docTypes.length > 0 ? docTypes : ['Document'];
@@ -625,7 +630,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
               {expanded ? t.applicationTracker.hideDetails : t.applicationTracker.viewDetails}
               <ArrowRight size={12} className={cn('transition-transform', expanded && 'rotate-90')} />
             </button>
-            {!isApproved && app.status !== 'rejected' && (
+            {!isApplicationLocked(app) && (
               <Link
                 to={`/applications/apply?edit=${app.id}`}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
@@ -747,7 +752,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
       )}
 
       {/* When collapsed and docs requested, show upload section directly */}
-      {!expanded && !isDraft && (pendingDocCount(app) > 0 || app.status === 'documents_requested') && (
+      {!expanded && !isDraft && !isApplicationLocked(app) && (pendingDocCount(app) > 0 || app.status === 'documents_requested') && (
         <div className="mt-3 border-t border-gray-100 pt-3">
           <GenericDocUpload app={app} onRefresh={onRefresh} />
         </div>

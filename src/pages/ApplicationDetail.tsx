@@ -3,7 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Building2, ExternalLink, FileText, Play, StickyNote,
   CheckCircle2, Pause, XCircle, MessageSquare, FileUp, Calendar,
-  Star, Send, Inbox, X, Check, Clock, Info, Download,
+  Star, Send, Inbox, X, Check, Clock, Info, Download, Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -21,6 +21,8 @@ import {
   recordLevelDecision,
   recordFinalDecision,
   getPipelineState,
+  isApplicationLocked,
+  applicationLockReason,
   type InvestmentApplication,
   type ApplicationStatus,
   type RequestedDocument,
@@ -1271,6 +1273,12 @@ export default function ApplicationDetail() {
     </div>
   );
 
+  // Once the investor has decided the record is closed: no supporting
+  // actions, no notes, no messages. The service refuses these writes anyway;
+  // this keeps the UI honest about it.
+  const locked = isApplicationLocked(app);
+  const lockReason = applicationLockReason(app);
+
   // Supporting actions only — Approve / Reject / Shortlist now live in the
   // 3-level shortlisting pipeline below and are gated by it.
   const actions: { label: string; status: ApplicationStatus; icon: React.ElementType; color: string; hoverBg: string; activeBg: string; borderColor: string; notifyOnly?: boolean }[] = [
@@ -1401,7 +1409,42 @@ export default function ApplicationDetail() {
             reviewerName={currentUser.name}
           />
 
+          {/* ── Locked record notice — replaces every action affordance ── */}
+          {locked && (
+            <div className={cn(
+              'border rounded-2xl p-4 flex items-start gap-3',
+              lockReason === 'approved' ? 'bg-green-50/60 border-green-200' : 'bg-gray-50 border-gray-200',
+            )}>
+              <div className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
+                lockReason === 'approved' ? 'bg-green-100' : 'bg-gray-200',
+              )}>
+                <Lock size={15} className={lockReason === 'approved' ? 'text-green-700' : 'text-gray-500'} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={cn('text-sm font-bold',
+                    lockReason === 'approved' ? 'text-green-900' : 'text-gray-800')}>
+                    {lockReason === 'approved' ? t.recordLock.approvedTitle
+                      : lockReason === 'rejected' ? t.recordLock.rejectedTitle
+                      : t.recordLock.notShortlistedTitle}
+                  </p>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white ring-1 ring-gray-200 text-gray-500">
+                    {t.recordLock.readOnly}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                  {lockReason === 'approved' ? t.recordLock.approvedDesc
+                    : lockReason === 'rejected' ? t.recordLock.rejectedDesc
+                    : t.recordLock.notShortlistedDesc}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1.5">{t.recordLock.noActions}</p>
+              </div>
+            </div>
+          )}
+
           {/* ── Supporting actions (available throughout the review) ── */}
+          {!locked && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               {t.reviewPipeline.supportingActions}
@@ -1474,6 +1517,8 @@ export default function ApplicationDetail() {
               )}
             </div>
           </div>
+
+          )}
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (
@@ -1744,13 +1789,18 @@ export default function ApplicationDetail() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder={t.applicationDetail.notesPlaceholder}
-                className="w-full text-xs text-gray-700 leading-relaxed border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y"
+                disabled={locked}
+                readOnly={locked}
+                className={cn(
+                  "w-full text-xs text-gray-700 leading-relaxed border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-y",
+                  locked && 'bg-gray-50 text-gray-400 cursor-not-allowed',
+                )}
                 rows={5}
               />
               <div className="flex justify-end mt-2">
                 <button
                   onClick={handleSaveNotes}
-                  disabled={savingNotes}
+                  disabled={savingNotes || locked}
                   className="text-xs font-semibold text-white bg-black hover:bg-gray-800 px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {savingNotes ? t.applicationDetail.savingNotes : t.applicationDetail.saveNotes}

@@ -1262,6 +1262,19 @@ const en = {
     reviewingAs: 'Recorded as {name}',
     cannotUndo: 'This action cannot be undone from this screen.',
   },
+
+  // ─── Locked (decided) applications ────────────────────────────────────────
+  recordLock: {
+    approvedTitle: 'Approved — this record is locked',
+    approvedDesc: 'This application has been approved and backs a portfolio record. It can no longer be edited or changed.',
+    rejectedTitle: 'Rejected — this record is locked',
+    rejectedDesc: 'This application was rejected after review. It is kept as a record and can no longer be edited.',
+    notShortlistedTitle: 'Not shortlisted — this record is locked',
+    notShortlistedDesc: 'This application did not clear the review levels. It is kept as a record and can no longer be edited.',
+    readOnly: 'Read-only',
+    noActions: 'No further actions are available on this application.',
+    cannotEdit: 'Approved applications cannot be edited.',
+  },
   languages: {
     en: 'English',
     ja: '日本語',

@@ -603,7 +603,16 @@ export async function createApplication(fields: InvestmentApplicationFields, isI
 export async function updateApplication(
   id: string,
   updates: Partial<InvestmentApplication>,
-  isInvestor: boolean
+  isInvestor: boolean,
+  options: {
+    /**
+     * Permits a write to an already-decided application. Reserved for the
+     * decision transition itself (recordFinalDecision / approveApplication),
+     * which must stay retryable if a later step such as portfolio creation
+     * fails. Never set this from UI code.
+     */
+    allowLocked?: boolean;
+  } = {},
 ): Promise<InvestmentApplication | null> {
   const localApps = loadLocal();
   const localIdx = localApps.findIndex(a => a.id === id);
@@ -620,6 +629,9 @@ export async function updateApplication(
   }
 
   if (localIdx !== -1) {
+    if (!options.allowLocked && isApplicationLocked(localApps[localIdx])) {
+      throw new ApplicationLockedError(applicationLockReason(localApps[localIdx]));
+    }
     const updated: InvestmentApplication = {
       ...localApps[localIdx],
       ...updates,
@@ -629,6 +641,16 @@ export async function updateApplication(
     localApps[localIdx] = updated;
     saveLocal(localApps);
     return updated;
+  }
+
+  // Read the server's current state before writing. The status in hand may be
+  // from a tab opened before the investor decided, so the stored record — not
+  // the caller — decides whether this write is allowed.
+  if (!options.allowLocked) {
+    const current = await crmGetById(id);
+    if (current && isApplicationLocked(current)) {
+      throw new ApplicationLockedError(applicationLockReason(current));
+    }
   }
 
   return crmUpdate(id, updates);
@@ -641,7 +663,9 @@ export async function updateApplicationStatus(
   id: string,
   status: ApplicationStatus,
   reviewerName?: string,
-  isInvestor = true
+  isInvestor = true,
+  /** Set only by the approve/reject transition — see updateApplication. */
+  allowLocked = false,
 ): Promise<InvestmentApplication | null> {
   const updates: Partial<InvestmentApplication> = { status };
 
@@ -650,7 +674,7 @@ export async function updateApplicationStatus(
     updates.reviewedAt = new Date().toISOString();
   }
 
-  return updateApplication(id, updates, isInvestor);
+  return updateApplication(id, updates, isInvestor, { allowLocked });
 }
 
 /**
@@ -673,7 +697,7 @@ export async function approveApplication(
   const app = await getApplicationById(id, isInvestor);
   if (!app) return null;
 
-  const updated = await updateApplicationStatus(id, 'approved', reviewerName, isInvestor);
+  const updated = await updateApplicationStatus(id, 'approved', reviewerName, isInvestor, true);
 
   if (isInvestor) {
     try {
@@ -720,6 +744,12 @@ export async function approveApplication(
 
 /** Delete an application. */
 export async function deleteApplication(id: string, isInvestor: boolean): Promise<void> {
+  // A decided application cannot be deleted either — same record lock.
+  const existing = loadLocal().find(a => a.id === id) || await crmGetById(id);
+  if (existing && isApplicationLocked(existing)) {
+    throw new ApplicationLockedError(applicationLockReason(existing));
+  }
+
   const all = loadLocal();
   const filtered = all.filter(a => a.id !== id);
   if (filtered.length !== all.length) {
@@ -1065,6 +1095,53 @@ function reconcileWithStatus(
  * distinguished by their Zoho *profile* — "Level 1/2/3 Reviewer" — not by their
  * Zoho role (all three share the "Manager" role).
  */
+/**
+ * ─── RECORD LOCK ──────────────────────────────────────────────────────────
+ *
+ * Once the investor has decided, the application is a closed record: an
+ * approved one backs a portfolio holding and an investment amount, so editing
+ * it after the fact would rewrite history behind the money.
+ *
+ * Enforced in updateApplication — the single chokepoint every write goes
+ * through — rather than only in the UI, so a stale tab, a direct service call
+ * or a hand-crafted request cannot get round it.
+ */
+export const LOCKED_STATUSES: ApplicationStatus[] = [
+  'approved',        // investor approved and invested
+  'invested',
+  'rejected',        // investor rejected after level 3
+  'not_shortlisted', // dropped by a reviewer — the funnel ended here
+];
+
+export function isApplicationLocked(app: Pick<InvestmentApplication, 'status'>): boolean {
+  return LOCKED_STATUSES.includes(app.status);
+}
+
+/** Machine-readable reason, so the UI can pick its own wording. */
+export type LockReason = 'approved' | 'rejected' | 'not_shortlisted' | null;
+
+export function applicationLockReason(app: Pick<InvestmentApplication, 'status'>): LockReason {
+  if (app.status === 'approved' || app.status === 'invested') return 'approved';
+  if (app.status === 'rejected') return 'rejected';
+  if (app.status === 'not_shortlisted') return 'not_shortlisted';
+  return null;
+}
+
+export class ApplicationLockedError extends Error {
+  readonly reason: LockReason;
+  constructor(reason: LockReason) {
+    super(
+      reason === 'approved'
+        ? 'This application has been approved and can no longer be changed'
+        : reason === 'rejected'
+        ? 'This application was rejected and can no longer be changed'
+        : 'This application was not shortlisted and can no longer be changed',
+    );
+    this.name = 'ApplicationLockedError';
+    this.reason = reason;
+  }
+}
+
 export type ViewerRole = 'founder' | 'reviewer_l1' | 'reviewer_l2' | 'reviewer_l3' | 'investor';
 
 /** The review level a viewer owns, or null for founders and the investor. */
@@ -1327,7 +1404,7 @@ export async function recordFinalDecision(
       status: 'rejected',
       reviewedBy: reviewer,
       reviewedAt: final.decidedAt,
-    }, isInvestor);
+    }, isInvestor, { allowLocked: true });
     return { app: updated, ledgerJson: json };
   }
 
@@ -1337,6 +1414,6 @@ export async function recordFinalDecision(
     reviewLedger: json,
     reviewedBy: reviewer,
     reviewedAt: final.decidedAt,
-  }, isInvestor);
+  }, isInvestor, { allowLocked: true });
   return { app: updated, ledgerJson: json };
 }

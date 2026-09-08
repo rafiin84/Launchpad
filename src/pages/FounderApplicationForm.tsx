@@ -19,13 +19,13 @@ import {
   Globe,
   Video,
   File,
-  AlertCircle,
-} from 'lucide-react';
+  AlertCircle, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   createApplication,
   getApplicationById,
+  isApplicationLocked,
   getApplications,
   canApplyAgain,
   updateApplication,
@@ -358,6 +358,8 @@ export default function FounderApplicationForm() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  // Set when ?edit= points at an application the investor has already decided.
+  const [lockedOut, setLockedOut] = useState(false);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [validationError, setValidationError] = useState('');
 
@@ -387,6 +389,11 @@ export default function FounderApplicationForm() {
     if (editId) {
       (async () => {
         const existing = await getApplicationById(editId, isInvestor);
+        // A decided application is a closed record — never open it for editing.
+        if (existing && isApplicationLocked(existing)) {
+          setLockedOut(true);
+          return;
+        }
         if (existing) {
           let docs: { name: string; url: string }[] = [];
           try {
@@ -1014,6 +1021,24 @@ export default function FounderApplicationForm() {
   // ── Render ──────────────────────────────────────────────────────────────
 
   const isLastStep = step === STEPS.length - 1;
+
+  if (lockedOut) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-6 h-6 text-gray-400" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">{t.recordLock.readOnly}</h2>
+        <p className="text-sm text-gray-500 mb-6">{t.recordLock.cannotEdit}</p>
+        <button
+          onClick={() => navigate('/applications')}
+          className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-gray-800 transition-colors"
+        >
+          {t.applicationForm.viewMyApplication}
+        </button>
+      </div>
+    );
+  }
 
   if (blocked) {
     return (
