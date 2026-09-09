@@ -399,10 +399,10 @@ export async function fetchFinancials(portfolioId: string): Promise<FinancialEnt
  * do not overwrite each other's work.
  */
 export async function saveFinancialQuarter(
-  portfolioId: string,
+  recordId: string,
   entry: FinancialEntry,
 ): Promise<FinancialEntry[]> {
-  const existing = await fetchFinancials(portfolioId);
+  const existing = await fetchFinancials(recordId);
   const src = entrySource(entry);
   // Replaces only this source's figures for the quarter, so a reviewer's
   // verification never erases what the founder reported, or vice versa.
@@ -413,8 +413,31 @@ export async function saveFinancialQuarter(
   ];
   const json = stringifyFinancials(next);
   const payload = { [FIELD]: json };
-  if (isPortalUser()) await portalUpdate(MODULE, portfolioId, payload);
-  else await zohoUpdate(MODULE, portfolioId, payload);
+  if (isPortalUser()) {
+    await portalUpdate(MODULE, recordId, payload);
+    // Read back before claiming success.
+    //
+    // A client portal carries its own field-level permissions, separate from
+    // the CRM profiles. When a field is not shared with the portal user type,
+    // Zoho does NOT reject the update — it accepts the request, bumps the
+    // record's Modified_Time, and silently discards that one field. The
+    // response says SUCCESS, so portalUpdate cannot tell the difference. The
+    // founder then sees their figures (rendered from local state) until the
+    // next reload, and the investor's page shows nothing, because nothing was
+    // written. Verifying the value is the only way to catch it.
+    const stored = await fetchFinancials(recordId).catch(() => null);
+    if (stored && !stored.some(e =>
+      e.year === entry.year && e.quarter === entry.quarter && entrySource(e) === src)) {
+      throw new Error(
+        'Zoho accepted the request but did not store the figures. The '
+        + `${FIELD} field is not shared with the client portal — in Zoho CRM go to `
+        + 'Setup → Channels → Portals → your portal → the founder user type → '
+        + `field permissions for ${MODULE}, and give ${FIELD} read/write access.`,
+      );
+    }
+  } else {
+    await zohoUpdate(MODULE, recordId, payload);
+  }
   return sortEntries(next);
 }
 
