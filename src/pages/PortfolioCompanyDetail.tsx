@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { cn } from '../lib/cn';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Globe, MapPin, Users, Calendar, DollarSign,
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getCRMPortfolioRecord, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
+import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
 import { Avatar } from '../components/ui/Avatar';
 import { loadToken } from '../services/oauth';
 
@@ -30,7 +32,7 @@ const statusColors: Record<string, string> = {
   'follow-on': 'bg-amber-50 text-amber-700',
 };
 
-type Tab = 'overview' | 'founder' | 'funding' | 'updates';
+type Tab = 'finance' | 'overview' | 'founder' | 'funding' | 'updates';
 
 export default function PortfolioCompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +42,7 @@ export default function PortfolioCompanyDetail() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('finance');
   const [founderPhotoUrl, setFounderPhotoUrl] = useState<string>('');
 
   useEffect(() => {
@@ -125,6 +127,7 @@ export default function PortfolioCompanyDetail() {
   const tags = record.tags ? record.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: 'finance', label: 'Finance Update' },
     { key: 'overview', label: 'Overview' },
     { key: 'founder', label: 'Founder' },
     { key: 'funding', label: 'Funding' },
@@ -205,7 +208,7 @@ export default function PortfolioCompanyDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
 
         {/* Left: Tabs (65%) */}
-        <div className="lg:col-span-2">
+        <div className={activeTab === 'finance' ? 'lg:col-span-3' : 'lg:col-span-2'}>
           {/* Tab bar */}
           <div className="flex items-center gap-1 border-b border-gray-100 mb-6">
             {tabs.map(tab => (
@@ -222,6 +225,12 @@ export default function PortfolioCompanyDetail() {
               </button>
             ))}
           </div>
+
+          {/* Finance Update tab — quarterly figures maintained by the Level 1
+              Reviewer from the founder's uploaded documents. */}
+          {activeTab === 'finance' && (
+            <FinanceUpdateTab companyId={record.id} companyName={record.companyName || ''} />
+          )}
 
           {/* Overview tab */}
           {activeTab === 'overview' && (
@@ -389,7 +398,7 @@ export default function PortfolioCompanyDetail() {
         </div>
 
         {/* Right: Sidebar (35%) */}
-        <div className="space-y-4">
+        <div className={cn('space-y-4', activeTab === 'finance' && 'hidden')}>
           {/* Key stats */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Key Stats</h3>
