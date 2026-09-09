@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
-  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera, FileUp } from 'lucide-react';
+  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
+import FinanceDocumentUpload from '../components/company/FinanceDocumentUpload';
 import { findPortfolioIdForFounder } from '../services/companyFinancials';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -15,6 +16,8 @@ import {
   fetchCompanyProfile, fetchAllCompanyProfiles, saveCompanyProfile,
   uploadCompanyLogo,
 } from '../services/companyProfile';
+
+type CompanyTab = 'overview' | 'finance';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
 const INDUSTRIES = ['SaaS', 'Fintech', 'Healthtech', 'Edtech', 'E-commerce', 'Marketplace', 'AI/ML', 'Hardware', 'Deep Tech', 'Consumer', 'Enterprise', 'Other'];
@@ -134,6 +137,13 @@ export default function FounderCompany() {
     });
     return () => { cancelled = true; };
   }, [userEmail]);
+  /**
+   * Two tabs, not two pages: the profile and the quarterly figures are the same
+   * company seen two ways, and the founder switches between them constantly
+   * while putting an update together. Overview stays the default because that
+   * is what a founder arriving here without a task in mind expects to see.
+   */
+  const [activeTab, setActiveTab] = useState<CompanyTab>('overview');
   const [data, setData]       = useState<CompanyData>(EMPTY);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState<CompanyData>(EMPTY);
@@ -366,6 +376,37 @@ export default function FounderCompany() {
         )}
       </div>
 
+      {/* ── Tabs ──
+          Sits with the meta strip rather than inside the page body so it reads
+          as part of the company header, and so switching tabs does not move it. */}
+      <div className="bg-white border-b border-gray-100 px-4 sm:px-6 lg:px-8">
+        <div className="flex gap-1 -mb-px overflow-x-auto">
+          {([
+            { id: 'overview' as const, label: t.companyProfile.companyOverview, icon: Building2 },
+            { id: 'finance' as const, label: 'Finance Update', icon: TrendingUp },
+          ]).map(tab => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors',
+                  active
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200',
+                )}
+              >
+                <Icon size={14} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Page body ── */}
       <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
@@ -452,6 +493,7 @@ export default function FounderCompany() {
         )}
 
         {/* Two-column layout */}
+        {activeTab === 'overview' && (
         <div className="flex gap-6 items-start">
 
           {/* Left: main sections */}
@@ -813,27 +855,25 @@ export default function FounderCompany() {
 
           </div>
         </div>
+        )}
 
         {/* ── Finance Update ──
             The founder's own quarterly figures. They write to the SAME
             Portfolios record the investor's Company page reads, so an update
             here shows up there immediately — marked self-reported until the
-            Level 1 Reviewer verifies it against the uploaded documents. */}
-        <div className="mt-8">
-          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">Finance Update</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Your quarterly figures. Investors see these on your company page, marked
-                as self-reported until the reviewer verifies them.
-              </p>
-            </div>
-            <Link
-              to="/documents"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <FileUp size={12} /> Upload financial documents
-            </Link>
+            Level 1 Reviewer verifies it against the uploaded documents.
+
+            Both ways in live in this tab: type a quarter in, or attach the
+            statements. Neither sends the founder off to another page. */}
+        {activeTab === 'finance' && (
+        <div>
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-gray-900">Finance Update</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Your quarterly figures. Investors see these on your company page, marked
+              as self-reported until the reviewer verifies them. Anything you attach
+              here also appears on your Documents page.
+            </p>
           </div>
 
           {portfolioId === undefined ? (
@@ -844,23 +884,32 @@ export default function FounderCompany() {
           ) : portfolioId ? (
             <FinanceUpdateTab companyId={portfolioId} companyName={data.name || ''} />
           ) : (
-            <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-2xl">
-              <FileUp size={24} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500 mb-1">Finance updates aren't open yet</p>
-              <p className="text-xs text-gray-400 max-w-md mx-auto">
-                Quarterly figures can be entered once your company is part of the
-                investor's portfolio. In the meantime you can upload your financial
-                documents from the Documents page.
-              </p>
-              <Link
-                to="/documents"
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gray-900 hover:bg-black"
-              >
-                <FileUp size={12} /> Go to Documents
-              </Link>
+            /* No portfolio record yet, so there is nowhere to store structured
+               figures — but the documents can still be collected now, and the
+               reviewer can key them in once the company is on the portfolio. */
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 flex items-start gap-3">
+                <AlertCircle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Quarterly figures aren't open yet
+                  </p>
+                  <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                    You can enter quarter-by-quarter numbers once your company is part
+                    of the investor's portfolio. Until then, attach your financial
+                    documents below — the reviewer can work from those.
+                  </p>
+                </div>
+              </div>
+              <FinanceDocumentUpload
+                companyName={data.name || ''}
+                authorName={currentUser.name}
+                authorRole="founder"
+              />
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

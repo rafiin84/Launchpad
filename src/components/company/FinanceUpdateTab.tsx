@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Minus, Plus, Pencil, X, Save, Lock,
-  FileText, AlertCircle, Table2, BarChart3, ShieldCheck, UserCircle2,
+  FileText, AlertCircle, Table2, BarChart3, ShieldCheck, UserCircle2, Pencil as PencilIcon, Paperclip, Upload,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../services/companyFinancials';
 import { fetchCRMDocuments, type CRMDocument } from '../../services/crmDocuments';
 import FinanceTemplateImport from './FinanceTemplateImport';
+import FinanceDocumentUpload from './FinanceDocumentUpload';
 import { cn } from '../../lib/cn';
 
 /**
@@ -710,6 +711,7 @@ export default function FinanceUpdateTab({
   const [preference, setPreference] = useState<SourcePreference>('best');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const [error, setError] = useState('');
 
   /**
@@ -873,6 +875,16 @@ export default function FinanceUpdateTab({
         </p>
       )}
 
+      {/* Financial documents — up to 5 files, also saved to the Documents page. */}
+      {canEdit && (showUpload || entries.length > 0) && (
+        <FinanceDocumentUpload
+          companyName={companyName}
+          authorName={currentUser.name}
+          authorRole={writeAs === 'founder' ? 'founder' : 'investor'}
+          onUploaded={() => { void load(); }}
+        />
+      )}
+
       {/* Spreadsheet route — download a template, fill it in Excel, upload it
           back. Only offered to whoever may actually record figures. */}
       {canEdit && (
@@ -889,23 +901,64 @@ export default function FinanceUpdateTab({
 
       {/* Empty state */}
       {!entries.length ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
-          <AlertCircle size={26} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500 mb-1">No financial data yet</p>
-          <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            {canEdit
-              ? 'Review the founder’s uploaded documents, then add the quarterly figures. Half-yearly and yearly views build themselves from the quarters.'
-              : 'The Level 1 Reviewer has not entered this company’s quarterly figures yet.'}
-          </p>
-          {canEdit && (
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gray-900 hover:bg-black"
-            >
-              <Plus size={13} /> Add first quarter
-            </button>
-          )}
-        </div>
+        canEdit ? (
+          /* Two ways in, offered as equal choices rather than one button and a
+             hidden alternative: type the quarter in, or send the documents. */
+          <div>
+            <div className="text-center mb-5">
+              <p className="text-sm font-medium text-gray-700">No financial data yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {writeAs === 'founder'
+                  ? 'Start with your first quarter, or send the documents and let the reviewer enter them.'
+                  : 'Enter the first quarter from the founder’s documents, or attach the documents first.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => setShowForm(true)}
+                className="text-left bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-900 hover:shadow-sm transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center mb-3">
+                  <PencilIcon size={17} className="text-white" />
+                </div>
+                <p className="text-sm font-bold text-gray-900">Add first quarter update</p>
+                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                  Type in the figures for one quarter. Margins, EBITDA, profit, burn and
+                  runway are calculated for you.
+                </p>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-900 mt-2.5">
+                  <Plus size={11} /> Enter figures
+                </span>
+              </button>
+
+              <button
+                onClick={() => setShowUpload(true)}
+                className="text-left bg-white border border-gray-200 rounded-2xl p-5 hover:border-indigo-400 hover:shadow-sm transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-3">
+                  <Paperclip size={17} className="text-indigo-600" />
+                </div>
+                <p className="text-sm font-bold text-gray-900">Upload documents</p>
+                <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                  Attach up to 5 statements or spreadsheets. They are saved to your
+                  Documents page too, and a filled-in template can be imported straight
+                  into the figures.
+                </p>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 mt-2.5">
+                  <Upload size={11} /> Choose files
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
+            <AlertCircle size={26} className="text-gray-200 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-500 mb-1">No financial data yet</p>
+            <p className="text-xs text-gray-400 max-w-sm mx-auto">
+              Neither the company nor the Level 1 Reviewer has entered quarterly figures yet.
+            </p>
+          </div>
+        )
       ) : (
         <>
           {/* Where these numbers came from — an investor should never have to
