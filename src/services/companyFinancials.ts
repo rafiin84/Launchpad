@@ -10,6 +10,11 @@
 //  Portfolios record's `Financial_Data` field — the same pattern the codebase
 //  already uses for Requested_Documents and Shortlist_Review.
 //
+//  Access: both sides call the CRM API directly with the caller's own token —
+//  an investor's CRM token, or a founder's portal token against the portal
+//  host. No server-side admin proxy, so Zoho's permissions are what actually
+//  govern access, and its errors reach the UI unchanged.
+//
 //  Design: the reviewer enters only RAW inputs, and every derived figure
 //  (margins, EBITDA, net profit, burn, runway, equity) is computed here. If
 //  margins were stored they could drift out of step with revenue; computed,
@@ -17,7 +22,9 @@
 //  so the halves can never disagree with the quarters that make them up.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { zohoGetById, zohoUpdate, portalGetById, portalUpdate } from './zohoApi';
+import {
+  zohoGetById, zohoUpdate, zohoSearch, portalGetById, portalUpdate, portalSearch,
+} from './zohoApi';
 import { loadRole } from './oauth';
 
 const MODULE = 'Portfolios';
@@ -286,55 +293,17 @@ function sortEntries(entries: FinancialEntry[]): FinancialEntry[] {
 
 // ─── Founder access path ─────────────────────────────────────────────────────
 //
-// crmPortfolio.ts reads Portfolios with the investor's own CRM token, which a
-// founder does not have: portal tokens are only valid against the portal host,
-// and that host does not expose the Portfolios module. The app's existing
-// /api/portal-crm-proxy does — 'portfolios' is on its allowlist — so the
-// founder path goes through it. It is the same route the app already uses for
-// founder-side CRM access.
-
-interface ProxyRecord { id: string; [k: string]: unknown }
-
-async function proxyRequest(
-  path: string,
-  init?: { method: 'GET' | 'PUT'; body?: unknown },
-): Promise<ProxyRecord[]> {
-  const res = await fetch(`/api/portal-crm-proxy?path=${encodeURIComponent(path)}`, {
-    method: init?.method ?? 'GET',
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
-    body: init?.body ? JSON.stringify(init.body) : undefined,
-  });
-  if (res.status === 204) return [];
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = (json as { message?: string }).message || `CRM request failed (${res.status})`;
-    throw new Error(msg);
-  }
-
-  const data = ((json as { data?: ProxyRecord[] }).data) ?? [];
-
-  // A write needs more than a 2xx. Zoho answers a record update with HTTP 200
-  // or 202 and puts the real verdict INSIDE the body, per record — so a
-  // rejected field (INVALID_DATA, a permission, a portal restriction) arrives
-  // as a perfectly successful-looking response. Without this check a founder's
-  // save appeared to work, closed the form, and showed the figures from local
-  // state, while the CRM record kept whatever it had; the investor's page then
-  // correctly reported no data. zohoUpdate() and portalUpdate() have always
-  // checked this, so only the proxy path was silently dropping writes.
-  if (init && init.method !== 'GET') {
-    const top = json as { code?: string; message?: string };
-    if (top.code && top.code !== 'SUCCESS') {
-      throw new Error(top.message || top.code);
-    }
-    const result = data[0] as { code?: string; message?: string; details?: unknown } | undefined;
-    if (!result || result.code !== 'SUCCESS') {
-      const detail = result?.details ? `: ${JSON.stringify(result.details)}` : '';
-      throw new Error(`${result?.message ?? 'CRM rejected the update'}${detail}`);
-    }
-  }
-
-  return data;
-}
+// Founders hit the CRM API directly with their own portal access token, the
+// same way companyProfile.ts already does for Founder_Companies — no server
+// proxy in between. That means every request carries the founder's identity
+// instead of an admin token, so Zoho's own portal permissions decide what
+// they may read and write, and a failure comes back as a real Zoho error
+// rather than a proxy status.
+//
+// Requirement: the Portfolios module must be shared with the client portal
+// (Setup → Channels → Portals → the portal's module permissions) with read
+// and write on Financial_Data. Without that Zoho answers 401/403 and the
+// Finance Update tab shows the message it returns.
 
 /**
  * Finds the Portfolios record for a founder by their email.
@@ -347,30 +316,30 @@ export async function findPortfolioIdForFounder(founderEmail: string): Promise<s
   const email = founderEmail.trim();
   if (!email) return null;
   try {
-    const records = await proxyRequest(
-      `/crm/v2/Portfolios/search?criteria=(Founder_Email:equals:${email})`,
-    );
-    return records[0]?.id ?? null;
+    const records = isPortalUser()
+      ? await portalSearch(MODULE, `(Founder_Email:equals:${email})`)
+      : await zohoSearch(MODULE, `(Founder_Email:equals:${email})`);
+    return (records[0]?.id as string | undefined) ?? null;
   } catch (err) {
     // A null here renders as "not part of the portfolio yet", which is a real
-    // state — so a lookup that failed for some other reason (proxy down, CRM
-    // error) would be invisible. Log it so it is at least diagnosable.
+    // state — so a lookup that failed for some other reason (no portal access
+    // to Portfolios, CRM error) would be invisible. Log it so it is at least
+    // diagnosable.
     console.warn('[financials] portfolio lookup failed for', email, err);
     return null;
   }
 }
 
 /**
- * Reads the series for a founder, via the proxy.
+ * Reads the series for a founder.
  *
- * Errors propagate rather than becoming an empty list: the caller renders them
- * in its error banner, and "the read failed" must not be indistinguishable
- * from "this company has reported nothing yet".
+ * Delegates to fetchFinancials, which already branches on the portal token —
+ * there is no separate founder read any more. Errors propagate rather than
+ * becoming an empty list: the caller renders them in its error banner, and
+ * "the read failed" must not look the same as "nothing reported yet".
  */
 export async function fetchFinancialsAsFounder(portfolioId: string): Promise<FinancialEntry[]> {
-  const records = await proxyRequest(`/crm/v2/Portfolios/${portfolioId}?fields=${FIELD}`);
-  const raw = records[0]?.[FIELD];
-  return parseFinancials(String(raw ?? ''));
+  return fetchFinancials(portfolioId);
 }
 
 /**
@@ -382,20 +351,9 @@ export async function saveFinancialQuarterAsFounder(
   portfolioId: string,
   entry: FinancialEntry,
 ): Promise<FinancialEntry[]> {
-  const existing = await fetchFinancialsAsFounder(portfolioId);
-  const mine: FinancialEntry = { ...entry, source: 'founder' };
-  const next = [
-    ...existing.filter(e =>
-      !(e.year === mine.year && e.quarter === mine.quarter && entrySource(e) === 'founder')),
-    mine,
-  ];
-  const json = stringifyFinancials(next);
-  await proxyRequest(`/crm/v2/Portfolios/${portfolioId}`, {
-    method: 'PUT',
-    body: { data: [{ id: portfolioId, [FIELD]: json }] },
-  });
-  return sortEntries(next);
+  return saveFinancialQuarter(portfolioId, { ...entry, source: 'founder' });
 }
+
 
 /** Reads the stored series straight off the Portfolios record. */
 export async function fetchFinancials(portfolioId: string): Promise<FinancialEntry[]> {
