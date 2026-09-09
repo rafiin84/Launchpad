@@ -1,4 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
+import {
+  ACCEPT_ATTR, FORMAT_GROUPS, validateUploadFile, mimeFor, isSpreadsheet,
+} from '../lib/uploadFormats';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, FileText, X, Loader2 } from 'lucide-react';
 import { Input, Textarea, Select } from '../components/ui/Input';
@@ -11,13 +14,7 @@ import { fetchAllCompanyProfiles, fetchCompanyProfile } from '../services/compan
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-const MIME_MAP: Record<string, string> = {
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-};
+
 
 interface FormState {
   documentName: string;
@@ -61,6 +58,9 @@ export default function AddDocument() {
   const typeOptions = [
     { value: 'pitch-deck', label: t.addDocument.pitchDeck },
     { value: 'financial-model', label: t.addDocument.financialModel },
+    // Quarterly statements are their own thing: the reviewer looks for these
+    // when entering a Finance Update, so they need to be findable by type.
+    { value: 'financial-statement', label: 'Financial Statement (quarterly)' },
     { value: 'legal-document', label: t.addDocument.legalDocument },
     { value: 'due-diligence', label: t.addDocument.dueDiligence },
     { value: 'other', label: t.addDocument.other },
@@ -100,8 +100,19 @@ export default function AddDocument() {
   }
 
   function handleFile(file: File) {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    // The picker's `accept` is only a hint — it can be switched to "All files",
+    // and a drag-and-drop ignores it completely. This is the actual gate, so
+    // both routes go through it.
+    const check = validateUploadFile(file);
+    if (!check.ok) {
+      setForm((prev) => ({ ...prev, fileName: '', fileSize: 0, fileData: '', mimeType: '' }));
+      setErrors((prev) => ({ ...prev, file: check.error ?? 'That file cannot be uploaded.' }));
+      return;
+    }
     const reader = new FileReader();
+    reader.onerror = () => {
+      setErrors((prev) => ({ ...prev, file: 'That file could not be read. It may be in use or corrupted.' }));
+    };
     reader.onload = (e) => {
       const fileData = (e.target?.result as string) ?? '';
       setForm((prev) => ({
@@ -109,7 +120,7 @@ export default function AddDocument() {
         fileName: file.name,
         fileSize: file.size,
         fileData,
-        mimeType: MIME_MAP[ext] || 'application/octet-stream',
+        mimeType: mimeFor(file.name),
       }));
       if (errors.file) setErrors((prev) => { const n = { ...prev }; delete n.file; return n; });
     };
@@ -244,12 +255,26 @@ export default function AddDocument() {
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-700">{t.addDocument.clickToUpload}</p>
-                  <p className="text-xs text-gray-400 mt-1">{t.addDocument.fileTypes}</p>
+                  <div className="mt-1.5 space-y-0.5">
+                    {FORMAT_GROUPS.map(g => (
+                      <p key={g.label} className="text-[11px] text-gray-400">
+                        <span className="font-semibold text-gray-500">{g.label}:</span>{' '}
+                        {g.extensions.map(e => e.toUpperCase()).join(', ')}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5">Up to 7 MB</p>
                 </div>
               </button>
             )}
             {errors.file && <p className="text-xs text-red-500 mt-2">{errors.file}</p>}
-            <input ref={fileRef} type="file" accept=".pdf,.docx,.xlsx,.xls,.doc" className="hidden" onChange={handleFileInput} />
+            {!errors.file && form.fileName && isSpreadsheet(form.fileName) && (
+              <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mt-2">
+                This is a spreadsheet — if it's a filled-in Finance Update template, it can be
+                imported straight into the quarterly figures from the Finance Update tab.
+              </p>
+            )}
+            <input ref={fileRef} type="file" accept={ACCEPT_ATTR} className="hidden" onChange={handleFileInput} />
           </div>
 
           {errors.submit && (
