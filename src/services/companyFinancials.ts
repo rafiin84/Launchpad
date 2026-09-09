@@ -310,7 +310,30 @@ async function proxyRequest(
     const msg = (json as { message?: string }).message || `CRM request failed (${res.status})`;
     throw new Error(msg);
   }
-  return ((json as { data?: ProxyRecord[] }).data) ?? [];
+
+  const data = ((json as { data?: ProxyRecord[] }).data) ?? [];
+
+  // A write needs more than a 2xx. Zoho answers a record update with HTTP 200
+  // or 202 and puts the real verdict INSIDE the body, per record — so a
+  // rejected field (INVALID_DATA, a permission, a portal restriction) arrives
+  // as a perfectly successful-looking response. Without this check a founder's
+  // save appeared to work, closed the form, and showed the figures from local
+  // state, while the CRM record kept whatever it had; the investor's page then
+  // correctly reported no data. zohoUpdate() and portalUpdate() have always
+  // checked this, so only the proxy path was silently dropping writes.
+  if (init && init.method !== 'GET') {
+    const top = json as { code?: string; message?: string };
+    if (top.code && top.code !== 'SUCCESS') {
+      throw new Error(top.message || top.code);
+    }
+    const result = data[0] as { code?: string; message?: string; details?: unknown } | undefined;
+    if (!result || result.code !== 'SUCCESS') {
+      const detail = result?.details ? `: ${JSON.stringify(result.details)}` : '';
+      throw new Error(`${result?.message ?? 'CRM rejected the update'}${detail}`);
+    }
+  }
+
+  return data;
 }
 
 /**
@@ -328,20 +351,26 @@ export async function findPortfolioIdForFounder(founderEmail: string): Promise<s
       `/crm/v2/Portfolios/search?criteria=(Founder_Email:equals:${email})`,
     );
     return records[0]?.id ?? null;
-  } catch {
+  } catch (err) {
+    // A null here renders as "not part of the portfolio yet", which is a real
+    // state — so a lookup that failed for some other reason (proxy down, CRM
+    // error) would be invisible. Log it so it is at least diagnosable.
+    console.warn('[financials] portfolio lookup failed for', email, err);
     return null;
   }
 }
 
-/** Reads the series for a founder, via the proxy. */
+/**
+ * Reads the series for a founder, via the proxy.
+ *
+ * Errors propagate rather than becoming an empty list: the caller renders them
+ * in its error banner, and "the read failed" must not be indistinguishable
+ * from "this company has reported nothing yet".
+ */
 export async function fetchFinancialsAsFounder(portfolioId: string): Promise<FinancialEntry[]> {
-  try {
-    const records = await proxyRequest(`/crm/v2/Portfolios/${portfolioId}?fields=${FIELD}`);
-    const raw = records[0]?.[FIELD];
-    return parseFinancials(String(raw ?? ''));
-  } catch {
-    return [];
-  }
+  const records = await proxyRequest(`/crm/v2/Portfolios/${portfolioId}?fields=${FIELD}`);
+  const raw = records[0]?.[FIELD];
+  return parseFinancials(String(raw ?? ''));
 }
 
 /**
