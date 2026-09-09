@@ -5,14 +5,17 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Minus, Plus, Pencil, X, Save, Lock,
-  FileText, AlertCircle, Table2, BarChart3,
+  FileText, AlertCircle, Table2, BarChart3, ShieldCheck, UserCircle2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   fetchFinancials, saveFinancialQuarter, buildRows, comparePeriods,
+  fetchFinancialsAsFounder, saveFinancialQuarterAsFounder,
+  findDiscrepancies, entrySource,
   METRICS, METRIC_GROUPS, INPUT_KEYS, formatMetric, formatCurrency, hasAnyInput,
   type FinancialEntry, type FinancialInputs, type FinancialRow,
-  type ViewMode, type Quarter, type MetricDef,
+  type ViewMode, type Quarter, type MetricDef, type EntrySource,
+  type SourcePreference,
 } from '../../services/companyFinancials';
 import { fetchCRMDocuments, type CRMDocument } from '../../services/crmDocuments';
 import { cn } from '../../lib/cn';
@@ -144,6 +147,7 @@ function QuarterForm(props: {
   documents: CRMDocument[];
   reviewerName: string;
   reviewerEmail: string;
+  writeAs: EntrySource;
   onSaved: (entries: FinancialEntry[]) => void;
   onClose: () => void;
 }) {
@@ -163,7 +167,7 @@ function QuarterForm(props: {
 
 function QuarterEditor({
   companyId, existing, documents, reviewerName, reviewerEmail, onSaved, onClose,
-  year, quarter, onYear, onQuarter,
+  year, quarter, onYear, onQuarter, writeAs,
 }: {
   companyId: string;
   existing: FinancialEntry[];
@@ -176,6 +180,8 @@ function QuarterEditor({
   quarter: Quarter;
   onYear: (y: number) => void;
   onQuarter: (q: Quarter) => void;
+  /** Whether these figures are self-reported or reviewer-verified. */
+  writeAs: EntrySource;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -184,7 +190,8 @@ function QuarterEditor({
   // editing is an update rather than a blank re-entry. This is derived state,
   // so the fields remount on a period key (see the `key` below) instead of
   // being synced in an effect.
-  const match = existing.find(e => e.year === year && e.quarter === quarter);
+  const match = existing.find(e =>
+    e.year === year && e.quarter === quarter && entrySource(e) === writeAs);
   const seed: Record<string, string> = {};
   if (match) {
     for (const k of INPUT_KEYS) {
@@ -209,7 +216,7 @@ function QuarterEditor({
     return out;
   }, [values]);
 
-  const isEditing = existing.some(e => e.year === year && e.quarter === quarter);
+  const isEditing = !!match;
 
   const save = async () => {
     if (!hasAnyInput(parsed)) { setError('Enter at least one figure before saving.'); return; }
@@ -219,13 +226,19 @@ function QuarterEditor({
       const entry: FinancialEntry = {
         ...parsed,
         year, quarter,
+        source: writeAs,
         reviewer: reviewerName,
         reviewerEmail,
         updatedAt: new Date().toISOString(),
         notes: notes.trim() || undefined,
         sourceDocumentIds: docIds.length ? docIds : undefined,
       };
-      const next = await saveFinancialQuarter(companyId, entry);
+      // Founders reach Portfolios through the proxy; reviewers use their own
+      // CRM token. Both write to the same record, which is what makes a
+      // founder's update appear on the investor's Company page.
+      const next = writeAs === 'founder'
+        ? await saveFinancialQuarterAsFounder(companyId, entry)
+        : await saveFinancialQuarter(companyId, entry);
       onSaved(next);
       onClose();
     } catch (err) {
@@ -249,8 +262,15 @@ function QuarterEditor({
               {isEditing ? 'Update' : 'Add'} quarterly financials
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Enter the figures from the founder's documents. Margins, EBITDA, profit,
-              burn and runway are calculated — you don't enter them.
+              {writeAs === 'founder'
+                ? 'Enter your figures for the quarter. Margins, EBITDA, profit, burn and runway are calculated — you don’t enter them.'
+                : 'Enter the figures from the founder’s documents. Margins, EBITDA, profit, burn and runway are calculated — you don’t enter them.'}
+            </p>
+            <p className={cn('text-[11px] font-semibold mt-1.5 inline-flex items-center gap-1',
+              writeAs === 'founder' ? 'text-amber-700' : 'text-emerald-700')}>
+              {writeAs === 'founder'
+                ? <><UserCircle2 size={11} /> Saved as self-reported</>
+                : <><ShieldCheck size={11} /> Saved as reviewer-verified</>}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
@@ -275,7 +295,8 @@ function QuarterEditor({
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Quarter</label>
               <div className="flex gap-1.5">
                 {([1, 2, 3, 4] as Quarter[]).map(q => {
-                  const filled = existing.some(e => e.year === year && e.quarter === q);
+                  const filled = existing.some(e =>
+                    e.year === year && e.quarter === q && entrySource(e) === writeAs);
                   return (
                     <button
                       key={q}
@@ -435,6 +456,16 @@ function MetricTable({ rows }: { rows: FinancialRow[] }) {
               {rows.map(r => (
                 <th key={r.label} className="text-right font-semibold text-gray-700 px-4 py-2.5 whitespace-nowrap min-w-[130px]">
                   {r.label}
+                  {r.provenance === 'founder' && (
+                    <span
+                      className="ml-1 text-[9px] text-amber-600 font-semibold"
+                      title={r.mixedProvenance
+                        ? 'Mixes verified and self-reported quarters'
+                        : 'Self-reported by the company, not yet verified'}
+                    >
+                      {r.mixedProvenance ? 'MIXED' : 'REPORTED'}
+                    </span>
+                  )}
                 </th>
               ))}
             </tr>
@@ -670,24 +701,33 @@ export default function FinanceUpdateTab({
   companyId: string;
   companyName: string;
 }) {
-  const { currentUser, reviewerLevel, isReviewer } = useAuth();
+  const { currentUser, reviewerLevel, isReviewer, isFounder } = useAuth();
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [documents, setDocuments] = useState<CRMDocument[]>([]);
   const [mode, setMode] = useState<ViewMode>('quarterly');
   const [view, setView] = useState<'charts' | 'table'>('charts');
+  const [preference, setPreference] = useState<SourcePreference>('best');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
 
-  // Only the Level 1 Reviewer maintains these figures.
-  const canEdit = isReviewer && reviewerLevel === 1;
+  /**
+   * Both sides can supply figures, and what they write is labelled differently:
+   * a founder reports on their own company, the Level 1 Reviewer verifies
+   * against the documents. Investors read but never write.
+   */
+  const writeAs: EntrySource | null =
+    isFounder ? 'founder'
+    : isReviewer && reviewerLevel === 1 ? 'reviewer'
+    : null;
+  const canEdit = writeAs !== null;
 
   // `loading` starts true and is only cleared once the fetch resolves, so no
   // state is set synchronously from the effect body below.
   const load = useCallback(async () => {
     try {
       const [fin, docs] = await Promise.all([
-        fetchFinancials(companyId),
+        isFounder ? fetchFinancialsAsFounder(companyId) : fetchFinancials(companyId),
         fetchCRMDocuments().catch(() => [] as CRMDocument[]),
       ]);
       // Nothing is set before this first await, so the effect body stays free
@@ -701,7 +741,7 @@ export default function FinanceUpdateTab({
       setError(err instanceof Error ? err.message : 'Could not load financial data.');
     }
     setLoading(false);
-  }, [companyId, companyName]);
+  }, [companyId, companyName, isFounder]);
 
   // `load` only touches state after its first await, so there is no cascading
   // render here; the rule cannot see through the async boundary. This is the
@@ -709,7 +749,13 @@ export default function FinanceUpdateTab({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
-  const rows = useMemo(() => buildRows(entries, mode), [entries, mode]);
+  const rows = useMemo(() => buildRows(entries, mode, preference), [entries, mode, preference]);
+
+  const discrepancies = useMemo(() => findDiscrepancies(entries), [entries]);
+  const hasReported = entries.some(e => entrySource(e) === 'founder');
+  const hasVerified = entries.some(e => entrySource(e) === 'reviewer');
+  const unverifiedCount = entries.filter(e => entrySource(e) === 'founder'
+    && !entries.some(v => v.year === e.year && v.quarter === e.quarter && entrySource(v) === 'reviewer')).length;
 
   const linkedDocs = useMemo(() => {
     const ids = new Set(rows.flatMap(r => r.sourceDocumentIds ?? []));
@@ -744,6 +790,7 @@ export default function FinanceUpdateTab({
           documents={documents}
           reviewerName={currentUser.name}
           reviewerEmail={currentUser.email}
+          writeAs={writeAs ?? 'founder'}
           onSaved={setEntries}
           onClose={() => setShowForm(false)}
         />
@@ -765,6 +812,28 @@ export default function FinanceUpdateTab({
             </button>
           ))}
         </div>
+
+        {hasReported && hasVerified && (
+          <div className="flex gap-1">
+            {([
+              { key: 'best', label: 'Latest' },
+              { key: 'verified', label: 'Verified only' },
+              { key: 'reported', label: 'As reported' },
+            ] as { key: SourcePreference; label: string }[]).map(p => (
+              <button
+                key={p.key}
+                onClick={() => setPreference(p.key)}
+                className={cn(
+                  'px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all',
+                  preference === p.key ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                    : 'text-gray-500 hover:bg-gray-100',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex gap-1 ml-auto">
           <button
@@ -792,7 +861,7 @@ export default function FinanceUpdateTab({
           </button>
         ) : (
           <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
-            <Lock size={10} /> Maintained by the Level 1 Reviewer
+            <Lock size={10} /> Reported by the company, verified by the Level 1 Reviewer
           </span>
         )}
       </div>
@@ -824,6 +893,81 @@ export default function FinanceUpdateTab({
         </div>
       ) : (
         <>
+          {/* Where these numbers came from — an investor should never have to
+              guess whether a figure has been checked. */}
+          {unverifiedCount > 0 && (
+            <div className="flex items-start gap-2.5 px-3.5 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
+              <UserCircle2 size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-amber-900">
+                  {unverifiedCount} quarter{unverifiedCount > 1 ? 's' : ''} self-reported by the company,
+                  not yet verified
+                </p>
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  {isReviewer && reviewerLevel === 1
+                    ? 'Review the supporting documents and enter the verified figures to replace these.'
+                    : 'These figures came from the company and have not been checked against its documents by the Level 1 Reviewer.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {discrepancies.length > 0 && (
+            <div className="bg-white border border-red-100 rounded-2xl p-4">
+              <div className="flex items-start gap-2.5 mb-2.5">
+                <AlertCircle size={15} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-red-900">
+                    {discrepancies.length} figure{discrepancies.length > 1 ? 's' : ''} differ
+                    between the company's report and the verified accounts
+                  </p>
+                  <p className="text-[11px] text-red-700 mt-0.5">
+                    Verified values are the ones shown above.
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left font-semibold py-1">Period</th>
+                      <th className="text-left font-semibold py-1">Metric</th>
+                      <th className="text-right font-semibold py-1">Reported</th>
+                      <th className="text-right font-semibold py-1">Verified</th>
+                      <th className="text-right font-semibold py-1">Difference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {discrepancies.map(d => {
+                      const def = METRICS.find(m => m.key === d.metric);
+                      return (
+                        <tr key={`${d.year}-${d.quarter}-${d.metric}`} className="border-t border-gray-50">
+                          <td className="py-1.5 text-gray-600">Q{d.quarter} FY{d.year}</td>
+                          <td className="py-1.5 text-gray-700">{def?.label ?? d.metric}</td>
+                          <td className="py-1.5 text-right text-gray-500">
+                            {formatMetric(d.reported, def?.format ?? 'currency')}
+                          </td>
+                          <td className="py-1.5 text-right font-semibold text-gray-900">
+                            {formatMetric(d.verified, def?.format ?? 'currency')}
+                          </td>
+                          <td className={cn('py-1.5 text-right font-semibold',
+                            d.diff < 0 ? 'text-red-700' : 'text-emerald-700')}>
+                            {d.diff > 0 ? '+' : ''}{formatMetric(d.diff, def?.format ?? 'currency')}
+                            {d.diffPct !== undefined && (
+                              <span className="text-gray-400 font-normal ml-1">
+                                ({d.diffPct > 0 ? '+' : ''}{d.diffPct.toFixed(1)}%)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <Headline rows={rows} />
           {view === 'charts' ? <Charts rows={rows} /> : <MetricTable rows={rows} />}
 
@@ -834,8 +978,16 @@ export default function FinanceUpdateTab({
             </p>
             <div className="space-y-2">
               {entries.slice().reverse().map(e => (
-                <div key={`${e.year}-${e.quarter}`} className="flex items-start gap-2 flex-wrap text-[11px]">
+                <div key={`${e.year}-${e.quarter}-${entrySource(e)}`} className="flex items-start gap-2 flex-wrap text-[11px]">
                   <span className="font-semibold text-gray-800 min-w-[70px]">Q{e.quarter} FY{e.year}</span>
+                  <span className={cn('inline-flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded',
+                    entrySource(e) === 'reviewer'
+                      ? 'text-emerald-700 bg-emerald-50'
+                      : 'text-amber-700 bg-amber-50')}>
+                    {entrySource(e) === 'reviewer'
+                      ? <><ShieldCheck size={9} /> Verified</>
+                      : <><UserCircle2 size={9} /> Self-reported</>}
+                  </span>
                   <span className="text-gray-500">
                     {e.reviewer || '—'}
                     {e.updatedAt && ` · ${new Date(e.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}

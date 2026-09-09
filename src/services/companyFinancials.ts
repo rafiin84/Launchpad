@@ -90,18 +90,36 @@ const BALANCE_END_KEYS: (keyof FinancialInputs)[] = [
   'accountsReceivable', 'accountsPayable', 'totalAssets', 'totalLiabilities',
 ];
 
-/** One stored quarter, with who verified it and from which documents. */
+/**
+ * Who supplied a set of figures.
+ *   'founder'  — self-reported by the company, not yet checked
+ *   'reviewer' — entered by the Level 1 Reviewer from the source documents
+ *
+ * Both can exist for the same quarter, and that is the point: the gap between
+ * what a company reports and what its documents support is exactly what an
+ * investor wants to see. Verified figures lead; the self-reported set is kept
+ * alongside rather than overwritten.
+ */
+export type EntrySource = 'founder' | 'reviewer';
+
+/** One stored quarter from one source. */
 export interface FinancialEntry extends FinancialInputs {
   year: number;
   quarter: Quarter;
-  /** Level 1 Reviewer who entered/last updated this quarter. */
+  /** Defaults to 'reviewer' for entries written before sources existed. */
+  source?: EntrySource;
+  /** Whoever entered these figures — the reviewer, or the founder themselves. */
   reviewer: string;
   reviewerEmail?: string;
   updatedAt: string;
-  /** Reviewer's commentary on the figures. */
+  /** Commentary on the figures. */
   notes?: string;
   /** CRM record ids of the founder-uploaded documents these figures came from. */
   sourceDocumentIds?: string[];
+}
+
+export function entrySource(e: FinancialEntry): EntrySource {
+  return e.source === 'founder' ? 'founder' : 'reviewer';
 }
 
 // ─── Derived figures ─────────────────────────────────────────────────────────
@@ -132,6 +150,10 @@ export type FinancialRow = FinancialInputs & DerivedFinancials & {
   updatedAt?: string;
   notes?: string;
   sourceDocumentIds?: string[];
+  /** 'reviewer' when every contributing quarter was verified, else 'founder'. */
+  provenance?: EntrySource;
+  /** True when the period mixes verified and self-reported quarters. */
+  mixedProvenance?: boolean;
 };
 
 /** Adds two possibly-absent numbers; absent + absent stays absent. */
@@ -223,11 +245,14 @@ export function parseFinancials(json: string): FinancialEntry[] {
       const year = Number(r.year);
       const quarter = Number(r.quarter) as Quarter;
       if (!Number.isFinite(year) || ![1, 2, 3, 4].includes(quarter)) continue;
-      const id = `${year}-${quarter}`;
-      if (seen.has(id)) continue;   // one entry per year/quarter wins
+      const source: EntrySource = r.source === 'founder' ? 'founder' : 'reviewer';
+      // One entry per year/quarter PER SOURCE — a founder's self-reported
+      // figures and the reviewer's verified ones coexist.
+      const id = `${year}-${quarter}-${source}`;
+      if (seen.has(id)) continue;
       seen.add(id);
       const entry: FinancialEntry = {
-        year, quarter,
+        year, quarter, source,
         reviewer: String(r.reviewer ?? ''),
         reviewerEmail: r.reviewerEmail ? String(r.reviewerEmail) : undefined,
         updatedAt: String(r.updatedAt ?? ''),
@@ -254,7 +279,93 @@ export function stringifyFinancials(entries: FinancialEntry[]): string {
 }
 
 function sortEntries(entries: FinancialEntry[]): FinancialEntry[] {
-  return [...entries].sort((a, b) => a.year - b.year || a.quarter - b.quarter);
+  return [...entries].sort((a, b) =>
+    a.year - b.year || a.quarter - b.quarter
+    || entrySource(a).localeCompare(entrySource(b)));
+}
+
+// ─── Founder access path ─────────────────────────────────────────────────────
+//
+// crmPortfolio.ts reads Portfolios with the investor's own CRM token, which a
+// founder does not have: portal tokens are only valid against the portal host,
+// and that host does not expose the Portfolios module. The app's existing
+// /api/portal-crm-proxy does — 'portfolios' is on its allowlist — so the
+// founder path goes through it. It is the same route the app already uses for
+// founder-side CRM access.
+
+interface ProxyRecord { id: string; [k: string]: unknown }
+
+async function proxyRequest(
+  path: string,
+  init?: { method: 'GET' | 'PUT'; body?: unknown },
+): Promise<ProxyRecord[]> {
+  const res = await fetch(`/api/portal-crm-proxy?path=${encodeURIComponent(path)}`, {
+    method: init?.method ?? 'GET',
+    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    body: init?.body ? JSON.stringify(init.body) : undefined,
+  });
+  if (res.status === 204) return [];
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (json as { message?: string }).message || `CRM request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return ((json as { data?: ProxyRecord[] }).data) ?? [];
+}
+
+/**
+ * Finds the Portfolios record for a founder by their email.
+ *
+ * The founder writes financials onto the SAME record the investor's Company
+ * page reads, which is what makes their update show up there — there is no
+ * second copy to reconcile.
+ */
+export async function findPortfolioIdForFounder(founderEmail: string): Promise<string | null> {
+  const email = founderEmail.trim();
+  if (!email) return null;
+  try {
+    const records = await proxyRequest(
+      `/crm/v2/Portfolios/search?criteria=(Founder_Email:equals:${email})`,
+    );
+    return records[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads the series for a founder, via the proxy. */
+export async function fetchFinancialsAsFounder(portfolioId: string): Promise<FinancialEntry[]> {
+  try {
+    const records = await proxyRequest(`/crm/v2/Portfolios/${portfolioId}?fields=${FIELD}`);
+    const raw = records[0]?.[FIELD];
+    return parseFinancials(String(raw ?? ''));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Saves a founder's self-reported quarter onto the Portfolios record.
+ * Forces source='founder' regardless of what the caller passes, so a founder
+ * can never write figures that would read as reviewer-verified.
+ */
+export async function saveFinancialQuarterAsFounder(
+  portfolioId: string,
+  entry: FinancialEntry,
+): Promise<FinancialEntry[]> {
+  const existing = await fetchFinancialsAsFounder(portfolioId);
+  const mine: FinancialEntry = { ...entry, source: 'founder' };
+  const next = [
+    ...existing.filter(e =>
+      !(e.year === mine.year && e.quarter === mine.quarter && entrySource(e) === 'founder')),
+    mine,
+  ];
+  const json = stringifyFinancials(next);
+  await proxyRequest(`/crm/v2/Portfolios/${portfolioId}`, {
+    method: 'PUT',
+    body: { data: [{ id: portfolioId, [FIELD]: json }] },
+  });
+  return sortEntries(next);
 }
 
 /** Reads the stored series straight off the Portfolios record. */
@@ -276,9 +387,13 @@ export async function saveFinancialQuarter(
   entry: FinancialEntry,
 ): Promise<FinancialEntry[]> {
   const existing = await fetchFinancials(portfolioId);
+  const src = entrySource(entry);
+  // Replaces only this source's figures for the quarter, so a reviewer's
+  // verification never erases what the founder reported, or vice versa.
   const next = [
-    ...existing.filter(e => !(e.year === entry.year && e.quarter === entry.quarter)),
-    entry,
+    ...existing.filter(e =>
+      !(e.year === entry.year && e.quarter === entry.quarter && entrySource(e) === src)),
+    { ...entry, source: src },
   ];
   const json = stringifyFinancials(next);
   const payload = { [FIELD]: json };
@@ -292,9 +407,11 @@ export async function deleteFinancialQuarter(
   portfolioId: string,
   year: number,
   quarter: Quarter,
+  source: EntrySource = 'reviewer',
 ): Promise<FinancialEntry[]> {
   const existing = await fetchFinancials(portfolioId);
-  const next = existing.filter(e => !(e.year === year && e.quarter === quarter));
+  const next = existing.filter(e =>
+    !(e.year === year && e.quarter === quarter && entrySource(e) === source));
   const payload = { [FIELD]: stringifyFinancials(next) };
   if (isPortalUser()) await portalUpdate(MODULE, portfolioId, payload);
   else await zohoUpdate(MODULE, portfolioId, payload);
@@ -342,18 +459,103 @@ function combine(entries: FinancialEntry[], key: PeriodKey): FinancialRow | null
     quarterCount: ordered.length,
     reviewer: last.reviewer,
     updatedAt: last.updatedAt,
+    provenance: ordered.every(e => entrySource(e) === 'reviewer') ? 'reviewer' : 'founder',
+    mixedProvenance: new Set(ordered.map(entrySource)).size > 1,
     notes: ordered.map(e => e.notes).filter(Boolean).join('\n\n') || undefined,
     sourceDocumentIds: Array.from(new Set(ordered.flatMap(e => e.sourceDocumentIds ?? []))),
   };
 }
 
+/**
+ * Which set of figures to display.
+ *   'verified'  — reviewer-verified only
+ *   'reported'  — founder self-reported only
+ *   'best'      — verified where it exists, otherwise self-reported (default)
+ */
+export type SourcePreference = 'verified' | 'reported' | 'best';
+
+/**
+ * Reduces the stored entries to at most one per quarter, honouring the
+ * preference. 'best' is what investors see: a quarter the reviewer has checked
+ * shows the checked figures, and a quarter they have not yet reached still
+ * shows something — clearly labelled as the company's own number.
+ */
+export function selectBySource(
+  entries: FinancialEntry[],
+  preference: SourcePreference = 'best',
+): FinancialEntry[] {
+  const byQuarter = new Map<string, FinancialEntry[]>();
+  for (const e of entries) {
+    const k = `${e.year}-${e.quarter}`;
+    byQuarter.set(k, [...(byQuarter.get(k) ?? []), e]);
+  }
+  const out: FinancialEntry[] = [];
+  for (const group of byQuarter.values()) {
+    const verified = group.find(e => entrySource(e) === 'reviewer');
+    const reported = group.find(e => entrySource(e) === 'founder');
+    const pick = preference === 'verified' ? verified
+      : preference === 'reported' ? reported
+      : verified ?? reported;
+    if (pick) out.push(pick);
+  }
+  return sortEntries(out);
+}
+
+/** True when the reviewer has verified this quarter. */
+export function isQuarterVerified(entries: FinancialEntry[], year: number, quarter: Quarter): boolean {
+  return entries.some(e => e.year === year && e.quarter === quarter && entrySource(e) === 'reviewer');
+}
+
+/**
+ * Metrics where the founder's self-reported figure and the reviewer's verified
+ * figure disagree, per quarter. This is the reviewer's and the investor's most
+ * useful signal, so it is computed rather than left for someone to spot.
+ */
+export interface Discrepancy {
+  year: number;
+  quarter: Quarter;
+  metric: keyof FinancialInputs;
+  reported: number;
+  verified: number;
+  diff: number;
+  diffPct?: number;
+}
+
+export function findDiscrepancies(entries: FinancialEntry[]): Discrepancy[] {
+  const out: Discrepancy[] = [];
+  const quarters = new Set(entries.map(e => `${e.year}-${e.quarter}`));
+  for (const key of quarters) {
+    const [y, q] = key.split('-').map(Number);
+    const reported = entries.find(e => e.year === y && e.quarter === q && entrySource(e) === 'founder');
+    const verified = entries.find(e => e.year === y && e.quarter === q && entrySource(e) === 'reviewer');
+    if (!reported || !verified) continue;
+    for (const k of INPUT_KEYS) {
+      const a = reported[k];
+      const b = verified[k];
+      if (a === undefined || b === undefined || a === b) continue;
+      out.push({
+        year: y, quarter: q as Quarter, metric: k,
+        reported: a, verified: b,
+        diff: b - a,
+        diffPct: a === 0 ? undefined : ((b - a) / Math.abs(a)) * 100,
+      });
+    }
+  }
+  return out.sort((a, b) => a.year - b.year || a.quarter - b.quarter);
+}
+
 /** Builds the rows for a view mode, oldest first. */
-export function buildRows(entries: FinancialEntry[], mode: ViewMode): FinancialRow[] {
-  const years = Array.from(new Set(entries.map(e => e.year))).sort((a, b) => a - b);
+export function buildRows(
+  entries: FinancialEntry[],
+  mode: ViewMode,
+  preference: SourcePreference = 'best',
+): FinancialRow[] {
+  const selected = selectBySource(entries, preference);
+  const years = Array.from(new Set(selected.map(e => e.year))).sort((a, b) => a - b);
   const rows: FinancialRow[] = [];
 
   for (const year of years) {
-    const ofYear = entries.filter(e => e.year === year);
+    const ofYear = selected.filter(e => e.year === year);
     if (mode === 'quarterly') {
       for (const q of [1, 2, 3, 4] as Quarter[]) {
         const match = ofYear.filter(e => e.quarter === q);

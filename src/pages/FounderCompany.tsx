@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
-  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera,
-} from 'lucide-react';
+  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera, FileUp } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
+import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
+import { findPortfolioIdForFounder } from '../services/companyFinancials';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
@@ -119,6 +120,20 @@ export default function FounderCompany() {
   const [searchParams] = useSearchParams();
   const queryEmail = searchParams.get('email');
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
+
+  // undefined = still looking, null = no portfolio record for this company yet.
+  // The "no email" case is derived rather than set in the effect, so nothing
+  // updates state synchronously from the effect body.
+  const [portfolioLookup, setPortfolioLookup] = useState<string | null | undefined>(undefined);
+  const portfolioId = userEmail ? portfolioLookup : null;
+  useEffect(() => {
+    if (!userEmail) return;
+    let cancelled = false;
+    void findPortfolioIdForFounder(userEmail).then(id => {
+      if (!cancelled) setPortfolioLookup(id);
+    });
+    return () => { cancelled = true; };
+  }, [userEmail]);
   const [data, setData]       = useState<CompanyData>(EMPTY);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState<CompanyData>(EMPTY);
@@ -797,6 +812,54 @@ export default function FounderCompany() {
             )}
 
           </div>
+        </div>
+
+        {/* ── Finance Update ──
+            The founder's own quarterly figures. They write to the SAME
+            Portfolios record the investor's Company page reads, so an update
+            here shows up there immediately — marked self-reported until the
+            Level 1 Reviewer verifies it against the uploaded documents. */}
+        <div className="mt-8">
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Finance Update</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Your quarterly figures. Investors see these on your company page, marked
+                as self-reported until the reviewer verifies them.
+              </p>
+            </div>
+            <Link
+              to="/documents"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <FileUp size={12} /> Upload financial documents
+            </Link>
+          </div>
+
+          {portfolioId === undefined ? (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse">
+              <div className="h-3 bg-gray-100 rounded w-1/4 mb-3" />
+              <div className="h-20 bg-gray-50 rounded" />
+            </div>
+          ) : portfolioId ? (
+            <FinanceUpdateTab companyId={portfolioId} companyName={data.name || ''} />
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-2xl">
+              <FileUp size={24} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">Finance updates aren't open yet</p>
+              <p className="text-xs text-gray-400 max-w-md mx-auto">
+                Quarterly figures can be entered once your company is part of the
+                investor's portfolio. In the meantime you can upload your financial
+                documents from the Documents page.
+              </p>
+              <Link
+                to="/documents"
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-gray-900 hover:bg-black"
+              >
+                <FileUp size={12} /> Go to Documents
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
