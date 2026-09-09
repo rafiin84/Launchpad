@@ -9,6 +9,7 @@ import {
 import { getCRMPortfolioRecord, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
+import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
 import { Avatar } from '../components/ui/Avatar';
 import { loadToken } from '../services/oauth';
 
@@ -44,6 +45,24 @@ export default function PortfolioCompanyDetail() {
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('finance');
   const [founderPhotoUrl, setFounderPhotoUrl] = useState<string>('');
+  /**
+   * The financials live on the founder's own Founder_Companies record, not on
+   * this Portfolios record — the founder owns that one and can write to it
+   * with their portal token. The two are joined on email, so this resolves
+   * the portfolio's Founder_Email to that record.
+   * undefined = still looking, null = no Founder_Companies record for them.
+   */
+  const [financeRecordId, setFinanceRecordId] = useState<string | null | undefined>(undefined);
+
+  const founderEmail = record?.founderEmail || '';
+  useEffect(() => {
+    if (!founderEmail) return;
+    let cancelled = false;
+    void findCompanyRecordIdForEmail(founderEmail).then(rid => {
+      if (!cancelled) setFinanceRecordId(rid);
+    });
+    return () => { cancelled = true; };
+  }, [founderEmail]);
 
   useEffect(() => {
     if (!id) return;
@@ -229,7 +248,33 @@ export default function PortfolioCompanyDetail() {
           {/* Finance Update tab — quarterly figures maintained by the Level 1
               Reviewer from the founder's uploaded documents. */}
           {activeTab === 'finance' && (
-            <FinanceUpdateTab companyId={record.id} companyName={record.companyName || ''} />
+            !record.founderEmail ? (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4">
+                <p className="text-sm font-semibold text-amber-900">No founder email on this company</p>
+                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                  Financials are matched to the founder by email. Add the founder's
+                  email to this portfolio record and their figures will appear here.
+                </p>
+              </div>
+            ) : financeRecordId === undefined ? (
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse">
+                <div className="h-3 bg-gray-100 rounded w-1/4 mb-3" />
+                <div className="h-20 bg-gray-50 rounded" />
+              </div>
+            ) : financeRecordId ? (
+              <FinanceUpdateTab companyId={financeRecordId} companyName={record.companyName || ''} />
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4">
+                <p className="text-sm font-semibold text-gray-700">
+                  No company profile for {record.founderEmail}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  The founder has not created their company profile yet, so there is
+                  nowhere for their financials to live. They appear here as soon as
+                  they save it from their own Companies page.
+                </p>
+              </div>
+            )
           )}
 
           {/* Overview tab */}

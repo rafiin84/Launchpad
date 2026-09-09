@@ -7,8 +7,15 @@
 //           → Investors read the verified figures on the Company page
 //
 //  Storage: no new module. The whole series lives as JSON in the existing
-//  Portfolios record's `Financial_Data` field — the same pattern the codebase
-//  already uses for Requested_Documents and Shortlist_Review.
+//  Founder_Companies record's `Financial_Data` field — the same pattern the
+//  codebase already uses for Requested_Documents and Shortlist_Review.
+//
+//  Why Founder_Companies and not Portfolios: the founder already owns this
+//  record — companyProfile.ts writes their whole profile to it with their own
+//  portal token — so writing financials there needs no extra portal
+//  permission and no admin proxy. Portfolios belongs to the investor. The
+//  two are joined on email: Founder_Companies.Email = Portfolios.Founder_Email,
+//  which is how the investor's Company page finds the founder's figures.
 //
 //  Access: both sides call the CRM API directly with the caller's own token —
 //  an investor's CRM token, or a founder's portal token against the portal
@@ -23,11 +30,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  zohoGetById, zohoUpdate, zohoSearch, portalGetById, portalUpdate, portalSearch,
+  zohoGetById, zohoUpdate, zohoSearch,
+  portalGetById, portalUpdate, portalSearch, portalList,
 } from './zohoApi';
 import { loadRole } from './oauth';
 
-const MODULE = 'Portfolios';
+const MODULE = 'Founder_Companies';
 const FIELD = 'Financial_Data';
 
 function isPortalUser(): boolean {
@@ -291,6 +299,9 @@ function sortEntries(entries: FinancialEntry[]): FinancialEntry[] {
     || entrySource(a).localeCompare(entrySource(b)));
 }
 
+/** email (lower-case) → Founder_Companies record id. Hits only; see below. */
+const ID_CACHE = new Map<string, string>();
+
 // ─── Founder access path ─────────────────────────────────────────────────────
 //
 // Founders hit the CRM API directly with their own portal access token, the
@@ -300,32 +311,50 @@ function sortEntries(entries: FinancialEntry[]): FinancialEntry[] {
 // they may read and write, and a failure comes back as a real Zoho error
 // rather than a proxy status.
 //
-// Requirement: the Portfolios module must be shared with the client portal
-// (Setup → Channels → Portals → the portal's module permissions) with read
-// and write on Financial_Data. Without that Zoho answers 401/403 and the
-// Finance Update tab shows the message it returns.
+// No extra portal permission is needed: Founder_Companies is already shared
+// with the portal, because companyProfile.ts reads and writes the founder's
+// whole profile on that record with the same token.
 
 /**
- * Finds the Portfolios record for a founder by their email.
+ * Finds the Founder_Companies record that holds a company's financials.
  *
- * The founder writes financials onto the SAME record the investor's Company
- * page reads, which is what makes their update show up there — there is no
- * second copy to reconcile.
+ * Both sides resolve through this one function, from the same email, so they
+ * land on the SAME record: the founder passes their own login address, and the
+ * investor's Company page passes the portfolio's Founder_Email. That shared
+ * key is what makes a founder's update appear on the investor's page — there
+ * is no second copy to reconcile.
  */
-export async function findPortfolioIdForFounder(founderEmail: string): Promise<string | null> {
-  const email = founderEmail.trim();
-  if (!email) return null;
+export async function findCompanyRecordIdForEmail(email: string): Promise<string | null> {
+  const key = email.trim();
+  if (!key) return null;
+  const cached = ID_CACHE.get(key.toLowerCase());
+  if (cached) return cached;
   try {
-    const records = isPortalUser()
-      ? await portalSearch(MODULE, `(Founder_Email:equals:${email})`)
-      : await zohoSearch(MODULE, `(Founder_Email:equals:${email})`);
-    return (records[0]?.id as string | undefined) ?? null;
+    let id: string | null = null;
+    if (isPortalUser()) {
+      // A portal user can only see their own Founder_Companies record, so the
+      // plain list is the cheapest way to find it. Search is the fallback for
+      // a portal whose sharing rules return more than one.
+      const own = await portalList(MODULE, { per_page: '1', fields: 'Email' })
+        .catch(() => [] as { id?: string }[]);
+      id = (own[0]?.id as string | undefined) ?? null;
+      if (!id) {
+        const found = await portalSearch(MODULE, `(Email:equals:${key})`);
+        id = (found[0]?.id as string | undefined) ?? null;
+      }
+    } else {
+      const found = await zohoSearch(MODULE, `(Email:equals:${key})`);
+      id = (found[0]?.id as string | undefined) ?? null;
+    }
+    // Only a hit is cached. A miss must stay uncached, or a founder who
+    // creates their company profile mid-session would keep reading as absent.
+    if (id) ID_CACHE.set(key.toLowerCase(), id);
+    return id;
   } catch (err) {
-    // A null here renders as "not part of the portfolio yet", which is a real
-    // state — so a lookup that failed for some other reason (no portal access
-    // to Portfolios, CRM error) would be invisible. Log it so it is at least
-    // diagnosable.
-    console.warn('[financials] portfolio lookup failed for', email, err);
+    // A null renders as "no company record yet", which is a real state — so a
+    // lookup that failed for another reason (no portal access, CRM error)
+    // would be invisible. Log it so it is at least diagnosable.
+    console.warn('[financials] company record lookup failed for', key, err);
     return null;
   }
 }
@@ -343,7 +372,7 @@ export async function fetchFinancialsAsFounder(portfolioId: string): Promise<Fin
 }
 
 /**
- * Saves a founder's self-reported quarter onto the Portfolios record.
+ * Saves a founder's self-reported quarter onto their Founder_Companies record.
  * Forces source='founder' regardless of what the caller passes, so a founder
  * can never write figures that would read as reviewer-verified.
  */
@@ -355,7 +384,7 @@ export async function saveFinancialQuarterAsFounder(
 }
 
 
-/** Reads the stored series straight off the Portfolios record. */
+/** Reads the stored series straight off the Founder_Companies record. */
 export async function fetchFinancials(portfolioId: string): Promise<FinancialEntry[]> {
   const record = isPortalUser()
     ? await portalGetById(MODULE, portfolioId, FIELD).catch(() => portalGetById(MODULE, portfolioId))

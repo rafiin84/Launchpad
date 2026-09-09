@@ -8,7 +8,7 @@ import { cn } from '../lib/cn';
 import { useAuth } from '../context/AuthContext';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
 import FinanceDocumentUpload from '../components/company/FinanceDocumentUpload';
-import { findPortfolioIdForFounder } from '../services/companyFinancials';
+import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
@@ -124,7 +124,7 @@ export default function FounderCompany() {
   const queryEmail = searchParams.get('email');
   const userEmail = zohoEmail || portalSession?.email || currentUser.email || '';
 
-  // undefined = still looking, null = no portfolio record for this company yet.
+  // undefined = still looking, null = no Founder_Companies record yet.
   // The "no email" case is derived rather than set in the effect, so nothing
   // updates state synchronously from the effect body.
   const [portfolioLookup, setPortfolioLookup] = useState<string | null | undefined>(undefined);
@@ -132,7 +132,7 @@ export default function FounderCompany() {
   useEffect(() => {
     if (!userEmail) return;
     let cancelled = false;
-    void findPortfolioIdForFounder(userEmail).then(id => {
+    void findCompanyRecordIdForEmail(userEmail).then(id => {
       if (!cancelled) setPortfolioLookup(id);
     });
     return () => { cancelled = true; };
