@@ -18,6 +18,7 @@ import {
   type SourcePreference,
 } from '../../services/companyFinancials';
 import { fetchCRMDocuments, type CRMDocument } from '../../services/crmDocuments';
+import FinanceTemplateImport from './FinanceTemplateImport';
 import { cn } from '../../lib/cn';
 
 /**
@@ -870,6 +871,20 @@ export default function FinanceUpdateTab({
         <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl px-3 py-2">
           {error}
         </p>
+      )}
+
+      {/* Spreadsheet route — download a template, fill it in Excel, upload it
+          back. Only offered to whoever may actually record figures. */}
+      {canEdit && (
+        <FinanceTemplateImport
+          companyId={companyId}
+          companyName={companyName}
+          existing={entries}
+          writeAs={writeAs ?? 'founder'}
+          reviewerName={currentUser.name}
+          reviewerEmail={currentUser.email}
+          onImported={setEntries}
+        />
       )}
 
       {/* Empty state */}

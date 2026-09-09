@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText, Lock, File, FileSpreadsheet, Scale, Plus,
-  Building2, Trash2, AlertCircle, RefreshCw, Download, User, Eye,
-} from 'lucide-react';
+  Building2, Trash2, AlertCircle, RefreshCw, Download, User, Eye, Folder, FolderOpen, ChevronLeft, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
@@ -11,6 +10,8 @@ import {
   fetchCRMDocuments, deleteCRMDocument, resolveDocumentUrl, type CRMDocument,
 } from '../services/crmDocuments';
 import { useAuth } from '../context/AuthContext';
+import { fetchCRMPortfolio } from '../services/crmPortfolio';
+import { cn } from '../lib/cn';
 import { useLanguage } from '../context/LanguageContext';
 import { loadUserName } from '../services/oauth';
 import { fetchCompanyProfile } from '../services/companyProfile';
@@ -45,6 +46,15 @@ function formatDate(iso: string, language: string): string {
   } catch { return ''; }
 }
 
+/** A company folder in the investor's document library. */
+interface CompanyFolder {
+  /** Display name; '' is the catch-all for documents with no company set. */
+  name: string;
+  docs: CRMDocument[];
+  /** True when the company is in the portfolio but has no documents yet. */
+  empty: boolean;
+}
+
 export default function Documents() {
   const { isFounder, isInvestor, founderCompanyName, currentUser } = useAuth();
   const { t, language } = useLanguage();
@@ -56,6 +66,12 @@ export default function Documents() {
   const [deleting, setDeleting] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Investors browse by company folder; null = the folder list itself.
+  const [openFolder, setOpenFolder] = useState<string | null>(null);
+  const [folderQuery, setFolderQuery] = useState('');
+  // Portfolio company names, so a company with no documents still gets a
+  // folder rather than silently disappearing from the library.
+  const [portfolioNames, setPortfolioNames] = useState<string[]>([]);
   const [viewerDoc, setViewerDoc] = useState<CRMDocument | null>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [viewerLoading, setViewerLoading] = useState(false);
@@ -114,6 +130,49 @@ export default function Documents() {
         return isMine || isForMyCompany;
       });
 
+  // Company folders. Built from the documents themselves, then topped up with
+  // every portfolio company so the library mirrors the portfolio rather than
+  // only the companies that happen to have uploaded something.
+  const folders: CompanyFolder[] = React.useMemo(() => {
+    const byCompany = new Map<string, CRMDocument[]>();
+    for (const d of visibleDocs) {
+      const key = (d.relatedCompany || '').trim();
+      byCompany.set(key, [...(byCompany.get(key) ?? []), d]);
+    }
+    // Match portfolio names case-insensitively so "R Company" and "R company"
+    // do not become two folders.
+    const seen = new Map<string, string>();
+    for (const key of byCompany.keys()) {
+      if (key) seen.set(key.toLowerCase(), key);
+    }
+    for (const name of portfolioNames) {
+      const lower = name.trim().toLowerCase();
+      if (lower && !seen.has(lower)) {
+        seen.set(lower, name);
+        byCompany.set(name, []);
+      }
+    }
+    const named = [...byCompany.entries()]
+      .filter(([name]) => name !== '')
+      .map(([name, docs]) => ({ name, docs, empty: docs.length === 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const unfiled = byCompany.get('') ?? [];
+    return unfiled.length
+      ? [...named, { name: '', docs: unfiled, empty: false }]
+      : named;
+  }, [visibleDocs, portfolioNames]);
+
+  const filteredFolders = folderQuery.trim()
+    ? folders.filter(f =>
+        (f.name || 'unfiled').toLowerCase().includes(folderQuery.trim().toLowerCase()))
+    : folders;
+
+  // Documents shown in the row list: everything for founders, or the open
+  // folder's contents for investors.
+  const listDocs = isInvestor && openFolder !== null
+    ? (folders.find(f => f.name === openFolder)?.docs ?? [])
+    : visibleDocs;
+
   const handleDelete = async () => {
     if (!pendingDeleteId) return;
     setDeleting(true);
@@ -128,11 +187,30 @@ export default function Documents() {
     }
   };
 
+  useEffect(() => {
+    if (!isInvestor) return;
+    let cancelled = false;
+    void fetchCRMPortfolio()
+      .then(recs => {
+        if (!cancelled) setPortfolioNames(recs.map(r => r.companyName).filter(Boolean));
+      })
+      .catch(() => { /* folders still work from the documents alone */ });
+    return () => { cancelled = true; };
+  }, [isInvestor]);
+
   const handleClearAll = async () => {
-    if (!confirm(`Delete all ${visibleDocs.length} documents? This cannot be undone.`)) return;
+    // Scoped to what is actually on screen. Inside a company folder this must
+    // delete that company's documents only — the button reads "Clear All (n)"
+    // for the open folder, and deleting the whole library from there would be
+    // a nasty surprise.
+    const scope = listDocs;
+    const where = isInvestor && openFolder !== null
+      ? ` in ${openFolder || 'Unfiled'}`
+      : '';
+    if (!confirm(`Delete all ${scope.length} documents${where}? This cannot be undone.`)) return;
     setClearingAll(true);
     try {
-      const targets = visibleDocs.map(d => d.id);
+      const targets = scope.map(d => d.id);
       const results = await Promise.allSettled(targets.map(id => deleteCRMDocument(id)));
       const deletedIds = new Set(targets.filter((_, i) => results[i]?.status === 'fulfilled'));
       setDocs(prev => prev.filter(d => !deletedIds.has(d.id)));
@@ -300,10 +378,90 @@ export default function Documents() {
         </div>
       )}
 
-      {!loading && !error && visibleDocs.length > 0 && (
+      {/* ── Company folders (investor, top level) ── */}
+      {!loading && !error && isInvestor && openFolder === null && (
         <div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-gray-900">
+              Companies <span className="text-xs font-medium text-gray-400">{filteredFolders.length}</span>
+            </h2>
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={folderQuery}
+                onChange={e => setFolderQuery(e.target.value)}
+                placeholder="Find a company..."
+                className="w-56 pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+              />
+            </div>
+          </div>
+
+          {filteredFolders.length === 0 ? (
+            <div className="text-center py-14 border-2 border-dashed border-gray-100 rounded-2xl">
+              <Folder size={26} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">
+                {folderQuery ? 'No company matches that' : 'No companies yet'}
+              </p>
+              <p className="text-xs text-gray-400">
+                {folderQuery
+                  ? 'Try a different name.'
+                  : 'Folders appear as companies join the portfolio or documents are uploaded.'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredFolders.map(folder => (
+                <button
+                  key={folder.name || '__unfiled__'}
+                  onClick={() => setOpenFolder(folder.name)}
+                  className="text-left bg-white border border-gray-100 rounded-2xl p-4 hover:border-indigo-200 hover:shadow-sm transition-all group"
+                >
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors',
+                    folder.empty ? 'bg-gray-50' : 'bg-indigo-50 group-hover:bg-indigo-100',
+                  )}>
+                    <Folder
+                      size={18}
+                      className={folder.empty ? 'text-gray-300' : 'text-indigo-600'}
+                    />
+                  </div>
+                  <p className={cn('text-sm font-semibold truncate',
+                    folder.name ? 'text-gray-900' : 'text-gray-500 italic')}>
+                    {folder.name || 'Unfiled'}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {folder.docs.length === 0
+                      ? 'No documents'
+                      : `${folder.docs.length} document${folder.docs.length === 1 ? '' : 's'}`}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Document rows: a founder's own list, or an opened company folder ── */}
+      {!loading && !error && listDocs.length > 0 && (!isInvestor || openFolder !== null) && (
+        <div>
+          {isInvestor && openFolder !== null && (
+            <button
+              onClick={() => setOpenFolder(null)}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800 mb-3"
+            >
+              <ChevronLeft size={14} /> All companies
+            </button>
+          )}
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900">{t.documentsPage.allDocuments} ({visibleDocs.length})</h2>
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              {isInvestor && openFolder !== null && (
+                <FolderOpen size={15} className="text-indigo-600" />
+              )}
+              {isInvestor && openFolder !== null
+                ? (openFolder || 'Unfiled')
+                : t.documentsPage.allDocuments} ({listDocs.length})
+            </h2>
             {isInvestor && (
               <button
                 onClick={handleClearAll}
@@ -311,12 +469,12 @@ export default function Documents() {
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Trash2 size={12} className={clearingAll ? 'animate-pulse' : ''} />
-                {clearingAll ? 'Deleting...' : `Clear All (${visibleDocs.length})`}
+                {clearingAll ? 'Deleting...' : `Clear All (${listDocs.length})`}
               </button>
             )}
           </div>
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-            {visibleDocs.map((doc, i) => {
+            {listDocs.map((doc, i) => {
               const typeKey = normalizeType(doc.documentType);
               const meta = TYPE_META[typeKey] ?? TYPE_META['other'];
               const Icon = meta.icon;
@@ -325,7 +483,7 @@ export default function Documents() {
                 <div
                   key={doc.id}
                   onClick={() => handleView(doc)}
-                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors cursor-pointer ${i < visibleDocs.length - 1 ? 'border-b border-gray-50' : ''}`}
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors cursor-pointer ${i < listDocs.length - 1 ? 'border-b border-gray-50' : ''}`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.color}`}>
                     <Icon size={16} />
