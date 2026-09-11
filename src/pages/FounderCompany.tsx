@@ -5,6 +5,7 @@ import {
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
   Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { percent, withUnit } from '../lib/units';
 import { useAuth } from '../context/AuthContext';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
 import FinanceDocumentUpload from '../components/company/FinanceDocumentUpload';
@@ -543,7 +544,7 @@ export default function FounderCompany() {
                   <div className="sm:col-span-2">
                     <DisplayField label={t.companyProfile.founders} value={d.founderNames} />
                   </div>
-                  <DisplayField label={t.companyProfile.teamSize} value={d.teamSize ? `${d.teamSize} people` : ''} />
+                  <DisplayField label={t.companyProfile.teamSize} value={withUnit(d.teamSize, 'people')} />
                   <DisplayField label={t.companyProfile.openRoles} value={d.openRoles} />
                 </>
               )}
@@ -591,7 +592,7 @@ export default function FounderCompany() {
                       )}
                       {d.momGrowth && (
                         <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-teal-700">{d.momGrowth}%</p>
+                          <p className="text-lg font-bold text-teal-700">{percent(d.momGrowth)}</p>
                           <p className="text-[10px] font-medium text-teal-500 uppercase tracking-wide mt-0.5">{t.companySidebar.momGrowth}</p>
                         </div>
                       )}
@@ -600,7 +601,7 @@ export default function FounderCompany() {
                   <div className="sm:col-span-2">
                     <DisplayField label={t.companyProfile.product} value={d.productDescription} />
                   </div>
-                  <DisplayField label={t.companyProfile.monthlyChurn} value={d.churnRate ? `${d.churnRate}%` : ''} />
+                  <DisplayField label={t.companyProfile.monthlyChurn} value={percent(d.churnRate)} />
                   <DisplayField label={t.companyProfile.nps} value={d.nps} />
                   {d.keyMetric && <DisplayField label={d.keyMetricLabel || 'Key Metric'} value={d.keyMetric} />}
                 </>
@@ -728,8 +729,8 @@ export default function FounderCompany() {
                   { label: t.companySidebar.mrr,              value: fmt(data.mrr) },
                   { label: t.companySidebar.arr,              value: fmt(data.arr) },
                   { label: t.companySidebar.activeCustomers,  value: data.activeCustomers || '—' },
-                  { label: t.companySidebar.momGrowth,        value: data.momGrowth ? `${data.momGrowth}%` : '—' },
-                  { label: t.companyProfile.monthlyChurn,  value: data.churnRate ? `${data.churnRate}%` : '—' },
+                  { label: t.companySidebar.momGrowth,        value: percent(data.momGrowth) || '—' },
+                  { label: t.companyProfile.monthlyChurn,  value: percent(data.churnRate) || '—' },
                   { label: t.companyProfile.nps,           value: data.nps || '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
@@ -834,7 +835,7 @@ export default function FounderCompany() {
                 {data.teamSize && (
                   <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-xs text-gray-500">{t.companySidebar.totalTeam}</span>
-                    <span className="text-sm font-bold text-gray-900">{data.teamSize} {t.companySidebar.people}</span>
+                    <span className="text-sm font-bold text-gray-900">{withUnit(data.teamSize, t.companySidebar.people)}</span>
                   </div>
                 )}
               </div>

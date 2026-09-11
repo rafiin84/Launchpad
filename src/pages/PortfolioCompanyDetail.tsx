@@ -11,6 +11,7 @@ import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
 import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
 import FounderProfile from '../components/company/FounderProfile';
+import FounderReportedProfile from '../components/company/FounderReportedProfile';
 import { loadToken } from '../services/oauth';
 
 function formatCurrency(n: number) {
@@ -313,6 +314,11 @@ export default function PortfolioCompanyDetail() {
                   ))}
                 </div>
               </div>
+
+              {/* The founder's own profile of the same company. Below the
+                  portfolio record, not merged into it: the two can disagree,
+                  and which one you are reading matters. */}
+              <FounderReportedProfile founderEmail={record.founderEmail || ''} />
             </div>
           )}
 

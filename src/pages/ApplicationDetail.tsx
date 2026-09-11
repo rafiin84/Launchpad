@@ -42,6 +42,7 @@ import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
 import { loadRole } from '../services/oauth';
 import { cn } from '../lib/cn';
+import { percent } from '../lib/units';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1513,7 +1514,7 @@ export default function ApplicationDetail() {
                 {app.equityOffered && (
                   <div>
                     <p className="text-xs text-gray-500">{t.applicationDetail.equityOffered}</p>
-                    <p className="text-sm font-semibold text-gray-900">{app.equityOffered}%</p>
+                    <p className="text-sm font-semibold text-gray-900">{percent(app.equityOffered)}</p>
                   </div>
                 )}
                 {app.previousFunding && (
