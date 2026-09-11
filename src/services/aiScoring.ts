@@ -113,6 +113,20 @@ export async function requestAiAssessment(
     body: JSON.stringify({ application }),
   });
 
+  // A non-JSON reply means the request never reached the function. The app's
+  // catch-all rewrite serves index.html for any unmatched path, so an
+  // undeployed endpoint answers a POST with 405 and an HTML body — and
+  // "AI scoring failed (405)" sends you looking at the wrong thing. Say what
+  // actually happened.
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      'The /api/ai-score endpoint is not deployed. It answered with the app '
+      + `page instead of the function (HTTP ${res.status}). Deploy the current `
+      + 'branch, then set ANTHROPIC_API_KEY in the deployment environment.',
+    );
+  }
+
   const json = await res.json().catch(() => ({})) as {
     assessment?: AiAssessment; error?: string;
   };
