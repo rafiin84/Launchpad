@@ -1251,7 +1251,7 @@ export default function ApplicationDetail() {
   };
 
   if (loading) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full animate-pulse space-y-4">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full animate-pulse space-y-4">
       <div className="h-4 bg-gray-100 rounded w-32" />
       <div className="h-48 bg-gray-100 rounded-2xl" />
       <div className="grid grid-cols-2 gap-4">
@@ -1262,7 +1262,7 @@ export default function ApplicationDetail() {
   );
 
   if (error || !app) return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full">
       <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
         <ArrowLeft size={15} /> {t.applications.title}
       </Link>
@@ -1307,7 +1307,7 @@ export default function ApplicationDetail() {
   const requestedDocs = parseRequestedDocuments(app.requestedDocuments);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full">
       {docViewer && (
         <DocumentViewerModal
           title={docViewer.name}
@@ -1362,7 +1362,7 @@ export default function ApplicationDetail() {
           floating in the middle of the gap above it. */}
       <Link
         to="/applications"
-        className="inline-flex items-center gap-1.5 -mt-1 mb-3 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
+        className="inline-flex items-center gap-1.5 mb-3 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
       >
         <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
         {t.applicationDetail.backToApplications}
