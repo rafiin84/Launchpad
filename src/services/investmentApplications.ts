@@ -123,6 +123,10 @@ export interface InvestmentApplication {
 
   // 3-level shortlisting ledger (JSON string — see ReviewLedger)
   reviewLedger: string;
+
+  // AI assessment (JSON string — see services/aiScoring). Advisory only: it is
+  // read by nothing in the pipeline and cannot move an application forward.
+  aiAssessment: string;
 }
 
 export type InvestmentApplicationFields = Omit<InvestmentApplication, 'id' | 'submittedAt' | 'updatedAt'>;
@@ -181,6 +185,7 @@ const FIELD_MAP: Record<keyof Omit<InvestmentApplication, 'id' | 'submittedAt' |
   meetingLink:         'Meeting_Link',
   meetingAgenda:       'Meeting_Agenda',
   reviewLedger:        'Shortlist_Review',
+  aiAssessment:        'AI_Assessment',
 };
 
 /** Currency fields in CRM — values must be sent as numbers */
@@ -292,6 +297,7 @@ function fromCrmRecord(r: ZohoRecord): InvestmentApplication {
     meetingAgenda:      str('Meeting_Agenda'),
     // Falls back to the local mirror when the CRM field does not exist yet
     reviewLedger:       str('Shortlist_Review') || loadLedgerMirror(r.id),
+    aiAssessment:       str('AI_Assessment'),
   };
 }
 

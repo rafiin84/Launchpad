@@ -30,6 +30,11 @@ import {
   type ReviewLevel,
 } from '../services/investmentApplications';
 import ReviewPipeline, { type LevelDecisionPayload } from '../components/applications/ReviewPipeline';
+import AiAssessmentPanel from '../components/applications/AiAssessment';
+import {
+  requestAiAssessment, saveAiAssessment, parseAiAssessment, hasAssessableContent,
+  type AiAssessment,
+} from '../services/aiScoring';
 import ConfirmDecisionDialog from '../components/applications/ConfirmDecisionDialog';
 import { addNotification } from '../services/notifications';
 import { zohoDownloadAttachment, portalDownloadAttachment } from '../services/zohoApi';
@@ -825,6 +830,15 @@ export default function ApplicationDetail() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ApplicationStatus | null>(null);
 
+  /**
+   * AI assessment. Held in its own state rather than read straight off `app`
+   * so a fresh score shows immediately, and a save that fails still leaves the
+   * reviewer looking at the assessment they just paid for.
+   */
+  const [aiScore, setAiScore] = useState<AiAssessment | null>(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiError, setAiError] = useState('');
+
   const [docViewer, setDocViewer] = useState<{ name: string; fileName: string } | null>(null);
   const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
   const [docViewerLoading, setDocViewerLoading] = useState(false);
@@ -838,6 +852,7 @@ export default function ApplicationDetail() {
       if (result) {
         setApp(result);
         setNotes(result.investorNotes || '');
+        setAiScore(parseAiAssessment(result.aiAssessment || ''));
       } else {
         setError(t.applicationDetail.applicationNotFound);
       }
@@ -896,6 +911,36 @@ export default function ApplicationDetail() {
       setActionError(msg);
     }
     setActionLoading(null);
+  };
+
+  /**
+   * Runs the assessment, shows it, then persists it.
+   *
+   * The score is shown before the save so a CRM write failure does not throw
+   * away a result the fund has already paid for; the save failing is reported
+   * next to the assessment instead of replacing it. Persisting matters because
+   * the alternative is every reviewer on the chain triggering their own run of
+   * the same application, and three reviewers reading three different scores.
+   */
+  const handleAiScore = async () => {
+    if (!id || !app) return;
+    setAiRunning(true);
+    setAiError('');
+    try {
+      const result = await requestAiAssessment(app, currentUser.name);
+      setAiScore(result);
+      try {
+        await saveAiAssessment(id, result, isInvestor);
+        setApp(prev => (prev ? { ...prev, aiAssessment: JSON.stringify(result) } : prev));
+      } catch (saveErr) {
+        setAiError(saveErr instanceof Error
+          ? `Scored, but could not be saved: ${saveErr.message}`
+          : 'Scored, but could not be saved.');
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI scoring failed.');
+    }
+    setAiRunning(false);
   };
 
   const handleSaveNotes = async () => {
@@ -1412,6 +1457,28 @@ export default function ApplicationDetail() {
 
         {/* LEFT — the application itself, read top to bottom */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* AI assessment — a single row until it has something to show, so it
+              does not push the application itself down the page. Reviewers and
+              investors only: a founder should not be shown a machine's opinion
+              of their own application. */}
+          {!isFounder && (
+            <AiAssessmentPanel
+              assessment={aiScore}
+              running={aiRunning}
+              error={aiError}
+              canScore={hasAssessableContent(app)}
+              onScore={handleAiScore}
+              scoredByLabel={aiScore?.scoredAt
+                ? (aiScore.scoredBy
+                    ? t.aiScoring.scoredBy
+                        .replace('{who}', aiScore.scoredBy)
+                        .replace('{when}', relativeTime(aiScore.scoredAt, t, language))
+                    : t.aiScoring.scoredOn
+                        .replace('{when}', relativeTime(aiScore.scoredAt, t, language)))
+                : undefined}
+            />
+          )}
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (

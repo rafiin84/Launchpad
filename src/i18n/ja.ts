@@ -68,6 +68,27 @@ const ja: TranslationKeys = {
     profile:       'プロフィールに戻る',
   },
 
+  // ─── AI scoring ──────────────────────────────────────────────────────────
+  aiScoring: {
+    title: 'AI評価',
+    action: 'AIスコアリング',
+    pitch: '評価基準に沿ってこの応募を採点します',
+    analysing: '分析中…',
+    rescore: '再採点',
+    nothingToScore: '評価するための情報がまだ足りません',
+    team: 'チーム',
+    market: '市場',
+    product: 'プロダクト',
+    traction: 'トラクション',
+    verdictStrong: '有望',
+    verdictPromising: '期待あり',
+    verdictWeak: '弱い',
+    verdictInsufficient: 'データ不足',
+    scoredBy: '{who} が採点 · {when}',
+    scoredOn: '{when} に採点',
+    disclaimer: '参考情報です。創業者が提出した内容のみに基づく評価であり、外部ソースとの照合は行っていません。審査フローには影響しません。',
+  },
+
   // ─── Navigation ──────────────────────────────────────────────────────────
   nav: {
     dashboard: 'ダッシュボード',

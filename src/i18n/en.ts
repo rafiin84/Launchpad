@@ -69,6 +69,27 @@ const en = {
     profile:       'Back to Profile',
   },
 
+  // ─── AI scoring ──────────────────────────────────────────────────────────
+  aiScoring: {
+    title: 'AI Assessment',
+    action: 'AI Scoring',
+    pitch: 'Score this application against a fixed rubric',
+    analysing: 'Analysing…',
+    rescore: 'Score again',
+    nothingToScore: 'Not enough has been filled in to assess yet',
+    team: 'Team',
+    market: 'Market',
+    product: 'Product',
+    traction: 'Traction',
+    verdictStrong: 'Strong',
+    verdictPromising: 'Promising',
+    verdictWeak: 'Weak',
+    verdictInsufficient: 'Not enough data',
+    scoredBy: 'Scored by {who} · {when}',
+    scoredOn: 'Scored {when}',
+    disclaimer: 'Advisory only. Judged on what the founder submitted — no claim here has been checked against an outside source, and this score does not affect the review pipeline.',
+  },
+
   // ─── Navigation ──────────────────────────────────────────────────────────
   nav: {
     dashboard: 'Dashboard',

@@ -552,6 +552,7 @@ export default function FounderApplicationForm() {
       status,
       // Shortlisting ledger starts empty — populated by investor reviews
       reviewLedger: '',
+      aiAssessment: '',
       companyName: form.companyName,
       companyWebsite: form.companyWebsite,
       companyIndustry: form.companyIndustry,
