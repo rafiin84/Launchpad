@@ -35,7 +35,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent";
 const selectCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none bg-white";
 
-// ─── Invite Applicant Modal ───────────────────────────────────────────────────────
+// ─── Invite Portal User Modal ─────────────────────────────────────────────────
 
 function AddFounderModal({ onClose, onAdded }: { onClose: () => void; onAdded: (f: CRMFounder) => void }) {
   const { t } = useLanguage();

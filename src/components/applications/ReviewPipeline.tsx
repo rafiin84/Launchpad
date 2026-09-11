@@ -412,7 +412,7 @@ function FinalRejectModal({
 // ─── Stage card ───────────────────────────────────────────────────────────────
 
 function StageCard({
-  level, state, review, isLast, language, t, onAction, actionLoading, canAct,
+  level, state, review, isLast, language, t, onAction, actionLoading, canAct, dense,
 }: {
   level: ReviewLevel;
   state: PipelineStageState;
@@ -424,6 +424,8 @@ function StageCard({
   actionLoading: boolean;
   /** Whether this viewer may act on this level. */
   canAct: boolean;
+  /** Narrow column: stack the action under the text instead of beside it. */
+  dense?: boolean;
 }) {
   const meta = LEVEL_META[level];
   const Icon = meta.icon;
@@ -469,7 +471,7 @@ function StageCard({
             isLocked && 'opacity-60',
           )}
         >
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className={cn('flex items-start gap-3 flex-wrap', !dense && 'justify-between')}>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className={cn('text-sm font-bold', isLocked ? 'text-gray-500' : 'text-gray-900')}>
@@ -484,7 +486,10 @@ function StageCard({
               <button
                 onClick={onAction}
                 disabled={actionLoading}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gray-900 hover:bg-black transition-colors disabled:opacity-50 flex-shrink-0"
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gray-900 hover:bg-black transition-colors disabled:opacity-50 flex-shrink-0',
+                  dense && 'w-full justify-center mt-2.5',
+                )}
               >
                 {actionLoading
                   ? t.reviewPipeline.recording
@@ -529,7 +534,7 @@ function StageCard({
 // ─── Final stage card ─────────────────────────────────────────────────────────
 
 function FinalStageCard({
-  state, ledgerFinal, language, t, onApprove, onReject, actionLoading, unlocked,
+  state, ledgerFinal, language, t, onApprove, onReject, actionLoading, unlocked, dense,
 }: {
   state: 'locked' | 'current' | 'approved' | 'rejected';
   ledgerFinal?: { reviewer: string; decidedAt: string; comment: string; outcome: string };
@@ -539,6 +544,8 @@ function FinalStageCard({
   onReject: () => void;
   actionLoading: boolean;
   unlocked: boolean;
+  /** Narrow column: stack the two decisions under the text, side by side. */
+  dense?: boolean;
 }) {
   const isLocked = state === 'locked';
   const isDecided = state === 'approved' || state === 'rejected';
@@ -570,7 +577,7 @@ function FinalStageCard({
             isLocked             && 'border-gray-100 bg-white opacity-60',
           )}
         >
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className={cn('flex items-start gap-3 flex-wrap', !dense && 'justify-between')}>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className={cn('text-sm font-bold', isLocked ? 'text-gray-500' : 'text-gray-900')}>
@@ -582,7 +589,10 @@ function FinalStageCard({
             </div>
 
             {state === 'current' && unlocked && (
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className={cn(
+                'flex items-center gap-2',
+                dense ? 'w-full mt-2.5 [&>button]:flex-1 [&>button]:justify-center' : 'flex-shrink-0',
+              )}>
                 <button
                   onClick={onReject}
                   disabled={actionLoading}
@@ -627,7 +637,7 @@ function FinalStageCard({
 
 export default function ReviewPipeline({
   app, onLevelDecision, onApprove, onReject, actionLoading, error,
-  actableLevel = null, canDecideFinal = true, reviewerName,
+  actableLevel = null, canDecideFinal = true, reviewerName, dense = false,
 }: {
   app: InvestmentApplication;
   onLevelDecision: (level: ReviewLevel, payload: LevelDecisionPayload) => Promise<void>;
@@ -644,6 +654,12 @@ export default function ReviewPipeline({
   canDecideFinal?: boolean;
   /** Shown on the confirmation step as who the decision is recorded against. */
   reviewerName?: string;
+  /**
+   * Render for a narrow column: headings stack instead of sitting opposite
+   * their counters, and each stage's action becomes a full-width button. The
+   * stage content is unchanged — this only affects how it folds.
+   */
+  dense?: boolean;
 }) {
   const { t, language } = useLanguage();
   const [modalLevel, setModalLevel] = useState<ReviewLevel | null>(null);
@@ -698,12 +714,12 @@ export default function ReviewPipeline({
 
       {/* ── Header: title + progress ── */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className={cn('flex items-start gap-4 flex-wrap mb-4', !dense && 'justify-between')}>
           <div>
             <h3 className="text-base font-bold text-gray-900">{t.reviewPipeline.title}</h3>
             <p className="text-xs text-gray-500 mt-0.5">{t.reviewPipeline.subtitle}</p>
           </div>
-          <div className="text-right flex-shrink-0">
+          <div className={cn('flex-shrink-0', !dense && 'text-right')}>
             <p className="text-xs font-bold text-gray-900">
               {droppedAtLevel !== null
                 ? t.reviewPipeline.stateNotShortlisted
@@ -820,6 +836,7 @@ export default function ReviewPipeline({
             onAction={() => setModalLevel(level)}
             actionLoading={actionLoading && currentLevel === level}
             canAct={actableLevel === null ? false : actableLevel === level}
+            dense={dense}
           />
         ))}
         <FinalStageCard
@@ -831,6 +848,7 @@ export default function ReviewPipeline({
           onReject={() => setShowRejectModal(true)}
           actionLoading={actionLoading}
           unlocked={finalUnlocked && canDecideFinal}
+          dense={dense}
         />
       </div>
     </div>

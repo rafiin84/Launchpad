@@ -1393,132 +1393,8 @@ export default function ApplicationDetail() {
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* LEFT */}
+        {/* LEFT — the application itself, read top to bottom */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* ── Shortlisting pipeline: the primary element of this page ── */}
-          <ReviewPipeline
-            app={app}
-            onLevelDecision={handleLevelDecision}
-            onApprove={handleOpenApprove}
-            onReject={handleFinalReject}
-            actionLoading={!!actionLoading}
-            error={actionError}
-            actableLevel={reviewerLevel}
-            canDecideFinal={!isReviewer}
-            reviewerName={currentUser.name}
-          />
-
-          {/* ── Locked record notice — replaces every action affordance ── */}
-          {locked && (
-            <div className={cn(
-              'border rounded-2xl p-4 flex items-start gap-3',
-              lockReason === 'approved' ? 'bg-green-50/60 border-green-200' : 'bg-gray-50 border-gray-200',
-            )}>
-              <div className={cn(
-                'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
-                lockReason === 'approved' ? 'bg-green-100' : 'bg-gray-200',
-              )}>
-                <Lock size={15} className={lockReason === 'approved' ? 'text-green-700' : 'text-gray-500'} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className={cn('text-sm font-bold',
-                    lockReason === 'approved' ? 'text-green-900' : 'text-gray-800')}>
-                    {lockReason === 'approved' ? t.recordLock.approvedTitle
-                      : lockReason === 'rejected' ? t.recordLock.rejectedTitle
-                      : t.recordLock.notShortlistedTitle}
-                  </p>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white ring-1 ring-gray-200 text-gray-500">
-                    {t.recordLock.readOnly}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                  {lockReason === 'approved' ? t.recordLock.approvedDesc
-                    : lockReason === 'rejected' ? t.recordLock.rejectedDesc
-                    : t.recordLock.notShortlistedDesc}
-                </p>
-                <p className="text-[11px] text-gray-400 mt-1.5">{t.recordLock.noActions}</p>
-              </div>
-            </div>
-          )}
-
-          {/* ── Supporting actions (available throughout the review) ── */}
-          {!locked && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              {t.reviewPipeline.supportingActions}
-            </p>
-            <p className="text-[11px] text-gray-400 mb-3">{t.reviewPipeline.supportingActionsDesc}</p>
-            <div className="bg-white border border-gray-100 rounded-2xl p-4">
-              <div className="flex flex-wrap gap-2">
-                {actions.map(a => {
-                  const Icon = a.icon;
-                  const isActive = app.status === a.status;
-                  const isLoading = actionLoading === a.status;
-
-                  const onClick = a.status === 'documents_requested'
-                    ? () => setShowDocsModal(true)
-                    : a.status === 'meeting_scheduled'
-                    ? () => setShowMeetingModal(true)
-                    : a.notifyOnly
-                    ? () => handleRequestInfo()
-                    : () => setConfirmAction(a.status);
-
-                  return (
-                    <button
-                      key={a.status}
-                      onClick={onClick}
-                      disabled={!!actionLoading}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
-                        isActive
-                          ? `${a.color} ${a.activeBg} ${a.borderColor}`
-                          : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
-                        isLoading && 'opacity-50 cursor-wait',
-                        !!actionLoading && 'disabled:opacity-50',
-                      )}
-                    >
-                      <Icon size={13} /> {isLoading ? t.applicationDetail.updating : a.label}
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => setShowMessage(!showMessage)}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
-                    showMessage
-                      ? 'text-blue-600 border-blue-300 bg-blue-50'
-                      : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
-                  )}
-                >
-                  <Send size={12} /> {t.applicationDetail.sendMessage}
-                </button>
-              </div>
-              {showMessage && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-3">
-                  <textarea
-                    value={messageText}
-                    onChange={e => setMessageText(e.target.value)}
-                    placeholder={t.applicationDetail.messagePlaceholder}
-                    className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
-                    rows={3}
-                  />
-                  <div className="flex justify-end mt-2">
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={sendingMessage || !messageText.trim()}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Send size={11} /> {sendingMessage ? t.applicationDetail.sending : t.applicationDetail.sendMessage}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          )}
 
           {/* Business Overview */}
           {(app.problemStatement || app.solution || app.targetMarket || app.businessModel || app.competitiveAdvantage || app.companyDescription) && (
@@ -1591,45 +1467,6 @@ export default function ApplicationDetail() {
               </div>
             </Section>
           )}
-
-          {/* Pitch Deck */}
-          {app.pitchDeckUrl && (
-            <Section title={t.applicationDetail.pitchDeck}>
-              {app.pitchDeckUrl.startsWith('data:') ? (
-                <iframe src={app.pitchDeckUrl} className="w-full rounded-xl" style={{ height: '500px' }} title={t.applicationDetail.pitchDeck} />
-              ) : (
-                <a href={app.pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-                  <FileText size={14} /> {app.pitchDeckName || t.applicationDetail.viewPitchDeck} <ExternalLink size={10} />
-                </a>
-              )}
-            </Section>
-          )}
-
-          {/* Demo Video */}
-          {app.demoVideoUrl && (
-            <Section title={t.applicationDetail.demoVideo}>
-              <VideoEmbed url={app.demoVideoUrl} />
-            </Section>
-          )}
-
-          {/* Supporting Documents */}
-          {supportingDocs.length > 0 && (
-            <Section title={t.applicationDetail.supportingDocuments}>
-              <div className="space-y-2">
-                {supportingDocs.map((doc, i) => (
-                  <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-indigo-600 transition-colors py-1">
-                    <FileText size={12} className="text-gray-400 flex-shrink-0" />
-                    {doc.name}
-                    <ExternalLink size={10} className="text-gray-300 ml-auto flex-shrink-0" />
-                  </a>
-                ))}
-              </div>
-            </Section>
-          )}
-        </div>
-
-        {/* RIGHT — sidebar */}
-        <div className="space-y-6">
 
           {/* Meeting Details */}
           {app.meetingDate && (
@@ -1808,6 +1645,174 @@ export default function ApplicationDetail() {
               </div>
             </div>
           </div>
+
+          {/* Pitch Deck */}
+          {app.pitchDeckUrl && (
+            <Section title={t.applicationDetail.pitchDeck}>
+              {app.pitchDeckUrl.startsWith('data:') ? (
+                <iframe src={app.pitchDeckUrl} className="w-full rounded-xl" style={{ height: '500px' }} title={t.applicationDetail.pitchDeck} />
+              ) : (
+                <a href={app.pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                  <FileText size={14} /> {app.pitchDeckName || t.applicationDetail.viewPitchDeck} <ExternalLink size={10} />
+                </a>
+              )}
+            </Section>
+          )}
+
+          {/* Demo Video */}
+          {app.demoVideoUrl && (
+            <Section title={t.applicationDetail.demoVideo}>
+              <VideoEmbed url={app.demoVideoUrl} />
+            </Section>
+          )}
+
+          {/* Supporting Documents */}
+          {supportingDocs.length > 0 && (
+            <Section title={t.applicationDetail.supportingDocuments}>
+              <div className="space-y-2">
+                {supportingDocs.map((doc, i) => (
+                  <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-indigo-600 transition-colors py-1">
+                    <FileText size={12} className="text-gray-400 flex-shrink-0" />
+                    {doc.name}
+                    <ExternalLink size={10} className="text-gray-300 ml-auto flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </Section>
+          )}
+        </div>
+
+        {/* RIGHT — the review pipeline and the actions that go with it.
+            Sticky on desktop so the stage a reviewer is acting on stays in
+            view while they read down the application; ordered first on
+            mobile, where a single column would otherwise bury the one thing
+            the reviewer came here to do. */}
+        <div className="space-y-6 order-first lg:order-none lg:sticky lg:top-6 lg:self-start">
+
+          {/* ── Shortlisting pipeline: the primary element of this page ── */}
+          <ReviewPipeline
+            app={app}
+            onLevelDecision={handleLevelDecision}
+            onApprove={handleOpenApprove}
+            onReject={handleFinalReject}
+            actionLoading={!!actionLoading}
+            error={actionError}
+            actableLevel={reviewerLevel}
+            canDecideFinal={!isReviewer}
+            reviewerName={currentUser.name}
+            dense
+          />
+
+          {/* ── Locked record notice — replaces every action affordance ── */}
+          {locked && (
+            <div className={cn(
+              'border rounded-2xl p-4 flex items-start gap-3',
+              lockReason === 'approved' ? 'bg-green-50/60 border-green-200' : 'bg-gray-50 border-gray-200',
+            )}>
+              <div className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
+                lockReason === 'approved' ? 'bg-green-100' : 'bg-gray-200',
+              )}>
+                <Lock size={15} className={lockReason === 'approved' ? 'text-green-700' : 'text-gray-500'} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={cn('text-sm font-bold',
+                    lockReason === 'approved' ? 'text-green-900' : 'text-gray-800')}>
+                    {lockReason === 'approved' ? t.recordLock.approvedTitle
+                      : lockReason === 'rejected' ? t.recordLock.rejectedTitle
+                      : t.recordLock.notShortlistedTitle}
+                  </p>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white ring-1 ring-gray-200 text-gray-500">
+                    {t.recordLock.readOnly}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                  {lockReason === 'approved' ? t.recordLock.approvedDesc
+                    : lockReason === 'rejected' ? t.recordLock.rejectedDesc
+                    : t.recordLock.notShortlistedDesc}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1.5">{t.recordLock.noActions}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Supporting actions (available throughout the review) ── */}
+          {!locked && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              {t.reviewPipeline.supportingActions}
+            </p>
+            <p className="text-[11px] text-gray-400 mb-3">{t.reviewPipeline.supportingActionsDesc}</p>
+            <div className="bg-white border border-gray-100 rounded-2xl p-4">
+              <div className="flex flex-wrap gap-2">
+                {actions.map(a => {
+                  const Icon = a.icon;
+                  const isActive = app.status === a.status;
+                  const isLoading = actionLoading === a.status;
+
+                  const onClick = a.status === 'documents_requested'
+                    ? () => setShowDocsModal(true)
+                    : a.status === 'meeting_scheduled'
+                    ? () => setShowMeetingModal(true)
+                    : a.notifyOnly
+                    ? () => handleRequestInfo()
+                    : () => setConfirmAction(a.status);
+
+                  return (
+                    <button
+                      key={a.status}
+                      onClick={onClick}
+                      disabled={!!actionLoading}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
+                        isActive
+                          ? `${a.color} ${a.activeBg} ${a.borderColor}`
+                          : `text-gray-600 border-gray-200 ${a.hoverBg} hover:border-gray-300`,
+                        isLoading && 'opacity-50 cursor-wait',
+                        !!actionLoading && 'disabled:opacity-50',
+                      )}
+                    >
+                      <Icon size={13} /> {isLoading ? t.applicationDetail.updating : a.label}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setShowMessage(!showMessage)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all',
+                    showMessage
+                      ? 'text-blue-600 border-blue-300 bg-blue-50'
+                      : 'text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-gray-300'
+                  )}
+                >
+                  <Send size={12} /> {t.applicationDetail.sendMessage}
+                </button>
+              </div>
+              {showMessage && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-3">
+                  <textarea
+                    value={messageText}
+                    onChange={e => setMessageText(e.target.value)}
+                    placeholder={t.applicationDetail.messagePlaceholder}
+                    className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
+                    rows={3}
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendingMessage || !messageText.trim()}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Send size={11} /> {sendingMessage ? t.applicationDetail.sending : t.applicationDetail.sendMessage}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          )}
         </div>
       </div>
     </div>

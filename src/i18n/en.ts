@@ -57,7 +57,7 @@ const en = {
     dashboard: 'Dashboard',
     myActivities: 'My Activities',
     applications: 'Applications',
-    applicants: 'Applicants',
+    applicants: 'Portal Users',
     company: 'Companies',
     portfolio: 'Portfolio',
     founders: 'Founders',
@@ -191,8 +191,8 @@ const en = {
     submitted: 'submitted',
     founders: 'Founders',
     inPortfolio: 'in portfolio',
-    applicants: 'Applicants',
-    portalUsers: 'portal users',
+    applicants: 'Portal Users',
+    portalUsers: 'invited to the portal',
     totalDeployed: 'Total Deployed',
     capitalInvested: 'capital invested',
     avgOwnership: 'Avg Ownership',
@@ -403,16 +403,16 @@ const en = {
     teamSizeSub: 'full-time employees',
   },
 
-  // ─── Founders / Applicants ────────────────────────────────────────────────
+  // ─── Founders / Portal users ──────────────────────────────────────────────
   founders: {
-    title: 'Applicants',
-    description: 'Manage your applicant founders',
+    title: 'Portal Users',
+    description: 'Manage the founders who can sign in to the portal',
     total: 'total',
-    inviteApplicant: 'Invite Applicant',
-    inviteFirstApplicant: 'Invite First Applicant',
-    noApplicantsYet: 'No applicants yet',
-    noApplicantsDesc: 'Invite applicants to manage your network.',
-    noMatch: 'No applicants match',
+    inviteApplicant: 'Invite Portal User',
+    inviteFirstApplicant: 'Invite First Portal User',
+    noApplicantsYet: 'No portal users yet',
+    noApplicantsDesc: 'Invite founders so they can sign in to the portal.',
+    noMatch: 'No portal users match',
     searchPlaceholder: 'Search by name, email, company, city…',
     connectCRM: 'Connect Zoho CRM to manage founders',
     connectCRMDesc: 'Sign in with Zoho CRM to get started.',
@@ -823,7 +823,7 @@ const en = {
 
   // ─── Founder Detail ──────────────────────────────────────────────────────
   founderDetail: {
-    applicants: 'Applicants',
+    applicants: 'Portal Users',
     founderNotFound: 'Founder not found',
     failedToLoad: 'Failed to load founder',
     unnamed: 'Unnamed',

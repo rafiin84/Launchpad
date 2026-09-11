@@ -59,7 +59,7 @@ const ja: TranslationKeys = {
     dashboard: 'ダッシュボード',
     myActivities: 'マイアクティビティ',
     applications: '申請',
-    applicants: '申請者',
+    applicants: 'ポータルユーザー',
     company: '会社',
     portfolio: 'ポートフォリオ',
     founders: '創業者',
@@ -193,8 +193,8 @@ const ja: TranslationKeys = {
     submitted: '提出済み',
     founders: '創業者',
     inPortfolio: 'ポートフォリオ内',
-    applicants: '応募者',
-    portalUsers: 'ポータルユーザー',
+    applicants: 'ポータルユーザー',
+    portalUsers: 'ポータルに招待済み',
     totalDeployed: '投下総額',
     capitalInvested: '投資資本',
     avgOwnership: '平均持分',
@@ -407,14 +407,14 @@ const ja: TranslationKeys = {
 
   // ─── Founders / Applicants ────────────────────────────────────────────────
   founders: {
-    title: '応募者',
-    description: '応募者の創業者を管理',
+    title: 'ポータルユーザー',
+    description: 'ポータルにサインインできる創業者を管理',
     total: '合計',
-    inviteApplicant: '応募者を招待',
-    inviteFirstApplicant: '最初の応募者を招待',
-    noApplicantsYet: '応募者はまだいません',
-    noApplicantsDesc: '応募者を招待してネットワークを管理しましょう。',
-    noMatch: '一致する応募者がいません',
+    inviteApplicant: 'ポータルユーザーを招待',
+    inviteFirstApplicant: '最初のポータルユーザーを招待',
+    noApplicantsYet: 'ポータルユーザーはまだいません',
+    noApplicantsDesc: '創業者を招待してポータルにサインインできるようにしましょう。',
+    noMatch: '一致するポータルユーザーがいません',
     searchPlaceholder: '名前、メール、会社、都市で検索…',
     connectCRM: 'Zoho CRMに接続して創業者を管理',
     connectCRMDesc: 'Zoho CRMでサインインして始めましょう。',
@@ -811,7 +811,7 @@ const ja: TranslationKeys = {
 
   // ─── Founder Detail ──────────────────────────────────────────────────────
   founderDetail: {
-    applicants: '応募者',
+    applicants: 'ポータルユーザー',
     founderNotFound: '創業者が見つかりません',
     failedToLoad: '創業者の読み込みに失敗しました',
     unnamed: '名前未設定',

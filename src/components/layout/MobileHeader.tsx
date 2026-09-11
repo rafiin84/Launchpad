@@ -20,7 +20,7 @@ export function MobileHeader() {
   const isApplicantDetail = segments[0] === 'applicants' && segments.length === 2;
   if (isFounderDetail || isApplicantDetail) {
     const backPath = isApplicantDetail ? '/applicants' : '/founders';
-    const title    = isApplicantDetail ? 'Applicant' : 'Founder';
+    const title    = isApplicantDetail ? 'Portal User' : 'Founder';
     return (
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 md:hidden">
         <div className="flex items-center gap-3 px-4 py-3">
