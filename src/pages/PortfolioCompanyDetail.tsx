@@ -3,14 +3,14 @@ import { cn } from '../lib/cn';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Globe, MapPin, Users, Calendar, DollarSign,
-  TrendingUp, Percent, FileText, User, Mail, Link2, Phone,
+  TrendingUp, Percent, FileText,
   Edit2, Trash2, Tag, ExternalLink, Newspaper,
 } from 'lucide-react';
 import { getCRMPortfolioRecord, deleteCRMPortfolioRecord, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import { DeleteConfirmModal } from '../components/ui/DeleteConfirmModal';
 import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
 import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
-import { Avatar } from '../components/ui/Avatar';
+import FounderProfile from '../components/company/FounderProfile';
 import { loadToken } from '../services/oauth';
 
 function formatCurrency(n: number) {
@@ -316,57 +316,19 @@ export default function PortfolioCompanyDetail() {
             </div>
           )}
 
-          {/* Founder tab */}
+          {/* Founder tab — the founder's own Contacts record in full, not the
+              four fields copied onto the portfolio entry. */}
           {activeTab === 'founder' && (
-            <div className="bg-white border border-gray-100 rounded-2xl p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-5">Founder Information</h3>
-              {record.founderName || record.founderEmail || record.founderLinkedin || record.founderPhone ? (
-                <div className="flex items-start gap-5">
-                  <div className="flex-shrink-0">
-                    <Avatar src={founderPhotoUrl || undefined} name={record.founderName || '?'} size="xl" />
-                  </div>
-                  <div className="space-y-3 flex-1">
-                    {record.founderName && (
-                      <div>
-                        <p className="text-base font-semibold text-gray-900">{record.founderName}</p>
-                        <p className="text-xs text-gray-400">Founder</p>
-                      </div>
-                    )}
-                    {record.founderEmail && (
-                      <div className="flex items-center gap-2">
-                        <Mail size={14} className="text-gray-300 flex-shrink-0" />
-                        <a href={`mailto:${record.founderEmail}`} className="text-sm text-indigo-600 hover:underline">
-                          {record.founderEmail}
-                        </a>
-                      </div>
-                    )}
-                    {record.founderPhone && (
-                      <div className="flex items-center gap-2">
-                        <Phone size={14} className="text-gray-300 flex-shrink-0" />
-                        <a href={`tel:${record.founderPhone}`} className="text-sm text-gray-700 hover:underline">
-                          {record.founderPhone}
-                        </a>
-                      </div>
-                    )}
-                    {record.founderLinkedin && (
-                      <div className="flex items-center gap-2">
-                        <Link2 size={14} className="text-gray-300 flex-shrink-0" />
-                        <a
-                          href={record.founderLinkedin.startsWith('http') ? record.founderLinkedin : `https://${record.founderLinkedin}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-indigo-600 hover:underline inline-flex items-center gap-1"
-                        >
-                          LinkedIn Profile <ExternalLink size={11} />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">No founder information available.</p>
-              )}
-            </div>
+            <FounderProfile
+              founderEmail={record.founderEmail || ''}
+              photoUrl={founderPhotoUrl}
+              fallback={{
+                name: record.founderName || '',
+                email: record.founderEmail || '',
+                phone: record.founderPhone || '',
+                linkedin: record.founderLinkedin || '',
+              }}
+            />
           )}
 
           {/* Funding tab */}
