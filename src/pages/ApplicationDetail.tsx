@@ -1358,11 +1358,12 @@ export default function ApplicationDetail() {
         />
       )}
 
-      {/* Back link sits tight to the header it belongs to, rather than
-          floating in the middle of the gap above it. */}
+      {/* Mobile only. On md and up this lives in DesktopHeader, which frees the
+          top of the page for the header card. MobileHeader renders nothing on
+          this route, so dropping it outright would leave no way back. */}
       <Link
         to="/applications"
-        className="inline-flex items-center gap-1.5 mb-3 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
+        className="md:hidden inline-flex items-center gap-1.5 mb-3 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
       >
         <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
         {t.applicationDetail.backToApplications}
