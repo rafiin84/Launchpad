@@ -1358,35 +1358,51 @@ export default function ApplicationDetail() {
         />
       )}
 
-      <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6">
-        <ArrowLeft size={15} /> {t.applicationDetail.backToApplications}
+      {/* Back link sits tight to the header it belongs to, rather than
+          floating in the middle of the gap above it. */}
+      <Link
+        to="/applications"
+        className="inline-flex items-center gap-1.5 -mt-1 mb-3 text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors group"
+      >
+        <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
+        {t.applicationDetail.backToApplications}
       </Link>
 
-      {/* Header */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
-            <Building2 size={24} className="text-gray-400" />
+      {/* ── Header ──
+          The one piece of the page that identifies what you are looking at, so
+          it carries the colour and everything below it stays quiet. Status and
+          stage keep their semantic colours but sit on white pills, which reads
+          against the gradient where a pale tinted pill would wash out. */}
+      <div className="relative overflow-hidden rounded-2xl mb-6 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 shadow-lg shadow-violet-500/20">
+        {/* Light blooms — decorative only */}
+        <div aria-hidden className="pointer-events-none absolute -top-20 -right-12 w-64 h-64 rounded-full bg-white/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 left-16 w-64 h-64 rounded-full bg-fuchsia-300/20 blur-3xl" />
+
+        <div className="relative p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 ring-1 ring-inset ring-white/25 backdrop-blur-sm flex-shrink-0 flex items-center justify-center">
+              <Building2 size={24} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5 mb-1.5 flex-wrap [&>span]:bg-white [&>span]:shadow-sm">
+                <h1 className="text-xl font-bold text-white">{app.companyName || t.applicationDetail.untitledApplication}</h1>
+                <StatusBadge status={app.status} />
+                {app.companyStage && <StageBadge stage={app.companyStage} />}
+              </div>
+              <div className="flex items-center gap-3 text-sm text-white/75 flex-wrap">
+                {app.companyIndustry && <span>{app.companyIndustry}</span>}
+                {app.companyLocation && <><span className="text-white/35">|</span><span>{app.companyLocation}</span></>}
+                {app.founderName && <><span className="text-white/35">|</span><span>{app.founderName}</span></>}
+                {app.submittedAt && <><span className="text-white/35">|</span><span>{t.applicationDetail.submittedAgo.replace('{time}', relativeTime(app.submittedAt, t, language))}</span></>}
+              </div>
+            </div>
+            {app.fundingAsk && (
+              <div className="text-right flex-shrink-0 rounded-xl bg-white/15 ring-1 ring-inset ring-white/25 backdrop-blur-sm px-4 py-2.5">
+                <p className="text-[11px] font-medium text-white/70 uppercase tracking-wide">{t.applicationDetail.fundingAsk}</p>
+                <p className="text-xl font-bold text-white mt-0.5">{formatCurrency(parseFloat(app.fundingAsk))}</p>
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{app.companyName || t.applicationDetail.untitledApplication}</h1>
-              <StatusBadge status={app.status} />
-              {app.companyStage && <StageBadge stage={app.companyStage} />}
-            </div>
-            <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
-              {app.companyIndustry && <span>{app.companyIndustry}</span>}
-              {app.companyLocation && <><span className="text-gray-300">|</span><span>{app.companyLocation}</span></>}
-              {app.founderName && <><span className="text-gray-300">|</span><span>{app.founderName}</span></>}
-              {app.submittedAt && <><span className="text-gray-300">|</span><span>{t.applicationDetail.submittedAgo.replace('{time}', relativeTime(app.submittedAt, t, language))}</span></>}
-            </div>
-          </div>
-          {app.fundingAsk && (
-            <div className="text-right flex-shrink-0">
-              <p className="text-xs text-gray-500">{t.applicationDetail.fundingAsk}</p>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(parseFloat(app.fundingAsk))}</p>
-            </div>
-          )}
         </div>
       </div>
 
