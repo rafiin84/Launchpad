@@ -183,7 +183,7 @@ export default function ActivityDetail() {
   /* ── Loading ── */
   if (loading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl">
+      <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-6 max-w-2xl">
         <div className="w-24 h-4 bg-gray-100 rounded animate-pulse mb-6" />
         <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4 animate-pulse">
           <div className="h-5 bg-gray-100 rounded w-2/3" />
@@ -199,8 +199,8 @@ export default function ActivityDetail() {
   /* ── Error ── */
   if (error || !activity) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl">
-        <Link to="/activities" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
+      <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-6 max-w-2xl">
+        <Link to="/activities" className="md:hidden inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
           <ArrowLeft size={15} /> Activities
         </Link>
         <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
@@ -214,7 +214,7 @@ export default function ActivityDetail() {
   const cfg  = TYPE_CONFIG[activity.activityType?.toLowerCase()] ?? { label: activity.activityType || 'Activity', bg: 'bg-gray-100', text: 'text-gray-600' };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 pb-6 max-w-2xl">
       {docViewer && (
         <DocumentViewerModal
           title={docViewer.name}
@@ -240,7 +240,7 @@ export default function ActivityDetail() {
 
       {/* Back + Actions */}
       <div className="flex items-center justify-between mb-6">
-        <Link to="/activities" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+        <Link to="/activities" className="md:hidden inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
           <ArrowLeft size={15} /> Activities
         </Link>
         {isAuthor && (

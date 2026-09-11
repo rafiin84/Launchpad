@@ -175,10 +175,10 @@ export default function AddPortfolioCompany() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8">
       <div className="max-w-3xl mx-auto">
         {/* Back nav */}
-        <Link to="/portfolio" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors">
+        <Link to="/portfolio" className="md:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           {t.addPortfolio.backToPortfolio}
         </Link>

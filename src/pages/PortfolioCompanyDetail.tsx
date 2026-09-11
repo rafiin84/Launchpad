@@ -103,7 +103,7 @@ export default function PortfolioCompanyDetail() {
 
   if (loading) {
     return (
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pt-3 pb-6">
         <div className="w-24 h-4 bg-gray-100 rounded animate-pulse mb-6" />
         <div className="h-48 sm:h-64 bg-gray-100 rounded-2xl animate-pulse mb-6" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -130,8 +130,8 @@ export default function PortfolioCompanyDetail() {
 
   if (error || !record) {
     return (
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-8">
+        <Link to="/portfolio" className="md:hidden inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6">
           <ArrowLeft size={15} /> Portfolio
         </Link>
         <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
@@ -166,8 +166,8 @@ export default function PortfolioCompanyDetail() {
       )}
 
       {/* Back link */}
-      <div className="pt-6 pb-4">
-        <Link to="/portfolio" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
+      <div className="pt-2 pb-4">
+        <Link to="/portfolio" className="md:hidden inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors">
           <ArrowLeft size={15} /> Portfolio
         </Link>
       </div>

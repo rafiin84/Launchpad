@@ -473,12 +473,12 @@ function InvestorEditProfile() {
   };
 
   return (
-    <div className="max-w-2xl px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-2xl px-4 sm:px-6 pt-3 sm:pt-4 pb-6 sm:pb-8">
 
       {/* Back */}
       <button
         onClick={() => navigate('/profile')}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
+        className="md:hidden flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
       >
         <ArrowLeft size={16} /> {t.profile.backToProfile}
       </button>
@@ -967,10 +967,10 @@ function FounderEditProfile() {
   const displayedPhoto = removePhoto ? '' : (photoPreview || currentPhotoUrl || currentUser.avatar);
 
   return (
-    <div className="max-w-2xl px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-2xl px-4 sm:px-6 pt-3 sm:pt-4 pb-6 sm:pb-8">
       <button
         onClick={() => navigate('/profile')}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
+        className="md:hidden flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
       >
         <ArrowLeft size={16} /> {t.profile.backToProfile}
       </button>

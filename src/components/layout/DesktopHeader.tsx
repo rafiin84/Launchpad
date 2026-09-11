@@ -6,6 +6,7 @@ import { NotificationBell } from '../ui/NotificationBell';
 import { LanguageSelector } from '../ui/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import type { TranslationKeys } from '../../i18n/en';
 import { cn } from '../../lib/cn';
 
 interface Props {
@@ -14,14 +15,24 @@ interface Props {
 }
 
 /**
- * Detail pages that get their "back" control in this header rather than in the
- * page body, so the page itself starts at the top of the viewport instead of
- * spending its first rows on a link. Keyed by the first path segment; the
- * `except` list is for sibling routes that are pages in their own right
- * (/applications/apply is a form, not an application).
+ * Routes whose "back" control lives in this header instead of in the page
+ * body, keyed by first path segment.
+ *
+ * `except` names sibling routes that are pages in their own right rather than
+ * a detail of the list — /applications/apply is a form a founder fills in, not
+ * an application being viewed — so those keep the plain header.
  */
-const BACK_IN_HEADER: Record<string, { to: string; except: string[] }> = {
-  applications: { to: '/applications', except: ['track', 'review', 'apply'] },
+const BACK_IN_HEADER: Record<string, { to: string; label: (t: TranslationKeys) => string; except?: string[] }> = {
+  applications:  { to: '/applications',  label: t => t.backLinks.applications, except: ['track', 'review', 'apply'] },
+  applicants:    { to: '/applicants',    label: t => t.backLinks.applicants },
+  founders:      { to: '/founders',      label: t => t.backLinks.founders },
+  portfolio:     { to: '/portfolio',     label: t => t.backLinks.portfolio },
+  companies:     { to: '/companies',     label: t => t.backLinks.companies },
+  activities:    { to: '/activities',    label: t => t.backLinks.activities },
+  conversations: { to: '/conversations', label: t => t.backLinks.conversations },
+  discussions:   { to: '/discussions',   label: t => t.backLinks.discussions },
+  documents:     { to: '/documents',     label: t => t.backLinks.documents },
+  profile:       { to: '/profile',       label: t => t.backLinks.profile },
 };
 
 export function DesktopHeader({ title, subtitle }: Props) {
@@ -33,9 +44,9 @@ export function DesktopHeader({ title, subtitle }: Props) {
   // shared header state has to remember to clear it, and forgetting leaves a
   // stale back link pointing somewhere the user is no longer coming from.
   const segments = pathname.split('/').filter(Boolean);
-  const backCfg = segments.length === 2 ? BACK_IN_HEADER[segments[0]] : undefined;
-  const back = backCfg && !backCfg.except.includes(segments[1])
-    ? { to: backCfg.to, label: t.applicationDetail.backToApplications }
+  const cfg = segments.length === 2 ? BACK_IN_HEADER[segments[0]] : undefined;
+  const back = cfg && !(cfg.except ?? []).includes(segments[1])
+    ? { to: cfg.to, label: cfg.label(t) }
     : null;
 
   return (

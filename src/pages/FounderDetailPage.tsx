@@ -99,7 +99,7 @@ export default function FounderDetailPage() {
 
   if (loading) {
     return (
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pt-3 pb-6">
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-gray-400" />
           <span className="ml-3 text-sm text-gray-500">{t.founderDetailPage.loadingDetails}</span>
@@ -110,8 +110,8 @@ export default function FounderDetailPage() {
 
   if (error || !company) {
     return (
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
-        <Link to="/founders" className="hidden sm:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pt-3 pb-6">
+        <Link to="/founders" className="md:hidden hidden sm:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
           <ArrowLeft size={14} /> {t.founderDetailPage.backToFounders}
         </Link>
         <div className="text-center py-16 bg-white border border-gray-100 rounded-2xl">
@@ -132,9 +132,9 @@ export default function FounderDetailPage() {
   ];
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8">
       {/* Back — hidden on mobile (handled by MobileHeader) */}
-      <Link to="/founders" className="hidden sm:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
+      <Link to="/founders" className="md:hidden hidden sm:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6">
         <ArrowLeft size={14} /> {t.founderDetailPage.backToFounders}
       </Link>
 

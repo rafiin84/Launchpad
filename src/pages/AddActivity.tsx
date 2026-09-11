@@ -227,10 +227,10 @@ export default function AddActivity() {
   const hasImage = !!(form.imagePreview || (imageMode === 'url' && form.imageUrl.startsWith('http')));
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8">
       <div className="max-w-2xl mx-auto">
 
-        <Link to="/activities" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
+        <Link to="/activities" className="md:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
           <ArrowLeft size={15} /> Back to Activities
         </Link>
 

@@ -1263,7 +1263,7 @@ export default function ApplicationDetail() {
 
   if (error || !app) return (
     <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full">
-      <Link to="/applications" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
+      <Link to="/applications" className="md:hidden inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 mb-6">
         <ArrowLeft size={15} /> {t.applications.title}
       </Link>
       <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">

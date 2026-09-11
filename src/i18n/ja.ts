@@ -54,6 +54,20 @@ const ja: TranslationKeys = {
     selectLanguage: '言語',
   },
 
+  // ─── Back links ──────────────────────────────────────────────────────────
+  backLinks: {
+    applications:  '応募一覧に戻る',
+    applicants:    'ポータルユーザー一覧に戻る',
+    founders:      '創業者一覧に戻る',
+    portfolio:     'ポートフォリオに戻る',
+    companies:     '企業一覧に戻る',
+    activities:    'アクティビティに戻る',
+    conversations: '会話一覧に戻る',
+    discussions:   'ディスカッションに戻る',
+    documents:     'ドキュメントに戻る',
+    profile:       'プロフィールに戻る',
+  },
+
   // ─── Navigation ──────────────────────────────────────────────────────────
   nav: {
     dashboard: 'ダッシュボード',

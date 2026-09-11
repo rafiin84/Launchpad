@@ -52,6 +52,23 @@ const en = {
     selectLanguage: 'Language',
   },
 
+  // ─── Back links ──────────────────────────────────────────────────────────
+  // Rendered in the header bar by DesktopHeader, keyed by the first path
+  // segment, so every detail and form page gets the same control in the same
+  // place instead of each spending a row of its own body on one.
+  backLinks: {
+    applications:  'Back to Applications',
+    applicants:    'Back to Portal Users',
+    founders:      'Back to Founders',
+    portfolio:     'Back to Portfolio',
+    companies:     'Back to Companies',
+    activities:    'Back to Activities',
+    conversations: 'Back to Conversations',
+    discussions:   'Back to Discussions',
+    documents:     'Back to Documents',
+    profile:       'Back to Profile',
+  },
+
   // ─── Navigation ──────────────────────────────────────────────────────────
   nav: {
     dashboard: 'Dashboard',
