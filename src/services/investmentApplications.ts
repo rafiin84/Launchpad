@@ -1303,9 +1303,11 @@ export interface ReviewerStats {
  * into other levels' funnel data or any individual application's content.
  */
 export async function getReviewerStats(level: ReviewLevel): Promise<ReviewerStats> {
-  const criteria = ALL_NON_DRAFT_STATUSES.map(s => `(Application_Status:equals:${s})`).join('or');
-  const records = await zohoSearch(CRM_MODULE, criteria);
-  const apps = records.map(fromCrmRecord);
+  // Zoho's search API caps criteria at 15 OR'd conditions, one short of the
+  // 17 non-draft statuses this needs — list-and-filter instead, same
+  // fallback crmGetAll uses when a stage-scoped search fails.
+  const records = await zohoList(CRM_MODULE, { per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc' });
+  const apps = records.map(fromCrmRecord).filter(a => (ALL_NON_DRAFT_STATUSES as string[]).includes(a.status));
 
   const stats: ReviewerStats = { received: 0, approved: 0, rejected: 0, pending: 0 };
   for (const app of apps) {
