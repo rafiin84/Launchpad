@@ -33,7 +33,6 @@ export function Sidebar() {
     { label: t.nav.myActivities,  path: '/activities',   icon: Rss },
     { label: t.nav.company,       path: '/portfolio',    icon: PieChart },
     { label: t.nav.applications,  path: '/applications', icon: Inbox },
-    { label: t.nav.founders,      path: '/founders',     icon: Building2 },
     { label: t.nav.applicants,    path: '/applicants',   icon: Users },
     { label: t.nav.documents,     path: '/documents',    icon: FileText },
   ];
