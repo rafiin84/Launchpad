@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Avatar } from '../ui/Avatar';
 
 export function BottomNav() {
-  const { isInvestor, currentUser } = useAuth();
+  const { isInvestor, isReviewer, currentUser } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,10 +35,11 @@ export function BottomNav() {
     { label: t.nav.company,       path: '/company',             icon: Building2 },
   ];
 
+  // Reviewers never get Companies or Portal Users — see Sidebar.tsx.
   const investorItems = [
     { label: t.nav.dashboard,     path: '/',              icon: LayoutDashboard },
     { label: t.nav.myActivities,  path: '/activities',    icon: Rss },
-    { label: t.nav.company,       path: '/portfolio',     icon: PieChart },
+    ...(isReviewer ? [] : [{ label: t.nav.company, path: '/portfolio', icon: PieChart }]),
     { label: t.nav.applications,  path: '/applications',  icon: Inbox },
   ];
 
@@ -50,8 +51,10 @@ export function BottomNav() {
 
   const investorMoreItems = [
     { label: t.nav.documents,  path: '/documents',  icon: FileText, desc: '' },
-    { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
-    { label: t.nav.applicants,   path: '/applicants', icon: Users,   desc: '' },
+    ...(isReviewer ? [] : [
+      { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
+      { label: t.nav.applicants, path: '/applicants', icon: Users,     desc: '' },
+    ]),
     { label: t.nav.profile,    path: '/profile',     icon: User,     desc: '' },
   ];
 

@@ -19,6 +19,7 @@ import { loadToken } from '../services/oauth';
 import { fetchZohoOrgName } from '../services/zohoApi';
 import { cn } from '../lib/cn';
 import FounderDashboard from './FounderDashboard';
+import ReviewerDashboard from './ReviewerDashboard';
 import {
   PieChart as RePieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -247,7 +248,7 @@ const STAGE_STYLES: Record<string, string> = {
 };
 
 export default function Home() {
-  const { currentUser, isFounder } = useAuth();
+  const { currentUser, isFounder, isReviewer } = useAuth();
   const { t } = useLanguage();
   const isConnected = !!loadToken();
 
@@ -317,6 +318,9 @@ export default function Home() {
 
   // Founders get their own dedicated dashboard
   if (isFounder) return <FounderDashboard />;
+  // Reviewers (Level 1/2/3) get their own review-stats dashboard, never the
+  // CEO's portfolio/financial data.
+  if (isReviewer) return <ReviewerDashboard />;
 
   const recentPortfolio = portfolio.slice(0, 4);
 

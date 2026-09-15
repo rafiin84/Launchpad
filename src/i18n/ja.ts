@@ -1238,6 +1238,21 @@ const ja: TranslationKeys = {
     stageScoped: '自分の審査ステージの申請のみ表示されます',
   },
 
+  reviewerDashboard: {
+    greeting: 'おはようございます、{name} さん',
+    subtitle: '{title} · あなたの審査状況',
+    received: '受領数',
+    receivedSub: 'あなたのレベルに到達した申請の総数',
+    approved: '承認数',
+    approvedSub: 'あなたが通過させた件数',
+    rejected: '却下数',
+    rejectedSub: 'あなたが不選考にした件数',
+    pending: '審査待ち',
+    pendingSub: 'あなたの判断待ちの件数',
+    goToQueue: 'キューを見る',
+    loadFailed: '審査統計を読み込めませんでした。',
+  },
+
   // ─── Decision confirmations (irreversible / one-way actions) ──────────────
   confirmDecision: {
     heading: 'ご確認ください',

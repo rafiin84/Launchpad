@@ -1262,6 +1262,21 @@ const en = {
     stageScoped: 'You only see applications at your review stage',
   },
 
+  reviewerDashboard: {
+    greeting: 'Good morning, {name}',
+    subtitle: '{title} · your review activity',
+    received: 'Received',
+    receivedSub: 'Total applications at your level',
+    approved: 'Approved',
+    approvedSub: 'Cleared by you',
+    rejected: 'Rejected',
+    rejectedSub: 'Dropped by you',
+    pending: 'Pending',
+    pendingSub: 'Awaiting your decision',
+    goToQueue: 'Go to your queue',
+    loadFailed: 'Could not load your review stats.',
+  },
+
   // ─── Decision confirmations (irreversible / one-way actions) ──────────────
   confirmDecision: {
     heading: 'Please confirm',

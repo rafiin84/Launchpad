@@ -23,17 +23,20 @@ interface NavItem {
 }
 
 export function Sidebar() {
-  const { isInvestor, logout } = useAuth();
+  const { isInvestor, isReviewer, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Reviewers (Level 1/2/3) never get Companies or Portal Users — those
+  // expose the CEO's portfolio/financial data and portal-invite management,
+  // neither of which is reviewer-facing information.
   const investorNav: NavItem[] = [
     { label: t.nav.dashboard,     path: '/',             icon: LayoutDashboard },
     { label: t.nav.myActivities,  path: '/activities',   icon: Rss },
-    { label: t.nav.company,       path: '/portfolio',    icon: PieChart },
+    ...(isReviewer ? [] : [{ label: t.nav.company,      path: '/portfolio',    icon: PieChart }]),
     { label: t.nav.applications,  path: '/applications', icon: Inbox },
-    { label: t.nav.applicants,    path: '/applicants',   icon: Users },
+    ...(isReviewer ? [] : [{ label: t.nav.applicants,   path: '/applicants',   icon: Users }]),
     { label: t.nav.documents,     path: '/documents',    icon: FileText },
   ];
 

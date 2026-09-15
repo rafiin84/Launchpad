@@ -1269,6 +1269,59 @@ export function getLevelReview(state: PipelineState, level: ReviewLevel): LevelR
   return state.ledger.levels.find(l => l.level === level);
 }
 
+/** Every status an application can hold once it has left the draft stage. */
+const ALL_NON_DRAFT_STATUSES: ApplicationStatus[] = [
+  'submitted', 'under_review', 'interested', 'more_info_requested', 'documents_requested',
+  'shortlisted', 'meeting_scheduled', 'due_diligence', 'on_hold',
+  'level1_screening', 'level1_cleared', 'level2_cleared', 'level3_cleared', 'not_shortlisted',
+  'approved', 'invested', 'rejected',
+];
+
+export interface ReviewerStats {
+  /** Total applications that have ever reached this level (decided or not). */
+  received: number;
+  /** Cleared (shortlisted) at this level. */
+  approved: number;
+  /** Dropped (not shortlisted) at this level. */
+  rejected: number;
+  /** Currently awaiting a decision at this level. */
+  pending: number;
+}
+
+/**
+ * Aggregate counts for one review level, for the reviewer's own dashboard.
+ *
+ * A reviewer's day-to-day queue (visibleStatusesFor) deliberately shows only
+ * applications CURRENTLY awaiting their decision — once they clear or drop
+ * one it leaves their queue entirely, by design (see crmGetAll's "must not
+ * silently widen visibility" note). That's the right policy for the review
+ * workflow itself, but it also means a reviewer can never see their own past
+ * decisions under that scoping. This fetches every non-draft application
+ * instead and reduces each one to a single ledger-derived outcome at their
+ * own level — never exposing company/founder detail, just a count — so a
+ * reviewer can see their own historical volume without gaining visibility
+ * into other levels' funnel data or any individual application's content.
+ */
+export async function getReviewerStats(level: ReviewLevel): Promise<ReviewerStats> {
+  const criteria = ALL_NON_DRAFT_STATUSES.map(s => `(Application_Status:equals:${s})`).join('or');
+  const records = await zohoSearch(CRM_MODULE, criteria);
+  const apps = records.map(fromCrmRecord);
+
+  const stats: ReviewerStats = { received: 0, approved: 0, rejected: 0, pending: 0 };
+  for (const app of apps) {
+    const entry = getPipelineState(app).ledger.levels.find(l => l.level === level);
+    if (entry) {
+      stats.received++;
+      if (entry.outcome === 'shortlisted') stats.approved++;
+      else stats.rejected++;
+    } else if (getPipelineState(app).currentLevel === level) {
+      stats.received++;
+      stats.pending++;
+    }
+  }
+  return stats;
+}
+
 // ── Actions ───────────────────────────────────────────────────────────────
 
 export interface LevelDecisionInput {

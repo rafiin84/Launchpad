@@ -34,6 +34,15 @@ function ProtectedLayout() {
   return <AppLayout />;
 }
 
+// Reviewers (Level 1/2/3) never get Companies (/portfolio) or Portal Users
+// (/applicants) — hiding the nav link isn't enough on its own, since the
+// route would still be directly reachable by URL.
+function BlockedForReviewers({ children }: { children: ReactNode }) {
+  const { isReviewer } = useAuth();
+  if (isReviewer) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 import Login from './pages/Login';
 import Callback from './pages/Callback';
 import PortalCallback from './pages/PortalCallback';
@@ -87,9 +96,9 @@ export default function App() {
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/activities" element={<Activities />} />
-            <Route path="/activities/new" element={<AddActivity />} />
+            <Route path="/activities/new" element={<BlockedForReviewers><AddActivity /></BlockedForReviewers>} />
             <Route path="/activities/:id" element={<ActivityDetail />} />
-            <Route path="/activities/:id/edit" element={<EditActivity />} />
+            <Route path="/activities/:id/edit" element={<BlockedForReviewers><EditActivity /></BlockedForReviewers>} />
             <Route path="/company" element={<FounderCompany />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/new" element={<AddCompany />} />
@@ -105,14 +114,14 @@ export default function App() {
             <Route path="/applications/new" element={<AddApplication />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
             <Route path="/applications/:id/edit" element={<EditApplication />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/portfolio/new" element={<AddPortfolioCompany />} />
-            <Route path="/portfolio/:id" element={<PortfolioCompanyDetail />} />
-            <Route path="/portfolio/:id/edit" element={<EditPortfolioCompany />} />
+            <Route path="/portfolio" element={<BlockedForReviewers><Portfolio /></BlockedForReviewers>} />
+            <Route path="/portfolio/new" element={<BlockedForReviewers><AddPortfolioCompany /></BlockedForReviewers>} />
+            <Route path="/portfolio/:id" element={<BlockedForReviewers><PortfolioCompanyDetail /></BlockedForReviewers>} />
+            <Route path="/portfolio/:id/edit" element={<BlockedForReviewers><EditPortfolioCompany /></BlockedForReviewers>} />
             <Route path="/founders" element={<InvestorFounders />} />
             <Route path="/founders/:id" element={<FounderDetailPage />} />
-            <Route path="/applicants" element={<Applicants />} />
-            <Route path="/applicants/:id" element={<ApplicantDetail />} />
+            <Route path="/applicants" element={<BlockedForReviewers><Applicants /></BlockedForReviewers>} />
+            <Route path="/applicants/:id" element={<BlockedForReviewers><ApplicantDetail /></BlockedForReviewers>} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/new" element={<AddDocument />} />

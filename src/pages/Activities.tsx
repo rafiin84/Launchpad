@@ -747,10 +747,12 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
   allActivities: CRMActivity[];
   onOpenDocument: (ref: ActivityFileRef, fileName: string) => void;
 }) {
-  const { currentUser, founderCompanyName, isInvestor, appUser } = useAuth();
+  const { currentUser, founderCompanyName, isInvestor, isReviewer, appUser } = useAuth();
   const { t } = useLanguage();
   const isOwnPost = currentUser.name.trim().toLowerCase() === activity.authorName?.trim().toLowerCase();
-  const canDelete = isOwnPost || isInvestor;
+  // Reviewers are view-only on activities — they never delete anyone's post,
+  // including their own (they can't create one to begin with).
+  const canDelete = !isReviewer && (isOwnPost || isInvestor);
   const [deleting, setDeleting] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const myCompanyName = isInvestor ? (appUser?.company || '') : founderCompanyName;
@@ -913,7 +915,7 @@ function ActivityCard({ activity, onDelete, companyLogos, allActivities, onOpenD
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Activities() {
-  const { currentUser, isFounder, isInvestor } = useAuth();
+  const { currentUser, isFounder, isInvestor, isReviewer } = useAuth();
   const { t } = useLanguage();
   const { setPageTitle } = usePageTitle();
   const [records, setRecords] = useState<CRMActivity[]>([]);
@@ -1171,8 +1173,10 @@ export default function Activities() {
         </div>
       )}
 
-      {/* Composer */}
-      <Composer onPost={handlePost} onSyncWarning={setSyncWarning} postVisibility={postVisibility} />
+      {/* Composer — reviewers are view-only and never post */}
+      {!isReviewer && (
+        <Composer onPost={handlePost} onSyncWarning={setSyncWarning} postVisibility={postVisibility} />
+      )}
 
       {/* Empty */}
       {!loading && !error && visibleRecords.length === 0 && canFetch && (
@@ -1183,8 +1187,8 @@ export default function Activities() {
         </div>
       )}
 
-      {/* Clear All — investor only */}
-      {!loading && !error && visibleRecords.length > 0 && isInvestor && (
+      {/* Clear All — investor only, never a reviewer */}
+      {!loading && !error && visibleRecords.length > 0 && isInvestor && !isReviewer && (
         <div className="flex justify-end mb-2">
           <button
             onClick={handleClearAll}
