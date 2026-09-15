@@ -44,7 +44,7 @@ export default function PortfolioCompanyDetail() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('finance');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [founderPhotoUrl, setFounderPhotoUrl] = useState<string>('');
   /**
    * The financials live on the founder's own Founder_Companies record, not on
