@@ -290,15 +290,16 @@ export default function FounderDashboard() {
   }, [userEmail]);
 
   useEffect(() => {
-    const founderName = currentUser.name?.trim().toLowerCase() || '';
-    const email = userEmail?.toLowerCase() || '';
+    // getApplications(false) is already scoped server-side to this founder's
+    // own applications (crmGetAll searches CRM by the portal login email —
+    // see loadFounderEmail there). Re-filtering here by userEmail/currentUser.name
+    // is redundant at best and wrong at worst: userEmail prefers zohoEmail,
+    // which (per the identical warning inside getApplications itself) can
+    // differ from the portal login email used for the actual CRM match,
+    // silently dropping every real application a founder has.
     getApplications(false).then(apps => {
-      const mine = apps.filter(a =>
-        (email && (a.founderEmail?.toLowerCase() === email || a.submittedByEmail?.toLowerCase() === email)) ||
-        (founderName && (a.founderName?.trim().toLowerCase() === founderName || a.submittedBy?.trim().toLowerCase() === founderName))
-      );
-      const submitted = mine.filter(a => a.status !== 'draft');
-      const drafts = mine.filter(a => a.status === 'draft');
+      const submitted = apps.filter(a => a.status !== 'draft');
+      const drafts = apps.filter(a => a.status === 'draft');
       if (submitted.length > 0) {
         setHasApplication(true);
         setHasDraftApplication(false);
@@ -307,7 +308,7 @@ export default function FounderDashboard() {
         setHasDraftApplication(drafts.length > 0);
       }
     }).catch(() => setHasApplication(null)); // null = unknown (CRM unreachable), don't show banner
-  }, [userEmail, currentUser.name]);
+  }, []);
 
   // Portal founders are always invited users — never show the "new user" welcome modal.
   // Also auto-dismiss once CRM confirms they have an existing profile or application.
