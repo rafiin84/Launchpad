@@ -96,7 +96,7 @@ const en = {
     myActivities: 'My Activities',
     applications: 'Applications',
     applicants: 'Portal Users',
-    company: 'Company',
+    company: 'Companies',
     myCompany: 'Company',
     portfolio: 'Portfolio',
     founders: 'Founders',
