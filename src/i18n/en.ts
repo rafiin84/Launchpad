@@ -1233,6 +1233,7 @@ const en = {
     declinedDesc: 'Your application cleared all three review stages but was not selected for investment. Any feedback will appear in your messages.',
 
     stageCount: 'Stage {n} of 4',
+    levelWord: 'Level',
     heroTitle: 'Application Progress',
     heroSubtitle: 'Level 1 \u2192 Level 2 \u2192 Level 3 \u2192 Final Decision',
     reviewedByLabel: 'Reviewed by',

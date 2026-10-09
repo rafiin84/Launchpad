@@ -1209,6 +1209,7 @@ const ja: TranslationKeys = {
     declinedDesc: '3段階すべてを通過しましたが、投資対象には選定されませんでした。フィードバックはメッセージに表示されます。',
 
     stageCount: 'ステージ {n} / 4',
+    levelWord: 'レベル',
     heroTitle: '申請の進捗',
     heroSubtitle: 'レベル1 → レベル2 → レベル3 → 最終判断',
     reviewedByLabel: '審査者',

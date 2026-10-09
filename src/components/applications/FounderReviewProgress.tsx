@@ -341,6 +341,82 @@ function StageList({
   );
 }
 
+// ─── Rail: sticky side panel with a vertical timeline ─────────────────────────
+
+function RailTimeline({
+  stages, actionNeeded, showReviewerDetails, language, t,
+}: {
+  stages: Stage[]; actionNeeded: boolean; showReviewerDetails: boolean;
+  language: string; t: TranslationKeys;
+}) {
+  return (
+    <ol className="relative">
+      {stages.map((s, i) => {
+        const isLast = i === stages.length - 1;
+        const hasRecord = !!s.date && s.state !== 'upcoming';
+        return (
+          <li key={s.key} className={cn('relative pl-12', !isLast && 'pb-4')}>
+            {!isLast && (
+              <div className={cn('absolute left-[15px] top-8 bottom-0 w-0.5', connectorClass(s.state))} />
+            )}
+            <div className="absolute left-0 top-3 z-10 rounded-full ring-4 ring-white">
+              <StageNode state={s.state} index={i} size="md" />
+            </div>
+            <div className={cn(
+              'rounded-xl border px-4 py-3',
+              s.state === 'in_review' ? 'border-amber-200 bg-amber-50/40' : 'border-gray-100 bg-white',
+            )}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className={cn('text-sm font-semibold', s.state === 'upcoming' ? 'text-gray-400' : 'text-gray-900')}>
+                  {s.label}
+                </p>
+                <StatePill state={s.state} t={t} />
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">{s.next}</p>
+
+              {hasRecord && (
+                <div className="flex items-center gap-x-2 gap-y-1 mt-2 flex-wrap text-xs text-gray-500">
+                  {showReviewerDetails && s.reviewer && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={cn(
+                        'w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0',
+                        s.state === 'cleared' || s.state === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-red-100 text-red-700',
+                      )}>
+                        {initials(s.reviewer)}
+                      </span>
+                      <span className="font-medium text-gray-700 break-all">{s.reviewer}</span>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1">
+                    <Clock size={11} /> {formatDate(s.date!, language)}
+                  </span>
+                </div>
+              )}
+
+              {showReviewerDetails && hasRecord && s.comment && (
+                <div className="mt-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+                    {t.founderPipeline.reviewCommentLabel}
+                  </p>
+                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{s.comment}</p>
+                </div>
+              )}
+
+              {s.state === 'in_review' && (
+                <p className="text-[11px] font-medium text-amber-700 mt-2">
+                  {actionNeeded ? t.founderPipeline.actionNeeded : t.founderPipeline.noActionNeeded}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // ─── Public component ─────────────────────────────────────────────────────────
 
 export default function FounderReviewProgress({
@@ -350,7 +426,7 @@ export default function FounderReviewProgress({
   showReviewerDetails = true,
 }: {
   app: InvestmentApplication;
-  variant?: 'compact' | 'detailed' | 'hero';
+  variant?: 'compact' | 'detailed' | 'hero' | 'rail';
   actionNeeded?: boolean;
   showReviewerDetails?: boolean;
 }) {
@@ -368,6 +444,58 @@ export default function FounderReviewProgress({
           <p className="text-[10px] text-gray-400 flex-shrink-0">
             {t.founderPipeline.stageCount.replace('{n}', String(Math.min(activeIndex + 1, 4)))}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Rail: sticky side panel — summary, progress bar, then a vertical timeline ──
+  if (variant === 'rail') {
+    const done = stages.filter(x => x.state === 'cleared' || x.state === 'approved' || x.state === 'declined').length;
+    const pct = Math.round((done / stages.length) * 100);
+    const barTone = terminal === 'not_cleared' || terminal === 'declined' ? 'bg-red-500' : 'bg-emerald-500';
+    const stepNo = Math.min(activeIndex + 1, stages.length);
+    return (
+      <div className="bg-white border border-gray-100 rounded-2xl p-5">
+        <h2 className="text-base font-bold text-gray-900">{t.founderPipeline.heroTitle}</h2>
+        <p className="text-xs text-gray-500 mt-0.5">{t.founderPipeline.subtitle}</p>
+
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-semibold text-gray-900">
+              {t.founderPipeline.stageCount.replace('{n}', String(terminal ? stages.length : stepNo))}
+            </p>
+            <p className="text-xs text-gray-400">{pct}%</p>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all', barTone)} style={{ width: `${pct}%` }} />
+          </div>
+          <div className="grid grid-cols-4 mt-2">
+            {stages.map((x, i) => (
+              <span
+                key={x.key}
+                className={cn(
+                  'text-[10px] font-medium truncate',
+                  i === 0 ? 'text-left' : i === stages.length - 1 ? 'text-right' : 'text-center',
+                  stepTone(x.state),
+                )}
+              >
+                {i < 3 ? `${t.founderPipeline.levelWord} ${i + 1}` : x.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {terminal && <div className="mt-4"><TerminalBanner terminal={terminal} droppedLabel={droppedLabel} t={t} /></div>}
+
+        <div className="mt-5">
+          <RailTimeline
+            stages={stages}
+            actionNeeded={actionNeeded}
+            showReviewerDetails={showReviewerDetails}
+            language={language}
+            t={t}
+          />
         </div>
       </div>
     );

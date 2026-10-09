@@ -908,18 +908,21 @@ export default function FounderApplicationTracker() {
       )}
 
       {!loading && !isEmpty && (
-        <>
-          {/* ── Application Progress — the single progress indicator for this page.
-                 Replaces the old aggregate "Application Pipeline" funnel and the
-                 "In Progress" stat card, which described the same thing three ways. ── */}
+        <div className={cn('grid grid-cols-1 gap-6 items-start', primaryApp && 'lg:grid-cols-3')}>
+          {/* Application progress — a sticky rail on the right, mirroring the
+              investor's Shortlisting Pipeline, so the founder can follow the
+              review while scrolling their application. */}
           {primaryApp && (
-            <FounderReviewProgress
-              app={primaryApp}
-              variant="hero"
-              actionNeeded={needsFounderAction(primaryApp)}
-            />
+            <aside className="order-first lg:order-none lg:col-start-3 lg:row-start-1 lg:sticky lg:top-6">
+              <FounderReviewProgress
+                app={primaryApp}
+                variant="rail"
+                actionNeeded={needsFounderAction(primaryApp)}
+              />
+            </aside>
           )}
 
+          <div className={cn('min-w-0', primaryApp && 'lg:col-span-2 lg:col-start-1 lg:row-start-1')}>
           {/* Draft section */}
           {drafts.length > 0 && (
             <div className="mb-6">
@@ -1013,7 +1016,8 @@ export default function FounderApplicationTracker() {
               </div>
             </div>
           )}
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
