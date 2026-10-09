@@ -32,7 +32,7 @@ export function BottomNav() {
     { label: t.nav.dashboard,     path: '/',                    icon: Home },
     { label: t.nav.myActivities,  path: '/activities',          icon: Rss },
     { label: t.nav.applications,  path: '/applications/track',  icon: Inbox },
-    { label: t.nav.company,       path: '/company',             icon: Building2 },
+    { label: t.nav.myCompany,     path: '/company',             icon: Building2 },
   ];
 
   // Reviewers never get Companies or Portal Users — see Sidebar.tsx.

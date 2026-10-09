@@ -97,6 +97,7 @@ const en = {
     applications: 'Applications',
     applicants: 'Portal Users',
     company: 'Companies',
+    myCompany: 'Company',
     portfolio: 'Portfolio',
     founders: 'Founders',
     documents: 'Documents',

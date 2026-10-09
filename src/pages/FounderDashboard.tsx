@@ -837,7 +837,7 @@ export default function FounderDashboard() {
               {[
                 { label: t.dashboard.postUpdate,      path: '/activities/new', icon: Zap },
                 { label: t.dashboard.viewActivities,  path: '/activities',     icon: Zap },
-                { label: t.nav.company,               path: '/company',        icon: Users },
+                { label: t.nav.myCompany,             path: '/company',        icon: Users },
                 { label: t.dashboard.uploadDocument,   path: '/documents/new',  icon: DollarSign },
               ].map(action => {
                 const Icon = action.icon;

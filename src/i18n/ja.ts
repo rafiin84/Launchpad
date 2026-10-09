@@ -96,6 +96,7 @@ const ja: TranslationKeys = {
     applications: '申請',
     applicants: 'ポータルユーザー',
     company: '会社',
+    myCompany: '会社',
     portfolio: 'ポートフォリオ',
     founders: '創業者',
     documents: 'ドキュメント',

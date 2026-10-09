@@ -159,7 +159,7 @@ export default function FounderCompany() {
   const [logoUploadError, setLogoUploadError] = useState(false);
   const logoFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setPageTitle(t.nav.company); return () => setPageTitle(null); }, [t]);
+  useEffect(() => { setPageTitle(t.nav.myCompany); return () => setPageTitle(null); }, [t]);
   useEffect(() => { setLogoError(false); }, [logoUrl]);
 
   useEffect(() => {
