@@ -194,14 +194,18 @@ function stepTone(state: StageState): string {
 function LevelStrip({ stages, size, language, t }: { stages: Stage[]; size: 'sm' | 'lg'; language: string; t: TranslationKeys }) {
   if (size === 'sm') {
     return (
-      <div className="flex items-start gap-1.5">
-        {stages.map((s, i) => (
-          <React.Fragment key={s.key}>
-            <StageNode state={s.state} index={i} size="sm" />
-            {i < stages.length - 1 && (
-              <div className={cn('h-0.5 flex-1 rounded-full min-w-[12px] mt-3', connectorClass(s.state))} />
+      <div className="flex items-center gap-1.5">
+        {stages.map(s => (
+          <div
+            key={s.key}
+            className={cn(
+              'h-1.5 flex-1 rounded-full',
+              s.state === 'cleared' || s.state === 'approved' ? 'bg-emerald-500'
+                : s.state === 'not_cleared' || s.state === 'declined' ? 'bg-red-500'
+                : s.state === 'in_review' ? 'bg-amber-400'
+                : 'bg-gray-200',
             )}
-          </React.Fragment>
+          />
         ))}
       </div>
     );

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox, Plus, FileText, Clock, CheckCircle, XCircle, Edit2,
-  Building2, DollarSign, ArrowRight, MessageSquare,
+  Building2, ArrowRight, MessageSquare, CalendarClock,
   Upload, Check, Send, Trash2,
 } from 'lucide-react';
 import FounderReviewProgress from '../components/applications/FounderReviewProgress';
@@ -85,34 +85,20 @@ const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; b
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: ApplicationStatus }) {
+function StatusLabel({ status }: { status: ApplicationStatus }) {
   const { t } = useLanguage();
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.submitted;
-  const statusLabels: Record<string, string> = {
-    draft: t.applicationTracker.statusDraft,
-    submitted: t.applicationTracker.statusSubmitted,
-    under_review: t.applicationTracker.statusUnderReview,
-    interested: t.applicationTracker.statusInterested,
-    more_info_requested: t.applicationTracker.statusMoreInfo,
-    documents_requested: t.applicationTracker.statusDocsRequested,
-    shortlisted: t.applicationTracker.statusShortlisted,
-    meeting_scheduled: t.applicationTracker.statusMeeting,
-    due_diligence: t.applicationTracker.statusDueDiligence,
-    on_hold: t.applicationTracker.statusOnHold,
-    level1_screening: t.applicationTracker.statusLevel1Screening,
-    level1_cleared: t.applicationTracker.statusLevel1Cleared,
-    level2_cleared: t.applicationTracker.statusLevel2Cleared,
-    level3_cleared: t.applicationTracker.statusLevel3Cleared,
-    not_shortlisted: t.applicationTracker.statusNotShortlisted,
-    approved: t.applicationTracker.statusApproved,
-    invested: t.applicationTracker.statusInvested,
-    rejected: t.applicationTracker.statusRejected,
+  const map: Record<string, string> = {
+    draft: t.applicationTracker.statusDraft, submitted: t.applicationTracker.statusSubmitted,
+    under_review: t.applicationTracker.statusUnderReview, interested: t.applicationTracker.statusInterested,
+    more_info_requested: t.applicationTracker.statusMoreInfo, documents_requested: t.applicationTracker.statusDocsRequested,
+    shortlisted: t.applicationTracker.statusShortlisted, meeting_scheduled: t.applicationTracker.statusMeeting,
+    due_diligence: t.applicationTracker.statusDueDiligence, on_hold: t.applicationTracker.statusOnHold,
+    level1_screening: t.applicationTracker.statusLevel1Screening, level1_cleared: t.applicationTracker.statusLevel1Cleared,
+    level2_cleared: t.applicationTracker.statusLevel2Cleared, level3_cleared: t.applicationTracker.statusLevel3Cleared,
+    not_shortlisted: t.applicationTracker.statusNotShortlisted, approved: t.applicationTracker.statusApproved,
+    invested: t.applicationTracker.statusInvested, rejected: t.applicationTracker.statusRejected,
   };
-  return (
-    <span className={cn('inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full', cfg.bg, cfg.text)}>
-      {statusLabels[status] || cfg.label}
-    </span>
-  );
+  return <>{map[status] || STATUS_CONFIG[status]?.label || status}</>;
 }
 
 interface ParsedMessage {
@@ -143,7 +129,7 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
   if (messages.length === 0 && !notes) return null;
 
   return (
-    <div className="mt-3 border-t border-gray-100 pt-3">
+    <div>
       <div className="flex items-center gap-1.5 mb-2.5">
         <MessageSquare size={12} className="text-indigo-500" />
         <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">
@@ -521,92 +507,201 @@ function needsFounderAction(app: InvestmentApplication): boolean {
 }
 
 
+function MeetingBlock({ app }: { app: InvestmentApplication }) {
+  const { t } = useLanguage();
+  if (!app.meetingDate) return null;
+  const when = new Date(app.meetingDate);
+  if (isNaN(when.getTime())) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <CalendarClock size={12} className="text-violet-600" />
+        <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
+          {t.applicationTracker.meetingScheduled}
+        </p>
+      </div>
+      <div className="flex items-stretch gap-3 bg-violet-50 border border-violet-100 rounded-xl p-3">
+        <div className="w-14 flex-shrink-0 rounded-lg bg-white border border-violet-100 flex flex-col items-center justify-center py-1.5">
+          <span className="text-[10px] font-semibold uppercase text-violet-500">
+            {when.toLocaleDateString('en-US', { month: 'short' })}
+          </span>
+          <span className="text-lg font-bold leading-none text-gray-900">{when.getDate()}</span>
+        </div>
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-bold text-gray-900">
+            {when.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+            {' · '}
+            <span className="text-violet-600">
+              {when.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </p>
+          {app.meetingLocation && (
+            <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.location}:</span> {app.meetingLocation}</p>
+          )}
+          {app.meetingLink && (
+            <p className="text-[11px] text-gray-600">
+              <span className="font-semibold text-gray-500">Link:</span>{' '}
+              <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline break-all">{app.meetingLink}</a>
+            </p>
+          )}
+          {app.meetingAgenda && (
+            <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.agenda}:</span> {app.meetingAgenda}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A labelled, bordered block — the same sectioned look as the investor's application page. */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{title}</p>
+      <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-3">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
 function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hideProgress = false }: { app: InvestmentApplication; expanded: boolean; onToggle: () => void; onRefresh: () => void; onDelete?: () => void; hideProgress?: boolean }) {
   const { t } = useLanguage();
   const isDraft = app.status === 'draft';
   const isApproved = app.status === 'approved' || app.status === 'invested';
   const needsAction = needsFounderAction(app);
+  const showDocs = expanded || (!isApplicationLocked(app) && (pendingDocCount(app) > 0 || app.status === 'documents_requested'));
+  const when = relativeTime((isDraft ? app.updatedAt : app.submittedAt) || app.updatedAt);
+  const hasUpdates = !isDraft && (!!app.investorNotes || !!app.meetingDate || showDocs);
+
+  const accent =
+    isDraft ? 'from-amber-500 to-orange-500' :
+    isApproved ? 'from-emerald-500 to-green-600' :
+    app.status === 'rejected' || app.status === 'not_shortlisted' ? 'from-rose-500 to-red-600' :
+    app.status === 'on_hold' ? 'from-slate-500 to-slate-600' :
+    'from-indigo-500 to-violet-600';
 
   return (
-    <div className={cn(
-      'bg-white border rounded-2xl p-5 transition-all',
-      isDraft ? 'border-amber-200 bg-amber-50/30' :
-      isApproved ? 'border-green-200 bg-green-50/30' :
-      needsAction ? 'border-amber-200 bg-amber-50/20' :
-      app.status === 'on_hold' ? 'border-slate-200 bg-slate-50/30' :
-      app.status === 'rejected' ? 'border-red-200 bg-red-50/20' :
-      'border-gray-100',
-    )}>
-      {/* Action required banner */}
-      {needsAction && (
-        <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mb-3">
-          <Clock size={12} />
-          {pendingDocCount(app) > 0 || app.status === 'documents_requested'
-            ? t.applicationTracker.docsRequested
-            : t.applicationTracker.moreInfoRequested}
-        </div>
-      )}
-      {isApproved && !hideProgress && (
-        <div className="flex items-center gap-2 text-xs font-medium text-green-700 bg-green-100 rounded-lg px-3 py-1.5 mb-3">
-          <CheckCircle size={12} />
-          {t.applicationTracker.applicationApproved}
-        </div>
-      )}
-      {app.status === 'on_hold' && (
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5 mb-3">
-          <Clock size={12} />
-          {t.applicationTracker.applicationOnHold}
-        </div>
-      )}
-      {app.status === 'rejected' && (
-        <div className="flex items-center gap-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg px-3 py-1.5 mb-3">
-          <XCircle size={12} />
-          {t.applicationTracker.applicationDeclined}
-        </div>
-      )}
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center">
-            <Building2 size={16} className="text-gray-400" />
+    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+      {/* Header band */}
+      <div className={cn('bg-gradient-to-r px-5 py-4 text-white', accent)}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex-shrink-0 flex items-center justify-center">
+              <Building2 size={18} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-base font-bold truncate">{app.companyName || 'Untitled'}</p>
+                <span className="text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                  <StatusLabel status={app.status} />
+                </span>
+              </div>
+              <p className="text-xs text-white/75 mt-0.5 truncate">
+                {[app.companyIndustry, app.companyStage, app.companyLocation].filter(Boolean).join('  ·  ')}
+                {when && <>{app.companyIndustry || app.companyStage || app.companyLocation ? '  ·  ' : ''}{isDraft ? 'Edited' : 'Submitted'} {when}</>}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{app.companyName || 'Untitled'}</p>
-            {app.companyIndustry && (
-              <span className="inline-flex text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5">
-                {app.companyIndustry}
-              </span>
+          {app.fundingAsk && (
+            <div className="flex-shrink-0 text-right bg-white/15 border border-white/20 rounded-xl px-3.5 py-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-white/70">Funding ask</p>
+              <p className="text-lg font-bold leading-tight">{formatCurrency(app.fundingAsk)}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Status banners */}
+        {needsAction && (
+          <div className="flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+            <Clock size={13} className="flex-shrink-0" />
+            {pendingDocCount(app) > 0 || app.status === 'documents_requested'
+              ? t.applicationTracker.docsRequested
+              : t.applicationTracker.moreInfoRequested}
+          </div>
+        )}
+        {isApproved && !hideProgress && (
+          <div className="flex items-center gap-2 text-xs font-medium text-green-800 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+            <CheckCircle size={13} className="flex-shrink-0" />
+            {t.applicationTracker.applicationApproved}
+          </div>
+        )}
+        {app.status === 'on_hold' && (
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+            <Clock size={13} className="flex-shrink-0" />
+            {t.applicationTracker.applicationOnHold}
+          </div>
+        )}
+        {app.status === 'rejected' && (
+          <div className="flex items-center gap-2 text-xs font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+            <XCircle size={13} className="flex-shrink-0" />
+            {t.applicationTracker.applicationDeclined}
+          </div>
+        )}
+
+        {/* Review progress — compact bar, unless the right-hand rail already shows it */}
+        {!isDraft && !hideProgress && <FounderReviewProgress app={app} variant="compact" />}
+
+        {/* Investor updates: messages, meeting and requested documents */}
+        {hasUpdates && (
+          <div className="space-y-3">
+            {app.investorNotes && (
+              <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4">
+                <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
+              </div>
+            )}
+            {app.meetingDate && !isNaN(new Date(app.meetingDate).getTime()) && (
+              <div className="bg-violet-50/40 border border-violet-100 rounded-xl p-4">
+                <MeetingBlock app={app} />
+              </div>
+            )}
+            {showDocs && <GenericDocUpload app={app} onRefresh={onRefresh} />}
+          </div>
+        )}
+
+        {/* Expanded details — the application as submitted */}
+        {expanded && !isDraft && (
+          <div className="space-y-4 pt-1">
+            {!hideProgress && (
+              <FounderReviewProgress app={app} variant="detailed" actionNeeded={needsFounderAction(app)} />
+            )}
+            {(app.companyDescription || app.problemStatement || app.solution) && (
+              <Section title="Business overview">
+                {app.companyDescription && <Field label={t.applicationTracker.description} value={app.companyDescription} />}
+                {app.problemStatement && <Field label={t.applicationTracker.problem} value={app.problemStatement} />}
+                {app.solution && <Field label={t.applicationTracker.solution} value={app.solution} />}
+              </Section>
+            )}
+            {(app.companyStage || app.companyLocation || app.currentRevenue || app.equityOffered) && (
+              <Section title="Company">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {app.companyStage && <Field label={t.applicationTracker.stage} value={app.companyStage} />}
+                  {app.companyLocation && <Field label={t.applicationTracker.location} value={app.companyLocation} />}
+                  {app.currentRevenue && <Field label={t.applicationTracker.revenue} value={formatCurrency(app.currentRevenue)} />}
+                  {app.equityOffered && <Field label={t.applicationTracker.equityOffered} value={`${app.equityOffered}%`} />}
+                </div>
+              </Section>
+            )}
+            {app.useOfFunds && (
+              <Section title="Funding">
+                <Field label={t.applicationTracker.useOfFunds} value={app.useOfFunds} />
+              </Section>
             )}
           </div>
-        </div>
-        <StatusBadge status={app.status} />
-      </div>
-
-      {/* Info row */}
-      <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-        {app.fundingAsk && (
-          <span className="flex items-center gap-1">
-            <DollarSign size={12} className="text-gray-400" />
-            <span className="font-medium text-gray-700">{formatCurrency(app.fundingAsk)}</span>
-          </span>
-        )}
-        {relativeTime((app.status === 'draft' ? app.updatedAt : app.submittedAt) || app.updatedAt) && (
-          <span className="flex items-center gap-1">
-            <Clock size={12} className="text-gray-400" />
-            {relativeTime((app.status === 'draft' ? app.updatedAt : app.submittedAt) || app.updatedAt)}
-          </span>
         )}
       </div>
 
-      {/* Review progress — compact strip, unless the hero above already shows it */}
-      {!isDraft && !hideProgress && (
-        <div className="mb-3">
-          <FounderReviewProgress app={app} variant="compact" />
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2">
+      {/* Footer actions */}
+      <div className="flex items-center gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50/60">
         {isDraft ? (
           <>
             <Link
@@ -628,7 +723,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
           <>
             <button
               onClick={onToggle}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors"
             >
               {expanded ? t.applicationTracker.hideDetails : t.applicationTracker.viewDetails}
               <ArrowRight size={12} className={cn('transition-transform', expanded && 'rotate-90')} />
@@ -644,153 +739,6 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
           </>
         )}
       </div>
-
-      {/* Expanded details — two-column layout: left = company profile, right = messages/meeting/docs */}
-      {expanded && !isDraft && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left column — review progress, then company profile */}
-            <div className="lg:col-span-2 space-y-3">
-              {!hideProgress && (
-                <FounderReviewProgress
-                  app={app}
-                  variant="detailed"
-                  actionNeeded={needsFounderAction(app)}
-                />
-              )}
-              {app.companyDescription && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.description}</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{app.companyDescription}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                {app.companyStage && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.stage}</p>
-                    <p className="text-xs text-gray-700">{app.companyStage}</p>
-                  </div>
-                )}
-                {app.companyLocation && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.location}</p>
-                    <p className="text-xs text-gray-700">{app.companyLocation}</p>
-                  </div>
-                )}
-                {app.currentRevenue && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.revenue}</p>
-                    <p className="text-xs text-gray-700">{formatCurrency(app.currentRevenue)}</p>
-                  </div>
-                )}
-                {app.equityOffered && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{t.applicationTracker.equityOffered}</p>
-                    <p className="text-xs text-gray-700">{app.equityOffered}%</p>
-                  </div>
-                )}
-              </div>
-              {app.problemStatement && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.problem}</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{app.problemStatement}</p>
-                </div>
-              )}
-              {app.solution && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.solution}</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{app.solution}</p>
-                </div>
-              )}
-              {app.useOfFunds && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t.applicationTracker.useOfFunds}</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{app.useOfFunds}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Right column — messages, meeting, documents */}
-            <div className="lg:col-span-1 space-y-4">
-              {app.investorNotes && (
-                <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
-              )}
-
-              {app.meetingDate && (
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2.5">
-                    <Clock size={12} className="text-violet-600" />
-                    <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
-                      {t.applicationTracker.meetingScheduled}
-                    </p>
-                  </div>
-                  <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
-                    <p className="text-xs font-bold text-gray-900">
-                      {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                      {' · '}
-                      <span className="text-violet-600">
-                        {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </p>
-                    {app.meetingLocation && (
-                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.location}:</span> {app.meetingLocation}</p>
-                    )}
-                    {app.meetingLink && (
-                      <p className="text-[11px] text-gray-600">
-                        <span className="font-semibold text-gray-500">Link:</span>{' '}
-                        <a href={app.meetingLink} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline break-all">{app.meetingLink}</a>
-                      </p>
-                    )}
-                    {app.meetingAgenda && (
-                      <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.agenda}:</span> {app.meetingAgenda}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <GenericDocUpload app={app} onRefresh={onRefresh} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* When collapsed and docs requested, show upload section directly */}
-      {!expanded && !isDraft && !isApplicationLocked(app) && (pendingDocCount(app) > 0 || app.status === 'documents_requested') && (
-        <div className="mt-3 border-t border-gray-100 pt-3">
-          <GenericDocUpload app={app} onRefresh={onRefresh} />
-        </div>
-      )}
-
-      {/* When collapsed, still show messages/meeting/docs below card summary */}
-      {!expanded && !isDraft && (app.investorNotes || app.meetingDate) && (
-        <div className="mt-3 border-t border-gray-100 pt-3 space-y-3">
-          {app.investorNotes && (
-            <InvestorMessages notes={app.investorNotes} reviewedBy={app.reviewedBy} reviewedAt={app.reviewedAt} />
-          )}
-          {app.meetingDate && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2.5">
-                <Clock size={12} className="text-violet-600" />
-                <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">
-                  Meeting Scheduled
-                </p>
-              </div>
-              <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5 space-y-1.5">
-                <p className="text-xs font-bold text-gray-900">
-                  {new Date(app.meetingDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                  {' · '}
-                  <span className="text-violet-600">
-                    {new Date(app.meetingDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </p>
-                {app.meetingAgenda && (
-                  <p className="text-[11px] text-gray-600"><span className="font-semibold text-gray-500">{t.applicationTracker.agenda}:</span> {app.meetingAgenda}</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
