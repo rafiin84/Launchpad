@@ -13,6 +13,7 @@ import { registerPortalUser, findPortalUser, setPortalUserStatus, getPortalUserS
 import { addNotification } from '../services/notifications';
 import { useLanguage } from '../context/LanguageContext';
 import type { UserRole } from '../types';
+import { apiUrl } from '../config/api';
 
 export default function FounderDetail() {
   const { t, language } = useLanguage();
@@ -76,7 +77,7 @@ export default function FounderDetail() {
         // 3. Fetch profile photo
         if (f.email) {
           const token = loadToken();
-          fetch('/api/profile?contactPhotos=1', {
+          fetch(apiUrl('/api/profile?contactPhotos=1'), {
             headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
           })
             .then(r => r.json())

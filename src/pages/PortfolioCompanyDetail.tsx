@@ -13,6 +13,7 @@ import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
 import FounderProfile from '../components/company/FounderProfile';
 import FounderReportedProfile from '../components/company/FounderReportedProfile';
 import { loadToken } from '../services/oauth';
+import { apiUrl } from '../config/api';
 
 function formatCurrency(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -74,7 +75,7 @@ export default function PortfolioCompanyDetail() {
         if (r?.founderEmail) {
           const email = r.founderEmail.toLowerCase();
           const token = loadToken();
-          fetch('/api/profile?contactPhotos=1', {
+          fetch(apiUrl('/api/profile?contactPhotos=1'), {
             headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
           })
             .then(res => res.json())

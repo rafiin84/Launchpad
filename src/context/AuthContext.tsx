@@ -14,6 +14,7 @@ import {
 } from '../services/crmAppUsers';
 import { loadPortalSession, savePortalSession, clearPortalSession, type PortalSession } from '../services/portalUsers';
 import { useLanguage } from './LanguageContext';
+import { apiUrl } from '../config/api';
 
 export interface ZohoProfile {
   email: string | null;
@@ -323,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fallback: fetch photo via server API if appusers photo wasn't found
         if (!gotPortalPhoto && emailForLookup) {
           try {
-            const res = await fetch(`/api/profile?email=${encodeURIComponent(emailForLookup)}&photo=1`);
+            const res = await fetch(apiUrl(`/api/profile?email=${encodeURIComponent(emailForLookup)}&photo=1`));
             if (res.ok) {
               const json = await res.json() as { photo?: string | null };
               if (json.photo && isValidAvatarData(json.photo)) {

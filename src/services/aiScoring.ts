@@ -14,6 +14,7 @@
 
 import { loadToken } from './oauth';
 import { updateApplication, type InvestmentApplication } from './investmentApplications';
+import { apiUrl } from '../config/api';
 
 export const AI_DIMENSIONS = ['team', 'market', 'product', 'traction'] as const;
 export type AiDimensionKey = typeof AI_DIMENSIONS[number];
@@ -104,7 +105,7 @@ export async function requestAiAssessment(
   }
 
   const token = loadToken();
-  const res = await fetch('/api/ai-score', {
+  const res = await fetch(apiUrl('/api/ai-score'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

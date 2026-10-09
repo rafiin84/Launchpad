@@ -10,6 +10,7 @@ import { fetchCompanyProfile, type CompanyData, EMPTY } from '../services/compan
 import { Avatar } from '../components/ui/Avatar';
 import { loadToken } from '../services/oauth';
 import { useLanguage } from '../context/LanguageContext';
+import { apiUrl } from '../config/api';
 
 function fmt(val: string, prefix = '$') {
   if (!val) return '';
@@ -82,7 +83,7 @@ export default function FounderDetailPage() {
           setProfile(result.data);
 
           const token = loadToken();
-          fetch('/api/profile?contactPhotos=1', {
+          fetch(apiUrl('/api/profile?contactPhotos=1'), {
             headers: token ? { 'Authorization': `Zoho-oauthtoken ${token}` } : {},
           })
             .then(r => r.json())

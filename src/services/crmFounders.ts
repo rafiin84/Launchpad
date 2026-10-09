@@ -5,6 +5,7 @@ import {
 } from './zohoApi';
 import { loadToken } from './oauth';
 import { ZOHO_HOSTS } from '../config/auth';
+import { apiUrl } from '../config/api';
 
 /** Direct CRM API URL — no proxy. */
 function crmUrl(apiPath: string): string {
@@ -208,7 +209,7 @@ export async function createCRMFounder(fields: CRMFounderFields): Promise<string
   if (fields.email) {
     const founderName = [fields.firstName, fields.lastName].filter(Boolean).join(' ');
     const location = [fields.mailingCity, fields.mailingState, fields.mailingCountry].filter(Boolean).join(', ');
-    fetch('/api/company', {
+    fetch(apiUrl('/api/company'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -328,7 +329,7 @@ export async function fetchAllPortalUserStatuses(): Promise<Map<string, PortalUs
   const result = new Map<string, PortalUserAPIStatus>();
 
   try {
-    const res = await fetch('/api/portal-users');
+    const res = await fetch(apiUrl('/api/portal-users'));
     if (!res.ok) {
       console.warn('[Portal] Server API returned', res.status);
       return result;
@@ -362,7 +363,7 @@ export async function fetchAllPortalUserStatuses(): Promise<Map<string, PortalUs
 export async function sendInviteEmail(contactId: string, email: string, name: string): Promise<{ message: string }> {
   const portalUrl = `${window.location.origin}/login`;
 
-  const res = await fetch('/api/send-invite', {
+  const res = await fetch(apiUrl('/api/send-invite'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contactId, email, name, portalUrl }),
