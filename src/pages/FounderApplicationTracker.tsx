@@ -36,6 +36,7 @@ import { usePageTitle } from '../context/PageTitleContext';
 function relativeTime(iso: string): string {
   const now = Date.now();
   const then = new Date(iso).getTime();
+  if (isNaN(then)) return '';
   const diffMs = now - then;
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
@@ -545,7 +546,7 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
             : t.applicationTracker.moreInfoRequested}
         </div>
       )}
-      {isApproved && (
+      {isApproved && !hideProgress && (
         <div className="flex items-center gap-2 text-xs font-medium text-green-700 bg-green-100 rounded-lg px-3 py-1.5 mb-3">
           <CheckCircle size={12} />
           {t.applicationTracker.applicationApproved}
@@ -589,10 +590,12 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
             <span className="font-medium text-gray-700">{formatCurrency(app.fundingAsk)}</span>
           </span>
         )}
-        <span className="flex items-center gap-1">
-          <Clock size={12} className="text-gray-400" />
-          {relativeTime(app.status === 'draft' ? app.updatedAt : app.submittedAt)}
-        </span>
+        {relativeTime((app.status === 'draft' ? app.updatedAt : app.submittedAt) || app.updatedAt) && (
+          <span className="flex items-center gap-1">
+            <Clock size={12} className="text-gray-400" />
+            {relativeTime((app.status === 'draft' ? app.updatedAt : app.submittedAt) || app.updatedAt)}
+          </span>
+        )}
       </div>
 
       {/* Review progress — compact strip, unless the hero above already shows it */}

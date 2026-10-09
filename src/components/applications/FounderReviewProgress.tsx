@@ -62,13 +62,6 @@ function stageNext(t: TranslationKeys, level: ReviewLevel): string {
   return level === 1 ? t.founderPipeline.stage1Next : level === 2 ? t.founderPipeline.stage2Next : t.founderPipeline.stage3Next;
 }
 
-/** Short label for the horizontal strip: "Level 1", "Level 2", … */
-function shortLabel(t: TranslationKeys, i: number): string {
-  return i < 3
-    ? `${t.founderPipeline.title.split(' ')[0]} ${i + 1}`.replace(/^\S+/, `L${i + 1}`)
-    : t.founderPipeline.finalStage;
-}
-
 interface BuiltPipeline {
   stages: Stage[];
   activeIndex: number;
@@ -191,40 +184,62 @@ function connectorClass(state: StageState): string {
 
 // ─── Horizontal level strip (hero + compact) ──────────────────────────────────
 
-function LevelStrip({ stages, size, t }: { stages: Stage[]; size: 'sm' | 'lg'; t: TranslationKeys }) {
-  return (
-    <div className="flex items-start gap-1.5">
-      {stages.map((s, i) => (
-        <React.Fragment key={s.key}>
-          <div className={cn('flex flex-col items-center', size === 'lg' && 'flex-shrink-0')}>
-            <StageNode state={s.state} index={i} size={size === 'lg' ? 'lg' : 'sm'} />
-            {size === 'lg' && (
-              <span
-                className={cn(
-                  'text-[10px] font-semibold mt-1.5 text-center leading-tight max-w-[72px]',
-                  s.state === 'upcoming' ? 'text-gray-400'
-                    : s.state === 'in_review' ? 'text-amber-700'
-                    : s.state === 'not_cleared' || s.state === 'declined' ? 'text-red-600'
-                    : 'text-emerald-700',
-                )}
-              >
-                {shortLabel(t, i)}
-              </span>
+function stepTone(state: StageState): string {
+  return state === 'upcoming' ? 'text-gray-400'
+    : state === 'in_review' ? 'text-amber-700'
+    : state === 'not_cleared' || state === 'declined' ? 'text-red-600'
+    : 'text-emerald-700';
+}
+
+function LevelStrip({ stages, size, language, t }: { stages: Stage[]; size: 'sm' | 'lg'; language: string; t: TranslationKeys }) {
+  if (size === 'sm') {
+    return (
+      <div className="flex items-start gap-1.5">
+        {stages.map((s, i) => (
+          <React.Fragment key={s.key}>
+            <StageNode state={s.state} index={i} size="sm" />
+            {i < stages.length - 1 && (
+              <div className={cn('h-0.5 flex-1 rounded-full min-w-[12px] mt-3', connectorClass(s.state))} />
             )}
-          </div>
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  }
+
+  // Four equal columns: each node sits at its column's centre, and the line
+  // to the next node is drawn from centre to centre, so labels never push the
+  // nodes out of alignment.
+  return (
+    <ol className="grid grid-cols-4">
+      {stages.map((s, i) => (
+        <li key={s.key} className="relative flex flex-col items-center text-center px-1">
           {i < stages.length - 1 && (
-            <div
-              className={cn(
-                'h-0.5 flex-1 rounded-full min-w-[12px]',
-                size === 'lg' ? 'mt-5' : 'mt-3',
-                connectorClass(s.state),
-              )}
-            />
+            <div className={cn('absolute top-5 left-1/2 w-full h-0.5 -translate-y-1/2', connectorClass(s.state))} />
           )}
-        </React.Fragment>
+          <div className="relative z-10 bg-white rounded-full">
+            <StageNode state={s.state} index={i} size="lg" />
+          </div>
+          <span className={cn('mt-2 text-xs font-semibold leading-tight', stepTone(s.state))}>{s.label}</span>
+          <span className="mt-0.5 text-[11px] text-gray-400 leading-tight">
+            {s.date && s.state !== 'upcoming' ? formatDate(s.date, language) : <StateText state={s.state} t={t} />}
+          </span>
+        </li>
       ))}
-    </div>
+    </ol>
   );
+}
+
+function StateText({ state, t }: { state: StageState; t: TranslationKeys }) {
+  const label = {
+    cleared: t.founderPipeline.stateCleared,
+    approved: t.founderPipeline.stateApproved,
+    in_review: t.founderPipeline.stateInReview,
+    upcoming: t.founderPipeline.stateUpcoming,
+    not_cleared: t.founderPipeline.stateNotCleared,
+    declined: t.founderPipeline.stateDeclined,
+  }[state];
+  return <>{label}</>;
 }
 
 // ─── Terminal banners ─────────────────────────────────────────────────────────
@@ -249,7 +264,7 @@ function TerminalBanner({ terminal, droppedLabel, t }: { terminal: StageState; d
   );
 }
 
-// ─── Vertical stage detail ────────────────────────────────────────────────────
+// ─── Stage-by-stage detail ────────────────────────────────────────────────────
 
 function StageList({
   stages, actionNeeded, showReviewerDetails, language, t,
@@ -258,60 +273,51 @@ function StageList({
   language: string; t: TranslationKeys;
 }) {
   return (
-    <div className="space-y-0">
+    <ul className="divide-y divide-gray-100">
       {stages.map((s, i) => {
-        const isLast = i === stages.length - 1;
         const isActive = s.state === 'in_review';
         const hasRecord = !!s.date && s.state !== 'upcoming';
         return (
-          <div key={s.key} className="relative flex gap-3">
-            {!isLast && (
-              <div className={cn('absolute left-[15px] top-8 w-0.5 h-[calc(100%-14px)]', connectorClass(s.state))} />
-            )}
-            <div className="pt-0.5 z-10">
-              <StageNode state={s.state} index={i} size="md" />
-            </div>
-            <div className={cn('flex-1 min-w-0', isLast ? 'pb-0' : 'pb-4')}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className={cn('text-xs font-semibold', s.state === 'upcoming' ? 'text-gray-400' : 'text-gray-900')}>
-                  {s.label}
-                </p>
-                <StatePill state={s.state} t={t} />
+          <li key={s.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+            <StageNode state={s.state} index={i} size="sm" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className={cn('text-sm font-semibold', s.state === 'upcoming' ? 'text-gray-400' : 'text-gray-900')}>
+                    {s.label}
+                  </p>
+                  <StatePill state={s.state} t={t} />
+                </div>
+
+                {hasRecord && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    {showReviewerDetails && s.reviewer && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={cn(
+                          'w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0',
+                          s.state === 'cleared' || s.state === 'approved'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700',
+                        )}>
+                          {initials(s.reviewer)}
+                        </span>
+                        <span className="font-medium text-gray-700">{s.reviewer}</span>
+                        <span className="text-gray-300">·</span>
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1">
+                      <Clock size={11} /> {formatDate(s.date!, language)}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Reviewer + date */}
-              {hasRecord && (
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {showReviewerDetails && s.reviewer && (
-                    <>
-                      <span className={cn(
-                        'w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0',
-                        s.state === 'cleared' || s.state === 'approved'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-red-100 text-red-700',
-                      )}>
-                        {initials(s.reviewer)}
-                      </span>
-                      <span className="text-[11px] text-gray-600">
-                        <span className="text-gray-400">{t.founderPipeline.reviewedByLabel} </span>
-                        <span className="font-medium text-gray-800">{s.reviewer}</span>
-                      </span>
-                      <span className="text-gray-300">·</span>
-                    </>
-                  )}
-                  <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
-                    <Clock size={10} /> {formatDate(s.date!, language)}
-                  </span>
-                </div>
-              )}
-
-              {/* Reviewer comment */}
               {showReviewerDetails && hasRecord && s.comment && (
                 <div className="mt-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
                     {t.founderPipeline.reviewCommentLabel}
                   </p>
-                  <p className="text-[11px] text-gray-700 leading-relaxed whitespace-pre-wrap">{s.comment}</p>
+                  <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{s.comment}</p>
                 </div>
               )}
 
@@ -321,17 +327,17 @@ function StageList({
                   <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide mb-0.5">
                     {t.founderPipeline.whatsNext}
                   </p>
-                  <p className="text-[11px] text-amber-900 leading-relaxed">{s.next}</p>
-                  <p className="text-[10px] font-medium text-amber-700 mt-1.5">
+                  <p className="text-xs text-amber-900 leading-relaxed">{s.next}</p>
+                  <p className="text-[11px] font-medium text-amber-700 mt-1.5">
                     {actionNeeded ? t.founderPipeline.actionNeeded : t.founderPipeline.noActionNeeded}
                   </p>
                 </div>
               )}
             </div>
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
@@ -356,7 +362,7 @@ export default function FounderReviewProgress({
     const current = stages[activeIndex];
     return (
       <div>
-        <LevelStrip stages={stages} size="sm" t={t} />
+        <LevelStrip stages={stages} size="sm" language={language} t={t} />
         <div className="flex items-center justify-between mt-1.5 gap-2">
           <p className="text-[10px] font-medium text-gray-600 truncate">{current?.label}</p>
           <p className="text-[10px] text-gray-400 flex-shrink-0">
@@ -419,7 +425,7 @@ export default function FounderReviewProgress({
 
         {/* Horizontal level strip */}
         <div className="mt-5">
-          <LevelStrip stages={stages} size="lg" t={t} />
+          <LevelStrip stages={stages} size="lg" language={language} t={t} />
         </div>
 
         {/* Current stage callout */}
