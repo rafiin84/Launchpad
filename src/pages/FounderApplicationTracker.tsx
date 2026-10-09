@@ -581,39 +581,41 @@ function ApplicationCard({ app, expanded, onToggle, onRefresh, onDelete, hidePro
   const when = relativeTime((isDraft ? app.updatedAt : app.submittedAt) || app.updatedAt);
   const hasUpdates = !isDraft && (!!app.investorNotes || !!app.meetingDate || showDocs);
 
-  const accent =
-    isDraft ? 'from-amber-500 to-orange-500' :
-    isApproved ? 'from-emerald-500 to-green-600' :
-    app.status === 'rejected' || app.status === 'not_shortlisted' ? 'from-rose-500 to-red-600' :
-    app.status === 'on_hold' ? 'from-slate-500 to-slate-600' :
-    'from-indigo-500 to-violet-600';
+  // Soft tints rather than saturated fills — the status reads from the hue
+  // without the whole card shouting green or red.
+  const tone =
+    isDraft ? { band: 'bg-amber-50 border-amber-100', icon: 'bg-amber-100 text-amber-700', pill: 'bg-amber-100 text-amber-800', sub: 'text-amber-800/70' } :
+    isApproved ? { band: 'bg-emerald-50 border-emerald-100', icon: 'bg-emerald-100 text-emerald-700', pill: 'bg-emerald-100 text-emerald-800', sub: 'text-emerald-800/70' } :
+    app.status === 'rejected' || app.status === 'not_shortlisted' ? { band: 'bg-rose-50 border-rose-100', icon: 'bg-rose-100 text-rose-700', pill: 'bg-rose-100 text-rose-800', sub: 'text-rose-800/70' } :
+    app.status === 'on_hold' ? { band: 'bg-slate-50 border-slate-100', icon: 'bg-slate-100 text-slate-600', pill: 'bg-slate-100 text-slate-700', sub: 'text-slate-600/80' } :
+    { band: 'bg-indigo-50 border-indigo-100', icon: 'bg-indigo-100 text-indigo-700', pill: 'bg-indigo-100 text-indigo-800', sub: 'text-indigo-800/70' };
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
       {/* Header band */}
-      <div className={cn('bg-gradient-to-r px-5 py-4 text-white', accent)}>
+      <div className={cn('px-5 py-4 border-b', tone.band)}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex-shrink-0 flex items-center justify-center">
+            <div className={cn('w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center', tone.icon)}>
               <Building2 size={18} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-base font-bold truncate">{app.companyName || 'Untitled'}</p>
-                <span className="text-[11px] font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                <p className="text-base font-bold text-gray-900 truncate">{app.companyName || 'Untitled'}</p>
+                <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', tone.pill)}>
                   <StatusLabel status={app.status} />
                 </span>
               </div>
-              <p className="text-xs text-white/75 mt-0.5 truncate">
+              <p className={cn('text-xs mt-0.5 truncate', tone.sub)}>
                 {[app.companyIndustry, app.companyStage, app.companyLocation].filter(Boolean).join('  ·  ')}
                 {when && <>{app.companyIndustry || app.companyStage || app.companyLocation ? '  ·  ' : ''}{isDraft ? 'Edited' : 'Submitted'} {when}</>}
               </p>
             </div>
           </div>
           {app.fundingAsk && (
-            <div className="flex-shrink-0 text-right bg-white/15 border border-white/20 rounded-xl px-3.5 py-2">
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-white/70">Funding ask</p>
-              <p className="text-lg font-bold leading-tight">{formatCurrency(app.fundingAsk)}</p>
+            <div className="flex-shrink-0 text-right bg-white border border-gray-100 rounded-xl px-3.5 py-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Funding ask</p>
+              <p className="text-lg font-bold leading-tight text-gray-900">{formatCurrency(app.fundingAsk)}</p>
             </div>
           )}
         </div>

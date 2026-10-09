@@ -141,11 +141,11 @@ function StageNode({ state, index, size }: { state: StageState; index: number; s
     <div
       className={cn(
         dim, 'rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold',
-        state === 'cleared'     && 'bg-emerald-500 text-white',
-        state === 'approved'    && 'bg-green-600 text-white',
+        state === 'cleared'     && 'bg-emerald-100 text-emerald-600',
+        state === 'approved'    && 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-200',
         state === 'in_review'   && 'bg-amber-100 text-amber-700 ring-2 ring-amber-300',
-        state === 'not_cleared' && 'bg-red-500 text-white',
-        state === 'declined'    && 'bg-red-500 text-white',
+        state === 'not_cleared' && 'bg-rose-100 text-rose-600',
+        state === 'declined'    && 'bg-rose-100 text-rose-600',
         state === 'upcoming'    && 'bg-gray-100 text-gray-300',
       )}
     >
@@ -177,8 +177,8 @@ function StatePill({ state, t }: { state: StageState; t: TranslationKeys }) {
 }
 
 function connectorClass(state: StageState): string {
-  return state === 'cleared' || state === 'approved' ? 'bg-emerald-300'
-    : state === 'not_cleared' || state === 'declined' ? 'bg-red-200'
+  return state === 'cleared' || state === 'approved' ? 'bg-emerald-200'
+    : state === 'not_cleared' || state === 'declined' ? 'bg-rose-200'
     : 'bg-gray-200';
 }
 
@@ -201,7 +201,7 @@ function LevelStrip({ stages, size, language, t }: { stages: Stage[]; size: 'sm'
             className={cn(
               'h-1.5 flex-1 rounded-full',
               s.state === 'cleared' || s.state === 'approved' ? 'bg-emerald-500'
-                : s.state === 'not_cleared' || s.state === 'declined' ? 'bg-red-500'
+                : s.state === 'not_cleared' || s.state === 'declined' ? 'bg-rose-400'
                 : s.state === 'in_review' ? 'bg-amber-400'
                 : 'bg-gray-200',
             )}
@@ -457,7 +457,7 @@ export default function FounderReviewProgress({
   if (variant === 'rail') {
     const done = stages.filter(x => x.state === 'cleared' || x.state === 'approved' || x.state === 'declined').length;
     const pct = Math.round((done / stages.length) * 100);
-    const barTone = terminal === 'not_cleared' || terminal === 'declined' ? 'bg-red-500' : 'bg-emerald-500';
+    const barTone = terminal === 'not_cleared' || terminal === 'declined' ? 'bg-rose-400' : 'bg-emerald-400';
     const stepNo = Math.min(activeIndex + 1, stages.length);
     return (
       <div className="bg-white border border-gray-100 rounded-2xl p-5">
