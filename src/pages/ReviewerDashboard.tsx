@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { withDemoIdentity } from '../config/demoIdentity';
 import { Inbox, CheckCircle2, XCircle, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,8 +18,7 @@ const REVIEWER_QUEUE_TITLES: Record<1 | 2 | 3, (t: ReturnType<typeof useLanguage
  * portfolio value, other companies' data, or other reviewers' stats.
  */
 export default function ReviewerDashboard() {
-  const { currentUser: authUser, reviewerLevel } = useAuth();
-  const currentUser = withDemoIdentity(authUser);
+  const { currentUser, reviewerLevel } = useAuth();
   const { t } = useLanguage();
   const [stats, setStats] = useState<ReviewerStats | null>(null);
   const [loading, setLoading] = useState(true);

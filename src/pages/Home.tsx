@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { withDemoIdentity } from '../config/demoIdentity';
 import {
   DollarSign, Building2, Inbox, Users,
   ArrowUpRight, TrendingUp, AlertCircle, Plus, BarChart2,
@@ -249,8 +248,7 @@ const STAGE_STYLES: Record<string, string> = {
 };
 
 export default function Home() {
-  const { currentUser: authUser, isFounder, isReviewer } = useAuth();
-  const currentUser = withDemoIdentity(authUser);
+  const { currentUser, isFounder, isReviewer } = useAuth();
   const { t } = useLanguage();
   const isConnected = !!loadToken();
 
