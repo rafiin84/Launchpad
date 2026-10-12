@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { withDemoIdentity } from '../config/demoIdentity';
 import type { ChangeEvent } from 'react';
 import {
   Activity, AlertCircle, RefreshCw, Building2,
@@ -103,6 +104,7 @@ function isHttpUrl(s: string): boolean {
 
 function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity: CRMActivity) => void; onSyncWarning?: (msg: string) => void; postVisibility: string }) {
   const { currentUser, isInvestor, isFounder, founderCompanyName, appUser } = useAuth();
+  const displayUser = withDemoIdentity(currentUser);
   const { t } = useLanguage();
   const photoFileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
@@ -338,7 +340,7 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
         className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 cursor-text hover:border-gray-200 transition-colors mb-4"
         onClick={() => setExpanded(true)}
       >
-        <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
+        <Avatar src={displayUser.avatar} name={displayUser.name} size="sm" />
         <div className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-400 select-none">
           {t.activities.shareActivities}
         </div>
@@ -357,9 +359,9 @@ function Composer({ onPost, onSyncWarning, postVisibility }: { onPost: (activity
     <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm mb-4">
       {/* Author */}
       <div className="flex items-center gap-3 mb-4">
-        <Avatar src={currentUser.avatar} name={currentUser.name} size="sm" />
+        <Avatar src={displayUser.avatar} name={displayUser.name} size="sm" />
         <div>
-          <p className="text-sm font-semibold text-gray-900">{currentUser.name}</p>
+          <p className="text-sm font-semibold text-gray-900">{displayUser.name}</p>
           <p className="text-xs text-gray-500 capitalize">{currentUser.role === 'investor' ? t.login.investor : t.login.founder}</p>
         </div>
       </div>
