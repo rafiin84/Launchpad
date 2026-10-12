@@ -6,7 +6,6 @@ import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
 import { loadCachedProfile } from '../services/crmAppUsers';
 import { fetchMyContactId, fetchMyFounderProfile, fetchMyFounderPhoto, type CRMFounder } from '../services/crmFounders';
-import { withDemoIdentity } from '../config/demoIdentity';
 
 /* ── Profile data: CRM appUser > local cache > old localStorage ──── */
 interface ProfileExtra {
@@ -60,8 +59,7 @@ export default function Profile() {
 }
 
 function InvestorProfile() {
-  const { currentUser: authUser, role, logout, zohoEmail, zohoProfile, appUser, coverImage } = useAuth();
-  const currentUser = withDemoIdentity(authUser);
+  const { currentUser, role, logout, zohoEmail, zohoProfile, appUser, coverImage } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [extra] = useState<ProfileExtra>(() => loadExtra(appUser as unknown as Record<string, unknown> | null));

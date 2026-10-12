@@ -5,11 +5,9 @@ import { Avatar } from '../ui/Avatar';
 import { NotificationBell } from '../ui/NotificationBell';
 import { LanguageSelector } from '../ui/LanguageSelector';
 import { useAuth } from '../../context/AuthContext';
-import { withDemoIdentity } from '../../config/demoIdentity';
 
 export function MobileHeader() {
-  const { currentUser: authUser, isFounder } = useAuth();
-  const currentUser = withDemoIdentity(authUser);
+  const { currentUser, isFounder } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
