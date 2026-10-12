@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import type { TranslationKeys } from '../../i18n/en';
 import { cn } from '../../lib/cn';
+import { withDemoIdentity } from '../../config/demoIdentity';
 
 interface Props {
   title?: ReactNode;
@@ -36,7 +37,8 @@ const BACK_IN_HEADER: Record<string, { to: string; label: (t: TranslationKeys) =
 };
 
 export function DesktopHeader({ title, subtitle }: Props) {
-  const { currentUser, role } = useAuth();
+  const { currentUser: authUser, role } = useAuth();
+  const currentUser = withDemoIdentity(authUser);
   const { t } = useLanguage();
   const { pathname } = useLocation();
 

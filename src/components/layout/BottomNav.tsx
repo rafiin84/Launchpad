@@ -5,9 +5,11 @@ import { cn } from '../../lib/cn';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Avatar } from '../ui/Avatar';
+import { withDemoIdentity } from '../../config/demoIdentity';
 
 export function BottomNav() {
-  const { isInvestor, isReviewer, currentUser } = useAuth();
+  const { isInvestor, isReviewer, currentUser: authUser } = useAuth();
+  const currentUser = withDemoIdentity(authUser);
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
