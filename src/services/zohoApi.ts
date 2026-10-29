@@ -510,6 +510,31 @@ export interface ZohoCurrentUser {
   zuid?: string;
 }
 
+export interface CrmUserLite { id: string; email: string; full_name: string }
+
+let crmUserDirectory: Promise<CrmUserLite[]> | null = null;
+
+/**
+ * Every CRM user's current name, keyed for lookup by email. Investor-side only
+ * (a portal token can't call the Users API). Cached for the page's lifetime;
+ * a failed fetch is not cached, so the next caller retries.
+ */
+export function fetchCrmUserDirectory(): Promise<CrmUserLite[]> {
+  if (crmUserDirectory) return crmUserDirectory;
+  const request = (async () => {
+    ensureToken();
+    const res = await fetch(buildCrmUrl('/crm/v2/users?type=AllUsers'), { headers: plainAuthHeader() });
+    if (!res.ok) throw new ZohoApiError(res.status, 'Could not load CRM users', 'USERS_FAILED');
+    const json = await res.json() as { users?: Array<{ id: string; email?: string; full_name?: string }> };
+    return (json.users ?? [])
+      .filter(u => u.email && u.full_name)
+      .map(u => ({ id: u.id, email: String(u.email), full_name: String(u.full_name) }));
+  })();
+  crmUserDirectory = request;
+  request.catch(() => { if (crmUserDirectory === request) crmUserDirectory = null; });
+  return request;
+}
+
 export async function fetchCurrentZohoUser(): Promise<ZohoCurrentUser | null> {
   try {
     ensureToken();

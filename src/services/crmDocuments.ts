@@ -1,6 +1,7 @@
 import { zohoList, zohoGetById, zohoCreate, zohoDelete, portalDelete, zohoGetAttachments, zohoDownloadAttachment, portalList, portalGetById, zohoUploadFile, portalUploadFile, downloadFieldFile } from './zohoApi';
 import { loadRole } from './oauth';
 import { portalCreate } from './zohoApi';
+import { liveAuthorName } from '../lib/liveAuthorName';
 
 export interface CRMDocument {
   id: string;
@@ -37,7 +38,7 @@ const FIELD_MAP: Record<string, string> = {
   authorRole:      'Author_Role',
 };
 
-const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD + ',Created_Time';
+const ALL_FIELDS = Object.values(FIELD_MAP).join(',') + ',' + FILE_UPLOAD_FIELD + ',Created_By,Created_Time';
 
 // A File Upload field reads back as an array of objects, but the admin CRM API
 // and the portal API return DIFFERENT key names for the same data:
@@ -69,7 +70,7 @@ function fromRecord(r: Record<string, unknown>): CRMDocument {
     fileSize:       s('File_Size'),
     fileUrl:        s('File_URL'),
     fileUploadId:   fu.id,
-    authorName:     s('Author_Name'),
+    authorName:     liveAuthorName(r, s('Author_Name'), s('Author_Role')),
     authorRole:     s('Author_Role'),
     createdTime:    s('Created_Time'),
   };

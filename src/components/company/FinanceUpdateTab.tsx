@@ -8,6 +8,7 @@ import {
   FileText, AlertCircle, Table2, BarChart3, ShieldCheck, UserCircle2, Pencil as PencilIcon, Paperclip, Upload,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLiveNames } from '../../lib/useLiveNames';
 import {
   fetchFinancials, saveFinancialQuarter, buildRows, comparePeriods,
   fetchFinancialsAsFounder, saveFinancialQuarterAsFounder,
@@ -704,6 +705,7 @@ export default function FinanceUpdateTab({
   companyName: string;
 }) {
   const { currentUser, reviewerLevel, isReviewer, isFounder } = useAuth();
+  const nameFor = useLiveNames();
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [documents, setDocuments] = useState<CRMDocument[]>([]);
   const [mode, setMode] = useState<ViewMode>('quarterly');
@@ -1057,7 +1059,7 @@ export default function FinanceUpdateTab({
                       : <><UserCircle2 size={9} /> Self-reported</>}
                   </span>
                   <span className="text-gray-500">
-                    {e.reviewer || '—'}
+                    {nameFor(e.reviewerEmail, e.reviewer) || '—'}
                     {e.updatedAt && ` · ${new Date(e.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                   </span>
                   {e.sourceDocumentIds?.length ? (

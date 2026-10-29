@@ -4,6 +4,7 @@ import {
   Search, FileSearch, Award, Gavel, AlertTriangle, Star,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useLiveNames } from '../../lib/useLiveNames';
 import type { TranslationKeys } from '../../i18n';
 import {
   getPipelineState,
@@ -76,11 +77,13 @@ function StagePill({ state, t }: { state: PipelineStageState | 'approved' | 'rej
 // ─── Reviewer / decision record ───────────────────────────────────────────────
 
 function ReviewRecord({
-  reviewer, at, comment, score, language, t, tone,
+  reviewer: savedReviewer, reviewerEmail, at, comment, score, language, t, tone,
 }: {
-  reviewer: string; at: string; comment: string; score?: number;
+  reviewer: string; reviewerEmail?: string; at: string; comment: string; score?: number;
   language: string; t: TranslationKeys; tone: 'positive' | 'negative';
 }) {
+  const nameFor = useLiveNames();
+  const reviewer = nameFor(reviewerEmail, savedReviewer);
   return (
     <div className="mt-3 space-y-2.5">
       <div className="flex items-center gap-2.5 flex-wrap">
@@ -502,6 +505,7 @@ function StageCard({
           {review && (
             <ReviewRecord
               reviewer={review.reviewer}
+              reviewerEmail={review.reviewerEmail}
               at={review.reviewedAt}
               comment={review.comment}
               score={review.score}
@@ -537,7 +541,7 @@ function FinalStageCard({
   state, ledgerFinal, language, t, onApprove, onReject, actionLoading, unlocked, dense,
 }: {
   state: 'locked' | 'current' | 'approved' | 'rejected';
-  ledgerFinal?: { reviewer: string; decidedAt: string; comment: string; outcome: string };
+  ledgerFinal?: { reviewer: string; reviewerEmail?: string; decidedAt: string; comment: string; outcome: string };
   language: string;
   t: TranslationKeys;
   onApprove: () => void;
@@ -614,6 +618,7 @@ function FinalStageCard({
           {ledgerFinal && (
             <ReviewRecord
               reviewer={ledgerFinal.reviewer}
+              reviewerEmail={ledgerFinal.reviewerEmail}
               at={ledgerFinal.decidedAt}
               comment={ledgerFinal.comment}
               language={language}
@@ -661,6 +666,7 @@ export default function ReviewPipeline({
    */
   dense?: boolean;
 }) {
+  const nameFor = useLiveNames();
   const { t, language } = useLanguage();
   const [modalLevel, setModalLevel] = useState<ReviewLevel | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -779,7 +785,7 @@ export default function ReviewPipeline({
                 <p className="text-[11px] text-red-600 mt-0.5">
                   {t.reviewPipeline.droppedBannerDesc
                     .replace(/\{n\}/g, String(droppedAtLevel))
-                    .replace('{reviewer}', dropped?.reviewer || '—')
+                    .replace('{reviewer}', nameFor(dropped?.reviewerEmail, dropped?.reviewer || '') || '—')
                     .replace('{date}', formatDateTime(dropped?.reviewedAt || '', language))}
                 </p>
               </div>
@@ -794,7 +800,7 @@ export default function ReviewPipeline({
               <p className="text-xs font-bold text-green-800">{t.reviewPipeline.approvedBanner}</p>
               <p className="text-[11px] text-green-600 mt-0.5">
                 {t.reviewPipeline.approvedBannerDesc
-                  .replace('{reviewer}', ledger.final?.reviewer || app.reviewedBy || '—')
+                  .replace('{reviewer}', nameFor(ledger.final?.reviewerEmail, ledger.final?.reviewer || app.reviewedBy || '') || '—')
                   .replace('{date}', formatDateTime(ledger.final?.decidedAt || app.reviewedAt || '', language))}
               </p>
             </div>
@@ -808,7 +814,7 @@ export default function ReviewPipeline({
               <p className="text-xs font-bold text-red-800">{t.reviewPipeline.rejectedBanner}</p>
               <p className="text-[11px] text-red-600 mt-0.5">
                 {t.reviewPipeline.rejectedBannerDesc
-                  .replace('{reviewer}', ledger.final?.reviewer || app.reviewedBy || '—')
+                  .replace('{reviewer}', nameFor(ledger.final?.reviewerEmail, ledger.final?.reviewer || app.reviewedBy || '') || '—')
                   .replace('{date}', formatDateTime(ledger.final?.decidedAt || app.reviewedAt || '', language))}
               </p>
             </div>

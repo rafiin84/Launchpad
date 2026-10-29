@@ -9,6 +9,7 @@
  */
 
 import { loadRole, loadPortalLoginEmail } from './oauth';
+import { liveAuthorName } from '../lib/liveAuthorName';
 import { zohoCreate, zohoList, portalList, portalListUnscoped, portalCreate } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
@@ -75,7 +76,7 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
     message: (parsed.message as string) || '',
     timestamp: s('Created_Time'),
     read: parsed.read === 'true',
-    actor: s('Author_Name'),
+    actor: liveAuthorName(r, s('Author_Name'), s('Author_Role')),
     actorRole: (s('Author_Role') || 'investor') as 'investor' | 'founder',
     targetRole: (s('Activity_Tags') || 'investor') as 'investor' | 'founder',
     targetEmail: (parsed.targetEmail as string) || undefined,
@@ -98,7 +99,7 @@ async function fetchFromServer(role: string): Promise<AppNotification[]> {
   } else {
     records = await zohoList('My_Activities', {
       per_page: '200',
-      fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_Time',
+      fields: 'Name,Activity_Type,Activity_Tags,Content,Author_Name,Author_Role,Created_By,Created_Time',
     }) as Record<string, unknown>[];
   }
   const matched = records

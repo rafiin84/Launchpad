@@ -4,6 +4,7 @@ import {
   type ZohoRecord,
 } from './zohoApi';
 import { loadRole } from './oauth';
+import { liveAuthorName, CREATED_BY_COQL_FIELDS } from '../lib/liveAuthorName';
 
 const MODULE = 'My_Activities';
 
@@ -68,7 +69,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     activityType:     str(FIELD_MAP.activityType),
     content:          str(FIELD_MAP.content),
     companyName:      str(FIELD_MAP.companyName),
-    authorName:       str(FIELD_MAP.authorName),
+    authorName:       liveAuthorName(r, str(FIELD_MAP.authorName), str(FIELD_MAP.authorRole)),
     authorRole:       str(FIELD_MAP.authorRole),
     tags:             str(FIELD_MAP.tags),
     imageUrl:         str(FIELD_MAP.imageUrl),
@@ -90,7 +91,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
 // Activity_File_Upload itself is deliberately NOT listed here (a file-upload-type
 // field is only fetched on demand when actually resolving/downloading a file —
 // see resolveActivityFileUrl).
-const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Activity_File_Name,Document_Ref,Created_Time,Modified_Time';
+const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Activity_File_Name,Document_Ref,Created_By,Created_Time,Modified_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
@@ -99,19 +100,27 @@ export async function getCRMActivity(id: string): Promise<CRMActivity> {
 }
 
 const COQL_FIELDS = 'id, Name, Activity_Type, Content, Company_Name, Author_Name, Author_Role, Activity_Tags, Image_URL, Activity_Image_Data, Visibility, Post_Type, Video_URL, Link_URL, Location_Name, Location_Coords, Poll_Data, Activity_File_Name, Document_Ref, Created_Time, Modified_Time';
+// Same query plus the creating user's live name parts (see liveAuthorName).
+const COQL_FIELDS_WITH_AUTHOR = `${COQL_FIELDS}, ${CREATED_BY_COQL_FIELDS}`;
+
+// The Created_By.* columns are an enhancement, never a reason to lose the feed:
+// if a COQL endpoint rejects them, retry with the original column list.
+async function coqlWithAuthor(run: (cols: string) => Promise<ZohoRecord[]>): Promise<CRMActivity[]> {
+  const query = (cols: string) => run(cols);
+  try {
+    return (await query(COQL_FIELDS_WITH_AUTHOR)).map(fromRecord);
+  } catch (err) {
+    console.warn('[Activities] COQL with author columns failed, retrying without:', err);
+    return (await query(COQL_FIELDS)).map(fromRecord);
+  }
+}
 
 async function fetchViaCoql(): Promise<CRMActivity[]> {
-  const records = await zohoCoql(
-    `SELECT ${COQL_FIELDS} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
-  );
-  return records.map(fromRecord);
+  return coqlWithAuthor(cols => zohoCoql(`SELECT ${cols} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`));
 }
 
 async function fetchViaPortalCoql(): Promise<CRMActivity[]> {
-  const records = await portalCoql(
-    `SELECT ${COQL_FIELDS} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`
-  );
-  return records.map(fromRecord);
+  return coqlWithAuthor(cols => portalCoql(`SELECT ${cols} FROM ${MODULE} ORDER BY Created_Time DESC LIMIT 200`));
 }
 
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {

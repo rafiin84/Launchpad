@@ -153,6 +153,15 @@ Since this field holds one entry per requested document rather than one file tot
 1. Enable multiple-file upload on `Requested_Document_Files` (see above — Setup UI only, not exposed via API).
 2. Grant the Founder profile Read & Write on `Requested_Document_Files` under Setup → Portals → Field Permissions on `Applications` — founders need it to upload and to view what they've already submitted. Investors read/write via the admin token, so no portal grant is needed on that side.
 
+### Names of people are never stored-and-trusted — resolve them live
+
+Activities, documents and notifications save `Author_Name` as plain text when written, and the review ledger saves `reviewer` (next to `reviewerEmail`). Renaming a CRM user therefore left the old name ("Kumar Vembu") on everything they had ever posted, in every session. Never render those saved strings directly for an investor-side author:
+- **Records an investor-side user created** (activities, documents, notifications): use `liveAuthorName()` (`src/lib/liveAuthorName.ts`), which prefers the record's `Created_By` — a live reference to the CRM user — over the saved text. A list/get returns `Created_By.name` as the full name, but **COQL returns only the last name there**, so COQL queries must select `Created_By.first_name, Created_By.last_name` (`CREATED_BY_COQL_FIELDS`) and the helper joins them; always retry a COQL query without those columns if the endpoint rejects them, so the feed never depends on them. Founder-authored records are excluded on purpose: they are created by a portal relay, so `Created_By` is not the founder.
+- **Review history** (ledger/finance entries): resolve by email with `useLiveNames()` (`src/lib/useLiveNames.ts`), backed by `fetchCrmUserDirectory()` (`zohoApi.ts`, `users?type=AllUsers`, investor token only — a portal token can't call it, so founder-facing views fall back to the saved text).
+- **The signed-in user's own name** comes from the CRM user's `full_name` at login; the cached profile name and the `appusers` copy are fallbacks only (`fullProfileSync` writes the live CRM name back into `appusers` so that mirror stays correct).
+
+Not retroactive: notification `message` text is composed once at write time ("Kumar Vembu has requested…") and only new notifications use the current name, and a founder's saved name on their own posts is not resolved against their Contact.
+
 ### i18n
 
 All user-facing strings live in `src/i18n` (see `en.ts`) and are consumed via `useLanguage()` from `src/context/LanguageContext.tsx` (`t.<namespace>.<key>`). Don't hardcode UI copy inline — add it to the language file.
