@@ -10,6 +10,7 @@
 
 import { loadRole, loadPortalLoginEmail } from './oauth';
 import { liveAuthorName } from '../lib/liveAuthorName';
+import { applyRenames, ensureRenamesLoaded } from './nameRenames';
 import { zohoCreate, zohoList, portalList, portalListUnscoped, portalCreate } from './zohoApi';
 
 const STORAGE_KEY = 'lp_notifications';
@@ -72,11 +73,11 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
   return {
     id: s('id'),
     type: ((parsed.type as string) || 'announcement') as NotificationType,
-    title: s('Name'),
-    message: (parsed.message as string) || '',
+    title: applyRenames(s('Name')),
+    message: applyRenames((parsed.message as string) || ''),
     timestamp: s('Created_Time'),
     read: parsed.read === 'true',
-    actor: liveAuthorName(r, s('Author_Name'), s('Author_Role')),
+    actor: applyRenames(liveAuthorName(r, s('Author_Name'), s('Author_Role'))),
     actorRole: (s('Author_Role') || 'investor') as 'investor' | 'founder',
     targetRole: (s('Activity_Tags') || 'investor') as 'investor' | 'founder',
     targetEmail: (parsed.targetEmail as string) || undefined,
@@ -88,6 +89,7 @@ function fromCRM(r: Record<string, unknown>): AppNotification {
 // ─── CRM helpers ───────────────────────────────────────────────────────────
 
 async function fetchFromServer(role: string): Promise<AppNotification[]> {
+  await ensureRenamesLoaded();
   let records: Record<string, unknown>[];
   if (role === 'founder') {
     // Portal profile rejects the custom `fields` param on My_Activities (400),

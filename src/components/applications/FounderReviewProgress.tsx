@@ -1,3 +1,5 @@
+import { applyRenames } from '../../services/nameRenames';
+import { useNameFix } from '../../lib/useNameRenames';
 import React from 'react';
 import { Check, Lock, CircleDot, X, ShieldCheck, Info, AlertCircle, Clock } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -93,7 +95,7 @@ function buildStages(app: InvestmentApplication, t: TranslationKeys): BuiltPipel
       next: stageNext(t, level),
       state: s,
       date: entry?.reviewedAt,
-      reviewer: entry?.reviewer,
+      reviewer: entry?.reviewer ? applyRenames(entry.reviewer) : entry?.reviewer,
       comment: entry?.comment,
     };
   });
@@ -111,7 +113,7 @@ function buildStages(app: InvestmentApplication, t: TranslationKeys): BuiltPipel
     next: t.founderPipeline.finalStageNext,
     state: finalState,
     date: finalState === 'approved' || finalState === 'declined' ? ledger.final?.decidedAt : undefined,
-    reviewer: ledger.final?.reviewer,
+    reviewer: ledger.final?.reviewer ? applyRenames(ledger.final.reviewer) : ledger.final?.reviewer,
     comment: ledger.final?.comment,
   });
 
@@ -435,6 +437,7 @@ export default function FounderReviewProgress({
   showReviewerDetails?: boolean;
 }) {
   const { t, language } = useLanguage();
+  useNameFix(); // re-render when a rename is learned; buildStages applies them
   const { stages, activeIndex, terminal, droppedLabel } = buildStages(app, t);
 
   // ── Compact: list-row strip ──

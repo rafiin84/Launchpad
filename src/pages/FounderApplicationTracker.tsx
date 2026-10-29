@@ -28,6 +28,7 @@ import {
 import { addNotification } from '../services/notifications';
 import { resolveDocumentUrl, type CRMDocument } from '../services/crmDocuments';
 import { DocumentViewerModal } from '../components/ui/DocumentViewerModal';
+import { useNameFix } from '../lib/useNameRenames';
 import { cn } from '../lib/cn';
 import { usePageTitle } from '../context/PageTitleContext';
 
@@ -124,6 +125,7 @@ function parseInvestorMessages(notes: string): ParsedMessage[] {
 
 function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; reviewedBy?: string; reviewedAt?: string }) {
   const { t } = useLanguage();
+  const fix = useNameFix();
   const messages = parseInvestorMessages(notes);
 
   if (messages.length === 0 && !notes) return null;
@@ -141,19 +143,19 @@ function InvestorMessages({ notes, reviewedBy, reviewedAt }: { notes: string; re
           {messages.map((msg, i) => (
             <div key={i} className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-semibold text-indigo-700">{msg.sender}</span>
+                <span className="text-[11px] font-semibold text-indigo-700">{fix(msg.sender)}</span>
                 <span className="text-[10px] text-indigo-400">{msg.timestamp}</span>
               </div>
-              <p className="text-xs text-gray-700 leading-relaxed">{msg.text}</p>
+              <p className="text-xs text-gray-700 leading-relaxed">{fix(msg.text)}</p>
             </div>
           ))}
         </div>
       ) : notes ? (
         <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
-          <p className="text-xs text-gray-700 leading-relaxed">{notes}</p>
+          <p className="text-xs text-gray-700 leading-relaxed">{fix(notes)}</p>
           {reviewedBy && (
             <p className="text-[10px] text-indigo-400 mt-1.5">
-              — {reviewedBy}{reviewedAt ? `, ${new Date(reviewedAt).toLocaleDateString()}` : ''}
+              — {fix(reviewedBy)}{reviewedAt ? `, ${new Date(reviewedAt).toLocaleDateString()}` : ''}
             </p>
           )}
         </div>
@@ -194,6 +196,7 @@ function toRequestedDocs(docTypes: string[], submitted: Record<string, Submitted
 // Documents page. Works for portal tokens too (unlike the CRM Attachments API,
 // which is blocked for founders).
 function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRefresh: () => void }) {
+  const fix = useNameFix();
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [investorName, setInvestorName] = useState<string>('');
   const [submitted, setSubmitted] = useState<Record<string, SubmittedDoc>>({});
@@ -398,7 +401,7 @@ function GenericDocUpload({ app, onRefresh }: { app: InvestmentApplication; onRe
       </div>
       {investorName && (
         <p className="text-[11px] text-gray-500 mb-1.5">
-          <span className="font-medium text-gray-700">{investorName}</span> has requested:{' '}
+          <span className="font-medium text-gray-700">{fix(investorName)}</span> has requested:{' '}
           <span className="font-medium text-gray-800">{displayDocs.join(', ')}</span>
         </p>
       )}

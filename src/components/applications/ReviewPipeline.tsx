@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useLiveNames } from '../../lib/useLiveNames';
+import { useNameFix } from '../../lib/useNameRenames';
 import type { TranslationKeys } from '../../i18n';
 import {
   getPipelineState,
@@ -83,7 +84,8 @@ function ReviewRecord({
   language: string; t: TranslationKeys; tone: 'positive' | 'negative';
 }) {
   const nameFor = useLiveNames();
-  const reviewer = nameFor(reviewerEmail, savedReviewer);
+  const fix = useNameFix();
+  const reviewer = fix(nameFor(reviewerEmail, savedReviewer));
   return (
     <div className="mt-3 space-y-2.5">
       <div className="flex items-center gap-2.5 flex-wrap">
@@ -666,7 +668,9 @@ export default function ReviewPipeline({
    */
   dense?: boolean;
 }) {
-  const nameFor = useLiveNames();
+  const liveNameFor = useLiveNames();
+  const fix = useNameFix();
+  const nameFor = (email: string | undefined, saved: string) => fix(liveNameFor(email, saved));
   const { t, language } = useLanguage();
   const [modalLevel, setModalLevel] = useState<ReviewLevel | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);

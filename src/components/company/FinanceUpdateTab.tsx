@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLiveNames } from '../../lib/useLiveNames';
+import { useNameFix } from '../../lib/useNameRenames';
 import {
   fetchFinancials, saveFinancialQuarter, buildRows, comparePeriods,
   fetchFinancialsAsFounder, saveFinancialQuarterAsFounder,
@@ -705,7 +706,9 @@ export default function FinanceUpdateTab({
   companyName: string;
 }) {
   const { currentUser, reviewerLevel, isReviewer, isFounder } = useAuth();
-  const nameFor = useLiveNames();
+  const liveNameFor = useLiveNames();
+  const fix = useNameFix();
+  const nameFor = (email: string | undefined, saved: string) => fix(liveNameFor(email, saved));
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [documents, setDocuments] = useState<CRMDocument[]>([]);
   const [mode, setMode] = useState<ViewMode>('quarterly');

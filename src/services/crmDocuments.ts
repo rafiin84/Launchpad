@@ -2,6 +2,7 @@ import { zohoList, zohoGetById, zohoCreate, zohoDelete, portalDelete, zohoGetAtt
 import { loadRole } from './oauth';
 import { portalCreate } from './zohoApi';
 import { liveAuthorName } from '../lib/liveAuthorName';
+import { applyRenames, ensureRenamesLoaded } from './nameRenames';
 
 export interface CRMDocument {
   id: string;
@@ -70,13 +71,14 @@ function fromRecord(r: Record<string, unknown>): CRMDocument {
     fileSize:       s('File_Size'),
     fileUrl:        s('File_URL'),
     fileUploadId:   fu.id,
-    authorName:     liveAuthorName(r, s('Author_Name'), s('Author_Role')),
+    authorName:     applyRenames(liveAuthorName(r, s('Author_Name'), s('Author_Role'), true)),
     authorRole:     s('Author_Role'),
     createdTime:    s('Created_Time'),
   };
 }
 
 export async function fetchCRMDocuments(): Promise<CRMDocument[]> {
+  await ensureRenamesLoaded();
   const params = { per_page: '200', sort_by: 'Created_Time', sort_order: 'desc', fields: ALL_FIELDS };
   // Founders read My_Documents via the portal API; investors via the admin API.
   const records = loadRole() === 'founder'
@@ -113,6 +115,7 @@ export async function createCRMDocument(
 }
 
 export async function fetchCRMDocumentById(id: string): Promise<CRMDocument | null> {
+  await ensureRenamesLoaded();
   const record = loadRole() === 'founder'
     ? await portalGetById(MODULE, id, ALL_FIELDS).catch(() => portalGetById(MODULE, id))
     : await zohoGetById(MODULE, id, ALL_FIELDS);

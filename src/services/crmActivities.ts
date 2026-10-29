@@ -5,6 +5,7 @@ import {
 } from './zohoApi';
 import { loadRole } from './oauth';
 import { liveAuthorName, CREATED_BY_COQL_FIELDS } from '../lib/liveAuthorName';
+import { applyRenames, ensureRenamesLoaded } from './nameRenames';
 
 const MODULE = 'My_Activities';
 
@@ -69,7 +70,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
     activityType:     str(FIELD_MAP.activityType),
     content:          str(FIELD_MAP.content),
     companyName:      str(FIELD_MAP.companyName),
-    authorName:       liveAuthorName(r, str(FIELD_MAP.authorName), str(FIELD_MAP.authorRole)),
+    authorName:       applyRenames(liveAuthorName(r, str(FIELD_MAP.authorName), str(FIELD_MAP.authorRole))),
     authorRole:       str(FIELD_MAP.authorRole),
     tags:             str(FIELD_MAP.tags),
     imageUrl:         str(FIELD_MAP.imageUrl),
@@ -94,6 +95,7 @@ function fromRecord(r: ZohoRecord): CRMActivity {
 const ALL_FIELDS = 'Name,Activity_Type,Content,Company_Name,Author_Name,Author_Role,Activity_Tags,Image_URL,Activity_Image_Data,Visibility,Post_Type,Video_URL,Link_URL,Location_Name,Location_Coords,Poll_Data,Activity_File_Name,Document_Ref,Created_By,Created_Time,Modified_Time';
 
 export async function getCRMActivity(id: string): Promise<CRMActivity> {
+  await ensureRenamesLoaded();
   const record = await zohoGetById(MODULE, id, ALL_FIELDS);
   if (!record) throw new Error('Activity not found');
   return fromRecord(record);
@@ -124,6 +126,7 @@ async function fetchViaPortalCoql(): Promise<CRMActivity[]> {
 }
 
 export async function fetchCRMActivities(): Promise<CRMActivity[]> {
+  await ensureRenamesLoaded();
   const isFounder = loadRole() === 'founder';
 
   // For founders: try portal COQL first — returns ALL records including investor posts.

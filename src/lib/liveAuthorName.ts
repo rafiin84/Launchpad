@@ -17,14 +17,25 @@
  *  - COQL: the object's `name` is only the last name, so the query selects
  *    `Created_By.first_name` / `Created_By.last_name` as flat keys instead.
  */
+import { learnRename } from '../services/nameRenames';
+
 export const CREATED_BY_COQL_FIELDS = 'Created_By.first_name, Created_By.last_name';
 
 export function liveAuthorName(
   record: Record<string, unknown>,
   savedName: string,
   savedRole: string,
+  /** True for records the author created directly (documents), so Created_By is right for any role. */
+  trustAnyRole = false,
 ): string {
-  if (String(savedRole || '').trim().toLowerCase() !== 'investor') return savedName;
+  if (!trustAnyRole && String(savedRole || '').trim().toLowerCase() !== 'investor') return savedName;
+  const live = resolveCreatedBy(record);
+  if (!live) return savedName;
+  learnRename(savedName, live);
+  return live;
+}
+
+function resolveCreatedBy(record: Record<string, unknown>): string {
 
   const first = String(record['Created_By.first_name'] ?? '').trim();
   const last = String(record['Created_By.last_name'] ?? '').trim();
@@ -36,5 +47,5 @@ export function liveAuthorName(
     const name = String((createdBy as Record<string, unknown>)['name'] ?? '').trim();
     if (name) return name;
   }
-  return savedName;
+  return '';
 }
