@@ -410,9 +410,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAppUser(found);
             setAppUserRecordId(found.id);
 
-            // Use appUser name only if it's a real name (not generic placeholder)
+            // The name comes from the CRM user record (full_name, set above) — the
+            // appusers copy is only a mirror and goes stale when the user is renamed
+            // in CRM, so use it only when CRM gave us no real name.
+            const crmNameIsReal = !!user.full_name && user.full_name !== 'Founder' && user.full_name !== 'Investor';
             const isAppUserNameReal = found.name && found.name !== 'User' && found.name !== 'Founder' && found.name !== 'Investor';
-            if (isAppUserNameReal) setUserName(found.name);
+            if (!crmNameIsReal && isAppUserNameReal) setUserName(found.name);
             if (found.languagePreference) applyFromCRM(found.languagePreference);
 
             // Fetch photo from appusers record image API

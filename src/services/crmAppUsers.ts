@@ -424,7 +424,11 @@ export async function fullProfileSync(
   const cached = loadCachedProfile();
   const fields: Partial<AppUserFields> & { email: string } = {
     email:       zohoUserData.email,
-    name:        cached?.name || zohoUserData.name || 'User',
+    // The CRM user's own name is the source of truth. The cached profile name is
+    // only a fallback for when CRM supplied none — preferring it (as this used to)
+    // wrote a stale name back into appusers on every login after the CRM user
+    // was renamed, which then overrode the real name in the UI.
+    name:        (zohoUserData.name && zohoUserData.name !== 'User' ? zohoUserData.name : cached?.name) || 'User',
     phone:       zohoUserData.phone || cached?.phone || '',
     mobile:      zohoUserData.mobile || cached?.mobile || '',
     role:        role,
