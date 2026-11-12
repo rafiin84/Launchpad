@@ -1481,6 +1481,8 @@ const en = {
     conversionRateItem: '1 {from} = {rate} {to}',
 
     filtersTitle: 'Report filters',
+    filters: 'Filters',
+    filtersReset: 'Reset',
     filterPeriodStart: 'Period start',
     filterPeriodEnd: 'Period end (as of)',
     filterFund: 'Fund',

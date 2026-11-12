@@ -1457,6 +1457,8 @@ const ja: TranslationKeys = {
     conversionRateItem: '1 {from} = {rate} {to}',
 
     filtersTitle: 'レポートのフィルター',
+    filters: 'フィルター',
+    filtersReset: 'リセット',
     filterPeriodStart: '期間の開始',
     filterPeriodEnd: '期間の終了（基準日）',
     filterFund: 'ファンド',

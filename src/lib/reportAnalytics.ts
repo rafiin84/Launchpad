@@ -64,6 +64,12 @@ export function emptyFilters(): ReportFilters {
   return { periodStart: '', periodEnd: '', fund: '', companyId: '', sector: '', stage: '', currency: '', policy: 'none', rateDate: '', rates: {} };
 }
 
+/** Filters that are set to something other than "all" — the count shown on the Filters button. */
+export function activeFilterCount(f: ReportFilters): number {
+  return [f.periodStart, f.periodEnd, f.fund, f.companyId, f.sector, f.stage, f.currency].filter(Boolean).length
+    + (f.policy !== 'none' ? 1 : 0);
+}
+
 export type ExclusionKind =
   | 'cancelled' | 'otherCurrency' | 'missingRate' | 'noDate' | 'noCurrency' | 'noLedger'
   | 'noCommitmentDate' | 'valuationAfter' | 'noValuation' | 'noReturnData' | 'noPerformance'

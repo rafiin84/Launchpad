@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AlertCircle, FileDown, FileText, Loader2, RefreshCw, Save, BarChart3, ChevronDown } from 'lucide-react';
+import { AlertCircle, FileDown, FileText, Loader2, RefreshCw, Save, BarChart3, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -13,9 +13,9 @@ import {
 } from '../services/crmReports';
 import { fetchModuleAccess } from '../services/zohoApi';
 import {
-  buildReport, emptyFilters, REPORT_TABS, type Report, type ReportFilters, type ReportTab,
+  activeFilterCount, buildReport, emptyFilters, REPORT_TABS, type Report, type ReportFilters, type ReportTab,
 } from '../lib/reportAnalytics';
-import ReportFiltersPanel, { type FilterOptions } from '../components/reports/ReportFiltersPanel';
+import ReportFiltersModal, { type FilterOptions } from '../components/reports/ReportFiltersModal';
 import { ActivitySection, CompaniesSection, PerformanceSection, SummarySection } from '../components/reports/ReportSections';
 import MethodologyPanel from '../components/reports/MethodologyPanel';
 import SaveViewModal from '../components/reports/SaveViewModal';
@@ -51,6 +51,7 @@ function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [showExcluded, setShowExcluded] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [views, setViews] = useState<SavedView[]>([]);
   const [canSave, setCanSave] = useState<boolean | null>(null);
@@ -138,12 +139,35 @@ function ReportsPage() {
     URL.revokeObjectURL(url);
   }
 
+  const filterCount = activeFilterCount(applied);
+
+  // What the report was generated with, in words — shown on screen and in the printed report.
+  const filterChips = useMemo(() => {
+    const chips: string[] = [];
+    if (applied.periodStart) chips.push(`${t.filterPeriodStart}: ${applied.periodStart}`);
+    if (applied.periodEnd) chips.push(`${t.filterPeriodEnd}: ${applied.periodEnd}`);
+    if (applied.fund) chips.push(`${t.filterFund}: ${applied.fund}`);
+    if (applied.companyId) chips.push(`${t.filterCompany}: ${options.companies.find(c => c.id === applied.companyId)?.name ?? applied.companyId}`);
+    if (applied.sector) chips.push(`${t.filterSector}: ${applied.sector}`);
+    if (applied.stage) chips.push(`${t.filterStage}: ${applied.stage}`);
+    if (applied.currency) chips.push(`${t.filterCurrency}: ${applied.currency}`);
+    return chips;
+  }, [applied, options.companies, t]);
+
   const tabLabel: Record<ReportTab, string> = {
     summary: t.tabSummary, performance: t.tabPerformance, activity: t.tabActivity, companies: t.tabCompanies,
   };
 
   const actions = (
     <div className="flex flex-wrap gap-2">
+      <Button variant="outline" onClick={() => setFiltersOpen(true)}>
+        <SlidersHorizontal size={14} className="mr-1.5" /> {t.filters}
+        {filterCount > 0 && <span className="ml-1.5 bg-black text-white text-[10px] font-semibold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 inline-flex items-center justify-center">{filterCount}</span>}
+      </Button>
+      <Button variant="primary" onClick={() => void generate(draft)} disabled={generating}>
+        {generating ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RefreshCw size={14} className="mr-1.5" />}
+        {generating ? t.generating : t.generate}
+      </Button>
       <Button variant="outline" onClick={exportCsv} disabled={!report || report.isEmpty}>
         <FileText size={14} className="mr-1.5" /> {t.exportCsv}
       </Button>
@@ -151,7 +175,7 @@ function ReportsPage() {
         <FileDown size={14} className="mr-1.5" /> {t.exportPdf}
       </Button>
       {canSave !== false && (
-        <Button variant="primary" onClick={() => { setSaveError(''); setSaveOpen(true); }} disabled={!report || report.isEmpty}>
+        <Button variant="outline" onClick={() => { setSaveError(''); setSaveOpen(true); }} disabled={!report || report.isEmpty}>
           <Save size={14} className="mr-1.5" /> {t.saveView}
         </Button>
       )}
@@ -163,7 +187,7 @@ function ReportsPage() {
       <style>{PRINT_CSS}</style>
       <div className="report-print-hide">
         <PageHeader title={t.title} description={t.intro} className="mb-4" />
-        <div className="mb-4 flex flex-col lg:flex-row lg:items-end gap-3">
+        <div className="mb-6 flex flex-col lg:flex-row lg:items-end gap-3">
           {actions}
           {views.length > 0 && (
             <div className="lg:ml-auto lg:w-72">
@@ -178,11 +202,6 @@ function ReportsPage() {
             {notice.message}
           </div>
         )}
-        <div className="mb-6">
-          <ReportFiltersPanel draft={draft} onChange={setDraft} options={options}
-            reportCurrency={report?.currency ?? ''} currenciesInScope={report?.currenciesInScope ?? []}
-            generating={generating} onGenerate={() => void generate(draft)} t={t} />
-        </div>
       </div>
 
       {loading && (
@@ -209,6 +228,11 @@ function ReportsPage() {
             <p className="text-xs font-medium text-gray-700">{dataAsOfText(t, report, locale)}</p>
             <p className="text-xs text-gray-500">{periodText(t, report)} · {t.reportingIn.replace('{currency}', report.currency || '—')}</p>
             <p className="text-xs text-gray-500">{conversionLine(t, report)}</p>
+            {filterChips.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5 pt-1.5" aria-label={t.filtersTitle}>
+                {filterChips.map(c => <li key={c} className="text-[11px] text-gray-600 bg-gray-100 rounded-full px-2.5 py-0.5">{c}</li>)}
+              </ul>
+            )}
           </header>
 
           {incomplete.length > 0 && (
@@ -260,6 +284,12 @@ function ReportsPage() {
         </div>
       )}
 
+      {filtersOpen && (
+        <ReportFiltersModal initial={draft} options={options}
+          reportCurrency={report?.currency ?? ''} currenciesInScope={report?.currenciesInScope ?? []}
+          generating={generating} t={t} onClose={() => setFiltersOpen(false)}
+          onGenerate={f => { setDraft(f); setFiltersOpen(false); void generate(f); }} />
+      )}
       {saveOpen && report && (
         <SaveViewModal key={loaded?.id ?? 'new'} initialName={loaded?.name ?? ''} loadedView={loaded}
           saving={saving} error={saveError} t={t} onSave={(n, id) => void saveView(n, id)}
