@@ -12,6 +12,7 @@ import {
   Building2,
   Users,
   Briefcase,
+  Landmark,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { pathMatches } from '../../lib/pathMatches';
@@ -38,6 +39,7 @@ export function Sidebar() {
     { label: t.nav.myActivities,  path: '/activities',   icon: Rss },
     ...(isReviewer ? [] : [{ label: t.nav.company,      path: '/portfolio',    icon: PieChart }]),
     ...(isReviewer ? [] : [{ label: t.nav.portfolioManagement, path: '/portfolio-management', icon: Briefcase }]),
+    ...(isReviewer ? [] : [{ label: t.nav.investments, path: '/investments', icon: Landmark }]),
     { label: t.nav.applications,  path: '/applications', icon: Inbox },
     ...(isReviewer ? [] : [{ label: t.nav.applicants,   path: '/applicants',   icon: Users }]),
     { label: t.nav.documents,     path: '/documents',    icon: FileText },

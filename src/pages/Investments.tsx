@@ -1,333 +1,330 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Percent, AlertCircle, RefreshCw, Plus, Building2, ArrowLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { CompanyLogo } from '../components/ui/CompanyLogo';
-import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
-import { fetchAllCompanyProfiles } from '../services/companyProfile';
-import { loadToken } from '../services/oauth';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import {
+  Search, Plus, Download, AlertCircle, Loader2, Landmark, RefreshCw, Lock,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
+import { Button } from '../components/ui/Button';
+import { Input, Select } from '../components/ui/Input';
+import { cn } from '../lib/cn';
+import {
+  amountsOf, createInvestment, emptyInvestmentInput, fetchInvestmentAccess, fetchInvestments,
+  inputFromInvestment, isPermissionError, TX_STATUSES, updateInvestment,
+  type InvestmentAccess, type InvestmentInput, type InvestmentRecord,
+} from '../services/crmInvestments';
+import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
+import { fetchPortfolioEntries } from '../services/crmPortfolioManagement';
+import { formatAmount, ownership, ROUND_ORDER, sumByCurrency } from '../lib/investmentCalc';
+import { formatDate, toCsv } from '../lib/portfolioFormat';
+import InvestmentFormModal from '../components/investments/InvestmentFormModal';
+import InvestmentPanel from '../components/investments/InvestmentPanel';
+import RoundHistory from '../components/investments/RoundHistory';
+import { StatusBadge } from '../components/investments/investmentUi';
+import { statusLabel } from '../components/investments/investmentText';
 
-function formatCurrency(amount: number) {
-  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
-  return `$${amount}`;
-}
+type StatusFilter = 'all' | (typeof TX_STATUSES)[number];
 
-const STATUS_STYLES: Record<string, string> = {
-  'Active':     'bg-emerald-50 text-emerald-700',
-  'Exited':     'bg-blue-50 text-blue-700',
-  'Written Off':'bg-red-50 text-red-600',
-  'Watch':      'bg-amber-50 text-amber-700',
-};
-
-function StatusBadge({ status }: { status: string }) {
-  if (!status) return null;
-  const style = STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-600';
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style}`}>{status}</span>
-  );
-}
-
-function InvestmentRow({ record, logoUrl }: { record: CRMPortfolioRecord; logoUrl?: string }) {
-  const amount = parseFloat(record.investmentAmount) || 0;
-  const ownership = parseFloat(record.ownershipPct) || 0;
-  const valuation = parseFloat(record.preMoneyValuation) || 0;
-
-  return (
-    <Link to={`/portfolio/${record.id}`}>
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-all group">
-        <div className="flex items-center gap-4">
-          <CompanyLogo name={record.companyName || '?'} website={record.website} logoUrl={logoUrl} size={10} />
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                {record.companyName || '—'}
-              </p>
-              {record.stage && <span className="text-xs text-gray-500">{record.stage}</span>}
-            </div>
-            <p className="text-xs text-gray-500">{record.industry || '—'}</p>
-          </div>
-
-          {/* Investment details */}
-          <div className="grid grid-cols-4 gap-8 text-right hidden md:grid">
-            <div>
-              <p className="text-xs text-gray-400">Invested</p>
-              <p className="text-sm font-semibold text-gray-900">{amount > 0 ? formatCurrency(amount) : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Ownership</p>
-              <p className="text-sm font-semibold text-gray-900">{ownership > 0 ? `${ownership}%` : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Pre-Money Val.</p>
-              <p className="text-sm font-semibold text-gray-900">{valuation > 0 ? formatCurrency(valuation) : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Status</p>
-              <StatusBadge status={record.status} />
-            </div>
-          </div>
-
-          {/* Mobile summary */}
-          <div className="md:hidden text-right">
-            <p className="text-sm font-semibold text-gray-900">{amount > 0 ? formatCurrency(amount) : '—'}</p>
-            {ownership > 0 && <p className="text-xs text-gray-500">{ownership}%</p>}
-          </div>
-        </div>
-
-        {record.notes && (
-          <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-50 italic line-clamp-1">
-            {record.notes}
-          </p>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-export default function Investments() {
+function InvestmentsPage() {
+  const { t: all, language } = useLanguage();
+  const t = all.investments;
   const navigate = useNavigate();
-  const [records, setRecords] = useState<CRMPortfolioRecord[]>([]);
+  const locale = language === 'ja' ? 'ja-JP' : 'en-US';
+
+  const [records, setRecords] = useState<InvestmentRecord[]>([]);
+  const [access, setAccess] = useState<InvestmentAccess>({ canCreate: null, canEdit: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [logoMap, setLogoMap] = useState<Record<string, string>>({});
-  const isConnected = !!loadToken();
 
-  const load = () => {
-    if (!isConnected) { setLoading(false); return; }
-    setLoading(true);
-    setError('');
-    fetchCRMPortfolio()
-      .then(setRecords)
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-      .finally(() => setLoading(false));
-  };
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('all');
+  const [round, setRound] = useState('');
+  const [panelId, setPanelId] = useState<string | null>(null);
 
-  useEffect(() => { load(); }, []);
+  const [form, setForm] = useState<null | { mode: 'add' | 'edit'; id?: string; initial: InvestmentInput }>(null);
+  const [companies, setCompanies] = useState<CRMPortfolioRecord[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [preparingAdd, setPreparingAdd] = useState(false);
 
-  useEffect(() => {
-    fetchAllCompanyProfiles().then(profiles => {
-      const map: Record<string, string> = {};
-      for (const p of profiles) {
-        if (p.logo) {
-          map[p.email.toLowerCase()] = p.logo;
-          if (p.data.name) map[p.data.name.toLowerCase()] = p.logo;
-        }
+  // Hide controls CRM says this user can't use. Unknown (null) keeps them visible —
+  // CRM still enforces, and a refused write is reported plainly.
+  const canCreate = access.canCreate !== false;
+  const canEdit = access.canEdit !== false;
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const [recs, acc] = await Promise.all([fetchInvestments(), fetchInvestmentAccess()]);
+      setRecords(recs); setAccess(acc);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : t.loadFailed);
+    } finally {
+      setLoading(false);
+    }
+  }, [t.loadFailed]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of records) c[r.status] = (c[r.status] ?? 0) + 1;
+    return c;
+  }, [records]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return records.filter(r =>
+      (status === 'all' || r.status === status) &&
+      (!round || r.round === round) &&
+      (!q || [r.companyName, r.reference, r.round, r.investorEntity].some(v => v.toLowerCase().includes(q))));
+  }, [records, query, status, round]);
+
+  // Summary cards — per currency, never across currencies.
+  const summary = useMemo(() => ({
+    committed: sumByCurrency(visible, r => r.committedAmount),
+    funded: sumByCurrency(visible, r => amountsOf(r).funded),
+    realized: sumByCurrency(visible, r => amountsOf(r).realized),
+  }), [visible]);
+
+  const panelRecord = panelId ? records.find(r => r.id === panelId) ?? null : null;
+
+  async function openAdd() {
+    setPreparingAdd(true); setFormError('');
+    try {
+      setCompanies(await fetchCRMPortfolio());
+    } catch {
+      setCompanies([]);
+      setFormError(t.loadFailed);
+    } finally {
+      setPreparingAdd(false);
+    }
+    setForm({ mode: 'add', initial: emptyInvestmentInput() });
+  }
+
+  function openEdit(r: InvestmentRecord) {
+    setFormError(''); setCompanies([]);
+    setForm({ mode: 'edit', id: r.id, initial: inputFromInvestment(r) });
+  }
+
+  async function save(input: InvestmentInput) {
+    if (!form) return;
+    setSaving(true); setFormError('');
+    try {
+      if (form.mode === 'add') {
+        // Link the record to the company's Portfolio Management entry when it has one.
+        const entries = await fetchPortfolioEntries().catch(() => []);
+        const entryId = entries.find(e => e.companyId && e.companyId === input.companyId)?.id;
+        const id = await createInvestment(input, entryId);
+        setPanelId(id);
+      } else if (form.id) {
+        await updateInvestment(form.id, input);
       }
-      setLogoMap(map);
-    }).catch(() => {});
-  }, []);
+      setForm(null);
+      await load();
+    } catch (err) {
+      setFormError(isPermissionError(err) ? t.noPermission : err instanceof Error && err.message ? err.message : t.actionFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  const totalInvested = records.reduce((s, r) => s + (parseFloat(r.investmentAmount) || 0), 0);
-  const avgOwnership = records.length > 0
-    ? (records.reduce((s, r) => s + (parseFloat(r.ownershipPct) || 0), 0) / records.length).toFixed(1)
-    : '0';
+  function exportTransactions() {
+    if (visible.length === 0) return;
+    const header = [
+      t.colReference, t.colCompany, t.colRound, t.colInstrument, t.colInvestorEntity, t.colStatus, t.colCurrency,
+      t.colInvestmentDate, t.colProposed, t.colProposedDate, t.colApprovalDate, t.colCommitted, t.colCommitmentDate,
+      t.colFunded, t.colLastFundingDate, t.colRefunded, t.colRealized, t.colPreMoney, t.colValuation,
+      t.colValuationDate, t.colHoldingValue, t.colHoldingAsOf, `${t.colOwnership} %`, t.colTermsReference,
+    ];
+    const body = visible.map(r => {
+      const a = amountsOf(r);
+      const own = ownership({
+        sharesAcquired: r.sharesAcquired, fullyDilutedShares: r.fullyDilutedShares,
+        capTableApproved: r.capTableApproved, recordedPct: r.recordedOwnershipPct,
+      });
+      return [
+        r.reference, r.companyName, r.round, r.instrument, r.investorEntity, r.status, r.currency,
+        r.investmentDate, r.proposedAmount, r.proposedDate, r.approvalDate, r.committedAmount, r.commitmentDate,
+        a.funded, r.lastFundingDate, a.refunded, a.realized, r.preMoney, r.postMoney,
+        r.valuationDate, r.holdingValue, r.holdingValueAsOf, own.pct, r.termsReference,
+      ];
+    });
+    // A BOM so Excel reads the UTF-8 (company names, Japanese labels) correctly.
+    const blob = new Blob(['﻿' + toCsv(header, body)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${t.exportFilename}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
-  const summaryCards = [
-    { label: 'Total Invested', value: formatCurrency(totalInvested), icon: DollarSign, accent: true },
-    { label: 'Portfolio Companies', value: records.length, icon: Building2, accent: false },
-    { label: 'Avg Ownership', value: `${avgOwnership}%`, icon: Percent, accent: false },
-  ];
+  const money = (items: Array<{ currency: string; amount: number }>) =>
+    items.length === 0 ? t.notRecorded : items.map(i => formatAmount(i.amount, i.currency, locale)).join(' · ');
 
-  const activeCount   = records.filter(r => r.status === 'Active').length;
-  const exitedCount   = records.filter(r => r.status === 'Exited').length;
-  const watchCount    = records.filter(r => r.status === 'Watch').length;
-  const topByAmount   = [...records]
-    .filter(r => parseFloat(r.investmentAmount) > 0)
-    .sort((a, b) => parseFloat(b.investmentAmount) - parseFloat(a.investmentAmount))
-    .slice(0, 5);
+  const actions = (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="outline" onClick={exportTransactions} disabled={visible.length === 0}>
+        <Download size={14} className="mr-1.5" /> {t.exportTransactions}
+      </Button>
+      {canCreate && (
+        <Button variant="primary" onClick={openAdd} disabled={preparingAdd}>
+          {preparingAdd ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Plus size={14} className="mr-1.5" />}
+          {t.addInvestmentRecord}
+        </Button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-900 transition-colors mb-6"
-      >
-        <ArrowLeft size={15} /> Back
-      </button>
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <PageHeader title={t.title} description={t.intro} className="mb-4" />
+      <div className="mb-6">{actions}</div>
 
-      <PageHeader
-        title="Investments"
-        description="Track your investment positions and portfolio performance"
-        action={
-          <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <Plus size={15} /> Add Investment
-          </Link>
-        }
-      />
+      {!loading && !error && access.canEdit === false && (
+        <p role="status" className="flex items-center gap-2 text-xs text-gray-500 mb-4"><Lock size={12} /> {t.readOnlyNote}</p>
+      )}
 
-      {/* Not-connected banner */}
-      {!isConnected && (
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 mb-6">
-          <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Connect Zoho CRM to see live data</p>
-            <p className="text-xs text-amber-600 mt-0.5">Go to Login and sign in with Zoho CRM.</p>
-          </div>
-          <Link to="/login" className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors">Connect</Link>
+      {loading && (
+        <div className="space-y-3" aria-busy="true" aria-label={t.loading}>
+          {[0, 1, 2, 3].map(i => <div key={i} className="h-14 bg-white border border-gray-100 rounded-2xl animate-pulse" />)}
         </div>
       )}
 
-      {/* Stats */}
-      <div className="flex gap-4 mb-6">
-        {summaryCards.map(card => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label} className={`rounded-2xl p-5 w-48 flex-shrink-0 ${card.accent ? 'bg-black' : 'bg-white border border-gray-100'}`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${card.accent ? 'bg-white/15' : 'bg-gray-50'}`}>
-                <Icon size={16} className={card.accent ? 'text-white' : 'text-gray-500'} />
-              </div>
-              <p className={`text-2xl font-bold mb-0.5 ${card.accent ? 'text-white' : 'text-gray-900'}`}>{card.value}</p>
-              <p className={`text-xs font-semibold ${card.accent ? 'text-gray-300' : 'text-gray-600'}`}>{card.label}</p>
-            </div>
-          );
-        })}
-      </div>
+      {!loading && error && (
+        <div role="alert" className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+          <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
+          <p className="text-sm font-medium text-red-700">{t.loadFailed}</p>
+          <p className="text-xs text-red-500 mt-1 break-words">{error}</p>
+          <button onClick={() => void load()} className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
+            <RefreshCw size={12} /> {t.retry}
+          </button>
+        </div>
+      )}
 
-      {/* Main two-column layout */}
-      <div className="flex gap-6 items-start">
+      {!loading && !error && records.length === 0 && (
+        <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
+          <Landmark size={28} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-700 mb-1">{t.emptyTitle}</p>
+          <p className="text-xs text-gray-400 mb-4">{t.emptyDesc}</p>
+          {canCreate && (
+            <Button variant="primary" onClick={openAdd} disabled={preparingAdd}><Plus size={14} className="mr-1.5" /> {t.addInvestmentRecord}</Button>
+          )}
+        </div>
+      )}
 
-        {/* Left: investment list */}
-        <div className="flex-1 min-w-0">
-          {/* Table header */}
-          <div className="hidden md:grid grid-cols-[1fr_auto] gap-4 px-5 py-2 mb-2">
-            <span className="text-xs font-medium text-gray-500">Company</span>
-            <div className="grid grid-cols-4 gap-8 text-right">
-              {['Invested', 'Ownership', 'Pre-Money Val.', 'Status'].map(h => (
-                <span key={h} className="text-xs font-medium text-gray-500">{h}</span>
-              ))}
-            </div>
-          </div>
-
-          {loading && (
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-                  <div className="flex gap-4">
-                    <div className="w-10 h-10 bg-gray-100 rounded-xl" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-100 rounded w-1/3" />
-                      <div className="h-3 bg-gray-100 rounded w-1/2" />
-                    </div>
-                  </div>
+      {!loading && !error && records.length > 0 && (
+        <div className="space-y-6">
+          <div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {([[t.summaryCommitted, summary.committed], [t.summaryFunded, summary.funded], [t.summaryRealized, summary.realized]] as const).map(([label, items]) => (
+                <div key={label} className="bg-white border border-gray-100 rounded-2xl px-4 py-3">
+                  <p className="text-[11px] text-gray-400">{label}</p>
+                  <p className="text-lg font-bold text-gray-900 tabular-nums mt-0.5">{money(items)}</p>
                 </div>
               ))}
             </div>
-          )}
+            <p className="text-[11px] text-gray-400 mt-2">{t.summaryNote}</p>
+          </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
-              <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
-              <p className="text-sm text-red-600 mb-3">{error}</p>
-              <button onClick={load} className="inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors">
-                <RefreshCw size={12} /> Retry
-              </button>
-            </div>
-          )}
-
-          {!loading && !error && records.length === 0 && isConnected && (
-            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
-              <DollarSign size={28} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500 mb-1">No investments yet</p>
-              <p className="text-xs text-gray-400 mb-4">Add a portfolio company with investment details to get started.</p>
-              <Link to="/portfolio/new" className="inline-flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2 rounded-xl">
-                <Plus size={14} /> Add Investment
-              </Link>
-            </div>
-          )}
-
-          {!loading && !error && records.length > 0 && (
-            <div className="space-y-3">
-              {records.map(r => <InvestmentRow key={r.id} record={r} logoUrl={logoMap[r.founderEmail?.toLowerCase() || ''] || logoMap[r.companyName?.toLowerCase() || '']} />)}
-            </div>
-          )}
-        </div>
-
-        {/* Right sidebar */}
-        <div className="w-72 flex-shrink-0 space-y-4 hidden lg:block sticky top-6">
-
-          {/* Portfolio Breakdown */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Portfolio Breakdown</h3>
-            <div className="space-y-3">
-              {[
-                { label: 'Active', count: activeCount, color: 'bg-emerald-500', textColor: 'text-emerald-700', bg: 'bg-emerald-50' },
-                { label: 'Watch', count: watchCount, color: 'bg-amber-500', textColor: 'text-amber-700', bg: 'bg-amber-50' },
-                { label: 'Exited', count: exitedCount, color: 'bg-blue-500', textColor: 'text-blue-700', bg: 'bg-blue-50' },
-              ].map(({ label, count, color, textColor, bg }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${color}`} />
-                    <span className="text-sm text-gray-700">{label}</span>
-                  </div>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${bg} ${textColor}`}>{count}</span>
-                </div>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label={t.colStatus}>
+              {(['all', ...TX_STATUSES] as StatusFilter[]).map(f => (
+                <button key={f} onClick={() => setStatus(f)} aria-pressed={status === f}
+                  className={cn('px-3 py-1.5 rounded-xl text-xs font-medium transition-colors',
+                    status === f ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
+                  {f === 'all' ? t.filterAll : statusLabel(t, f)}
+                  <span className="ml-1.5 opacity-60 tabular-nums">{f === 'all' ? records.length : counts[f] ?? 0}</span>
+                </button>
               ))}
             </div>
-            {records.length > 0 && (
-              <div className="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden flex">
-                {activeCount > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${(activeCount / records.length) * 100}%` }} />}
-                {watchCount > 0 && <div className="bg-amber-500 h-full" style={{ width: `${(watchCount / records.length) * 100}%` }} />}
-                {exitedCount > 0 && <div className="bg-blue-500 h-full" style={{ width: `${(exitedCount / records.length) * 100}%` }} />}
+            <div className="lg:ml-auto flex flex-col sm:flex-row gap-2 lg:w-[28rem]">
+              <div className="sm:w-40">
+                <Select value={round} onChange={e => setRound(e.target.value)} aria-label={t.colRound}
+                  options={ROUND_ORDER.map(v => ({ value: v, label: v }))} placeholder={t.allRounds} />
               </div>
-            )}
+              <div className="flex-1">
+                <Input value={query} onChange={e => setQuery(e.target.value)} placeholder={t.searchPlaceholder}
+                  aria-label={t.searchPlaceholder} icon={<Search size={15} />} />
+              </div>
+            </div>
           </div>
 
-          {/* Top Holdings */}
-          {topByAmount.length > 0 && (
-            <div className="bg-white border border-gray-100 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Top Holdings</h3>
-              <div className="space-y-3">
-                {topByAmount.map((r, i) => {
-                  const amt = parseFloat(r.investmentAmount) || 0;
-                  const pct = totalInvested > 0 ? (amt / totalInvested) * 100 : 0;
-                  return (
-                    <Link key={r.id} to={`/portfolio/${r.id}`} className="block group">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                          <span className="text-xs font-medium text-gray-800 group-hover:text-indigo-600 transition-colors truncate max-w-[120px]">{r.companyName}</span>
-                        </div>
-                        <span className="text-xs font-semibold text-gray-700">{formatCurrency(amt)}</span>
-                      </div>
-                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden ml-6">
-                        <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
+          {visible.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-10">{t.noMatches}</p>
+          ) : (
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-x-auto">
+              <table className="w-full text-sm min-w-[64rem]">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                    {[t.colCompany, t.colRound, t.colInstrument, t.colInvestmentDate, t.colCommitted, t.colFunded, t.colCurrency, t.colValuation, t.colStatus]
+                      .map(h => <th key={h} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">{h}</th>)}
+                    <th scope="col" className="px-3 py-3"><span className="sr-only">{t.viewInvestment}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map(r => (
+                    <tr key={r.id} onClick={() => setPanelId(r.id)}
+                      className={cn('border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50/70', panelId === r.id && 'bg-indigo-50/40')}>
+                      <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                        {r.companyName || '—'}
+                        <span className="block text-[11px] font-normal text-gray-400">{r.reference}</span>
+                      </td>
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{r.round || '—'}</td>
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{r.instrument || '—'}</td>
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{formatDate(r.investmentDate, locale)}</td>
+                      <td className="px-3 py-3 text-gray-900 tabular-nums whitespace-nowrap">{formatAmount(r.committedAmount, r.currency, locale)}</td>
+                      <td className="px-3 py-3 text-gray-900 tabular-nums whitespace-nowrap">{formatAmount(amountsOf(r).funded, r.currency, locale)}</td>
+                      <td className="px-3 py-3 text-gray-600">{r.currency || '—'}</td>
+                      <td className="px-3 py-3 tabular-nums whitespace-nowrap">
+                        <span className="text-gray-900">{formatAmount(r.postMoney, r.currency, locale)}</span>
+                        {r.valuationDate && <span className="block text-[11px] text-gray-400">{formatDate(r.valuationDate, locale)}</span>}
+                      </td>
+                      <td className="px-3 py-3"><StatusBadge status={r.status} t={t} /></td>
+                      <td className="px-3 py-3 text-right">
+                        <button onClick={ev => { ev.stopPropagation(); setPanelId(r.id); }}
+                          className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap">{t.viewInvestment}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Quick stats */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Quick Stats</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">Total Companies</span>
-                <span className="text-sm font-semibold text-gray-900">{records.length}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">Total Deployed</span>
-                <span className="text-sm font-semibold text-gray-900">{formatCurrency(totalInvested)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">Avg Ticket Size</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {records.length > 0 ? formatCurrency(totalInvested / records.length) : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">Avg Ownership</span>
-                <span className="text-sm font-semibold text-gray-900">{avgOwnership}%</span>
-              </div>
-            </div>
-          </div>
-
+          <RoundHistory investments={visible} language={language} t={t} onSelect={setPanelId} />
         </div>
-      </div>
+      )}
+
+      {panelRecord && (
+        <InvestmentPanel
+          key={panelRecord.id}
+          inv={panelRecord} canEdit={canEdit} language={language} t={t}
+          onClose={() => setPanelId(null)}
+          onEdit={() => openEdit(panelRecord)}
+          onOpenCompany={() => navigate(`/portfolio/${panelRecord.companyId}`)}
+          onChanged={updated => setRecords(prev => prev.map(r => (r.id === updated.id ? updated : r)))}
+        />
+      )}
+
+      {form && (
+        <InvestmentFormModal
+          key={form.id ?? 'new'}
+          mode={form.mode} initial={form.initial} companies={companies}
+          saving={saving} error={formError} t={t}
+          onSave={save} onClose={() => { if (!saving) setForm(null); }}
+        />
+      )}
     </div>
   );
+}
+
+// Investor-side only. Reviewers are investor-side users but have no access to this
+// module, and founders are never shown it.
+export default function Investments() {
+  const { isInvestor, isReviewer } = useAuth();
+  if (!isInvestor || isReviewer) return <Navigate to="/" replace />;
+  return <InvestmentsPage />;
 }

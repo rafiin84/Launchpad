@@ -83,6 +83,7 @@ import ApplicantDetail from './pages/FounderDetail';
 import InvestorFounders from './pages/InvestorFounders';
 import FounderDetailPage from './pages/FounderDetailPage';
 import PortfolioManagement from './pages/PortfolioManagement';
+import Investments from './pages/Investments';
 
 export default function App() {
   return (
@@ -122,6 +123,7 @@ export default function App() {
             <Route path="/founders" element={<InvestorFounders />} />
             <Route path="/founders/:id" element={<FounderDetailPage />} />
             <Route path="/portfolio-management" element={<BlockedForReviewers><PortfolioManagement /></BlockedForReviewers>} />
+            <Route path="/investments" element={<BlockedForReviewers><Investments /></BlockedForReviewers>} />
             <Route path="/applicants" element={<BlockedForReviewers><Applicants /></BlockedForReviewers>} />
             <Route path="/applicants/:id" element={<BlockedForReviewers><ApplicantDetail /></BlockedForReviewers>} />
             <Route path="/funds" element={<Funds />} />

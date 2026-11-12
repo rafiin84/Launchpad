@@ -822,6 +822,22 @@ export async function fetchZohoModules(): Promise<ZohoModule[]> {
   return json.modules ?? [];
 }
 
+/**
+ * GET a CRM settings endpoint (module / field metadata) with the signed-in
+ * user's token. Returns null on any failure — callers use it for hints (what the
+ * user may do, a field's limits), never for anything the API enforces itself.
+ */
+export async function zohoGetSettings<T = Record<string, unknown>>(apiPath: string): Promise<T | null> {
+  try {
+    ensureToken();
+    const res = await fetch(buildCrmUrl(apiPath), { headers: authHeader() });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function findModuleApiName(keyword: string): Promise<string | null> {
   const modules = await fetchZohoModules();
   const kw = keyword.toLowerCase();
