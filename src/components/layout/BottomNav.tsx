@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home, MoreHorizontal, Users, ChevronRight, Briefcase, Landmark } from 'lucide-react';
+import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home, MoreHorizontal, Users, ChevronRight, Briefcase, Landmark, BarChart3 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { pathMatches } from '../../lib/pathMatches';
 import { useAuth } from '../../context/AuthContext';
@@ -55,6 +55,7 @@ export function BottomNav() {
     ...(isReviewer ? [] : [
       { label: t.nav.portfolioManagement, path: '/portfolio-management', icon: Briefcase, desc: '' },
       { label: t.nav.investments, path: '/investments', icon: Landmark, desc: '' },
+      { label: t.nav.reportsAnalytics, path: '/reports', icon: BarChart3, desc: '' },
       { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
       { label: t.nav.applicants, path: '/applicants', icon: Users,     desc: '' },
     ]),

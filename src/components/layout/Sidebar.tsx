@@ -13,6 +13,7 @@ import {
   Users,
   Briefcase,
   Landmark,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { pathMatches } from '../../lib/pathMatches';
@@ -40,6 +41,7 @@ export function Sidebar() {
     ...(isReviewer ? [] : [{ label: t.nav.company,      path: '/portfolio',    icon: PieChart }]),
     ...(isReviewer ? [] : [{ label: t.nav.portfolioManagement, path: '/portfolio-management', icon: Briefcase }]),
     ...(isReviewer ? [] : [{ label: t.nav.investments, path: '/investments', icon: Landmark }]),
+    ...(isReviewer ? [] : [{ label: t.nav.reportsAnalytics, path: '/reports', icon: BarChart3 }]),
     { label: t.nav.applications,  path: '/applications', icon: Inbox },
     ...(isReviewer ? [] : [{ label: t.nav.applicants,   path: '/applicants',   icon: Users }]),
     { label: t.nav.documents,     path: '/documents',    icon: FileText },

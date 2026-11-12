@@ -838,6 +838,18 @@ export async function zohoGetSettings<T = Record<string, unknown>>(apiPath: stri
   }
 }
 
+/**
+ * What the signed-in user may do in a module, from its `creatable` / `editable`
+ * flags. false = CRM says no; null = could not tell (CRM still enforces). Used
+ * only to hide controls the user cannot use.
+ */
+export async function fetchModuleAccess(apiName: string): Promise<{ canCreate: boolean | null; canEdit: boolean | null }> {
+  const res = await zohoGetSettings<{ modules?: Array<Record<string, unknown>> }>(`/crm/v2/settings/modules/${apiName}`);
+  const m = res?.modules?.[0];
+  const flag = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+  return { canCreate: m ? flag(m['creatable']) : null, canEdit: m ? flag(m['editable']) : null };
+}
+
 export async function findModuleApiName(keyword: string): Promise<string | null> {
   const modules = await fetchZohoModules();
   const kw = keyword.toLowerCase();

@@ -103,6 +103,32 @@ export function lastFundingDate(flows: CashFlow[]): string {
   return flows.filter(f => f.type === 'Funding').reduce((m, f) => (f.date > m ? f.date : m), '');
 }
 
+/** The slice of an investment record the amount rules need. */
+interface AmountSource {
+  cashFlows: CashFlow[];
+  storedFunded: number | null;
+  storedRealized: number | null;
+  storedRefunded: number | null;
+}
+
+/**
+ * Funded / realized / refunded for display: from the dated ledger when there is
+ * one, else what CRM stores. A kind of movement with no entry in the ledger is
+ * "not recorded" (null), not zero — zero would claim nothing was received.
+ */
+export function amountsOf(inv: AmountSource): { funded: number | null; realized: number | null; refunded: number | null } {
+  if (inv.cashFlows.length > 0) {
+    const t = flowTotals(inv.cashFlows);
+    const has = (type: string) => inv.cashFlows.some(f => f.type === type);
+    return {
+      funded: has('Funding') ? t.funded : null,
+      realized: has('Proceeds') ? t.realized : null,
+      refunded: has('Refund') ? t.refunded : null,
+    };
+  }
+  return { funded: inv.storedFunded, realized: inv.storedRealized, refunded: inv.storedRefunded };
+}
+
 // ─── Returns ────────────────────────────────────────────────────────────────
 
 export interface ReturnInputs {
@@ -176,14 +202,21 @@ export function returnMetrics({ flows, holdingValue, holdingValueAsOf }: ReturnI
   if (paidIn <= 0) return { ...base, missing: ['cashFlows'] };
 
   const moic = (totals.realized + (holdingValue as number)) / paidIn;
-  const series = [
-    ...flows.map(f => ({
-      date: f.date,
-      amount: f.type === 'Funding' ? -f.amount : f.amount, // Proceeds and Refunds flow back to the investor
-    })),
-    { date: holdingValueAsOf.slice(0, 10), amount: holdingValue as number },
+  return { ...base, moic, irrPct: xirr(returnSeries(flows, holdingValue as number, holdingValueAsOf)) };
+}
+
+/**
+ * The dated cash series an IRR is solved over, from the investor's side:
+ * funding goes out (negative); proceeds and refunds come back; the holding value
+ * is a final inflow on its as-of date.
+ */
+export function returnSeries(
+  flows: CashFlow[], holdingValue: number, holdingValueAsOf: string,
+): Array<{ date: string; amount: number }> {
+  return [
+    ...flows.map(f => ({ date: f.date, amount: f.type === 'Funding' ? -f.amount : f.amount })),
+    { date: holdingValueAsOf.slice(0, 10), amount: holdingValue },
   ];
-  return { ...base, moic, irrPct: xirr(series) };
 }
 
 // ─── Ownership ──────────────────────────────────────────────────────────────

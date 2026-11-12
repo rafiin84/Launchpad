@@ -11,11 +11,11 @@
  * use, and surfaces CRM's refusal if a write is rejected anyway.
  */
 import {
-  zohoList, zohoCreate, zohoUpdate, zohoGetById, zohoGetSettings, zohoUploadFile,
+  zohoList, zohoCreate, zohoUpdate, zohoGetById, zohoGetSettings, zohoUploadFile, fetchModuleAccess,
   downloadFieldFile, ZohoApiError, type ZohoRecord,
 } from './zohoApi';
 import {
-  appendCashFlow, flowTotals, lastFundingDate, parseCashFlows, stringifyCashFlows,
+  amountsOf, appendCashFlow, flowTotals, lastFundingDate, parseCashFlows, stringifyCashFlows,
   type CashFlow, type NewCashFlow,
 } from '../lib/investmentCalc';
 
@@ -148,23 +148,7 @@ function fromRecord(r: ZohoRecord): InvestmentRecord {
   };
 }
 
-/**
- * Funded / realized / refunded for display: from the dated ledger when there is
- * one, else what CRM stores. A kind of movement with no entry in the ledger is
- * "not recorded" (null), not zero — zero would claim nothing was received.
- */
-export function amountsOf(inv: InvestmentRecord): { funded: number | null; realized: number | null; refunded: number | null } {
-  if (inv.cashFlows.length > 0) {
-    const t = flowTotals(inv.cashFlows);
-    const has = (type: string) => inv.cashFlows.some(f => f.type === type);
-    return {
-      funded: has('Funding') ? t.funded : null,
-      realized: has('Proceeds') ? t.realized : null,
-      refunded: has('Refund') ? t.refunded : null,
-    };
-  }
-  return { funded: inv.storedFunded, realized: inv.storedRealized, refunded: inv.storedRefunded };
-}
+export { amountsOf };
 
 export async function fetchInvestments(): Promise<InvestmentRecord[]> {
   const records = await zohoList(INVESTMENTS_MODULE, {
@@ -187,12 +171,7 @@ export interface InvestmentAccess {
   canEdit: boolean | null;
 }
 
-export async function fetchInvestmentAccess(): Promise<InvestmentAccess> {
-  const res = await zohoGetSettings<{ modules?: Array<Record<string, unknown>> }>(`/crm/v2/settings/modules/${INVESTMENTS_MODULE}`);
-  const m = res?.modules?.[0];
-  const flag = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
-  return { canCreate: m ? flag(m['creatable']) : null, canEdit: m ? flag(m['editable']) : null };
-}
+export const fetchInvestmentAccess = (): Promise<InvestmentAccess> => fetchModuleAccess(INVESTMENTS_MODULE);
 
 /** True when CRM refused a write for permission reasons, so the page can say so plainly. */
 export function isPermissionError(err: unknown): boolean {
