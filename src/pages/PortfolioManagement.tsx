@@ -10,13 +10,15 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cn } from '../lib/cn';
 import {
-  createPortfolioEntry, createTimelineEvent, emptyInput, fetchHealthRules, fetchPortfolioEntries,
+  createPortfolioEntry, emptyInput, fetchPortfolioEntries,
   inputFromEntry, updatePortfolioEntry, type PortfolioEntry, type PortfolioEntryInput,
 } from '../services/crmPortfolioManagement';
 import { fetchCRMPortfolio, type CRMPortfolioRecord } from '../services/crmPortfolio';
 import {
-  evaluateHealth, hasNotReportedRecently, staleThresholdDays, type HealthRule, type HealthStatus,
+  evaluateHealth, hasNotReportedRecently, staleThresholdDays, type HealthStatus,
 } from '../lib/portfolioHealth';
+import { HEALTH_RULES as rules } from '../config/portfolioHealthRules';
+import type { TimelineEvent } from '../lib/portfolioTimeline';
 import { formatDate, formatMoney, formatPercent, toCsv } from '../lib/portfolioFormat';
 import AllocationCards from '../components/portfolio/AllocationCards';
 import CompanyPanel from '../components/portfolio/CompanyPanel';
@@ -26,6 +28,8 @@ import { HealthBadge } from '../components/portfolio/portfolioUi';
 import { healthLabel } from '../components/portfolio/portfolioText';
 
 const MAX_COMPARE = 4;
+// Rules are a config constant, so the stale threshold is too.
+const staleDays = staleThresholdDays(rules);
 type Filter = 'all' | HealthStatus;
 const HEALTH_FILTERS: HealthStatus[] = ['on_track', 'needs_attention', 'at_risk', 'data_unavailable'];
 
@@ -36,7 +40,6 @@ function PortfolioManagementPage() {
   const locale = language === 'ja' ? 'ja-JP' : 'en-US';
 
   const [entries, setEntries] = useState<PortfolioEntry[]>([]);
-  const [rules, setRules] = useState<HealthRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -56,8 +59,7 @@ function PortfolioManagementPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [e, r] = await Promise.all([fetchPortfolioEntries(), fetchHealthRules()]);
-      setEntries(e); setRules(r);
+      setEntries(await fetchPortfolioEntries());
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t.loadFailed);
     } finally {
@@ -67,7 +69,6 @@ function PortfolioManagementPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const staleDays = useMemo(() => staleThresholdDays(rules), [rules]);
 
   const rows = useMemo(() => entries.map(entry => ({
     entry,
@@ -80,7 +81,7 @@ function PortfolioManagementPage() {
       recordedReason: entry.recordedHealthReason,
     }, rules),
     stale: hasNotReportedRecently(entry.lastCompanyUpdate, staleDays),
-  })), [entries, rules, staleDays]);
+  })), [entries]);
 
   const counts = useMemo(() => {
     const c: Record<HealthStatus, number> = { on_track: 0, needs_attention: 0, at_risk: 0, data_unavailable: 0 };
@@ -133,15 +134,13 @@ function PortfolioManagementPage() {
     setSaving(true); setFormError('');
     try {
       if (form.mode === 'add') {
-        const id = await createPortfolioEntry(input);
-        // Record the investment on the company's timeline. Best effort: the entry
-        // itself is already saved, and a timeline failure must not undo that.
+        // The investment goes on the company's timeline in the same create call.
         const amount = input.totalInvested.trim() === '' ? null : Number(input.totalInvested);
-        await createTimelineEvent({
-          entryId: id, type: 'Initial Investment', title: input.companyName.trim(),
+        const id = await createPortfolioEntry(input, {
+          type: 'Initial Investment', title: input.companyName.trim(),
           date: input.initialInvestmentDate || new Date().toISOString().slice(0, 10),
           amount: amount !== null && Number.isFinite(amount) ? amount : null,
-        }).catch(() => undefined);
+        });
         setPanelId(id);
       } else if (form.entryId) {
         await updatePortfolioEntry(form.entryId, input);
@@ -153,6 +152,11 @@ function PortfolioManagementPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  /** The panel just saved an event — mirror it here so the page and panel agree without a refetch. */
+  function applyTimeline(entryId: string, timeline: TimelineEvent[]) {
+    setEntries(prev => prev.map(e => (e.id === entryId ? { ...e, timeline } : e)));
   }
 
   function exportCsv() {
@@ -314,6 +318,7 @@ function PortfolioManagementPage() {
           onClose={() => setPanelId(null)}
           onEdit={() => openEdit(panelRow.entry)}
           onOpenCompany={() => navigate(`/portfolio/${panelRow.entry.companyId}`)}
+          onTimelineChange={timeline => applyTimeline(panelRow.entry.id, timeline)}
         />
       )}
 

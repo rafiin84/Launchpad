@@ -25,8 +25,8 @@ async function getModule(): Promise<string> {
   const override = getPortfolioModuleOverride();
   if (override) { resolvedModule = override; return resolvedModule; }
   // Auto-discover by searching all modules for 'portfolios' in the name. It must
-  // be the plural: 'portfolio' also matches Portfolio_Management, Portfolio_Timeline
-  // and Portfolio_Health_Rules, and this picks the FIRST match — so the Companies
+  // be the plural: 'portfolio' also matches Portfolio_Management,
+  // and this picks the FIRST match — so the Companies
   // page would silently read the wrong module the moment Zoho's list order changed.
   const discovered = await findModuleApiName('portfolios').catch(() => null);
   resolvedModule = discovered ?? 'Portfolios';

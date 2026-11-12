@@ -1,6 +1,6 @@
 /**
- * Portfolio health, derived from configurable rules (the Portfolio_Health_Rules
- * module in CRM) and explainable: every non-"on track" result carries the exact
+ * Portfolio health, derived from configurable rules (config/portfolioHealthRules.ts)
+ * and explainable: every non-"on track" result carries the exact
  * rules and values that produced it.
  *
  * The business rule this encodes: a company is NEVER marked Needs Attention or
@@ -14,7 +14,7 @@
 
 export type HealthStatus = 'on_track' | 'needs_attention' | 'at_risk' | 'data_unavailable';
 
-/** The metrics a rule may test. Must match the picklist on Portfolio_Health_Rules.Metric. */
+/** The metrics a rule may test. Rules in config/portfolioHealthRules.ts must use one of these. */
 export const RULE_METRICS = [
   'Runway Months',
   'Revenue Growth Percentage',

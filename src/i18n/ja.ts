@@ -1324,7 +1324,7 @@ const ja: TranslationKeys = {
 
     timelineTitle: 'タイムライン',
     timelineEmpty: 'この企業のイベントはまだ記録されていません。',
-    timelineFailed: 'タイムラインを読み込めませんでした。',
+    timelineFull: 'この企業のタイムラインは上限に達しました。新しいイベントを追加するには、CRM で古いイベントを整理してください。',
     noteTitle: 'ポートフォリオメモ',
     notePlaceholder: 'この企業についてメモを書く…',
     noteSaved: 'メモを追加しました。',

@@ -1,34 +1,27 @@
 /**
- * Portfolio Management — one record per portfolio company, plus a per-company
- * timeline and a configurable set of health rules. Three CRM modules:
+ * Portfolio Management — one record per portfolio company, in a single CRM
+ * module (`Portfolio_Management`). Everything about a company lives on its
+ * record: the table fields, and its timeline of events as JSON in the
+ * `Timeline_Events` large-text field (see lib/portfolioTimeline.ts). Health
+ * rules are a config file (config/portfolioHealthRules.ts), not a module.
  *
- *   Portfolio_Management     the portfolio table (investor-side only)
- *   Portfolio_Timeline       investment events, valuation updates, finance
- *                            reports, milestones, meetings, notes, follow-ups
- *   Portfolio_Health_Rules   thresholds that decide a company's health
- *
- * All three are investor-side: Administrator / Standard / Investor profiles only,
- * read with the investor's own token, so Zoho's record and field permissions are
- * what govern access (and therefore exports — see the export in the page).
+ * Investor-side only: Administrator / Standard / Investor profiles, read with
+ * the investor's own token, so Zoho's record and field permissions are what
+ * govern access (and therefore exports — see the export in the page).
  *
  * `Company` is a lookup to the Companies module (API name `Portfolios`). That
  * lookup is the only join; sector/geography/stage are snapshots kept here so the
  * allocation views can group on them without fetching every company.
  */
-import { zohoList, zohoCreate, zohoUpdate, zohoSearch, type ZohoRecord } from './zohoApi';
-import { parseHealthStatus, type HealthStatus, type HealthRule } from '../lib/portfolioHealth';
+import { zohoList, zohoCreate, zohoUpdate, zohoGetById, type ZohoRecord } from './zohoApi';
+import { parseHealthStatus, type HealthStatus } from '../lib/portfolioHealth';
+import { appendEvent, parseTimeline, type NewEventInput, type TimelineEvent } from '../lib/portfolioTimeline';
 
 export const PM_MODULE = 'Portfolio_Management';
-export const TIMELINE_MODULE = 'Portfolio_Timeline';
-export const RULES_MODULE = 'Portfolio_Health_Rules';
 
 export const STAGES = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth'] as const;
 export const STATUSES = ['Active', 'On Hold', 'Exited', 'Written Off'] as const;
 export const MEMBERSHIP_BASES = ['Confirmed Investment', 'Authorized Relationship'] as const;
-export const EVENT_TYPES = [
-  'Initial Investment', 'Follow-on Investment', 'Valuation Update', 'Finance Report',
-  'Milestone', 'Meeting', 'Exit', 'Note', 'Follow-up', 'Other',
-] as const;
 
 export interface PortfolioEntry {
   id: string;
@@ -63,18 +56,11 @@ export interface PortfolioEntry {
   openRoles: number | null;
   lastCompanyUpdate: string;
   notes: string;
+  /** Events recorded on this company, newest first. */
+  timeline: TimelineEvent[];
+  /** The raw stored JSON — kept so an append never rewrites what it didn't parse. */
+  timelineJson: string;
   modifiedTime: string;
-}
-
-export interface TimelineEvent {
-  id: string;
-  title: string;
-  entryId: string;
-  type: string;
-  date: string;
-  amount: number | null;
-  details: string;
-  link: string;
 }
 
 const PM_FIELDS = [
@@ -83,7 +69,7 @@ const PM_FIELDS = [
   'Sector', 'Geography', 'Current_Stage', 'Investment_Year', 'Health_Status', 'Health_Reason',
   'Health_As_Of', 'Reporting_Period', 'Metrics_As_Of', 'Latest_Revenue', 'Revenue_Growth_Percentage',
   'Monthly_Burn_Rate', 'Runway_Months', 'Headcount', 'Open_Roles', 'Last_Company_Update',
-  'Investment_Notes', 'Modified_Time',
+  'Investment_Notes', 'Timeline_Events', 'Modified_Time',
 ].join(',');
 
 const str = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
@@ -130,6 +116,8 @@ function fromRecord(r: ZohoRecord): PortfolioEntry {
     openRoles: num(r['Open_Roles']),
     lastCompanyUpdate: str(r['Last_Company_Update']),
     notes: str(r['Investment_Notes']),
+    timeline: parseTimeline(str(r['Timeline_Events'])),
+    timelineJson: str(r['Timeline_Events']),
     modifiedTime: str(r['Modified_Time']),
   };
 }
@@ -139,39 +127,6 @@ export async function fetchPortfolioEntries(): Promise<PortfolioEntry[]> {
     per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc', fields: PM_FIELDS,
   });
   return records.map(fromRecord);
-}
-
-export async function fetchHealthRules(): Promise<HealthRule[]> {
-  const records = await zohoList(RULES_MODULE, {
-    per_page: '200',
-    fields: 'Name,Metric,Condition,Threshold,Resulting_Health,Rule_Active,Explanation',
-  }).catch(() => [] as ZohoRecord[]);   // no rules module access/rules yet -> no rules, not an error
-  return records.map(r => ({
-    id: r.id,
-    name: str(r['Name']),
-    metric: str(r['Metric']),
-    condition: str(r['Condition']),
-    threshold: num(r['Threshold']),
-    resulting: str(r['Resulting_Health']),
-    active: r['Rule_Active'] === true || r['Rule_Active'] === 'true',
-    explanation: str(r['Explanation']),
-  }));
-}
-
-export async function fetchTimeline(entryId: string): Promise<TimelineEvent[]> {
-  const records = await zohoSearch(TIMELINE_MODULE, `(Portfolio_Entry:equals:${entryId})`);
-  return records
-    .map(r => ({
-      id: r.id,
-      title: str(r['Name']),
-      entryId,
-      type: str(r['Event_Type']),
-      date: str(r['Event_Date']) || str(r['Created_Time']).slice(0, 10),
-      amount: num(r['Event_Amount']),
-      details: str(r['Event_Details']),
-      link: str(r['Source_Link']),
-    }))
-    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ─── Writes ──────────────────────────────────────────────────────────────────
@@ -279,8 +234,15 @@ function toPayload(input: PortfolioEntryInput): Record<string, unknown> {
   return p;
 }
 
-export function createPortfolioEntry(input: PortfolioEntryInput): Promise<string> {
-  return zohoCreate(PM_MODULE, toPayload(input));
+/**
+ * Create the record. When `firstEvent` is given it is written into the same
+ * create call, so a new company starts with its "Initial Investment" on the
+ * timeline without a second request that could fail on its own.
+ */
+export function createPortfolioEntry(input: PortfolioEntryInput, firstEvent?: NewEventInput): Promise<string> {
+  const payload = toPayload(input);
+  if (firstEvent) payload['Timeline_Events'] = appendEvent('', firstEvent);
+  return zohoCreate(PM_MODULE, payload);
 }
 
 export async function updatePortfolioEntry(id: string, input: PortfolioEntryInput): Promise<void> {
@@ -298,25 +260,18 @@ export async function updatePortfolioEntry(id: string, input: PortfolioEntryInpu
   await zohoUpdate(PM_MODULE, id, payload);
 }
 
-export interface TimelineEventInput {
-  entryId: string;
-  type: string;
-  title: string;
-  date: string;
-  details?: string;
-  amount?: number | null;
-  link?: string;
-}
-
-export function createTimelineEvent(e: TimelineEventInput): Promise<string> {
-  const p: Record<string, unknown> = {
-    Name: e.title.trim(),
-    Portfolio_Entry: { id: e.entryId },
-    Event_Type: e.type,
-    Event_Date: e.date,
-  };
-  if (e.details?.trim()) p['Event_Details'] = e.details.trim();
-  if (e.amount !== undefined && e.amount !== null) p['Event_Amount'] = e.amount;
-  if (e.link?.trim()) p['Source_Link'] = e.link.trim();
-  return zohoCreate(TIMELINE_MODULE, p);
+/**
+ * Add an event to a company's timeline. A read-modify-write on the record's
+ * `Timeline_Events` field, since Zoho replaces a field's whole value on write:
+ * re-read the stored JSON first so two events recorded in a row (or from two
+ * tabs) don't overwrite each other. A genuinely simultaneous save can still lose
+ * one — same trade-off the app accepts for Requested_Documents.
+ *
+ * Returns the updated events. Throws TimelineFullError if the field is full.
+ */
+export async function addTimelineEvent(entryId: string, input: NewEventInput): Promise<TimelineEvent[]> {
+  const record = await zohoGetById(PM_MODULE, entryId);
+  const next = appendEvent(str(record?.['Timeline_Events']), input);
+  await zohoUpdate(PM_MODULE, entryId, { Timeline_Events: next });
+  return parseTimeline(next);
 }

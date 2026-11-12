@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  X, ExternalLink, Pencil, StickyNote, CalendarClock, Loader2, AlertCircle,
+  X, ExternalLink, Pencil, StickyNote, CalendarClock, AlertCircle,
   TrendingUp, Flag, Handshake, FileBarChart, Coins, LogOut, CircleDot,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/Input';
 import {
-  createTimelineEvent, fetchTimeline, type PortfolioEntry, type TimelineEvent,
+  addTimelineEvent, type PortfolioEntry,
 } from '../../services/crmPortfolioManagement';
+import { TimelineFullError, type TimelineEvent } from '../../lib/portfolioTimeline';
 import { getCRMPortfolioRecord } from '../../services/crmPortfolio';
 import { fetchFinancials, findCompanyRecordIdForEmail, type FinancialEntry } from '../../services/companyFinancials';
 import type { HealthResult } from '../../lib/portfolioHealth';
@@ -50,7 +51,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 export default function CompanyPanel({
-  entry, health, language, t, onClose, onEdit, onOpenCompany,
+  entry, health, language, t, onClose, onEdit, onOpenCompany, onTimelineChange,
 }: {
   entry: PortfolioEntry;
   health: HealthResult;
@@ -59,11 +60,11 @@ export default function CompanyPanel({
   onClose: () => void;
   onEdit: () => void;
   onOpenCompany: () => void;
+  /** Called with the full updated timeline after an event is saved. */
+  onTimelineChange: (timeline: TimelineEvent[]) => void;
 }) {
   const locale = language === 'ja' ? 'ja-JP' : 'en-US';
 
-  const [events, setEvents] = useState<TimelineEvent[] | null>(null);
-  const [timelineError, setTimelineError] = useState(false);
   const [trend, setTrend] = useState<RevenuePoint[]>([]);
   const [composer, setComposer] = useState<null | 'note' | 'followup'>(null);
   const [text, setText] = useState('');
@@ -71,16 +72,10 @@ export default function CompanyPanel({
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const loadTimeline = useCallback(
-    () => fetchTimeline(entry.id)
-      .then(ev => { setEvents(ev); setTimelineError(false); })
-      .catch(() => { setEvents([]); setTimelineError(true); }),
-    [entry.id],
-  );
-
-  // The page mounts this panel with key={entry.id}, so switching companies starts
-  // from clean state — nothing here needs to reset itself.
-  useEffect(() => { void loadTimeline(); }, [loadTimeline]);
+  // The timeline is part of the entry itself (one CRM record), so there is nothing
+  // to fetch. The page mounts this panel with key={entry.id}, so switching companies
+  // starts from clean state.
+  const events = entry.timeline;
 
   // Revenue trend comes from the company's own finance reports (Founder_Companies),
   // found through the founder's email on the Companies record. Silent when absent.
@@ -117,14 +112,14 @@ export default function CompanyPanel({
     try {
       const today = new Date().toISOString().slice(0, 10);
       const firstLine = body.split('\n')[0].slice(0, 120);
-      await createTimelineEvent(composer === 'note'
-        ? { entryId: entry.id, type: 'Note', title: firstLine, date: today, details: body }
-        : { entryId: entry.id, type: 'Follow-up', title: firstLine, date: due, details: body });
+      const updated = await addTimelineEvent(entry.id, composer === 'note'
+        ? { type: 'Note', title: firstLine, date: today, details: body }
+        : { type: 'Follow-up', title: firstLine, date: due, details: body });
+      onTimelineChange(updated);
       setNotice({ ok: true, message: composer === 'note' ? t.noteSaved : t.followUpSaved });
       setComposer(null); setText(''); setDue('');
-      await loadTimeline();
-    } catch {
-      setNotice({ ok: false, message: t.actionFailed });
+    } catch (err) {
+      setNotice({ ok: false, message: err instanceof TimelineFullError ? t.timelineFull : t.actionFailed });
     } finally {
       setSaving(false);
     }
@@ -228,11 +223,7 @@ export default function CompanyPanel({
             </form>
           )}
 
-          {events === null ? (
-            <p className="text-sm text-gray-400 flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> {t.loading}</p>
-          ) : timelineError ? (
-            <p className="text-sm text-red-600 flex items-center gap-2"><AlertCircle size={14} /> {t.timelineFailed}</p>
-          ) : events.length === 0 ? (
+          {events.length === 0 ? (
             <p className="text-sm text-gray-500">{t.timelineEmpty}</p>
           ) : (
             <ol className="space-y-3">

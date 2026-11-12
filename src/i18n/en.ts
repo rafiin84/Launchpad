@@ -1348,7 +1348,7 @@ const en = {
 
     timelineTitle: 'Timeline',
     timelineEmpty: 'No events recorded for this company yet.',
-    timelineFailed: 'Could not load the timeline.',
+    timelineFull: "This company's timeline is full. Older events need to be cleared in CRM before more can be added.",
     noteTitle: 'Portfolio note',
     notePlaceholder: 'Write a note about this company…',
     noteSaved: 'Note added.',
