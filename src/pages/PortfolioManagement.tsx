@@ -120,7 +120,7 @@ function PortfolioManagementPage() {
     } finally {
       setPreparingAdd(false);
     }
-    setForm({ mode: 'add', initial: emptyInput() });
+    setForm({ mode: 'add', initial: { ...emptyInput(), confirmedOn: new Date().toISOString().slice(0, 10) } });
   }
 
   function openEdit(entry: PortfolioEntry) {

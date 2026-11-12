@@ -77,8 +77,19 @@ export default function EntryFormModal({
       const v = form[k];
       if (v.trim() !== '' && !Number.isFinite(Number(v))) next[k] = t.errNumber;
     }
+    // Required: what the portfolio table, the allocation views and the membership
+    // rule (a confirmed investment or an authorised relationship) depend on.
+    const required: Array<keyof PortfolioEntryInput> = [
+      'membershipBasis', 'initialInvestmentDate', 'totalInvested', 'ownershipPct', 'status', 'sector', 'currentStage',
+    ];
+    if (form.membershipBasis === 'Confirmed Investment') required.push('confirmedOn');
+    if (form.status === 'Exited') required.push('exitDate');
+    for (const k of required) if (!next[k] && form[k].trim() === '') next[k] = t.errRequired;
+
+    const invested = form.totalInvested.trim();
+    if (!next.totalInvested && invested !== '' && Number.isFinite(Number(invested)) && Number(invested) <= 0) next.totalInvested = t.errPositive;
     const own = form.ownershipPct.trim();
-    if (own !== '' && Number.isFinite(Number(own)) && (Number(own) < 0 || Number(own) > 100)) next.ownershipPct = t.errPercent;
+    if (!next.ownershipPct && own !== '' && Number.isFinite(Number(own)) && (Number(own) < 0 || Number(own) > 100)) next.ownershipPct = t.errPercent;
     setErrors(next);
     if (Object.keys(next).length === 0) onSave(form);
   }
@@ -98,6 +109,7 @@ export default function EntryFormModal({
       }
     >
       <form id="pm-entry-form" onSubmit={submit} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p className="col-span-full text-xs text-gray-400">{t.requiredNote}</p>
         {error && <div className="col-span-full bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
         {mode === 'add' ? (
@@ -117,23 +129,23 @@ export default function EntryFormModal({
         )}
 
         {section(t.sectionInvestment)}
-        <Select label={t.formMembership} value={form.membershipBasis} onChange={set('membershipBasis')}
-          options={MEMBERSHIP_BASES.map(v => ({ value: v, label: v }))} />
-        <Input label={t.formConfirmedOn} type="date" value={form.confirmedOn} onChange={set('confirmedOn')} />
-        <Input label={t.formInitialDate} type="date" value={form.initialInvestmentDate} onChange={set('initialInvestmentDate')} />
-        <Input label={t.formTotalInvested} type="number" step="any" min="0" value={form.totalInvested} onChange={set('totalInvested')} error={errors.totalInvested} />
+        <Select label={`${t.formMembership} *`} value={form.membershipBasis} onChange={set('membershipBasis')}
+          options={MEMBERSHIP_BASES.map(v => ({ value: v, label: v }))} error={errors.membershipBasis} />
+        <Input label={`${t.formConfirmedOn}${form.membershipBasis === 'Confirmed Investment' ? ' *' : ''}`} type="date" value={form.confirmedOn} onChange={set('confirmedOn')} error={errors.confirmedOn} />
+        <Input label={`${t.formInitialDate} *`} type="date" value={form.initialInvestmentDate} onChange={set('initialInvestmentDate')} error={errors.initialInvestmentDate} />
+        <Input label={`${t.formTotalInvested} *`} type="number" step="any" min="0" value={form.totalInvested} onChange={set('totalInvested')} error={errors.totalInvested} />
         <Input label={t.formLatestValuation} type="number" step="any" min="0" value={form.latestValuation} onChange={set('latestValuation')} error={errors.latestValuation} />
         <Input label={t.formValuationAsOf} type="date" value={form.valuationAsOf} onChange={set('valuationAsOf')} />
-        <Input label={t.formOwnership} type="number" step="any" min="0" max="100" value={form.ownershipPct} onChange={set('ownershipPct')} error={errors.ownershipPct} />
-        <Select label={t.formStatus} value={form.status} onChange={set('status')}
-          options={STATUSES.map(v => ({ value: v, label: v }))} />
-        {form.status === 'Exited' && <Input label={t.formExitDate} type="date" value={form.exitDate} onChange={set('exitDate')} />}
+        <Input label={`${t.formOwnership} *`} type="number" step="any" min="0" max="100" value={form.ownershipPct} onChange={set('ownershipPct')} error={errors.ownershipPct} />
+        <Select label={`${t.formStatus} *`} value={form.status} onChange={set('status')}
+          options={STATUSES.map(v => ({ value: v, label: v }))} error={errors.status} />
+        {form.status === 'Exited' && <Input label={`${t.formExitDate} *`} type="date" value={form.exitDate} onChange={set('exitDate')} error={errors.exitDate} />}
 
         {section(t.sectionClassification)}
-        <Input label={t.formSector} value={form.sector} onChange={set('sector')} />
+        <Input label={`${t.formSector} *`} value={form.sector} onChange={set('sector')} error={errors.sector} />
         <Input label={t.formGeography} value={form.geography} onChange={set('geography')} />
-        <Select label={t.formStage} value={form.currentStage} onChange={set('currentStage')}
-          options={STAGES.map(v => ({ value: v, label: v }))} placeholder="—" />
+        <Select label={`${t.formStage} *`} value={form.currentStage} onChange={set('currentStage')}
+          options={STAGES.map(v => ({ value: v, label: v }))} placeholder="—" error={errors.currentStage} />
 
         {section(t.sectionPerformance)}
         <div>
