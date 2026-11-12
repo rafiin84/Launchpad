@@ -11,8 +11,10 @@ import {
   Rss,
   Building2,
   Users,
+  Briefcase,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { pathMatches } from '../../lib/pathMatches';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -35,6 +37,7 @@ export function Sidebar() {
     { label: t.nav.dashboard,     path: '/',             icon: LayoutDashboard },
     { label: t.nav.myActivities,  path: '/activities',   icon: Rss },
     ...(isReviewer ? [] : [{ label: t.nav.company,      path: '/portfolio',    icon: PieChart }]),
+    ...(isReviewer ? [] : [{ label: t.nav.portfolioManagement, path: '/portfolio-management', icon: Briefcase }]),
     { label: t.nav.applications,  path: '/applications', icon: Inbox },
     ...(isReviewer ? [] : [{ label: t.nav.applicants,   path: '/applicants',   icon: Users }]),
     { label: t.nav.documents,     path: '/documents',    icon: FileText },
@@ -72,7 +75,7 @@ export function Sidebar() {
           const isActive =
             item.path === '/'
               ? location.pathname === '/'
-              : location.pathname.startsWith(item.path);
+              : pathMatches(location.pathname, item.path);
 
           return (
             <NavLink

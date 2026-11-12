@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home, MoreHorizontal, Users, ChevronRight } from 'lucide-react';
+import { Building2, PieChart, User, LayoutDashboard, Inbox, FileText, Rss, Home, MoreHorizontal, Users, ChevronRight, Briefcase } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import { pathMatches } from '../../lib/pathMatches';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Avatar } from '../ui/Avatar';
@@ -52,6 +53,7 @@ export function BottomNav() {
   const investorMoreItems = [
     { label: t.nav.documents,  path: '/documents',  icon: FileText, desc: '' },
     ...(isReviewer ? [] : [
+      { label: t.nav.portfolioManagement, path: '/portfolio-management', icon: Briefcase, desc: '' },
       { label: t.nav.founders,   path: '/founders',   icon: Building2, desc: '' },
       { label: t.nav.applicants, path: '/applicants', icon: Users,     desc: '' },
     ]),
@@ -62,7 +64,7 @@ export function BottomNav() {
   const moreItems = isInvestor ? investorMoreItems : founderMoreItems;
 
   const moreIsActive = moreItems.some(item =>
-    item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+    item.path === '/' ? location.pathname === '/' : pathMatches(location.pathname, item.path)
   );
 
   return (
@@ -109,7 +111,7 @@ export function BottomNav() {
             <div className="px-5 py-3 space-y-0.5">
               {moreItems.filter(i => i.path !== '/profile').map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname.startsWith(item.path);
+                const isActive = pathMatches(location.pathname, item.path);
                 return (
                   <button
                     key={item.path}
@@ -159,7 +161,7 @@ export function BottomNav() {
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
-                : location.pathname.startsWith(item.path);
+                : pathMatches(location.pathname, item.path);
 
             return (
               <NavLink

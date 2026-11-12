@@ -81,6 +81,10 @@ These are the Zoho CRM module API names the app reads/writes (defined as `MODULE
 | `Contacts` | `crmFounders.ts` | Founder directory (investor-side, admin token) **and** a founder's own editable profile (portal token, self-service — see below) |
 | `Deals` | `crmDeals.ts` | Investor deal flow |
 | `Founder_Companies` | `companyProfile.ts` | Founder company profile data |
+| `Portfolios` (labelled **Companies** in CRM) | `crmPortfolio.ts` | The investor-maintained company records behind the Companies page. API name is still `Portfolios` — only the display label was renamed |
+| `Portfolio_Management` | `crmPortfolioManagement.ts` | One record per portfolio company: the Portfolio Management page's table, health inputs and as-of dates (investor side only) |
+| `Portfolio_Timeline` | `crmPortfolioManagement.ts` | Per-company events: investments, valuation updates, finance reports, milestones, meetings, notes, follow-ups |
+| `Portfolio_Health_Rules` | `crmPortfolioManagement.ts` | Configurable health thresholds; empty until the business team defines them |
 
 Application/activity payloads are hand-mapped between camelCase app fields and CRM field API names via `FIELD_MAP`-style objects in each service — when adding a field, it must be added in the service's field map, not just the CRM schema.
 
@@ -163,6 +167,19 @@ Activities, documents and notifications save `Author_Name` as plain text when wr
 **Founders cannot read other users' records or the CRM user list**, so a founder's registry only contains renames learned from the feed they can see (investor posts carry `Created_By`). A server-side lookup that derived renames for everyone was designed and deliberately **not shipped**: it would have been a public endpoint returning admin-token-derived data — add it only with an authenticated caller check. Until then a founder who never loaded a feed containing a renamed investor's post may still see the old name inside application notes.
 
 The signed-in user's own name comes from the CRM user's `full_name` at login; the cached profile name and the `appusers` copy are fallbacks only (`fullProfileSync` writes the live CRM name back into `appusers`).
+
+### Portfolio Management (investor page at `/portfolio-management`)
+
+An investor-only page over three CRM modules (see the module map). Access is investor-side only at every layer: the modules grant only the Administrator/Standard/Investor profiles, the nav hides it for reviewers, and the route is wrapped in `BlockedForReviewers` *and* the page itself redirects a founder or reviewer — it is the same belt-and-braces as the other reviewer restrictions.
+
+- **One record per company, joined by the `Company` lookup** (to `Portfolios`). Sector, geography and stage are snapshots kept on the record so allocation can group on them without fetching every company. `Investment Year` is a plain number kept in step with the initial investment date on every save (`toPayload`) — Zoho rejected every formula expression tried.
+- **Health is computed, never stored as the answer** (`src/lib/portfolioHealth.ts`, pure and unit-tested): active rules from `Portfolio_Health_Rules` are evaluated against the metrics a company has reported, and every non-"on track" result carries the rules and values behind it. **A rule can only fire on a reported value, so missing data never produces Needs Attention / At Risk** — if nothing can be evaluated the result is "Data unavailable", or the status the team recorded by hand, never a negative label. A reported `0` is data, not missing. `Headcount Change` is accepted in the rule picklist but cannot fire yet (no previous headcount is stored). The staleness banner uses the active `Days Since Last Update` rule's threshold, else 90 days.
+- **Every performance figure shows its as-of date and reporting period** (`Metrics_As_Of`, `Reporting_Period`, `Valuation_As_Of`, `Health_As_Of`). Revenue trend is not duplicated here — it is read from the company's own finance reports (`Founder_Companies.Financial_Data` via `companyFinancials.ts`), reviewer-verified figures preferred over self-reported.
+- **Add Portfolio Note and Create Follow-up are `Portfolio_Timeline` rows** (`Event_Type` `Note` / `Follow-up`, a follow-up's date being its due date), not CRM Notes/Tasks — so they appear in the company timeline immediately. They are not real CRM Tasks and send no reminder.
+- **Export is client-side CSV of exactly the rows the investor can see** (so it inherits the same record/field permissions as the page, since the data was read with their own token), with formula-injection neutralised (`csvCell`) because company names and notes are free text opened in Excel.
+- **Do not search for a module by the word "portfolio".** `findModuleApiName('portfolio')` returns the *first* module whose name contains it, and the Portfolio_* modules now match too; `crmPortfolio.ts` searches for `portfolios` (plural) for exactly this reason.
+- Active-nav matching is `pathMatches()` (`src/lib/pathMatches.ts`): exact path or a sub-path, never a bare prefix — `/portfolio` must not highlight on `/portfolio-management`.
+- Not built yet: editing/deleting timeline events, configuring health rules from inside the app (rules are edited in the CRM), and a way to bulk-import existing Companies as portfolio entries (Add Investment prefills one at a time).
 
 ### i18n
 
