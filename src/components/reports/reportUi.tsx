@@ -1,67 +1,56 @@
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/cn';
-import { sparklinePoints } from '../../lib/reportAnalytics';
+import { TONES, type Tone } from './reportTheme';
 
-const BAR_COLORS = ['bg-indigo-500', 'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-rose-400'];
-
-export function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+/** A headline number with a soft tinted icon. */
+export function Kpi({ icon: Icon, tone, label, value, sub, hint }: {
+  icon: LucideIcon; tone: Tone; label: string; value: React.ReactNode; sub?: string; hint?: string;
+}) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 min-w-0">
-      <p className="text-[11px] text-gray-400">{label}</p>
-      <p className="text-lg font-bold text-gray-900 tabular-nums mt-0.5 truncate" title={hint}>{value}</p>
+    <div className="bg-white border border-gray-100 rounded-3xl p-4 sm:p-5 min-w-0 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <span className={cn('w-9 h-9 rounded-2xl flex items-center justify-center mb-3', TONES[tone])}>
+        <Icon size={17} strokeWidth={2} />
+      </span>
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xl font-bold text-gray-900 tabular-nums tracking-tight mt-0.5 break-words" title={hint}>{value}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-1 truncate">{sub}</p>}
     </div>
   );
 }
 
-export function Card({ title, note, children, className }: { title: string; note?: string; children: React.ReactNode; className?: string }) {
+export function Card({ title, note, children, className, action }: {
+  title: string; note?: string; children: React.ReactNode; className?: string; action?: React.ReactNode;
+}) {
   return (
-    <section className={cn('bg-white border border-gray-100 rounded-2xl p-4 break-inside-avoid', className)}>
-      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-      {note && <p className="text-[11px] text-gray-400 mt-0.5">{note}</p>}
-      <div className="mt-3">{children}</div>
+    <section className={cn('bg-white border border-gray-100 rounded-3xl p-5 break-inside-avoid shadow-[0_1px_2px_rgba(16,24,40,0.04)]', className)}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          {note && <p className="text-[11px] text-gray-400 mt-0.5">{note}</p>}
+        </div>
+        {action}
+      </div>
+      {children}
     </section>
   );
 }
 
-/** Horizontal bars, scaled to the largest value. A zero-only list still renders its rows. */
-export function BarList({ items }: { items: Array<{ label: string; value: number; display: string; sub?: string }> }) {
-  const max = Math.max(0, ...items.map(i => i.value));
-  return (
-    <ul className="space-y-2">
-      {items.map((it, i) => (
-        <li key={it.label}>
-          <div className="flex items-baseline justify-between gap-3 text-xs">
-            <span className="text-gray-700 truncate">{it.label}</span>
-            <span className="text-gray-900 font-medium tabular-nums whitespace-nowrap">{it.display}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-gray-100 mt-1 overflow-hidden">
-            <div className={cn('h-full rounded-full', BAR_COLORS[i % BAR_COLORS.length])}
-              style={{ width: `${max > 0 ? Math.max(2, (it.value / max) * 100) : 0}%` }} />
-          </div>
-          {it.sub && <p className="text-[11px] text-gray-400 mt-0.5">{it.sub}</p>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function Sparkline({ values, label }: { values: number[]; label: string }) {
-  const w = 96, h = 28;
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} className="flex-shrink-0">
-      {values.length > 1
-        ? <polyline points={sparklinePoints(values, w, h)} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" strokeLinecap="round" className="text-indigo-500" />
-        : <circle cx={w / 2} cy={h / 2} r="3" className="fill-indigo-500" />}
-    </svg>
-  );
+/** A small rounded tag; tone picks a pastel. */
+export function Pill({ tone, children }: { tone: 'emerald' | 'rose' | 'gray' | 'indigo'; children: React.ReactNode }) {
+  const styles = {
+    emerald: 'bg-emerald-50 text-emerald-600', rose: 'bg-rose-50 text-rose-500',
+    gray: 'bg-gray-100 text-gray-500', indigo: 'bg-indigo-50 text-indigo-500',
+  };
+  return <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', styles[tone])}>{children}</span>;
 }
 
 export function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-x-auto">
+    <div className="bg-white border border-gray-100 rounded-3xl overflow-x-auto shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <table className="w-full text-sm min-w-[40rem]">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-100">
-            {head.map(h => <th key={h} scope="col" className="px-3 py-3 font-medium whitespace-nowrap">{h}</th>)}
+            {head.map(h => <th key={h} scope="col" className="px-4 py-3.5 font-medium whitespace-nowrap">{h}</th>)}
           </tr>
         </thead>
         <tbody>{children}</tbody>

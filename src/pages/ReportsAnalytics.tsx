@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AlertCircle, FileDown, FileText, Loader2, RefreshCw, Save, BarChart3, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import {
+  AlertCircle, BarChart3, CalendarDays, ChevronDown, Clock, Coins, FileDown, FileText, Loader2, RefreshCw, Save, SlidersHorizontal,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -15,7 +17,7 @@ import { fetchModuleAccess } from '../services/zohoApi';
 import {
   activeFilterCount, buildReport, emptyFilters, REPORT_TABS, type Report, type ReportFilters, type ReportTab,
 } from '../lib/reportAnalytics';
-import ReportFiltersModal, { type FilterOptions } from '../components/reports/ReportFiltersModal';
+import ReportFiltersDrawer, { type FilterOptions } from '../components/reports/ReportFiltersDrawer';
 import { ActivitySection, CompaniesSection, PerformanceSection, SummarySection } from '../components/reports/ReportSections';
 import MethodologyPanel from '../components/reports/MethodologyPanel';
 import SaveViewModal from '../components/reports/SaveViewModal';
@@ -52,6 +54,7 @@ function ReportsPage() {
   const [error, setError] = useState('');
   const [showExcluded, setShowExcluded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const [views, setViews] = useState<SavedView[]>([]);
   const [canSave, setCanSave] = useState<boolean | null>(null);
@@ -158,47 +161,48 @@ function ReportsPage() {
     summary: t.tabSummary, performance: t.tabPerformance, activity: t.tabActivity, companies: t.tabCompanies,
   };
 
-  const actions = (
-    <div className="flex flex-wrap gap-2">
+  function exportPdf() {
+    // Show every section (the charts need a moment to size themselves) and then
+    // open the print dialog; the browser's "Save as PDF" makes the file.
+    setPrinting(true);
+    window.setTimeout(() => window.print(), 900);
+  }
+  useEffect(() => {
+    const done = () => setPrinting(false);
+    window.addEventListener('afterprint', done);
+    return () => window.removeEventListener('afterprint', done);
+  }, []);
+
+  const noReport = !report || report.isEmpty;
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+      {views.length > 0 && (
+        <div className="w-44">
+          <Select aria-label={t.savedViews} value={loaded?.id ?? ''} onChange={e => openView(e.target.value)}
+            options={views.map(v => ({ value: v.id, label: v.name }))} placeholder={t.savedViewsPlaceholder} className="py-2 text-xs" />
+        </div>
+      )}
       <Button variant="outline" onClick={() => setFiltersOpen(true)}>
         <SlidersHorizontal size={14} className="mr-1.5" /> {t.filters}
-        {filterCount > 0 && <span className="ml-1.5 bg-black text-white text-[10px] font-semibold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 inline-flex items-center justify-center">{filterCount}</span>}
+        {filterCount > 0 && <span className="ml-1.5 bg-gray-900 text-white text-[10px] font-semibold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 inline-flex items-center justify-center">{filterCount}</span>}
       </Button>
       <Button variant="primary" onClick={() => void generate(draft)} disabled={generating}>
         {generating ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RefreshCw size={14} className="mr-1.5" />}
         {generating ? t.generating : t.generate}
       </Button>
-      <Button variant="outline" onClick={exportCsv} disabled={!report || report.isEmpty}>
-        <FileText size={14} className="mr-1.5" /> {t.exportCsv}
-      </Button>
-      <Button variant="outline" onClick={() => window.print()} disabled={!report || report.isEmpty} title={t.pdfNote}>
-        <FileDown size={14} className="mr-1.5" /> {t.exportPdf}
-      </Button>
-      {canSave !== false && (
-        <Button variant="outline" onClick={() => { setSaveError(''); setSaveOpen(true); }} disabled={!report || report.isEmpty}>
-          <Save size={14} className="mr-1.5" /> {t.saveView}
-        </Button>
-      )}
     </div>
   );
 
+  const chip = 'inline-flex items-center gap-1.5 text-[11px] text-gray-600 bg-white border border-gray-100 rounded-full px-2.5 py-1';
+
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-[90rem]">
       <style>{PRINT_CSS}</style>
       <div className="report-print-hide">
-        <PageHeader title={t.title} description={t.intro} className="mb-4" />
-        <div className="mb-6 flex flex-col lg:flex-row lg:items-end gap-3">
-          {actions}
-          {views.length > 0 && (
-            <div className="lg:ml-auto lg:w-72">
-              <Select label={t.savedViews} value={loaded?.id ?? ''} onChange={e => openView(e.target.value)}
-                options={views.map(v => ({ value: v.id, label: v.name }))} placeholder={t.savedViewsPlaceholder} />
-            </div>
-          )}
-        </div>
+        <PageHeader title={t.title} description={t.intro} action={headerActions} className="mb-5" />
         {notice && (
           <div role={notice.ok ? 'status' : 'alert'}
-            className={cn('text-xs rounded-lg px-3 py-2 mb-4', notice.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
+            className={cn('text-xs rounded-xl px-3 py-2 mb-4', notice.ok ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600')}>
             {notice.message}
           </div>
         )}
@@ -206,75 +210,86 @@ function ReportsPage() {
 
       {loading && (
         <div className="space-y-3" aria-busy="true" aria-label={t.loading}>
-          {[0, 1, 2].map(i => <div key={i} className="h-24 bg-white border border-gray-100 rounded-2xl animate-pulse" />)}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{[0, 1, 2, 3, 4].map(i => <div key={i} className="h-28 bg-white border border-gray-100 rounded-3xl animate-pulse" />)}</div>
+          <div className="h-64 bg-white border border-gray-100 rounded-3xl animate-pulse" />
         </div>
       )}
 
       {!loading && error && (
-        <div role="alert" className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
-          <AlertCircle size={20} className="text-red-400 mx-auto mb-2" />
-          <p className="text-sm font-medium text-red-700">{t.loadFailed}</p>
-          <p className="text-xs text-red-500 mt-1 break-words">{error}</p>
-          <button onClick={() => void generate(draft)} className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-red-600 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
+        <div role="alert" className="bg-red-50 border border-red-100 rounded-3xl p-6 text-center">
+          <AlertCircle size={20} className="text-red-300 mx-auto mb-2" />
+          <p className="text-sm font-medium text-red-600">{t.loadFailed}</p>
+          <p className="text-xs text-red-400 mt-1 break-words">{error}</p>
+          <button onClick={() => void generate(draft)} className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-red-500 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg">
             <RefreshCw size={12} /> {t.retry}
           </button>
         </div>
       )}
 
       {!loading && !error && report && (
-        <div className="report-print space-y-4">
-          <header className="space-y-0.5">
+        <div className="report-print space-y-5">
+          <header className="space-y-2">
             <h2 className="hidden print:block text-lg font-bold text-gray-900">{t.title}{loaded ? ` · ${loaded.name}` : ''}</h2>
-            <p className="text-xs font-medium text-gray-700">{dataAsOfText(t, report, locale)}</p>
-            <p className="text-xs text-gray-500">{periodText(t, report)} · {t.reportingIn.replace('{currency}', report.currency || '—')}</p>
-            <p className="text-xs text-gray-500">{conversionLine(t, report)}</p>
-            {filterChips.length > 0 && (
-              <ul className="flex flex-wrap gap-1.5 pt-1.5" aria-label={t.filtersTitle}>
-                {filterChips.map(c => <li key={c} className="text-[11px] text-gray-600 bg-gray-100 rounded-full px-2.5 py-0.5">{c}</li>)}
-              </ul>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={chip}><Clock size={12} className="text-gray-400" />{dataAsOfText(t, report, locale)}</span>
+              <span className={chip}><CalendarDays size={12} className="text-gray-400" />{periodText(t, report)}</span>
+              <span className={chip}><Coins size={12} className="text-gray-400" />{t.reportingIn.replace('{currency}', report.currency || '—')}</span>
+              {filterChips.map(c => <span key={c} className="inline-flex items-center text-[11px] text-indigo-500 bg-indigo-50 rounded-full px-2.5 py-1">{c}</span>)}
+            </div>
+            <p className="text-[11px] text-gray-400">{conversionLine(t, report)}</p>
           </header>
 
           {incomplete.length > 0 && (
-            <div role="status" className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+            <div role="status" className="bg-amber-50/70 border border-amber-100 rounded-2xl px-4 py-3">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-amber-800">{t.excludedBanner}</p>
+                <p className="text-sm font-medium text-amber-700">{t.excludedBanner}</p>
                 <button onClick={() => setShowExcluded(s => !s)} aria-expanded={showExcluded}
-                  className="report-print-hide flex items-center gap-1 text-xs font-medium text-amber-700 whitespace-nowrap">
+                  className="report-print-hide flex items-center gap-1 text-xs font-medium text-amber-600 whitespace-nowrap">
                   {showExcluded ? t.excludedHide : t.excludedShow}
                   <ChevronDown size={13} className={showExcluded ? 'rotate-180' : ''} />
                 </button>
               </div>
-              <ul className={cn('mt-2 space-y-1 text-xs text-amber-700 list-disc pl-4', showExcluded ? 'block' : 'hidden print:block')}>
+              <ul className={cn('mt-2 space-y-1 text-xs text-amber-600 list-disc pl-4', showExcluded ? 'block' : 'hidden print:block')}>
                 {excluded.map(m => <li key={m}>{m}</li>)}
               </ul>
             </div>
           )}
 
           {report.isEmpty ? (
-            <div className="text-center py-16 border-2 border-dashed border-gray-100 rounded-2xl">
-              <BarChart3 size={28} className="text-gray-200 mx-auto mb-3" />
+            <div className="text-center py-20 bg-white border border-gray-100 rounded-3xl">
+              <span className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-300 inline-flex items-center justify-center mb-3"><BarChart3 size={22} /></span>
               <p className="text-sm font-medium text-gray-700 mb-1">{t.emptyTitle}</p>
               <p className="text-xs text-gray-400">{t.emptyDesc}</p>
             </div>
           ) : (
             <>
-              <div className="report-print-hide flex flex-wrap gap-1.5" role="tablist">
-                {REPORT_TABS.map(k => (
-                  <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-                    className={cn('px-3 py-1.5 rounded-xl text-xs font-medium transition-colors',
-                      tab === k ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
-                    {tabLabel[k]}
-                  </button>
-                ))}
+              <div className="report-print-hide flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div className="inline-flex p-1 bg-gray-100/80 rounded-2xl overflow-x-auto max-w-full" role="tablist">
+                  {REPORT_TABS.map(k => (
+                    <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                      className={cn('px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all',
+                        tab === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800')}>
+                      {tabLabel[k]}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={exportCsv} disabled={noReport}><FileText size={13} className="mr-1.5" /> {t.exportCsv}</Button>
+                  <Button variant="outline" size="sm" onClick={exportPdf} disabled={noReport} title={t.pdfNote}><FileDown size={13} className="mr-1.5" /> {t.exportPdf}</Button>
+                  {canSave !== false && (
+                    <Button variant="outline" size="sm" onClick={() => { setSaveError(''); setSaveOpen(true); }} disabled={noReport}>
+                      <Save size={13} className="mr-1.5" /> {t.saveView}
+                    </Button>
+                  )}
+                </div>
               </div>
               {REPORT_TABS.map(k => (
-                <section key={k} className={cn(tab === k ? 'block' : 'hidden print:block')} aria-label={tabLabel[k]}>
+                <section key={k} className={cn(tab === k || printing ? 'block' : 'hidden print:block')} aria-label={tabLabel[k]}>
                   <h2 className="hidden print:block text-sm font-bold text-gray-900 mt-4 mb-2">{tabLabel[k]}</h2>
-                  {k === 'summary' && <SummarySection report={report} t={t} locale={locale} />}
-                  {k === 'performance' && <PerformanceSection report={report} t={t} locale={locale} />}
-                  {k === 'activity' && <ActivitySection report={report} t={t} locale={locale} />}
-                  {k === 'companies' && <CompaniesSection report={report} t={t} locale={locale} />}
+                  {(tab === k || printing) && k === 'summary' && <SummarySection report={report} t={t} locale={locale} />}
+                  {(tab === k || printing) && k === 'performance' && <PerformanceSection report={report} t={t} locale={locale} />}
+                  {(tab === k || printing) && k === 'activity' && <ActivitySection report={report} t={t} locale={locale} />}
+                  {(tab === k || printing) && k === 'companies' && <CompaniesSection report={report} t={t} locale={locale} />}
                 </section>
               ))}
             </>
@@ -285,7 +300,7 @@ function ReportsPage() {
       )}
 
       {filtersOpen && (
-        <ReportFiltersModal initial={draft} options={options}
+        <ReportFiltersDrawer initial={draft} options={options}
           reportCurrency={report?.currency ?? ''} currenciesInScope={report?.currenciesInScope ?? []}
           generating={generating} t={t} onClose={() => setFiltersOpen(false)}
           onGenerate={f => { setDraft(f); setFiltersOpen(false); void generate(f); }} />
@@ -294,11 +309,6 @@ function ReportsPage() {
         <SaveViewModal key={loaded?.id ?? 'new'} initialName={loaded?.name ?? ''} loadedView={loaded}
           saving={saving} error={saveError} t={t} onSave={(n, id) => void saveView(n, id)}
           onClose={() => { if (!saving) setSaveOpen(false); }} />
-      )}
-      {generating && !loading && (
-        <div className="fixed bottom-4 right-4 report-print-hide flex items-center gap-2 bg-black text-white text-xs px-3 py-2 rounded-xl shadow-lg" role="status">
-          <Loader2 size={13} className="animate-spin" /> {t.generating}
-        </div>
       )}
     </div>
   );

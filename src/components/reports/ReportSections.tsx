@@ -1,29 +1,44 @@
+import {
+  Activity, BarChart3, Building2, Coins, Layers, PieChart, Rocket, Target, TrendingUp, Wallet,
+} from 'lucide-react';
 import { formatDate, formatPercent } from '../../lib/portfolioFormat';
-import type { Bucket, Report } from '../../lib/reportAnalytics';
-import { BarList, Card, Sparkline, Table, Tile } from './reportUi';
+import type { Report } from '../../lib/reportAnalytics';
+import { AreaSpark, ColumnChart, DonutChart, HBarChart, type ChartDatum } from './ReportCharts';
+import { Card, Kpi, Pill, Table } from './reportUi';
 import { moneyFullOf, moneyOf, plainNumber, type RepText } from './reportText';
 
 interface P { report: Report; t: RepText; locale: string }
+
+const hasMetrics = (c: Report['companies'][number]) => [c.revenue, c.growthPct, c.burn, c.runwayMonths].some(v => v !== null);
+
+const toData = (buckets: Report['activity']['byYear']): ChartDatum[] =>
+  buckets.map(b => ({ label: b.label, value: b.funded, count: b.count }));
 
 export function SummarySection({ report, t, locale }: P) {
   const money = moneyOf(report, locale);
   const full = moneyFullOf(report, locale);
   const s = report.summary;
-  const dist = s.distribution.map(d => ({
-    label: d.label, value: d.share, display: `${Math.round(d.share * 100)}%`, sub: `${d.count} · ${money(d.invested)}`,
-  }));
+  const dist: ChartDatum[] = s.distribution.map(d => ({ label: d.label, value: d.invested, count: d.count }));
+  const count = (n: number) => t.actCount.replace('{n}', String(n));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Tile label={t.sumCompanies} value={s.companies} />
-        <Tile label={t.sumInvestments} value={s.investments} />
-        <Tile label={t.sumTotalFunded} value={money(s.totalFunded)} hint={full(s.totalFunded)} />
-        <Tile label={t.sumDeployed} value={money(s.deployed)} hint={full(s.deployed)} />
-        <Tile label={t.sumCommitted} value={money(s.committed)} hint={full(s.committed)} />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        <Kpi icon={Building2} tone="indigo" label={t.sumCompanies} value={s.companies} />
+        <Kpi icon={Layers} tone="sky" label={t.sumInvestments} value={s.investments} />
+        <Kpi icon={Wallet} tone="emerald" label={t.sumTotalFunded} value={money(s.totalFunded)} hint={full(s.totalFunded)} />
+        <Kpi icon={Rocket} tone="violet" label={t.sumDeployed} value={money(s.deployed)} hint={full(s.deployed)} />
+        <Kpi icon={Target} tone="amber" label={t.sumCommitted} value={money(s.committed)} hint={full(s.committed)} />
       </div>
-      <Card title={t.sumDistribution} note={t.sumDistributionNote}>
-        {dist.length === 0 ? <p className="text-sm text-gray-500">—</p> : <BarList items={dist} />}
-      </Card>
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        <Card className="xl:col-span-2" title={t.sumDistribution} note={t.sumDistributionNote}>
+          {dist.length === 0 ? <p className="text-sm text-gray-500">—</p>
+            : <DonutChart data={dist} format={money} centerLabel={t.sumTotalFunded} centerValue={money(s.totalFunded)} countLabel={count} />}
+        </Card>
+        <Card className="xl:col-span-3" title={t.actByYear}>
+          {report.activity.byYear.length === 0 ? <p className="text-sm text-gray-500">—</p>
+            : <ColumnChart data={toData(report.activity.byYear)} format={money} countLabel={count} />}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -34,17 +49,17 @@ export function PerformanceSection({ report, t, locale }: P) {
   const r = report.returns;
   const s = report.summary;
   const recorded = r.rows.some(x => x.realized !== null);
+  const valued = r.rows.some(x => x.unrealized !== null);
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label={t.perfRealized} value={recorded ? money(s.realized) : t.notAvailable} hint={recorded ? full(s.realized) : undefined} />
-        <Tile label={t.perfPortfolioValue} value={r.rows.some(x => x.unrealized !== null) ? money(s.portfolioValue) : t.notAvailable}
-          hint={full(s.portfolioValue)} />
-        <Tile label={t.perfMoic} value={r.moic === null ? t.notAvailable : `${r.moic.toFixed(2)}x`} />
-        <Tile label={t.perfIrr} value={r.irrPct === null ? t.notAvailable : `${r.irrPct.toFixed(1)}%`} />
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <Kpi icon={Coins} tone="emerald" label={t.perfRealized} value={recorded ? money(s.realized) : t.notAvailable} hint={recorded ? full(s.realized) : undefined} />
+        <Kpi icon={PieChart} tone="sky" label={t.perfPortfolioValue} value={valued ? money(s.portfolioValue) : t.notAvailable} hint={valued ? full(s.portfolioValue) : undefined} />
+        <Kpi icon={BarChart3} tone="violet" label={t.perfMoic} value={r.moic === null ? t.notAvailable : `${r.moic.toFixed(2)}x`} />
+        <Kpi icon={Activity} tone="amber" label={t.perfIrr} value={r.irrPct === null ? t.notAvailable : `${r.irrPct.toFixed(1)}%`} />
       </div>
       {r.moic === null ? (
-        <p className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">{t.perfReturnsUnavailable}</p>
+        <p className="text-sm text-gray-500 bg-white border border-gray-100 rounded-2xl px-4 py-3">{t.perfReturnsUnavailable}</p>
       ) : (
         <p className="text-xs text-gray-500">
           {t.perfBasedOn.replace('{n}', String(r.eligible)).replace('{total}', String(r.total))}
@@ -52,40 +67,57 @@ export function PerformanceSection({ report, t, locale }: P) {
         </p>
       )}
 
-      <Card title={t.perfValuationTrend} note={t.perfValuationNote.replace('{currency}', report.currency)}>
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900">{t.perfValuationTrend}</h3>
+        <p className="text-[11px] text-gray-400 mb-3">{t.perfValuationNote.replace('{currency}', report.currency)}</p>
         {report.valuation.length === 0 ? (
-          <p className="text-sm text-gray-500">{t.perfNoTrend}</p>
+          <p className="text-sm text-gray-500 bg-white border border-gray-100 rounded-2xl px-4 py-3">{t.perfNoTrend}</p>
         ) : (
-          <ul className="divide-y divide-gray-50">
-            {report.valuation.map(v => (
-              <li key={v.companyId || v.company} className="flex items-center gap-3 py-2">
-                <p className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0">{v.company || '—'}</p>
-                <Sparkline values={v.points.map(p => p.value)} label={v.company} />
-                <div className="text-right w-28 flex-shrink-0">
-                  <p className="text-sm font-semibold tabular-nums text-gray-900">{money(v.points[v.points.length - 1].value)}</p>
-                  <p className="text-[11px] text-gray-400">
-                    {v.changePct === null ? t.perfSinglePoint : `${v.changePct >= 0 ? '+' : ''}${v.changePct.toFixed(0)}%`}
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {[...report.valuation].sort((a, b) => b.points.length - a.points.length).map((v, i) => {
+              const last = v.points[v.points.length - 1];
+              return (
+                <div key={v.companyId || v.company} className="bg-white border border-gray-100 rounded-3xl p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] break-inside-avoid">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{v.company || '—'}</p>
+                      <p className="text-lg font-bold text-gray-900 tabular-nums">{money(last.value)}</p>
+                    </div>
+                    {v.changePct === null
+                      ? <Pill tone="gray">{t.perfSinglePoint}</Pill>
+                      : <Pill tone={v.changePct >= 0 ? 'emerald' : 'rose'}>{v.changePct >= 0 ? '+' : ''}{v.changePct.toFixed(0)}%</Pill>}
+                  </div>
+                  {v.points.length > 1 ? (
+                    <>
+                      <AreaSpark points={v.points.map(p => ({ label: p.date, value: p.value }))} color={i} label={v.company} />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                        <span>{v.points[0].round || ''} · {formatDate(v.points[0].date, locale)}</span>
+                        <span>{last.round || ''} · {formatDate(last.date, locale)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-4 text-[11px] text-gray-400">{[last.round, formatDate(last.date, locale)].filter(Boolean).join(' · ')}</p>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
         )}
-      </Card>
+      </div>
 
       {r.rows.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">{t.perfByInvestment}</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">{t.perfByInvestment}</h3>
           <Table head={[t.colCompany, t.colRound, t.colFunded, t.colRealized, t.colUnrealized, t.colMoic, t.colIrr]}>
             {r.rows.map(x => (
               <tr key={x.id} className="border-b border-gray-50 last:border-0">
-                <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{x.company || '—'}</td>
-                <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{x.round || '—'}</td>
-                <td className="px-3 py-2.5 tabular-nums">{x.funded === null ? '—' : money(x.funded)}</td>
-                <td className="px-3 py-2.5 tabular-nums">{x.realized === null ? '—' : money(x.realized)}</td>
-                <td className="px-3 py-2.5 tabular-nums">{x.unrealized === null ? '—' : money(x.unrealized)}</td>
-                <td className="px-3 py-2.5 tabular-nums">{x.moic === null ? '—' : `${x.moic.toFixed(2)}x`}</td>
-                <td className="px-3 py-2.5 tabular-nums">{x.irrPct === null ? '—' : `${x.irrPct.toFixed(1)}%`}</td>
+                <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{x.company || '—'}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{x.round || '—'}</td>
+                <td className="px-4 py-3 tabular-nums">{x.funded === null ? '—' : money(x.funded)}</td>
+                <td className="px-4 py-3 tabular-nums">{x.realized === null ? '—' : money(x.realized)}</td>
+                <td className="px-4 py-3 tabular-nums">{x.unrealized === null ? '—' : money(x.unrealized)}</td>
+                <td className="px-4 py-3">{x.moic === null ? '—' : <Pill tone={x.moic >= 1 ? 'emerald' : 'rose'}>{x.moic.toFixed(2)}x</Pill>}</td>
+                <td className="px-4 py-3 tabular-nums">{x.irrPct === null ? '—' : `${x.irrPct.toFixed(1)}%`}</td>
               </tr>
             ))}
           </Table>
@@ -97,57 +129,82 @@ export function PerformanceSection({ report, t, locale }: P) {
 
 export function ActivitySection({ report, t, locale }: P) {
   const money = moneyOf(report, locale);
-  const groups: Array<[string, Bucket[]]> = [
-    [t.actByYear, report.activity.byYear], [t.actByStage, report.activity.byStage],
-    [t.actBySector, report.activity.bySector], [t.actByGeography, report.activity.byGeography],
-    [t.actByInstrument, report.activity.byInstrument],
-  ];
+  const count = (n: number) => t.actCount.replace('{n}', String(n));
+  const a = report.activity;
+  const total = report.summary.totalFunded;
+  const empty = <p className="text-sm text-gray-500">—</p>;
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-400">{t.actNote}</p>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {groups.map(([title, buckets]) => (
-          <Card key={title} title={title}>
-            {buckets.length === 0 ? <p className="text-sm text-gray-500">—</p> : (
-              <BarList items={buckets.map(b => ({
-                label: b.label, value: b.funded, display: money(b.funded), sub: t.actCount.replace('{n}', String(b.count)),
-              }))} />
-            )}
-          </Card>
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="lg:col-span-2" title={t.actByYear}>
+          {a.byYear.length === 0 ? empty : <ColumnChart data={toData(a.byYear)} format={money} countLabel={count} />}
+        </Card>
+        <Card title={t.actByStage}>{a.byStage.length === 0 ? empty : <HBarChart data={toData(a.byStage)} format={money} countLabel={count} />}</Card>
+        <Card title={t.actByGeography}>{a.byGeography.length === 0 ? empty : <HBarChart data={toData(a.byGeography)} format={money} countLabel={count} />}</Card>
+        <Card title={t.actBySector}>
+          {a.bySector.length === 0 ? empty : <DonutChart data={toData(a.bySector)} format={money} centerLabel={t.colFunded} centerValue={money(total)} countLabel={count} />}
+        </Card>
+        <Card title={t.actByInstrument}>
+          {a.byInstrument.length === 0 ? empty : <DonutChart data={toData(a.byInstrument)} format={money} centerLabel={t.colFunded} centerValue={money(total)} countLabel={count} />}
+        </Card>
       </div>
     </div>
   );
 }
 
 export function CompaniesSection({ report, t, locale }: P) {
+  const runwayCap = 24;
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-400">{t.coNote}</p>
       {report.companies.length === 0 ? (
         <p className="text-sm text-gray-500">—</p>
       ) : (
-        <Table head={[t.colCompany, t.colSector, t.colStage, t.colRevenue, t.colGrowth, t.colBurn, t.colRunway, t.colMetricsAsOf, t.colMilestones]}>
-          {report.companies.map(c => (
-            <tr key={c.key} className="border-b border-gray-50 last:border-0 align-top">
-              <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{c.name}</td>
-              <td className="px-3 py-2.5 text-gray-600">{c.sector || '—'}</td>
-              <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{c.stage || '—'}</td>
-              <td className="px-3 py-2.5 tabular-nums">{c.revenue === null ? t.notReported : plainNumber(c.revenue, locale)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{c.growthPct === null ? '—' : formatPercent(c.growthPct)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{c.burn === null ? '—' : plainNumber(c.burn, locale)}</td>
-              <td className="px-3 py-2.5 tabular-nums whitespace-nowrap">{c.runwayMonths === null ? '—' : t.months.replace('{n}', c.runwayMonths.toLocaleString(locale, { maximumFractionDigits: 1 }))}</td>
-              <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                {c.metricsAsOf ? formatDate(c.metricsAsOf, locale) : '—'}
-                {c.reportingPeriod && <span className="block text-[11px] text-gray-400">{c.reportingPeriod}</span>}
-              </td>
-              <td className="px-3 py-2.5 text-gray-600">
-                {c.milestones === 0 ? t.milestonesNone : t.milestonesRecorded.replace('{n}', String(c.milestones))}
-                {c.latestMilestone && <span className="block text-[11px] text-gray-400">{t.milestoneLatest.replace('{title}', c.latestMilestone.title)}</span>}
-              </td>
-            </tr>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {[...report.companies].sort((x, y) => Number(hasMetrics(y)) - Number(hasMetrics(x))).map(c => (
+            <div key={c.key} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] break-inside-avoid">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                  <p className="text-[11px] text-gray-400 truncate">{[c.sector, c.stage].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
+                {c.growthPct !== null && <Pill tone={c.growthPct >= 0 ? 'emerald' : 'rose'}>{c.growthPct >= 0 ? '+' : ''}{formatPercent(c.growthPct, 0)}</Pill>}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-gray-400">{t.colRevenue}</p>
+                  <p className="text-lg font-bold text-gray-900 tabular-nums">{c.revenue === null ? <span className="text-sm font-medium text-gray-400">{t.notReported}</span> : plainNumber(c.revenue, locale)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-400">{t.colBurn}</p>
+                  <p className="text-lg font-bold text-gray-900 tabular-nums">{c.burn === null ? <span className="text-sm font-medium text-gray-400">—</span> : plainNumber(c.burn, locale)}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="flex items-baseline justify-between text-[11px] text-gray-400 mb-1.5">
+                  <span>{t.colRunway}</span>
+                  <span className="text-gray-700 font-medium tabular-nums">
+                    {c.runwayMonths === null ? '—' : t.months.replace('{n}', c.runwayMonths.toLocaleString(locale, { maximumFractionDigits: 1 }))}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-indigo-200" style={{ width: `${c.runwayMonths === null ? 0 : Math.min(100, Math.max(3, (c.runwayMonths / runwayCap) * 100))}%` }} />
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-gray-50 text-[11px] text-gray-500 space-y-0.5">
+                <p>
+                  {t.colMilestones}: {c.milestones === 0 ? t.milestonesNone : t.milestonesRecorded.replace('{n}', String(c.milestones))}
+                  {c.latestMilestone && <span className="text-gray-400"> · {t.milestoneLatest.replace('{title}', c.latestMilestone.title)}</span>}
+                </p>
+                {c.metricsAsOf && <p className="text-gray-400 flex items-center gap-1"><TrendingUp size={11} /> {t.colMetricsAsOf} {formatDate(c.metricsAsOf, locale)}{c.reportingPeriod ? ` · ${c.reportingPeriod}` : ''}</p>}
+              </div>
+            </div>
           ))}
-        </Table>
+        </div>
       )}
     </div>
   );
