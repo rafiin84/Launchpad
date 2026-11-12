@@ -84,6 +84,7 @@ These are the Zoho CRM module API names the app reads/writes (defined as `MODULE
 | `Portfolios` (labelled **Companies** in CRM) | `crmPortfolio.ts` | The investor-maintained company records behind the Companies page. API name is still `Portfolios` — only the display label was renamed |
 | `Portfolio_Management` | `crmPortfolioManagement.ts` | One record per portfolio company: the Portfolio Management page's table, health inputs, as-of dates and the company's timeline (`Timeline_Events` JSON). The only module for that feature (investor side only) |
 | `Investments` | `crmInvestments.ts` | One record per investment round in a company; its cash movements are JSON in `Cash_Flows`. The only module for the Investments feature (investor side only) — see "Investments module" below |
+| `Reports_Analytics` (labelled **Reports and Analytics**) | _(no page yet)_ | The only module for the Reports & Analytics feature: one record per **saved report view** (filters, currency-conversion policy and rates used, last generated snapshot as JSON in `Report_Snapshot`, `Data_As_Of`). Investor side only (Administrator/Standard/Investor). Report figures are computed from `Investments` / `Portfolio_Management` / `Founder_Companies` at generation time, never stored as source data |
 
 Application/activity payloads are hand-mapped between camelCase app fields and CRM field API names via `FIELD_MAP`-style objects in each service — when adding a field, it must be added in the service's field map, not just the CRM schema.
 
