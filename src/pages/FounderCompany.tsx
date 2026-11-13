@@ -3,11 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Globe, MapPin, Users, DollarSign, TrendingUp,
   Lightbulb, Target, Edit3, Check, X, ExternalLink,
-  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react';
+  Calendar, Shield, Loader2, CheckCircle, AlertCircle, Camera, MessageSquare, FileText, Flag } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { percent, withUnit } from '../lib/units';
 import { useAuth } from '../context/AuthContext';
 import FinanceReportsPanel from '../components/finance/FinanceReportsPanel';
+import FounderActivitiesTab from '../components/company/FounderActivitiesTab';
+import DocumentsTab from '../components/company/DocumentsTab';
+import MilestonesTab from '../components/company/MilestonesTab';
 import { findCompanyRecordIdForEmail } from '../services/founderCompanyLookup';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
@@ -17,7 +20,7 @@ import {
   uploadCompanyLogo,
 } from '../services/companyProfile';
 
-type CompanyTab = 'overview' | 'finance';
+type CompanyTab = 'overview' | 'finance' | 'activities' | 'documents' | 'milestones';
 
 const STAGES = ['Idea', 'Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Growth', 'Profitable'];
 const INDUSTRIES = ['SaaS', 'Fintech', 'Healthtech', 'Edtech', 'E-commerce', 'Marketplace', 'AI/ML', 'Hardware', 'Deep Tech', 'Consumer', 'Enterprise', 'Other'];
@@ -384,6 +387,13 @@ export default function FounderCompany() {
           {([
             { id: 'overview' as const, label: t.companyProfile.companyOverview, icon: Building2 },
             { id: 'finance' as const, label: t.companyDetail.tabFinance, icon: TrendingUp },
+            // Founders keep their company's activity, documents and milestones here too; an investor
+            // browsing a founder's page (?email=) does not get write tabs.
+            ...(isInvestor ? [] : [
+              { id: 'activities' as const, label: t.companyDetail.tabActivities, icon: MessageSquare },
+              { id: 'documents' as const, label: t.companyDetail.tabDocuments, icon: FileText },
+              { id: 'milestones' as const, label: t.companyDetail.tabMilestones, icon: Flag },
+            ]),
           ]).map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -876,6 +886,20 @@ export default function FounderCompany() {
         {activeTab === 'finance' && (
           <FinanceReportsPanel mode="founder" founderCompanyId={portfolioId} companyName={data.name || ''}
             user={{ name: currentUser.name, email: userEmail }} t={t.finance} locale={language === 'ja' ? 'ja-JP' : 'en-US'} />
+        )}
+
+        {/* ── Activities / Documents / Milestones ──
+            Each saves to the CRM record the investor's Company page reads: updates through the
+            feed (Feed_Submissions → My_Activities), documents to My_Documents tagged with this
+            company, milestones to this Founder_Companies record. Nothing is copied. */}
+        {!isInvestor && activeTab === 'activities' && (
+          <FounderActivitiesTab companyName={data.name || ''} authorName={currentUser.name} locale={language === 'ja' ? 'ja-JP' : 'en-US'} t={t.companyDetail} />
+        )}
+        {!isInvestor && activeTab === 'documents' && (
+          <DocumentsTab companyNames={[data.name || ''].filter(Boolean)} mode="founder" authorName={currentUser.name} locale={language === 'ja' ? 'ja-JP' : 'en-US'} t={t.companyDetail} />
+        )}
+        {!isInvestor && activeTab === 'milestones' && (
+          <MilestonesTab founderCompanyId={portfolioId} founderOutlook="" locale={language === 'ja' ? 'ja-JP' : 'en-US'} t={t.companyDetail} />
         )}
       </div>
     </div>

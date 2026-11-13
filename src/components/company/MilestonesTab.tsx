@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/Input';
 import { ModalFrame } from '../portfolio/portfolioUi';
 import { Pill } from '../reports/reportUi';
-import { fetchMilestonesJson, saveMilestonesJson } from '../../services/crmFounderMilestones';
+import { FieldNotSavedError, fetchMilestonesJson, saveMilestonesJson } from '../../services/crmFounderMilestones';
 import { isPermissionError } from '../../services/crmInvestments';
 import {
   MilestonesFullError, buildMilestone, completionPct, milestoneStatus, parseMilestones, sortMilestones, stringifyMilestones,
@@ -58,7 +58,7 @@ export default function MilestonesTab({ founderCompanyId, founderOutlook, locale
       await saveMilestonesJson(founderCompanyId, next);
       setJson(next); setEditing(null);
     } catch (err) {
-      setError(err instanceof MilestonesFullError ? t.msFull : isPermissionError(err) ? t.msNoPermission : err instanceof Error && err.message ? err.message : t.msFailed);
+      setError(err instanceof MilestonesFullError ? t.msFull : (isPermissionError(err) || err instanceof FieldNotSavedError) ? t.msNoPermission : err instanceof Error && err.message ? err.message : t.msFailed);
     } finally {
       setSaving(false);
     }

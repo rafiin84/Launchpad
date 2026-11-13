@@ -79,6 +79,9 @@ export default function PortfolioCompanyDetail() {
     return () => { cancelled = true; };
   }, [record, founderEmail]);
 
+  // A company can be named differently on the investor record and on the founder's own profile; match on both.
+  const companyNames = useMemo(() => [...new Set([record?.companyName, profile?.data?.name].map(n => (n ?? '').trim()).filter(Boolean))], [record?.companyName, profile]);
+
   const tabs: Array<{ key: Tab; label: string }> = useMemo(() => [
     { key: 'overview', label: t.tabOverview }, { key: 'finance', label: t.tabFinance }, { key: 'activities', label: t.tabActivities },
     { key: 'documents', label: t.tabDocuments }, { key: 'milestones', label: t.tabMilestones },
@@ -169,8 +172,8 @@ export default function PortfolioCompanyDetail() {
         <FinanceReportsPanel mode="investor" founderCompanyId={founderEmail ? (profile === undefined ? undefined : profile?.recordId ?? null) : null}
           companyName={record.companyName} user={{ name: currentUser?.name ?? '', email: currentUser?.email ?? '' }} t={all.finance} locale={locale} />
       )}
-      {activeTab === 'activities' && <ActivitiesTab companyId={record.id} companyName={record.companyName} locale={locale} t={t} />}
-      {activeTab === 'documents' && <DocumentsTab companyName={record.companyName} locale={locale} t={t} />}
+      {activeTab === 'activities' && <ActivitiesTab companyId={record.id} companyNames={companyNames} locale={locale} t={t} />}
+      {activeTab === 'documents' && <DocumentsTab companyNames={companyNames} mode="investor" locale={locale} t={t} />}
       {activeTab === 'milestones' && (
         <MilestonesTab founderCompanyId={founderEmail ? (profile === undefined ? undefined : profile?.recordId ?? null) : null}
           founderOutlook={profile?.data?.nextMilestones ?? ''} locale={locale} t={t} />

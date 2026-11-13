@@ -22,7 +22,7 @@ const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLow
  * the interactions logged on its Portfolio Management timeline, and the feed
  * posts that name it. New interactions are logged onto the timeline.
  */
-export default function ActivitiesTab({ companyId, companyName, locale, t }: { companyId: string; companyName: string; locale: string; t: T }) {
+export default function ActivitiesTab({ companyId, companyNames, locale, t }: { companyId: string; companyNames: string[]; locale: string; t: T }) {
   const [entry, setEntry] = useState<PortfolioEntry | null>(null);
   const [posts, setPosts] = useState<Awaited<ReturnType<typeof fetchSharedActivities>>>([]);
   const [loading, setLoading] = useState(true);
@@ -40,13 +40,13 @@ export default function ActivitiesTab({ companyId, companyName, locale, t }: { c
     try {
       const [entries, feed] = await Promise.all([fetchPortfolioEntries().catch(() => [] as PortfolioEntry[]), fetchSharedActivities().catch(() => [])]);
       setEntry(entries.find(e => e.companyId === companyId) ?? null);
-      setPosts(feed.filter(a => same(a.companyName, companyName)));
+      setPosts(feed.filter(a => companyNames.some(n => n && same(a.companyName, n))));
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [companyId, companyName, t.loadFailed]);
+  }, [companyId, companyNames, t.loadFailed]);
 
   useEffect(() => { void load(); }, [load]);
 
