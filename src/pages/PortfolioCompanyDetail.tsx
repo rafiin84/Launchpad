@@ -172,7 +172,8 @@ export default function PortfolioCompanyDetail() {
       {activeTab === 'activities' && <ActivitiesTab companyId={record.id} companyName={record.companyName} locale={locale} t={t} />}
       {activeTab === 'documents' && <DocumentsTab companyName={record.companyName} locale={locale} t={t} />}
       {activeTab === 'milestones' && (
-        <MilestonesTab companyId={record.id} initialJson={record.milestones} founderOutlook={profile?.data?.nextMilestones ?? ''} locale={locale} t={t} />
+        <MilestonesTab founderCompanyId={founderEmail ? (profile === undefined ? undefined : profile?.recordId ?? null) : null}
+          founderOutlook={profile?.data?.nextMilestones ?? ''} locale={locale} t={t} />
       )}
     </div>
   );

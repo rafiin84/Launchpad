@@ -13,20 +13,13 @@ import type { TranslationKeys } from '../../i18n';
 
 type T = TranslationKeys['companyDetail'];
 
-/** A profile section: the investor-maintained text, else what the founder reported (labelled), else "not provided". */
-function ProfileBlock({ title, value, fallback, t }: { title: string; value: string; fallback?: string; t: T }) {
-  const own = value.trim();
-  const reported = !own && (fallback ?? '').trim() ? (fallback as string).trim() : '';
+/** One profile section, as the founder wrote it on their Founder Companies record. */
+function ProfileBlock({ title, value, t }: { title: string; value: string; t: T }) {
   return (
     <div className="min-w-0">
-      {(title || reported) && (
-        <div className="flex items-center gap-2 mb-1.5">
-          {title && <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</h4>}
-          {reported && <Pill tone="indigo">{t.reportedByFounder}</Pill>}
-        </div>
-      )}
-      {own || reported
-        ? <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line break-words">{own || reported}</p>
+      {title && <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{title}</h4>}
+      {value.trim()
+        ? <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line break-words">{value.trim()}</p>
         : <p className="text-sm text-gray-400">{t.notProvided}</p>}
     </div>
   );
@@ -75,24 +68,34 @@ export default function OverviewTab({
             : !record.shortDescription && <p className="text-sm text-gray-400">{t.notProvided}</p>}
         </section>
 
+        {/* Company details are kept on the founder's Founder Companies record — one place, no copy on the investor record. */}
         <section className={card}>
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">{t.sectionProfile}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-            <ProfileBlock t={t} title={t.ovBusinessModel} value={record.businessModel} fallback={founderData?.revenueModel} />
-            <ProfileBlock t={t} title={t.ovProducts} value={record.productsServices} fallback={founderData?.productDescription} />
-            <ProfileBlock t={t} title={t.ovProblem} value={record.problemStatement} />
-            <ProfileBlock t={t} title={t.ovSolution} value={record.solution} />
-            <ProfileBlock t={t} title={t.ovTargetMarket} value={record.targetMarket} fallback={founderData?.targetMarket} />
-            <ProfileBlock t={t} title={t.ovCompetitive} value={record.competitiveLandscape}
-              fallback={[founderData?.keyCompetitors, founderData?.differentiator].filter(Boolean).join('\n')} />
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">{t.sectionProfile}</h3>
+            {founderData && <Pill tone="indigo">{t.reportedByFounder}</Pill>}
           </div>
-        </section>
-
-        <section className={card}>
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">{t.ovTeamInfo}</h3>
-          <ProfileBlock t={t} title="" value={record.teamInformation}
-            fallback={[founderData?.founderNames, founderData?.openRoles && `${founderData.openRoles} open roles`].filter(Boolean).join(' · ')} />
-          {record.teamSize && <p className="mt-3 text-xs text-gray-500">{t.ovTeamSize}: <span className="font-semibold text-gray-800">{record.teamSize}</span></p>}
+          {!founderData ? (
+            <p className="text-sm text-gray-500">{t.noFounderProfile}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <ProfileBlock t={t} title={t.ovBusinessModel} value={founderData.revenueModel} />
+                <ProfileBlock t={t} title={t.ovProducts} value={founderData.productDescription} />
+                <ProfileBlock t={t} title={t.ovProblem} value={founderData.problemStatement} />
+                <ProfileBlock t={t} title={t.ovSolution} value={founderData.solution} />
+                <ProfileBlock t={t} title={t.ovTargetMarket} value={founderData.targetMarket} />
+                <ProfileBlock t={t} title={t.ovCompetitive}
+                  value={[founderData.keyCompetitors, founderData.differentiator].filter(Boolean).join('\n')} />
+              </div>
+              <div className="mt-5 pt-4 border-t border-gray-50">
+                <ProfileBlock t={t} title={t.ovTeamInfo}
+                  value={[founderData.teamInformation, founderData.founderNames, founderData.openRoles && `${founderData.openRoles} open roles`].filter(Boolean).join('\n')} />
+                {(founderData.teamSize || record.teamSize) && (
+                  <p className="mt-3 text-xs text-gray-500">{t.ovTeamSize}: <span className="font-semibold text-gray-800">{founderData.teamSize || record.teamSize}</span></p>
+                )}
+              </div>
+            </>
+          )}
         </section>
 
         <section>

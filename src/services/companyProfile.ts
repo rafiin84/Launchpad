@@ -52,6 +52,9 @@ export interface CompanyData {
   useOfFunds: string;
   keyRisks: string;
   nextMilestones: string;
+  problemStatement: string;
+  solution: string;
+  teamInformation: string;
 }
 
 export const EMPTY: CompanyData = {
@@ -61,6 +64,7 @@ export const EMPTY: CompanyData = {
   totalRaised: '', lastRoundSize: '', lastRoundStage: '', lastRoundDate: '', preMoneyValuation: '', monthlyBurn: '', runway: '', revenueModel: '',
   tam: '', sam: '', som: '', targetMarket: '', keyCompetitors: '', differentiator: '',
   currentAsk: '', useOfFunds: '', keyRisks: '', nextMilestones: '',
+  problemStatement: '', solution: '', teamInformation: '',
 };
 
 // ─── CRM field mapping ───────────────────────────────────────────────────────
@@ -108,6 +112,9 @@ const CRM_TO_CLIENT: Record<string, keyof CompanyData> = {
   Use_of_Funds:        'useOfFunds',
   Key_Risks:           'keyRisks',
   Next_Milestones:     'nextMilestones',
+  Problem_Statement:   'problemStatement',
+  Solution:            'solution',
+  Team_Information:    'teamInformation',
 };
 
 // All CRM field names for list queries

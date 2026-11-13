@@ -8,7 +8,6 @@ import { cn } from '../lib/cn';
 import { savePortfolioCompany } from '../services/store';
 import { createCRMPortfolioRecord } from '../services/crmPortfolio';
 import { usePortfolioOptions } from '../lib/usePortfolioOptions';
-import CompanyProfileFields from '../components/company/CompanyProfileFields';
 import { loadToken } from '../services/oauth';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -83,13 +82,6 @@ interface FormState {
   founderEmail: string;
   founderLinkedin: string;
   founderPhone: string;
-  businessModel: string;
-  productsServices: string;
-  problemStatement: string;
-  solution: string;
-  targetMarket: string;
-  competitiveLandscape: string;
-  teamInformation: string;
 }
 
 const empty: FormState = {
@@ -97,8 +89,6 @@ const empty: FormState = {
   foundedYear: '', teamSize: '', shortDescription: '', fullDescription: '', tags: '',
   investmentAmount: '', investmentDate: '', preMoneyValuation: '', ownershipPct: '',
   status: '', notes: '', founderName: '', founderEmail: '', founderLinkedin: '', founderPhone: '',
-  businessModel: '', productsServices: '', problemStatement: '', solution: '', targetMarket: '',
-  competitiveLandscape: '', teamInformation: '',
 };
 
 function validate(f: FormState, t: any): Record<string, string> {
@@ -203,12 +193,6 @@ export default function AddPortfolioCompany() {
               <Textarea label={t.addPortfolio.fullDescription} value={form.fullDescription} onChange={set('fullDescription')} placeholder="" rows={4} />
               <Input label={t.addPortfolio.tags} value={form.tags} onChange={set('tags')} placeholder="" />
             </div>
-          </div>
-
-          {/* Company profile — shown on the Overview tab */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
-            <p className="text-sm font-semibold text-gray-900 mb-4">{t.companyDetail.sectionProfile}</p>
-            <CompanyProfileFields values={form} onChange={set as never} />
           </div>
 
           {/* Investment Details */}

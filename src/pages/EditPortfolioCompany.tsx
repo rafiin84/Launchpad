@@ -7,8 +7,6 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { getCRMPortfolioRecord, updateCRMPortfolioRecord, type CRMFormFields } from '../services/crmPortfolio';
 import { usePortfolioOptions } from '../lib/usePortfolioOptions';
-import CompanyProfileFields from '../components/company/CompanyProfileFields';
-import { useLanguage } from '../context/LanguageContext';
 
 // ─── Logo Upload ──────────────────────────────────────────────────────────────
 function LogoUpload({ label = 'Company Logo', value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
@@ -67,7 +65,6 @@ export default function EditPortfolioCompany() {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const options = usePortfolioOptions();
-  const cd = useLanguage().t.companyDetail;
 
   useEffect(() => {
     if (!id) return;
@@ -155,12 +152,6 @@ export default function EditPortfolioCompany() {
               <Textarea label="Full Description" value={form.fullDescription} onChange={set('fullDescription')} placeholder="Describe the company..." rows={4} />
               <Input label="Tags" value={form.tags} onChange={set('tags')} placeholder="e.g. fintech, b2b, saas — comma separated" />
             </div>
-          </div>
-
-          {/* Company profile — shown on the Overview tab */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">{cd.sectionProfile}</h2>
-            <CompanyProfileFields values={form} onChange={set as never} />
           </div>
 
           {/* Investment Details */}

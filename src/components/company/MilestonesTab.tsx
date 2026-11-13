@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, AlertTriangle, Pencil, Plus, Trash2, Flag } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/Input';
 import { ModalFrame } from '../portfolio/portfolioUi';
 import { Pill } from '../reports/reportUi';
-import { getCRMPortfolioRecord, saveMilestones } from '../../services/crmPortfolio';
+import { fetchMilestonesJson, saveMilestonesJson } from '../../services/crmFounderMilestones';
 import { isPermissionError } from '../../services/crmInvestments';
 import {
   MilestonesFullError, buildMilestone, completionPct, milestoneStatus, parseMilestones, sortMilestones, stringifyMilestones,
@@ -18,18 +18,31 @@ type T = TranslationKeys['companyDetail'];
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 /**
- * A company's achievements and upcoming milestones, stored on its Companies
- * record. Completion status comes from the dates (lib/milestones.ts), never from
- * a stored flag. Every change re-reads the stored list first, so two people
- * editing don't overwrite each other's milestones.
+ * A company's achievements and upcoming milestones, stored on its Founder
+ * Companies record (one place for the company's details). Completion status
+ * comes from the dates (lib/milestones.ts), never from a stored flag. Every
+ * change re-reads the stored list first, so two people editing don't overwrite
+ * each other.
  */
-export default function MilestonesTab({ companyId, initialJson, founderOutlook, locale, t }: {
-  companyId: string; initialJson: string; founderOutlook: string; locale: string; t: T;
+export default function MilestonesTab({ founderCompanyId, founderOutlook, locale, t }: {
+  /** The company's Founder_Companies id. undefined = still looking, null = the founder has no company record. */
+  founderCompanyId: string | null | undefined; founderOutlook: string; locale: string; t: T;
 }) {
-  const [json, setJson] = useState(initialJson);
+  const [json, setJson] = useState('');
+  const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<null | { id?: string; input: MilestoneInput }>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!founderCompanyId) return;
+    let cancelled = false;
+    void fetchMilestonesJson(founderCompanyId)
+      .then(j => { if (!cancelled) { setJson(j); setLoaded(true); } })
+      .catch(err => { if (!cancelled) { setError(err instanceof Error && err.message ? err.message : t.msFailed); setLoaded(true); } });
+    return () => { cancelled = true; };
+  }, [founderCompanyId, t.msFailed]);
+
   const today = todayISO();
 
   const list = useMemo(() => sortMilestones(parseMilestones(json), today), [json, today]);
@@ -38,11 +51,11 @@ export default function MilestonesTab({ companyId, initialJson, founderOutlook, 
 
   /** Re-read the stored list, apply `change`, write it back. */
   async function mutate(change: (current: Milestone[]) => Milestone[]) {
+    if (!founderCompanyId) return;
     setSaving(true); setError('');
     try {
-      const fresh = await getCRMPortfolioRecord(companyId);
-      const next = stringifyMilestones(change(parseMilestones(fresh?.milestones ?? json)));
-      await saveMilestones(companyId, next);
+      const next = stringifyMilestones(change(parseMilestones(await fetchMilestonesJson(founderCompanyId))));
+      await saveMilestonesJson(founderCompanyId, next);
       setJson(next); setEditing(null);
     } catch (err) {
       setError(err instanceof MilestonesFullError ? t.msFull : isPermissionError(err) ? t.msNoPermission : err instanceof Error && err.message ? err.message : t.msFailed);
@@ -53,6 +66,18 @@ export default function MilestonesTab({ companyId, initialJson, founderOutlook, 
 
   const toggle = (m: Milestone) => mutate(cur => cur.map(x => (x.id === m.id ? { ...x, completedDate: x.completedDate ? '' : todayISO() } : x)));
   const remove = (m: Milestone) => mutate(cur => cur.filter(x => x.id !== m.id));
+
+  if (founderCompanyId === undefined || (founderCompanyId && !loaded)) {
+    return <div className="h-32 bg-white border border-gray-100 rounded-3xl animate-pulse" aria-busy="true" aria-label={t.loading} />;
+  }
+  if (founderCompanyId === null) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500 bg-white border border-gray-100 rounded-2xl px-4 py-3">{t.msNoProfile}</p>
+        {founderOutlook.trim() && <p className="text-sm text-gray-700 whitespace-pre-line">{founderOutlook}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

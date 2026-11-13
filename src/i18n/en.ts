@@ -1791,6 +1791,8 @@ const en = {
     docBy: 'Added by {name} · {date}',
     docPrivate: 'Private',
 
+    noFounderProfile: 'The founder has not created a company profile yet. Company details are kept on their Founder Companies record, so they appear here once the founder fills them in.',
+    msNoProfile: 'Milestones are kept on the founder\u2019s company record, which does not exist yet. They can be added once the founder has created their company profile.',
     msEmpty: 'No milestones are recorded for this company yet.',
     msAdd: 'Add milestone',
     msTitleLabel: 'Milestone',

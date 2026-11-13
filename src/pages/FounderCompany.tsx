@@ -557,6 +557,15 @@ export default function FounderCompany() {
                     <EditField label={t.companyProfile.product} field="productDescription" value={d.productDescription} onChange={handleChange}
                       placeholder="What does your product do? Who is it for? What's the core value?" multiline />
                   </div>
+                  <div className="sm:col-span-2">
+                    <EditField label={t.companyDetail.ovProblem} field="problemStatement" value={d.problemStatement} onChange={handleChange} multiline />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EditField label={t.companyDetail.ovSolution} field="solution" value={d.solution} onChange={handleChange} multiline />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <EditField label={t.companyDetail.ovTeamInfo} field="teamInformation" value={d.teamInformation} onChange={handleChange} multiline />
+                  </div>
                   <EditField label="MRR ($)" field="mrr" value={d.mrr} onChange={handleChange} placeholder="50,000" />
                   <EditField label="ARR ($)" field="arr" value={d.arr} onChange={handleChange} placeholder="600,000" />
                   <EditField label={t.companySidebar.activeCustomers} field="activeCustomers" value={d.activeCustomers} onChange={handleChange} placeholder="250" />
@@ -600,6 +609,9 @@ export default function FounderCompany() {
                   <div className="sm:col-span-2">
                     <DisplayField label={t.companyProfile.product} value={d.productDescription} />
                   </div>
+                  <div className="sm:col-span-2"><DisplayField label={t.companyDetail.ovProblem} value={d.problemStatement} /></div>
+                  <div className="sm:col-span-2"><DisplayField label={t.companyDetail.ovSolution} value={d.solution} /></div>
+                  <div className="sm:col-span-2"><DisplayField label={t.companyDetail.ovTeamInfo} value={d.teamInformation} /></div>
                   <DisplayField label={t.companyProfile.monthlyChurn} value={percent(d.churnRate)} />
                   <DisplayField label={t.companyProfile.nps} value={d.nps} />
                   {d.keyMetric && <DisplayField label={d.keyMetricLabel || 'Key Metric'} value={d.keyMetric} />}
