@@ -36,10 +36,11 @@ export function Card({ title, note, children, className, action }: {
 }
 
 /** A small rounded tag; tone picks a pastel. */
-export function Pill({ tone, children }: { tone: 'emerald' | 'rose' | 'gray' | 'indigo'; children: React.ReactNode }) {
+export function Pill({ tone, children }: { tone: 'emerald' | 'rose' | 'gray' | 'indigo' | 'amber' | 'sky'; children: React.ReactNode }) {
   const styles = {
     emerald: 'bg-emerald-50 text-emerald-600', rose: 'bg-rose-50 text-rose-500',
     gray: 'bg-gray-100 text-gray-500', indigo: 'bg-indigo-50 text-indigo-500',
+    amber: 'bg-amber-50 text-amber-600', sky: 'bg-sky-50 text-sky-600',
   };
   return <span className={cn('inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', styles[tone])}>{children}</span>;
 }

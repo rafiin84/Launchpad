@@ -7,9 +7,8 @@ import {
 import { cn } from '../lib/cn';
 import { percent, withUnit } from '../lib/units';
 import { useAuth } from '../context/AuthContext';
-import FinanceUpdateTab from '../components/company/FinanceUpdateTab';
-import FinanceDocumentUpload from '../components/company/FinanceDocumentUpload';
-import { findCompanyRecordIdForEmail } from '../services/companyFinancials';
+import FinanceReportsPanel from '../components/finance/FinanceReportsPanel';
+import { findCompanyRecordIdForEmail } from '../services/founderCompanyLookup';
 import { useLanguage } from '../context/LanguageContext';
 import { usePageTitle } from '../context/PageTitleContext';
 import {
@@ -118,7 +117,7 @@ function Section({ title, icon: Icon, children, editing, accent, iconColor = 'te
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FounderCompany() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { setPageTitle } = usePageTitle();
   const { coverImage, currentUser, isInvestor, zohoEmail, portalSession } = useAuth();
   const [searchParams] = useSearchParams();
@@ -384,7 +383,7 @@ export default function FounderCompany() {
         <div className="flex gap-1 -mb-px overflow-x-auto">
           {([
             { id: 'overview' as const, label: t.companyProfile.companyOverview, icon: Building2 },
-            { id: 'finance' as const, label: 'Finance Update', icon: TrendingUp },
+            { id: 'finance' as const, label: t.companyDetail.tabFinance, icon: TrendingUp },
           ]).map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -859,57 +858,12 @@ export default function FounderCompany() {
         )}
 
         {/* ── Finance Update ──
-            The founder's own quarterly figures. They write to the SAME
-            Portfolios record the investor's Company page reads, so an update
-            here shows up there immediately — marked self-reported until the
-            Level 1 Reviewer verifies it against the uploaded documents.
-
-            Both ways in live in this tab: type a quarter in, or attach the
-            statements. Neither sends the founder off to another page. */}
+            The founder submits periodic reports to the Finance Reports module
+            (one record per version). Investors read them on the company's
+            Finance Update tab; Zoho decides which investors may see which. */}
         {activeTab === 'finance' && (
-        <div>
-          <div className="mb-4">
-            <h2 className="text-base font-bold text-gray-900">Finance Update</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Your quarterly figures. Investors see these on your company page, marked
-              as self-reported until the reviewer verifies them. Anything you attach
-              here also appears on your Documents page.
-            </p>
-          </div>
-
-          {portfolioId === undefined ? (
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 animate-pulse">
-              <div className="h-3 bg-gray-100 rounded w-1/4 mb-3" />
-              <div className="h-20 bg-gray-50 rounded" />
-            </div>
-          ) : portfolioId ? (
-            <FinanceUpdateTab companyId={portfolioId} companyName={data.name || ''} />
-          ) : (
-            /* No portfolio record yet, so there is nowhere to store structured
-               figures — but the documents can still be collected now, and the
-               reviewer can key them in once the company is on the portfolio. */
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 flex items-start gap-3">
-                <AlertCircle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-900">
-                    Quarterly figures aren't open yet
-                  </p>
-                  <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                    You can enter quarter-by-quarter numbers once your company is part
-                    of the investor's portfolio. Until then, attach your financial
-                    documents below — the reviewer can work from those.
-                  </p>
-                </div>
-              </div>
-              <FinanceDocumentUpload
-                companyName={data.name || ''}
-                authorName={currentUser.name}
-                authorRole="founder"
-              />
-            </div>
-          )}
-        </div>
+          <FinanceReportsPanel mode="founder" founderCompanyId={portfolioId} companyName={data.name || ''}
+            user={{ name: currentUser.name, email: userEmail }} t={t.finance} locale={language === 'ja' ? 'ja-JP' : 'en-US'} />
         )}
       </div>
     </div>

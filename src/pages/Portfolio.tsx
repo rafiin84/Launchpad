@@ -24,11 +24,14 @@ import { fetchAllCompanyProfiles } from '../services/companyProfile';
 import { loadToken } from '../services/oauth';
 import { cn } from '../lib/cn';
 import { useLanguage } from '../context/LanguageContext';
+import { usePortfolioOptions, optionLabel } from '../lib/usePortfolioOptions';
+import { formatDate } from '../lib/portfolioFormat';
 
 // ─── CRM Company Card ────────────────────────────────────────────────────────
 
 function CRMCompanyCard({ c, onDelete, logoUrl }: { c: CRMPortfolioRecord; onDelete: (id: string) => void; logoUrl?: string }) {
   const { t, language } = useLanguage();
+  const options = usePortfolioOptions();
   const amount = parseFloat(c.investmentAmount) || 0;
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
@@ -44,13 +47,13 @@ function CRMCompanyCard({ c, onDelete, logoUrl }: { c: CRMPortfolioRecord; onDel
           <CompanyLogo name={c.companyName || '?'} website={c.website} logoUrl={logoUrl} size={10} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{c.companyName}</p>
-            <p className="text-xs text-gray-400 capitalize">{c.industry}{c.stage ? ` · ${c.stage}` : ''}</p>
+            <p className="text-xs text-gray-400">{optionLabel(options.industry, c.industry)}{c.stage ? ` · ${optionLabel(options.stage, c.stage)}` : ''}</p>
           </div>
         </Link>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {c.status && (
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
-              {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+              {optionLabel(options.status, c.status)}
             </span>
           )}
           <Link
@@ -83,6 +86,12 @@ function CRMCompanyCard({ c, onDelete, logoUrl }: { c: CRMPortfolioRecord; onDel
             </div>
           )}
         </div>
+        {(c.founderName || c.modifiedTime) && (
+          <div className="flex items-center justify-between gap-3 mt-2 text-xs text-gray-400">
+            {c.founderName && <span className="truncate">{t.companyDetail.colFounder}: {c.founderName}</span>}
+            {c.modifiedTime && <span className="whitespace-nowrap">{t.companyDetail.colLastUpdated}: {formatDate(c.modifiedTime, language === 'ja' ? 'ja-JP' : 'en-US')}</span>}
+          </div>
+        )}
         {(c.location || c.investmentDate) && (
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
             {c.location && <span className="flex items-center gap-1"><MapPin size={10} />{c.location}</span>}
@@ -97,7 +106,8 @@ function CRMCompanyCard({ c, onDelete, logoUrl }: { c: CRMPortfolioRecord; onDel
 // ─── Portfolio List Table ─────────────────────────────────────────────────────
 
 function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfolioRecord[]; onDelete: (id: string) => void; logoMap: Record<string, string> }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const options = usePortfolioOptions();
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-50 text-emerald-700',
     exited: 'bg-indigo-50 text-indigo-700',
@@ -115,7 +125,7 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
   return (
     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[980px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/60">
               <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3.5 w-52">{t.portfolioPage.company}</th>
@@ -124,6 +134,8 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
               <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">{t.portfolioPage.invested}</th>
               <th className="text-right text-xs font-semibold text-gray-500 px-4 py-3.5 w-28">{t.portfolioPage.ownershipPct}</th>
               <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-36">{t.portfolioPage.location}</th>
+              <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-36">{t.companyDetail.colFounder}</th>
+              <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3.5 w-32">{t.companyDetail.colLastUpdated}</th>
               <th className="px-4 py-3.5 w-20" />
             </tr>
           </thead>
@@ -143,15 +155,15 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
 
                 {/* Industry / Stage */}
                 <td className="px-4 py-4">
-                  <p className="text-xs text-gray-700 truncate capitalize">{c.industry || '—'}</p>
-                  {c.stage && <p className="text-xs text-gray-400 truncate capitalize">{c.stage}</p>}
+                  <p className="text-xs text-gray-700 truncate">{c.industry ? optionLabel(options.industry, c.industry) : '—'}</p>
+                  {c.stage && <p className="text-xs text-gray-400 truncate">{optionLabel(options.stage, c.stage)}</p>}
                 </td>
 
                 {/* Status */}
                 <td className="px-4 py-4">
                   {c.status ? (
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                      {optionLabel(options.status, c.status)}
                     </span>
                   ) : <span className="text-xs text-gray-400">—</span>}
                 </td>
@@ -170,6 +182,12 @@ function PortfolioTable({ companies, onDelete, logoMap }: { companies: CRMPortfo
                 <td className="px-4 py-4">
                   <span className="text-xs text-gray-600">{c.location || '—'}</span>
                 </td>
+
+                {/* Founder */}
+                <td className="px-4 py-4"><span className="text-xs text-gray-600 truncate block">{c.founderName || '—'}</span></td>
+
+                {/* Last updated */}
+                <td className="px-4 py-4"><span className="text-xs text-gray-600 whitespace-nowrap">{c.modifiedTime ? formatDate(c.modifiedTime, language === 'ja' ? 'ja-JP' : 'en-US') : '—'}</span></td>
 
                 {/* Actions */}
                 <td className="px-4 py-4">

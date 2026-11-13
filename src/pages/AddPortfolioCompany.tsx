@@ -7,6 +7,8 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { savePortfolioCompany } from '../services/store';
 import { createCRMPortfolioRecord } from '../services/crmPortfolio';
+import { usePortfolioOptions } from '../lib/usePortfolioOptions';
+import CompanyProfileFields from '../components/company/CompanyProfileFields';
 import { loadToken } from '../services/oauth';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -57,30 +59,6 @@ function LogoUpload({ label, value, onChange }: LogoUploadProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Options
-// ---------------------------------------------------------------------------
-const industryOptions = [
-  { value: 'fintech', label: 'FinTech' },
-  { value: 'healthtech', label: 'HealthTech' },
-  { value: 'saas', label: 'SaaS' },
-  { value: 'edtech', label: 'EdTech' },
-  { value: 'cleantech', label: 'CleanTech' },
-  { value: 'ai-ml', label: 'AI/ML' },
-  { value: 'ecommerce', label: 'E-Commerce' },
-  { value: 'other', label: 'Other' },
-];
-
-const stageOptions = [
-  { value: 'pre-seed', label: 'Pre-Seed' },
-  { value: 'seed', label: 'Seed' },
-  { value: 'series-a', label: 'Series A' },
-  { value: 'series-b', label: 'Series B' },
-  { value: 'series-c', label: 'Series C' },
-  { value: 'growth', label: 'Growth' },
-  { value: 'pre-ipo', label: 'Pre-IPO' },
-];
-
-// ---------------------------------------------------------------------------
 // Form state
 // ---------------------------------------------------------------------------
 interface FormState {
@@ -105,6 +83,13 @@ interface FormState {
   founderEmail: string;
   founderLinkedin: string;
   founderPhone: string;
+  businessModel: string;
+  productsServices: string;
+  problemStatement: string;
+  solution: string;
+  targetMarket: string;
+  competitiveLandscape: string;
+  teamInformation: string;
 }
 
 const empty: FormState = {
@@ -112,6 +97,8 @@ const empty: FormState = {
   foundedYear: '', teamSize: '', shortDescription: '', fullDescription: '', tags: '',
   investmentAmount: '', investmentDate: '', preMoneyValuation: '', ownershipPct: '',
   status: '', notes: '', founderName: '', founderEmail: '', founderLinkedin: '', founderPhone: '',
+  businessModel: '', productsServices: '', problemStatement: '', solution: '', targetMarket: '',
+  competitiveLandscape: '', teamInformation: '',
 };
 
 function validate(f: FormState, t: any): Record<string, string> {
@@ -138,12 +125,7 @@ export default function AddPortfolioCompany() {
   const [apiError, setApiError] = useState('');
   const isConnected = !!loadToken();
 
-  const statusOptions = [
-    { value: 'active', label: t.addPortfolio.statusActive },
-    { value: 'exited', label: t.addPortfolio.statusExited },
-    { value: 'written-off', label: t.addPortfolio.statusWrittenOff },
-    { value: 'follow-on', label: t.addPortfolio.statusFollowOn },
-  ];
+  const options = usePortfolioOptions();
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -211,8 +193,8 @@ export default function AddPortfolioCompany() {
               <Input label={`${t.addPortfolio.companyName} *`} value={form.companyName} onChange={set('companyName')} error={errors.companyName} placeholder="Acme Inc." />
               <Input label={t.addPortfolio.website} type="url" value={form.website} onChange={set('website')} placeholder="https://acme.com" />
               <Input label={t.addPortfolio.location} value={form.location} onChange={set('location')} placeholder="San Francisco, CA" />
-              <Select label={`${t.addPortfolio.industry} *`} value={form.industry} onChange={set('industry')} options={industryOptions} placeholder={t.addPortfolio.industry} error={errors.industry} />
-              <Select label={`${t.addPortfolio.companyStage} *`} value={form.stage} onChange={set('stage')} options={stageOptions} placeholder={t.addPortfolio.companyStage} error={errors.stage} />
+              <Select label={`${t.addPortfolio.industry} *`} value={form.industry} onChange={set('industry')} options={options.industry} placeholder={t.addPortfolio.industry} error={errors.industry} />
+              <Select label={`${t.addPortfolio.companyStage} *`} value={form.stage} onChange={set('stage')} options={options.stage} placeholder={t.addPortfolio.companyStage} error={errors.stage} />
               <Input label={t.addPortfolio.foundedYear} type="number" value={form.foundedYear} onChange={set('foundedYear')} placeholder="2020" />
               <Input label={t.addPortfolio.teamSize} type="number" value={form.teamSize} onChange={set('teamSize')} placeholder="25" />
               <Input label={`${t.addPortfolio.shortDescription} *`} value={form.shortDescription} onChange={set('shortDescription')} error={errors.shortDescription} placeholder="" className="sm:col-span-2" />
@@ -223,6 +205,12 @@ export default function AddPortfolioCompany() {
             </div>
           </div>
 
+          {/* Company profile — shown on the Overview tab */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
+            <p className="text-sm font-semibold text-gray-900 mb-4">{t.companyDetail.sectionProfile}</p>
+            <CompanyProfileFields values={form} onChange={set as never} />
+          </div>
+
           {/* Investment Details */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
             <p className="text-sm font-semibold text-gray-900 mb-4">{t.addPortfolio.investmentDetails}</p>
@@ -231,7 +219,7 @@ export default function AddPortfolioCompany() {
               <Input label={`${t.addPortfolio.investmentDate} *`} type="date" value={form.investmentDate} onChange={set('investmentDate')} error={errors.investmentDate} />
               <Input label={t.addPortfolio.preMoneyValuation} type="number" value={form.preMoneyValuation} onChange={set('preMoneyValuation')} placeholder="5000000" />
               <Input label={t.addPortfolio.ownershipPct} type="number" value={form.ownershipPct} onChange={set('ownershipPct')} placeholder="10.00" step="0.01" />
-              <Select label={`${t.addPortfolio.status} *`} value={form.status} onChange={set('status')} options={statusOptions} placeholder={t.addPortfolio.status} error={errors.status} className="sm:col-span-2" />
+              <Select label={`${t.addPortfolio.status} *`} value={form.status} onChange={set('status')} options={options.status} placeholder={t.addPortfolio.status} error={errors.status} className="sm:col-span-2" />
             </div>
             <div className="mt-4">
               <Textarea label={t.addPortfolio.notes} value={form.notes} onChange={set('notes')} placeholder="" rows={3} />

@@ -347,9 +347,9 @@ export async function zohoUpsert(
 
 // ─── Search records (COQL or criteria) ───────────────────────────────────────
 
-export async function zohoSearch(module: string, criteria: string): Promise<ZohoRecord[]> {
+export async function zohoSearch(module: string, criteria: string, fields?: string): Promise<ZohoRecord[]> {
   ensureToken();
-  const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}`;
+  const apiPath = `/crm/v2/${module}/search?criteria=${encodeURIComponent(criteria)}${fields ? `&fields=${fields}` : ''}`;
   const url = buildCrmUrl(apiPath);
 
   const res = await fetch(url, { headers: authHeader() });
@@ -827,15 +827,37 @@ export async function fetchZohoModules(): Promise<ZohoModule[]> {
  * user's token. Returns null on any failure — callers use it for hints (what the
  * user may do, a field's limits), never for anything the API enforces itself.
  */
-export async function zohoGetSettings<T = Record<string, unknown>>(apiPath: string): Promise<T | null> {
+export async function zohoGetSettings<T = Record<string, unknown>>(apiPath: string, portal = false): Promise<T | null> {
   try {
     ensureToken();
-    const res = await fetch(buildCrmUrl(apiPath), { headers: authHeader() });
+    const res = await fetch(portal ? buildPortalCrmUrl(apiPath) : buildCrmUrl(apiPath), { headers: authHeader() });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
     return null;
   }
+}
+
+export interface PicklistOption { actual: string; display: string }
+
+/**
+ * The picklist options CRM currently defines for each picklist field of a module,
+ * keyed by field API name — so option lists are read from CRM, never typed into
+ * the app. Null when the metadata can't be read (a portal user may not be allowed
+ * to), in which case callers fall back to what the data itself contains.
+ */
+export async function fetchFieldPicklists(module: string, portal = false): Promise<Record<string, PicklistOption[]> | null> {
+  const res = await zohoGetSettings<{ fields?: Array<{ api_name?: string; pick_list_values?: Array<{ actual_value?: string; display_value?: string }> }> }>(
+    `/crm/v2/settings/fields?module=${module}`, portal);
+  if (!res?.fields) return null;
+  const out: Record<string, PicklistOption[]> = {};
+  for (const f of res.fields) {
+    if (!f.api_name || !f.pick_list_values?.length) continue;
+    out[f.api_name] = f.pick_list_values
+      .filter(v => v.actual_value && v.actual_value !== '-None-')
+      .map(v => ({ actual: v.actual_value as string, display: v.display_value || (v.actual_value as string) }));
+  }
+  return out;
 }
 
 /**

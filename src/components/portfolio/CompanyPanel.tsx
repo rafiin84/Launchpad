@@ -10,7 +10,9 @@ import {
 } from '../../services/crmPortfolioManagement';
 import { TimelineFullError, type TimelineEvent } from '../../lib/portfolioTimeline';
 import { getCRMPortfolioRecord } from '../../services/crmPortfolio';
-import { fetchFinancials, findCompanyRecordIdForEmail, type FinancialEntry } from '../../services/companyFinancials';
+import { findCompanyRecordIdForEmail } from '../../services/founderCompanyLookup';
+import { fetchReportsForInvestor } from '../../services/crmFinanceReports';
+import { latestPerPeriod, periodLabel, isFrequency, type FinanceReport } from '../../lib/financeReports';
 import type { HealthResult } from '../../lib/portfolioHealth';
 import { formatDate, formatMoney, formatNumber, formatPercent } from '../../lib/portfolioFormat';
 import { cn } from '../../lib/cn';
@@ -25,20 +27,21 @@ const EVENT_ICONS: Record<string, typeof Flag> = {
 
 interface RevenuePoint { label: string; revenue: number; verified: boolean }
 
-/** Latest quarters of revenue from the company's finance reports, preferring reviewer-verified figures. */
-function revenuePoints(entries: FinancialEntry[]): RevenuePoint[] {
-  const byQuarter = new Map<string, FinancialEntry>();
-  for (const e of entries) {
-    if (e.revenue === undefined) continue;
-    const key = `${e.year}-${e.quarter}`;
-    const existing = byQuarter.get(key);
-    // A reviewer's figure replaces a founder's self-reported one for the same quarter.
-    if (!existing || (e.source ?? 'reviewer') === 'reviewer') byQuarter.set(key, e);
-  }
-  return [...byQuarter.values()]
-    .sort((a, b) => a.year - b.year || a.quarter - b.quarter)
+/**
+ * The latest periods of revenue from the company's finance reports, in whichever
+ * frequency it reported most recently. Only reports an investor can see are
+ * here (drafts are never read), and an Approved report is drawn solid while one
+ * still awaiting review is lighter.
+ */
+function revenuePoints(reports: FinanceReport[]): RevenuePoint[] {
+  const newest = [...reports].sort((a, b) => b.periodStart.localeCompare(a.periodStart))[0];
+  if (!newest) return [];
+  return latestPerPeriod(reports.filter(r => r.frequency === newest.frequency && r.revenue !== null))
     .slice(-6)
-    .map(e => ({ label: `Q${e.quarter} ${String(e.year).slice(2)}`, revenue: e.revenue ?? 0, verified: (e.source ?? 'reviewer') === 'reviewer' }));
+    .map(r => ({
+      label: isFrequency(r.frequency) ? periodLabel(r.frequency, r.year, r.number) : String(r.year),
+      revenue: r.revenue ?? 0, verified: r.status === 'Approved',
+    }));
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -88,7 +91,7 @@ export default function CompanyPanel({
         if (!company?.founderEmail) return;
         const financeId = await findCompanyRecordIdForEmail(company.founderEmail);
         if (!financeId) return;
-        const points = revenuePoints(await fetchFinancials(financeId));
+        const points = revenuePoints(await fetchReportsForInvestor(financeId));
         if (!cancelled) setTrend(points);
       } catch { /* no trend available */ }
     })();

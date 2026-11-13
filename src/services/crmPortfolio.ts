@@ -4,7 +4,7 @@
 //   Zoho CRM → Setup → Customization → Modules → Portfolio → Fields
 // The "API Name" column is the key — adjust FIELD_MAP if yours differ.
 
-import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, findModuleApiName, type ZohoRecord } from './zohoApi';
+import { zohoList, zohoGetById, zohoCreate, zohoUpdate, zohoDelete, findModuleApiName, fetchFieldPicklists, type PicklistOption, type ZohoRecord } from './zohoApi';
 
 const MODULE_STORAGE_KEY = 'lp_crm_portfolio_module';
 
@@ -55,7 +55,20 @@ const FIELD_MAP: Record<string, string> = {
   founderEmail:      'Founder_Email',
   founderLinkedin:   'Founder_LinkedIn',
   founderPhone:      'Founder_Phone',
+  // Company profile — what the Overview tab shows.
+  businessModel:        'Business_Model',
+  productsServices:     'Products_and_Services',
+  problemStatement:     'Problem_Statement',
+  solution:             'Solution',
+  targetMarket:         'Target_Market',
+  competitiveLandscape: 'Competitive_Landscape',
+  teamInformation:      'Team_Information',
+  // JSON array of milestones — written only by saveMilestones, never by the edit form
+  // (a form holding an old copy must not overwrite milestones changed since).
+  milestones:           'Milestones',
 };
+
+const NOT_FROM_FORM = new Set(['milestones']);
 
 // Fields whose values should be sent as numbers, not strings
 const NUMERIC_FIELDS = new Set(['investmentAmount', 'preMoneyValuation', 'ownershipPct', 'teamSize', 'foundedYear']);
@@ -84,15 +97,28 @@ export interface CRMPortfolioRecord {
   founderEmail: string;
   founderLinkedin: string;
   founderPhone: string;
+  businessModel: string;
+  productsServices: string;
+  problemStatement: string;
+  solution: string;
+  targetMarket: string;
+  competitiveLandscape: string;
+  teamInformation: string;
+  milestones: string;
+  /** CRM's Modified_Time — when the record last changed. */
+  modifiedTime: string;
 }
 
-export type CRMFormFields = Omit<CRMPortfolioRecord, 'id'>;
+type ProfileKeys = 'businessModel' | 'productsServices' | 'problemStatement' | 'solution' | 'targetMarket' | 'competitiveLandscape' | 'teamInformation';
+/** What a form edits. The company-profile text fields are optional so callers that don't ask for them (e.g. creating a company from an approved application) still work. */
+export type CRMFormFields = Omit<CRMPortfolioRecord, 'id' | 'milestones' | 'modifiedTime' | ProfileKeys> & Partial<Pick<CRMPortfolioRecord, ProfileKeys>>;
 
 // ─── Converters ───────────────────────────────────────────────────────────────
 
 function toPayload(fields: CRMFormFields): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const [formKey, crmKey] of Object.entries(FIELD_MAP)) {
+    if (NOT_FROM_FORM.has(formKey)) continue;
     const raw = (fields as Record<string, string>)[formKey] ?? '';
     if (raw === '') continue;
     if (NUMERIC_FIELDS.has(formKey)) {
@@ -134,6 +160,15 @@ function fromRecord(r: ZohoRecord): CRMPortfolioRecord {
     founderEmail:      str(FIELD_MAP.founderEmail),
     founderLinkedin:   str(FIELD_MAP.founderLinkedin),
     founderPhone:      str(FIELD_MAP.founderPhone),
+    businessModel:        str(FIELD_MAP.businessModel),
+    productsServices:     str(FIELD_MAP.productsServices),
+    problemStatement:     str(FIELD_MAP.problemStatement),
+    solution:             str(FIELD_MAP.solution),
+    targetMarket:         str(FIELD_MAP.targetMarket),
+    competitiveLandscape: str(FIELD_MAP.competitiveLandscape),
+    teamInformation:      str(FIELD_MAP.teamInformation),
+    milestones:           str(FIELD_MAP.milestones),
+    modifiedTime:         str('Modified_Time'),
   };
 }
 
@@ -163,6 +198,25 @@ export async function createCRMPortfolioRecord(fields: CRMFormFields): Promise<s
 export async function updateCRMPortfolioRecord(id: string, fields: CRMFormFields): Promise<void> {
   const mod = await getModule();
   return zohoUpdate(mod, id, toPayload(fields));
+}
+
+/**
+ * Replace a company's milestones. A read-modify-write is the caller's job (read
+ * the record, change the list, pass the whole JSON back) — see lib/milestones.ts.
+ */
+export async function saveMilestones(id: string, json: string): Promise<void> {
+  const mod = await getModule();
+  return zohoUpdate(mod, id, { [FIELD_MAP.milestones]: json });
+}
+
+/** The picklist options CRM currently defines on Companies (industry, stage, status), by form key. */
+export async function fetchPortfolioPicklists(): Promise<Record<'industry' | 'stage' | 'status', PicklistOption[]> | null> {
+  const mod = await getModule();
+  const all = await fetchFieldPicklists(mod);
+  if (!all) return null;
+  return {
+    industry: all[FIELD_MAP.industry] ?? [], stage: all[FIELD_MAP.stage] ?? [], status: all[FIELD_MAP.status] ?? [],
+  };
 }
 
 export async function deleteCRMPortfolioRecord(id: string): Promise<void> {

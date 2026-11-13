@@ -6,6 +6,9 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { cn } from '../lib/cn';
 import { getCRMPortfolioRecord, updateCRMPortfolioRecord, type CRMFormFields } from '../services/crmPortfolio';
+import { usePortfolioOptions } from '../lib/usePortfolioOptions';
+import CompanyProfileFields from '../components/company/CompanyProfileFields';
+import { useLanguage } from '../context/LanguageContext';
 
 // ─── Logo Upload ──────────────────────────────────────────────────────────────
 function LogoUpload({ label = 'Company Logo', value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
@@ -33,33 +36,6 @@ function LogoUpload({ label = 'Company Logo', value, onChange }: { label?: strin
     </div>
   );
 }
-
-// ─── Options ──────────────────────────────────────────────────────────────────
-const industryOptions = [
-  { value: 'fintech', label: 'FinTech' },
-  { value: 'healthtech', label: 'HealthTech' },
-  { value: 'saas', label: 'SaaS' },
-  { value: 'edtech', label: 'EdTech' },
-  { value: 'cleantech', label: 'CleanTech' },
-  { value: 'ai-ml', label: 'AI/ML' },
-  { value: 'ecommerce', label: 'E-Commerce' },
-  { value: 'other', label: 'Other' },
-];
-const stageOptions = [
-  { value: 'pre-seed', label: 'Pre-Seed' },
-  { value: 'seed', label: 'Seed' },
-  { value: 'series-a', label: 'Series A' },
-  { value: 'series-b', label: 'Series B' },
-  { value: 'series-c', label: 'Series C' },
-  { value: 'growth', label: 'Growth' },
-  { value: 'pre-ipo', label: 'Pre-IPO' },
-];
-const statusOptions = [
-  { value: 'active', label: 'Active' },
-  { value: 'exited', label: 'Exited' },
-  { value: 'written-off', label: 'Written Off' },
-  { value: 'follow-on', label: 'Follow-On' },
-];
 
 interface FormState extends CRMFormFields { logo: string; }
 
@@ -90,6 +66,8 @@ export default function EditPortfolioCompany() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const options = usePortfolioOptions();
+  const cd = useLanguage().t.companyDetail;
 
   useEffect(() => {
     if (!id) return;
@@ -167,8 +145,8 @@ export default function EditPortfolioCompany() {
               <Input label="Company Name *" value={form.companyName} onChange={set('companyName')} error={errors.companyName} placeholder="Acme Inc." />
               <Input label="Website" type="url" value={form.website} onChange={set('website')} placeholder="https://acme.com" />
               <Input label="Location" value={form.location} onChange={set('location')} placeholder="San Francisco, CA" />
-              <Select label="Industry *" value={form.industry} onChange={set('industry')} options={industryOptions} placeholder="Select industry" error={errors.industry} />
-              <Select label="Company Stage *" value={form.stage} onChange={set('stage')} options={stageOptions} placeholder="Select stage" error={errors.stage} />
+              <Select label="Industry *" value={form.industry} onChange={set('industry')} options={options.industry} placeholder="Select industry" error={errors.industry} />
+              <Select label="Company Stage *" value={form.stage} onChange={set('stage')} options={options.stage} placeholder="Select stage" error={errors.stage} />
               <Input label="Founded Year" type="number" value={form.foundedYear} onChange={set('foundedYear')} placeholder="2020" />
               <Input label="Team Size" type="number" value={form.teamSize} onChange={set('teamSize')} placeholder="25" />
               <Input label="Short Description *" value={form.shortDescription} onChange={set('shortDescription')} error={errors.shortDescription} placeholder="One-line pitch" className="sm:col-span-2" />
@@ -179,6 +157,12 @@ export default function EditPortfolioCompany() {
             </div>
           </div>
 
+          {/* Company profile — shown on the Overview tab */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">{cd.sectionProfile}</h2>
+            <CompanyProfileFields values={form} onChange={set as never} />
+          </div>
+
           {/* Investment Details */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
             <p className="text-sm font-semibold text-gray-900 mb-4">Investment Details</p>
@@ -187,7 +171,7 @@ export default function EditPortfolioCompany() {
               <Input label="Investment Date *" type="date" value={form.investmentDate} onChange={set('investmentDate')} error={errors.investmentDate} />
               <Input label="Pre-Money Valuation" type="number" value={form.preMoneyValuation} onChange={set('preMoneyValuation')} placeholder="5000000" />
               <Input label="Ownership %" type="number" value={form.ownershipPct} onChange={set('ownershipPct')} placeholder="10.00" step="0.01" />
-              <Select label="Status *" value={form.status} onChange={set('status')} options={statusOptions} placeholder="Select status" error={errors.status} className="sm:col-span-2" />
+              <Select label="Status *" value={form.status} onChange={set('status')} options={options.status} placeholder="Select status" error={errors.status} className="sm:col-span-2" />
             </div>
             <div className="mt-4">
               <Textarea label="Notes" value={form.notes} onChange={set('notes')} placeholder="Any notes about this investment..." rows={3} />

@@ -346,6 +346,24 @@ export async function fetchCompanyProfile(email: string): Promise<CompanyProfile
   return { data: local, logo: null };
 }
 
+/**
+ * The founder's company profile as CRM holds it, for someone ELSE to read (the
+ * investor's Company page). Unlike fetchCompanyProfile it never falls back to —
+ * or writes to — the browser's local copy: that copy belongs to whoever last used
+ * this browser, and showing it to an investor would present stale or foreign data
+ * as this company's. Null when the founder has no record; throws when CRM can't be read.
+ */
+export async function fetchCompanyProfileFromCrm(email: string): Promise<{ data: CompanyData; recordId: string; logo: string | null } | null> {
+  const records = await searchFounders(email);
+  if (records.length === 0) return null;
+  const record = records[0];
+  return {
+    data: crmRecordToData(record as Record<string, unknown>),
+    recordId: record.id,
+    logo: await resolveCompanyLogo(record.id).catch(() => null),
+  };
+}
+
 export async function saveCompanyProfile(email: string, data: CompanyData): Promise<SaveResult> {
   saveLocal(email, data);
   window.dispatchEvent(new Event('founder-company-updated'));

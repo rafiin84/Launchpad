@@ -9,8 +9,10 @@
  */
 export const EVENT_TYPES = [
   'Initial Investment', 'Follow-on Investment', 'Valuation Update', 'Finance Report',
-  'Milestone', 'Meeting', 'Exit', 'Note', 'Follow-up', 'Other',
+  'Milestone', 'Call', 'Meeting', 'Exit', 'Note', 'Follow-up', 'Other',
 ] as const;
+/** The event types a person logs by hand as an interaction with the company. */
+export const INTERACTION_TYPES = ['Call', 'Meeting', 'Note', 'Follow-up', 'Other'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export interface TimelineEvent {

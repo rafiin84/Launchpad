@@ -4,7 +4,7 @@ import {
   DollarSign, Compass,
 } from 'lucide-react';
 import {
-  fetchCompanyProfile, type CompanyData,
+  fetchCompanyProfileFromCrm, type CompanyData,
 } from '../../services/companyProfile';
 import { percent, withUnit, withCurrencyPrefix } from '../../lib/units';
 import { cn } from '../../lib/cn';
@@ -75,14 +75,13 @@ export default function FounderReportedProfile({
   useEffect(() => {
     if (!founderEmail) return;
     let cancelled = false;
-    fetchCompanyProfile(founderEmail)
+    fetchCompanyProfileFromCrm(founderEmail)
       .then(res => {
         if (cancelled) return;
-        // fetchCompanyProfile falls back to an empty shape rather than null, so
-        // "has the founder filled anything in" is a question about the values.
-        const any = Object.values(res.data || {}).some(v => String(v ?? '').trim());
-        setData(any ? res.data : null);
-        setLogo(res.logo);
+        // "Has the founder filled anything in" is a question about the values.
+        const any = !!res && Object.values(res.data).some(v => String(v ?? '').trim());
+        setData(any && res ? res.data : null);
+        setLogo(res?.logo ?? null);
       })
       .catch(err => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the founder profile.');
