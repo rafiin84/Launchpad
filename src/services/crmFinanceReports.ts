@@ -18,7 +18,7 @@
  *    approving their own report; the app also never sends them from a founder.
  */
 import {
-  zohoSearch, zohoUpdate, portalCreate, portalList, portalUpdate, type ZohoRecord,
+  zohoList, zohoUpdate, portalCreate, portalList, portalUpdate, type ZohoRecord,
 } from './zohoApi';
 import {
   METRICS, STATUS, nextVersion, periodBounds, periodKey, periodLabel, groupByPeriod, isFrequency,
@@ -74,11 +74,18 @@ const zohoNow = () => new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
 /**
  * An investor's view of a company's reports: every version CRM lets them read,
  * except drafts (a draft is the founder's working copy, not a report).
+ *
+ * This is a plain list + client-side filter, not a search criteria query:
+ * `Founder_Company` is a lookup field, and Zoho's Search Records API does not
+ * support `equals` on lookup fields (nor `not_equal` on any field) — trying it
+ * returns "Invalid query formed". Filtering client-side only narrows what the
+ * investor's own token already returned, so it never widens access.
  */
 export async function fetchReportsForInvestor(founderCompanyId: string): Promise<FinanceReport[]> {
-  const records = await zohoSearch(
-    FINANCE_MODULE, `((Founder_Company:equals:${founderCompanyId})and(Review_Status:not_equal:${STATUS.draft}))`, FIELDS);
-  return records.map(fromRecord).filter(r => r.status !== STATUS.draft && isFrequency(r.frequency));
+  const records = await zohoList(FINANCE_MODULE, {
+    per_page: '200', sort_by: 'Modified_Time', sort_order: 'desc', fields: FIELDS,
+  });
+  return records.map(fromRecord).filter(r => r.founderCompanyId === founderCompanyId && r.status !== STATUS.draft && isFrequency(r.frequency));
 }
 
 /** A founder's own reports, drafts included — Zoho returns only the portal user's own records. */
